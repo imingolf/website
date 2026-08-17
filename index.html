@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>I'm In Golf | Golf with your mates. Sorted.</title>
+
+<style>
+*{
+  box-sizing:border-box;
+}
+
+body{
+  margin:0;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;
+  background:#f4f7f5;
+  color:#14231b;
+}
+
+.hero{
+  background:linear-gradient(135deg,#0d5d32,#188047);
+  color:white;
+  padding:70px 24px;
+  text-align:center;
+  border-radius:0 0 45px 45px;
+}
+
+.logo{
+  font-size:52px;
+  font-weight:800;
+  margin-bottom:10px;
+}
+
+.tagline{
+  font-size:27px;
+  font-weight:700;
+  margin:10px 0;
+}
+
+.hero p{
+  font-size:18px;
+  opacity:.92;
+  max-width:600px;
+  margin:15px auto;
+  line-height:1.5;
+}
+
+.container{
+  max-width:950px;
+  margin:auto;
+  padding:35px 20px 70px;
+}
+
+.intro{
+  text-align:center;
+  margin:15px auto 35px;
+  max-width:700px;
+}
+
+.intro h2{
+  font-size:32px;
+  margin-bottom:10px;
+}
+
+.intro p{
+  color:#657069;
+  font-size:18px;
+  line-height:1.55;
+}
+
+.features{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:18px;
+}
+
+.card{
+  background:white;
+  border-radius:24px;
+  padding:28px 22px;
+  box-shadow:0 3px 14px rgba(0,0,0,.07);
+  border:1px solid #dce5df;
+  text-align:center;
+}
+
+.icon{
+  font-size:46px;
+}
+
+.card h3{
+  font-size:23px;
+  margin:12px 0 8px;
+}
+
+.card p{
+  color:#68736c;
+  line-height:1.5;
+  margin:0;
+}
+
+.trip{
+  margin-top:35px;
+  background:#e8f5ed;
+  border-radius:26px;
+  padding:35px;
+  text-align:center;
+}
+
+.trip h2{
+  font-size:30px;
+  margin:5px 0 10px;
+}
+
+.trip p{
+  max-width:650px;
+  margin:auto;
+  color:#536159;
+  font-size:17px;
+  line-height:1.6;
+}
+
+.how{
+  padding:45px 0 20px;
+  text-align:center;
+}
+
+.how h2{
+  font-size:30px;
+}
+
+.steps{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:18px;
+  margin-top:25px;
+}
+
+.step{
+  padding:20px;
+}
+
+.number{
+  width:42px;
+  height:42px;
+  border-radius:50%;
+  background:#14783f;
+  color:white;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  margin:0 auto 12px;
+  font-weight:800;
+}
+
+.cta{
+  background:#14783f;
+  color:white;
+  padding:38px 25px;
+  border-radius:28px;
+  text-align:center;
+  margin-top:30px;
+}
+
+.cta h2{
+  margin:0 0 10px;
+  font-size:30px;
+}
+
+.cta p{
+  margin:0;
+  font-size:18px;
+  opacity:.9;
+}
+
+footer{
+  text-align:center;
+  color:#778079;
+  padding:30px 20px 45px;
+  font-size:14px;
+}
+
+@media(max-width:700px){
+
+  .hero{
+    padding:55px 20px;
+  }
+
+  .logo{
+    font-size:42px;
+  }
+
+  .tagline{
+    font-size:23px;
+  }
+
+  .features,
+  .steps{
+    grid-template-columns:1fr;
+  }
+
+  .container{
+    padding:25px 16px 60px;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<section class="hero">
+
+  <div class="logo">
+    I'm In Golf ⛳
+  </div>
+
+  <div class="tagline">
+    Golf with your mates. Sorted.
+  </div>
+
+  <p>
+    A simple way to organise your golf group's games,
+    payments, scores and bragging rights.
+  </p>
+
+</section>
+
+
+<main class="container">
+
+  <section class="intro">
+
+    <h2>Everything your golf group needs.</h2>
+
+    <p>
+      From the regular weekend game to a golf trip away,
+      I'm In Golf keeps everyone in the group on the same page.
+    </p>
+
+  </section>
+
+
+  <section class="features">
+
+    <div class="card">
+
+      <div class="icon">💷</div>
+
+      <h3>Money Games</h3>
+
+      <p>
+        See who's playing, who's paid and keep track
+        of the results and winnings.
+      </p>
+
+    </div>
+
+
+    <div class="card">
+
+      <div class="icon">🏆</div>
+
+      <h3>Points Games</h3>
+
+      <p>
+        Play Stableford or Net competitions and build
+        your season-long league table.
+      </p>
+
+    </div>
+
+
+    <div class="card">
+
+      <div class="icon">✈️</div>
+
+      <h3>Golf Trips</h3>
+
+      <p>
+        Run multiple rounds, award trip points and see
+        who becomes the trip champion.
+      </p>
+
+    </div>
+
+  </section>
+
+
+  <section class="trip">
+
+    <div style="font-size:45px;">✈️🏆</div>
+
+    <h2>Made for golf trips</h2>
+
+    <p>
+      Going away with your mates? Set up the trip,
+      play multiple rounds and let I'm In Golf keep
+      the championship standings updated throughout the trip.
+    </p>
+
+  </section>
+
+
+  <section class="how">
+
+    <h2>Simple from the first tee to the last.</h2>
+
+    <div class="steps">
+
+      <div class="step">
+        <div class="number">1</div>
+        <strong>Join the round</strong>
+        <p>See the game and who's playing.</p>
+      </div>
+
+      <div class="step">
+        <div class="number">2</div>
+        <strong>Play your golf</strong>
+        <p>Enter scores and keep everything together.</p>
+      </div>
+
+      <div class="step">
+        <div class="number">3</div>
+        <strong>See who won</strong>
+        <p>Results, leagues and bragging rights.</p>
+      </div>
+
+    </div>
+
+  </section>
+
+
+  <section class="cta">
+
+    <h2>🏌️ Play. Compete. Enjoy.</h2>
+
+    <p>
+      I'm In Golf — built for golfers who play with their mates.
+    </p>
+
+  </section>
+
+</main>
+
+
+<footer>
+  © 2026 I'm In Golf • imingolf.co.uk
+</footer>
+
+</body>
+</html>
