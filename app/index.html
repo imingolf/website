@@ -142,8 +142,17 @@ let state={
 const $=id=>document.getElementById(id);
 function configured(){return window.TENS_IN_CONFIG && TENS_IN_CONFIG.supabaseUrl && !TENS_IN_CONFIG.supabaseUrl.includes("PASTE_")}
 window.addEventListener("load",()=>{
- if(!configured()) $("configMissing").classList.remove("hidden");
- const saved=localStorage.getItem("tensInPin"); if(saved) $("pinInput").value=saved;
+  if(!configured()) $("configMissing").classList.remove("hidden");
+
+  const urlPin=new URLSearchParams(window.location.search).get("pin");
+  const saved=localStorage.getItem("tensInPin");
+
+  if(urlPin){
+    $("pinInput").value=urlPin;
+    connect();
+  }else if(saved){
+    $("pinInput").value=saved;
+  }
 });
 
 async function connect(){
@@ -410,7 +419,7 @@ $("screen").innerHTML=`
   </div>`;
 }
 function shareApp(){
-  const url="https://imingolf.co.uk/app/";
+  const url="https://imingolf.co.uk/app/?pin="+encodeURIComponent(pin);
 
   const message=`⛳ I'm In Golf
 
