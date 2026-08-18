@@ -427,18 +427,19 @@ Join our golf group.
 
 Group PIN: ${pin}
 
-Open the link below in Safari or Chrome and add I'm In Golf to your Home Screen.`;
+Open I'm In Golf here:
+${url}`;
 
   if(navigator.share){
     navigator.share({
       title:"I'm In Golf",
-      text:message,
-      url:url
+      text:message
     });
   }else{
-    navigator.clipboard?.writeText(message+"\n\n"+url);
+    navigator.clipboard?.writeText(message);
     alert("Invite copied. Paste it into WhatsApp.");
   }
+
 }
 
 function pay(){
