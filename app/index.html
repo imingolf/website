@@ -450,9 +450,17 @@ function pay(){
  ? `<button class="${p.paid?'secondary':'primary'} small" onclick="togglePaid(${i})">${p.paid?'✓ Paid':'Mark paid'}</button>`
  : `<span class="pill ${p.paid?'paid':'pending'}">${p.paid?'✓ Paid':'Not paid'}</span>`
 }</div></div>`).join("")}
-<a href="https://monzo.me/gregoryaspinall?h=ImsHfW&account_type=personal" target="_blank"><button class="primary full">💳 Pay Entry Fee </button></a>
- ${paidCount()===state.players.length?'<div class="notice"><b>🔒 All paid. Ready to play.</b></div>':'<button class="secondary full" onclick="reminder()">🔔 Copy payment reminder</button>'}</div>`;
+${pin==="2026"
+  ? `<button class="secondary full" onclick="alert('👀 Demo Mode\\n\\nPayments are disabled in the demo.')">🔒 Demo — Payments Disabled</button>`
+  : `<a href="https://monzo.me/gregoryaspinall?h=ImsHfW&account_type=personal" target="_blank"><button class="primary full">💳 Pay Entry Fee</button></a>`
 }
+${pin==="2026"
+  ? '<div class="notice"><b>👀 Demo Mode — no real payments are taken.</b></div>'
+  : (paidCount()===state.players.length
+      ? '<div class="notice"><b>🔒 All paid. Ready to play.</b></div>'
+      : '<button class="secondary full" onclick="reminder()">🔔 Copy payment reminder</button>')
+}</div>`;
+ }
 async function togglePaid(i){
 
   if(!demoCanEdit())return;
