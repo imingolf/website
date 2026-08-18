@@ -1,7 +1,7 @@
 {
   "name": "I'm In Golf",
   "short_name": "I'm In Golf",
-  "start_url": "/",
+  "start_url": "/app/",
   "display": "standalone",
   "background_color": "#f4f6f3",
   "theme_color": "#176b3a",
