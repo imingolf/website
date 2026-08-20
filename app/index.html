@@ -2790,9 +2790,114 @@ ${state.trip?.pastTrips?.length ? `
 <button class="red full" onclick="deleteLastRound()">↩️ Delete Last Round</button>
 <button class="red full" onclick="clearLeague()">🗑️ Clear League & History</button></div>
  <div class="card"><h2>Players</h2><button class="primary full" onclick="show('players')">Manage players & handicaps</button></div>
- <div class="card"><h2>Group access</h2><div class="notice warning"><b>Group PIN: ${pin}</b><br>Share this only with your golf group.</div>
- <button class="ghost full" onclick="copyInvite()">Copy invite message</button><button class="red full" onclick="adminLogout()">Log out of Admin</button></div>`;
+<div class="card">
+  <h2>Group access</h2>
+
+  <div class="notice warning">
+    <b>Group PIN: ${pin}</b><br>
+    Share this only with your golf group.
+  </div>
+
+  <button class="ghost full" onclick="copyInvite()">
+    Copy invite message
+  </button>
+</div>
+
+<div class="card">
+  <h2>➕ New Golf Group</h2>
+
+  <div class="muted">
+    Owner only. Create a separate group with its own unique PIN.
+  </div>
+
+  <button class="primary full" onclick="createNewGolfGroup()">
+    ➕ Create New Group
+  </button>
+</div>
+
+<div class="card">
+  <button class="red full" onclick="adminLogout()">
+    Log out of Admin
+  </button>
+</div>`;
+ }
+async function createNewGolfGroup(){
+
+  if(!isAdmin){
+    alert("Admin access required.");
+    return;
+  }
+
+  if(!db){
+    alert("Database connection is not available.");
+    return;
+  }
+
+  const groupName=prompt("New golf group name:");
+  if(groupName===null)return;
+
+  const cleanGroupName=groupName.trim();
+
+  if(!cleanGroupName){
+    alert("Please enter a group name.");
+    return;
+  }
+
+  const creationCode=prompt("Enter your private owner creation code:");
+  if(creationCode===null)return;
+
+  if(!creationCode.trim()){
+    alert("Creation code is required.");
+    return;
+  }
+
+  const newState={
+    course:"",
+    date:"",
+    stake:20,
+    gameType:"money",
+    pointsCompetition:"stableford",
+    pointsValue:10,
+    players:[],
+    history:[]
+  };
+
+  const {data,error}=await db.rpc(
+    "create_golf_group",
+    {
+      p_group_name:cleanGroupName,
+      p_state:newState,
+      p_creation_code:creationCode.trim()
+    }
+  );
+
+  if(error){
+    alert("Group could not be created.\n\nCheck your private creation code and try again.");
+    return;
+  }
+
+  const newPin=String(data);
+
+  const invite=
+`⛳ I'm In Golf
+
+Join our golf group: ${cleanGroupName}
+
+Group PIN: ${newPin}
+
+Open I'm In Golf here:
+https://imingolf.co.uk/app/?pin=${encodeURIComponent(newPin)}`;
+
+  navigator.clipboard?.writeText(invite);
+
+  alert(
+    "✅ New group created!\n\n" +
+    cleanGroupName +
+    "\n\nGroup PIN: " + newPin +
+    "\n\nThe invite message has been copied."
+  );
 }
+
 function competitionReminder(){
 if(roundLocked()){
     alert("🔒 Entries are closed — scoring has started.");
