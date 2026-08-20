@@ -110,64 +110,11 @@ function chooseMyPlayer(){
         Can't see your name?
       </div>
 
-      <button class="primary full" onclick="joinNewPlayer()">
-        ➕ Join this group
+      <button class="primary full" onclick="show('players')">
+        👋 Join Group
       </button>
     </div>
   `;
-}
-async function joinNewPlayer(){
-
-  const name=prompt("Enter your name:");
-  if(name===null)return;
-
-  const cleanName=name.trim();
-
-  if(!cleanName){
-    alert("Please enter your name.");
-    return;
-  }
-
-  const duplicate=state.players.some(
-    p=>p.name.trim().toLowerCase()===cleanName.toLowerCase()
-  );
-
-  if(duplicate){
-    alert("That name is already in the group. Tap your existing name instead.");
-    return;
-  }
-
-  const handicapInput=prompt("Enter your handicap:");
-  if(handicapInput===null)return;
-
-  const handicap=Number(handicapInput);
-if(!Number.isFinite(handicap) || handicap < -10 || handicap > 60){
-  
-    alert("Please enter a valid handicap.");
-    return;
-  }
-
-  const newPlayer={
-    id:"p"+Date.now(),
-    name:cleanName,
-    handicap:handicap,
-    paid:false,
-    stableford:null,
-    netScore:null,
-    wins:0,
-    leaguePoints:0,
-    netWinnings:0
-  };
-
-  state.players.push(newPlayer);
-
-  myPlayerId=newPlayer.id;
-  localStorage.setItem("tensInPlayerId",myPlayerId);
-
-  await save();
-
-  alert("Welcome " + newPlayer.name + "!");
-  show("round");
 }
 function selectMyPlayer(id){
   const player=state.players.find(p=>p.id===id);
@@ -2643,28 +2590,35 @@ p.handicap=newHandicap;
  await save();
 }
 async function addPlayer(){
- const name=prompt("Player name");
- if(!name)return;
+  const name=prompt("Player name");
+  if(!name)return;
 
- const h=prompt("Handicap","18");
+  const h=prompt("Handicap","18");
 
- const newPlayer={
-   id:Date.now().toString(36),
-   name:name.trim(),
-   handicap:Number(h)||0,
-   competition:null,
-   paid:false,
-   stableford:null,
-   netScore:null,
-wins:0,
-leaguePoints:0,
-netWinnings:0
-    };
-state.players.push(newPlayer);
+  const newPlayer={
+    id:Date.now().toString(36),
+    name:name.trim(),
+    handicap:Number(h)||0,
+    competition:null,
+    paid:false,
+    stableford:null,
+    netScore:null,
+    wins:0,
+    leaguePoints:0,
+    netWinnings:0
+  };
 
-render();
-await save();
- }
+  state.players.push(newPlayer);
+
+  myPlayerId=newPlayer.id;
+  localStorage.setItem("tensInPlayerId",myPlayerId);
+
+  render();
+  await save();
+
+  alert("Welcome " + newPlayer.name + "!");
+  show("round");
+}
 async function editPlayer(i){const p=state.players[i];const name=prompt("Player name",p.name);if(!name)return;const h=prompt("Handicap",p.handicap);p.name=name.trim();p.handicap=Number(h)||0;render();await save()}
 async function removePlayer(i){if(!confirm("Remove "+state.players[i].name+"? Their past round history will stay saved."))return;state.players.splice(i,1);render();await save()}
 
