@@ -100,7 +100,7 @@ function chooseMyPlayer(){
       <h2>👤 Who are you?</h2>
       <div class="muted">Tap your name below.</div>
 
-      ${state.players.map(p=>`
+      ${[...state.players].sort((a,b)=>a.name.localeCompare(b.name)).map(p=>`
         <button class="secondary full" onclick="selectMyPlayer('${p.id}')">
           ${esc(p.name)}
         </button>
@@ -443,26 +443,56 @@ ${url}`;
   }
 
 }
-
 function pay(){
- $("screen").innerHTML=`<div class="card"><h2>💷 Pay Before Play</h2><div class="big">£${pot()}</div>
-<div class="muted">Paid pot • £${potentialPot()} if everyone pays • £${state.stake} each</div>
-<div class="muted" style="margin-top:6px;">🏆 Stableford pot: £${stablefordPot()} • ⛳ Net pot: £${netPot()}</div></div>
- <div class="card">${state.players.map((p,i)=>`<div class="player"><div class="row"><div><b>${esc(p.name)}</b><div class="muted">£${state.stake} stake</div></div>${(isAdmin || p.id===myPlayerId)
- ? `<button class="${p.paid?'secondary':'primary'} small" onclick="togglePaid(${i})">${p.paid?'✓ Paid':'Mark paid'}</button>`
- : `<span class="pill ${p.paid?'paid':'pending'}">${p.paid?'✓ Paid':'Not paid'}</span>`
-}</div></div>`).join("")}
-${pin==="2026"
-  ? `<button class="secondary full" onclick="alert('👀 Demo Mode\\n\\nPayments are disabled in the demo.')">🔒 Demo — Payments Disabled</button>`
-  : `<a href="https://monzo.me/gregoryaspinall?h=ImsHfW&account_type=personal" target="_blank"><button class="primary full">💳 Pay Entry Fee</button></a>`
+
+ const sortedPlayers=[...state.players]
+   .sort((a,b)=>a.name.localeCompare(b.name));
+
+ $("screen").innerHTML=`
+ <div class="card">
+   <h2>💷 Pay Before Play</h2>
+   <div class="big">£${pot()}</div>
+   <div class="muted">Paid pot • £${potentialPot()} if everyone pays • £${state.stake} each</div>
+   <div class="muted" style="margin-top:6px;">
+     🏆 Stableford pot: £${stablefordPot()} • ⛳ Net pot: £${netPot()}
+   </div>
+ </div>
+
+ <div class="card">
+   ${sortedPlayers.map(p=>{
+
+     const i=state.players.findIndex(x=>x.id===p.id);
+
+     return `
+       <div class="player">
+         <div class="row">
+           <div>
+             <b>${esc(p.name)}</b>
+             <div class="muted">£${state.stake} stake</div>
+           </div>
+
+           ${(isAdmin || p.id===myPlayerId)
+             ? `<button class="${p.paid?'secondary':'primary'} small" onclick="togglePaid(${i})">${p.paid?'✓ Paid':'Mark paid'}</button>`
+             : `<span class="pill ${p.paid?'paid':'pending'}">${p.paid?'✓ Paid':'Not paid'}</span>`
+           }
+         </div>
+       </div>
+     `;
+   }).join("")}
+
+   ${pin==="2026"
+     ? `<button class="secondary full" onclick="alert('👀 Demo Mode\\n\\nPayments are disabled in the demo.')">🔒 Demo — Payments Disabled</button>`
+     : `<a href="https://monzo.me/gregoryaspinall?h=ImsHfW&account_type=personal" target="_blank"><button class="primary full">💳 Pay Entry Fee</button></a>`
+   }
+
+   ${pin==="2026"
+     ? '<div class="notice"><b>👀 Demo Mode — no real payments are taken.</b></div>'
+     : (paidCount()===state.players.length
+         ? '<div class="notice"><b>🔒 All paid. Ready to play.</b></div>'
+         : '<button class="secondary full" onclick="reminder()">🔔 Copy payment reminder</button>')
+   }
+ </div>`;
 }
-${pin==="2026"
-  ? '<div class="notice"><b>👀 Demo Mode — no real payments are taken.</b></div>'
-  : (paidCount()===state.players.length
-      ? '<div class="notice"><b>🔒 All paid. Ready to play.</b></div>'
-      : '<button class="secondary full" onclick="reminder()">🔔 Copy payment reminder</button>')
-}</div>`;
- }
 async function togglePaid(i){
 
   if(!demoCanEdit())return;
@@ -489,6 +519,9 @@ function scores(){
 
   const isPointsGame=state.gameType==="points";
   const pointsComp=state.pointsCompetition || "stableford";
+
+  const sortedPlayers=[...state.players]
+    .sort((a,b)=>a.name.localeCompare(b.name));
 
   const stablefordRanked=[...state.players]
     .filter(p=>
@@ -524,7 +557,11 @@ function scores(){
         </div>
       ` : ""}
 
-      ${state.players.map((p,i)=>`
+      ${sortedPlayers.map(p=>{
+
+        const i=state.players.findIndex(x=>x.id===p.id);
+
+        return `
         <div class="player">
           <div>
             <b>${esc(p.name)}</b>
@@ -623,7 +660,8 @@ function scores(){
             </div>
           `}
         </div>
-      `).join("")}
+        `;
+      }).join("")}
     </div>
 
     ${(!isPointsGame || pointsComp==="stableford") ? `
@@ -2537,32 +2575,53 @@ const bestNet=
   `;
 }
 function playersPage(){
+
+ const sortedPlayers=[...state.players]
+   .sort((a,b)=>a.name.localeCompare(b.name));
+
  $("screen").innerHTML=`
  <div class="card">
    <h2>👥 Players</h2>
-<div class="notice">👤 You: ${esc(state.players.find(p=>p.id===myPlayerId)?.name || "Not selected")}</div>
-<button class="secondary full" onclick="changeMyPlayer()">🔄 Change who I am</button>
-   ${state.players.map((p,i)=>`
-     <div class="player">
-       <div class="row">
-         <div>
-           <b>${esc(p.name)}</b>
-           <div class="muted">Handicap ${p.handicap}</div>
+
+   <div class="notice">
+     👤 You: ${esc(state.players.find(p=>p.id===myPlayerId)?.name || "Not selected")}
+   </div>
+
+   <button class="secondary full" onclick="changeMyPlayer()">
+     🔄 Change who I am
+   </button>
+
+   ${sortedPlayers.map(p=>{
+
+     const i=state.players.findIndex(x=>x.id===p.id);
+
+     return `
+       <div class="player">
+         <div class="row">
+           <div>
+             <b>${esc(p.name)}</b>
+             <div class="muted">Handicap ${p.handicap}</div>
+           </div>
+
+           ${isAdmin ? `
+             <div>
+               <button class="secondary small" onclick="editPlayer(${i})">Edit</button>
+               ${state.players.length>2 ? `
+                 <button class="red small" onclick="removePlayer(${i})">Remove</button>
+               ` : ""}
+             </div>
+           ` : p.id===myPlayerId ? `
+             <button class="secondary small" onclick="changeMyHandicap(${i})">
+               ✏️ Change Handicap
+             </button>
+           ` : ""}
+
          </div>
-${isAdmin ? `
-  <div>
-    <button class="secondary small" onclick="editPlayer(${i})">Edit</button>
-    ${state.players.length>2 ? `<button class="red small" onclick="removePlayer(${i})">Remove</button>` : ""}
-  </div>
-` : p.id===myPlayerId ? `
-  <button class="secondary small" onclick="changeMyHandicap(${i})">✏️ Change Handicap</button>
-` : ""}
+       </div>
+     `;
+   }).join("")}
 
-                </div>
-     </div>
-   `).join("")}
-
-  <button class="primary full" onclick="addPlayer()">👋 Join Group</button>
+   <button class="primary full" onclick="addPlayer()">👋 Join Group</button>
  </div>`;
 }
 function changeMyPlayer(){
@@ -2579,8 +2638,8 @@ async function changeMyHandicap(i){
  if(h===null)return;
 
  const newHandicap=Number(h);
-if(!Number.isFinite(newHandicap) || newHandicap<0){
-  alert("Please enter a valid handicap.");
+if(!Number.isFinite(newHandicap) || newHandicap < -10 || newHandicap > 60){
+  alert("Please enter a valid handicap between -10 and 60.");
   return;
 }
 p.handicap=newHandicap;
@@ -2589,21 +2648,32 @@ p.handicap=newHandicap;
  await save();
 }
 async function addPlayer(){
-  const name=prompt("Player name");
-  if(name===null)return;
+const firstName=prompt("First name:");
+if(firstName===null)return;
 
-  const cleanName=name.trim();
+const cleanFirstName=firstName.trim();
 
-  if(!cleanName){
-    alert("Please enter your name.");
-    return;
-  }
+if(!cleanFirstName){
+  alert("Please enter your first name.");
+  return;
+}
 
-  const duplicate=state.players.some(
-    p=>p.name.trim().toLowerCase()===cleanName.toLowerCase()
-  );
+const surname=prompt("Surname:");
+if(surname===null)return;
 
-  if(duplicate){
+const cleanSurname=surname.trim();
+
+if(!cleanSurname){
+  alert("Please enter your surname.");
+  return;
+}
+
+const cleanName=cleanFirstName + " " + cleanSurname;
+
+const duplicate=state.players.some(
+  p=>p.name.trim().toLowerCase()===cleanName.toLowerCase()
+);
+    if(duplicate){
     alert("That name is already in the group. Please choose your existing name.");
     return;
   }
@@ -2613,11 +2683,10 @@ async function addPlayer(){
 
   const handicap=Number(h);
 
-  if(!Number.isFinite(handicap) || handicap < 0 || handicap > 60){
-    alert("Please enter a valid handicap between 0 and 60.");
-    return;
-  }
-
+  if(!Number.isFinite(handicap) || handicap < -10 || handicap > 60){
+  alert("Please enter a valid handicap between -10 and 60.");
+  return;
+}
   const newPlayer={
     id:Date.now().toString(36),
     name:cleanName,
