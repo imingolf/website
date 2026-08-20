@@ -106,13 +106,69 @@ function chooseMyPlayer(){
         </button>
       `).join("")}
 
-      <div class="muted" style="margin-top:12px;">
-        If your name isn't listed, ask the group admin to add you.
+      <div class="muted" style="margin-top:16px;text-align:center;">
+        Can't see your name?
       </div>
+
+      <button class="primary full" onclick="joinNewPlayer()">
+        ➕ Join this group
+      </button>
     </div>
   `;
 }
+async function joinNewPlayer(){
 
+  const name=prompt("Enter your name:");
+  if(name===null)return;
+
+  const cleanName=name.trim();
+
+  if(!cleanName){
+    alert("Please enter your name.");
+    return;
+  }
+
+  const duplicate=state.players.some(
+    p=>p.name.trim().toLowerCase()===cleanName.toLowerCase()
+  );
+
+  if(duplicate){
+    alert("That name is already in the group. Tap your existing name instead.");
+    return;
+  }
+
+  const handicapInput=prompt("Enter your handicap:");
+  if(handicapInput===null)return;
+
+  const handicap=Number(handicapInput);
+if(!Number.isFinite(handicap) || handicap < -10 || handicap > 60){
+  
+    alert("Please enter a valid handicap.");
+    return;
+  }
+
+  const newPlayer={
+    id:"p"+Date.now(),
+    name:cleanName,
+    handicap:handicap,
+    paid:false,
+    stableford:null,
+    netScore:null,
+    wins:0,
+    leaguePoints:0,
+    netWinnings:0
+  };
+
+  state.players.push(newPlayer);
+
+  myPlayerId=newPlayer.id;
+  localStorage.setItem("tensInPlayerId",myPlayerId);
+
+  await save();
+
+  alert("Welcome " + newPlayer.name + "!");
+  show("round");
+}
 function selectMyPlayer(id){
   const player=state.players.find(p=>p.id===id);
   if(!player)return;
