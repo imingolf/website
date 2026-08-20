@@ -2688,7 +2688,7 @@ ${state.trip?.pastTrips?.length ? `
 <button class="red full" onclick="deleteLastRound()">↩️ Delete Last Round</button>
 <button class="red full" onclick="clearLeague()">🗑️ Clear League & History</button></div>
  <div class="card"><h2>Players</h2><button class="primary full" onclick="show('players')">Manage players & handicaps</button></div>
- <div class="card"><h2>Group access</h2><div class="notice warning"><b>Group PIN: 1010</b><br>Share this only with your golf group.</div>
+ <div class="card"><h2>Group access</h2><div class="notice warning"><b>Group PIN: ${pin}</b><br>Share this only with your golf group.</div>
  <button class="ghost full" onclick="copyInvite()">Copy invite message</button><button class="red full" onclick="adminLogout()">Log out of Admin</button></div>`;
 }
 function competitionReminder(){
