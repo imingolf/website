@@ -2590,14 +2590,38 @@ p.handicap=newHandicap;
 }
 async function addPlayer(){
   const name=prompt("Player name");
-  if(!name)return;
+  if(name===null)return;
+
+  const cleanName=name.trim();
+
+  if(!cleanName){
+    alert("Please enter your name.");
+    return;
+  }
+
+  const duplicate=state.players.some(
+    p=>p.name.trim().toLowerCase()===cleanName.toLowerCase()
+  );
+
+  if(duplicate){
+    alert("That name is already in the group. Please choose your existing name.");
+    return;
+  }
 
   const h=prompt("Handicap","18");
+  if(h===null)return;
+
+  const handicap=Number(h);
+
+  if(!Number.isFinite(handicap) || handicap < 0 || handicap > 60){
+    alert("Please enter a valid handicap between 0 and 60.");
+    return;
+  }
 
   const newPlayer={
     id:Date.now().toString(36),
-    name:name.trim(),
-    handicap:Number(h)||0,
+    name:cleanName,
+    handicap:handicap,
     competition:null,
     paid:false,
     stableford:null,
