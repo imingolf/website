@@ -3575,7 +3575,21 @@ async function clearLeague(){
 
  alert("League and previous round history cleared.");
 }
-function copyInvite(){navigator.clipboard?.writeText("Join our I'm In Golf group. Open the app link and enter PIN 1010.");alert("Invite message copied. Add your I'm In Golf link and send it in WhatsApp.");}
+function copyInvite(){
+  const url="https://imingolf.co.uk/app/?pin="+encodeURIComponent(pin);
+
+  const message=`⛳ I'm In Golf
+
+Join our golf group.
+
+Group PIN: ${pin}
+
+Open I'm In Golf here:
+${url}`;
+
+  navigator.clipboard?.writeText(message);
+  alert("Invite copied. Paste it into WhatsApp.");
+}
 function formatDate(d){
  if(!d || !d.includes("-"))return d;
  const [y,m,day]=d.split("-");
