@@ -270,6 +270,7 @@ function render(){
   if(page==="playerstats" && statsPlayerId)showPlayerStats(statsPlayerId);
   if(page==="players")playersPage();
   if(page==="settings")settingsPage();
+  if(page==="admininvite")adminInvitePage();
 }
 function roundLocked(){
   return state.players.some(p=>p.stableford!=null || p.netScore!=null);
@@ -2946,6 +2947,43 @@ function ownerLogout(){
   render();
 }
 
+function adminInvitePage(){
+  if(!lastAdminInvite){
+    show("settings");
+    return;
+  }
+
+  const lines=lastAdminInvite.split("\n");
+  const groupLine=lines.find(line=>line.startsWith("You've been invited to manage:")) || "";
+  const pinLine=lines.find(line=>line.startsWith("Group PIN:")) || "";
+
+  const groupName=groupLine.replace("You've been invited to manage:","").trim();
+  const newPin=pinLine.replace("Group PIN:","").trim();
+
+  $("screen").innerHTML=`
+    <div class="card">
+      <h2>✅ New group created!</h2>
+      <div class="big">${esc(groupName || "New Golf Group")}</div>
+      <div class="notice">
+        <b>Group PIN: ${esc(newPin)}</b><br>
+        Send the private Admin invite to the person who will manage this group.
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>📤 Admin invite</h2>
+      <button class="primary full" onclick="shareAdminInvite()">
+        📤 Share Admin Invite
+      </button>
+      <button class="secondary full" onclick="copyAdminInvite()">
+        📋 Copy Admin Invite
+      </button>
+      <button class="ghost full" onclick="show('settings')">
+        Back to Settings
+      </button>
+    </div>`;
+}
+
 async function copyAdminInvite(){
   if(!lastAdminInvite){ alert("Create a new group first."); return; }
   try{
@@ -3051,23 +3089,8 @@ On first opening, you'll be asked to choose your own 4-digit Admin PIN.
 Keep this setup link private.`;
 
   lastAdminInvite=invite;
-
-  $("screen").innerHTML=`
-    <div class="card">
-      <h2>✅ New group created!</h2>
-      <div class="big">${esc(cleanGroupName)}</div>
-      <div class="notice">
-        <b>Group PIN: ${esc(newPin)}</b><br>
-        Send the private Admin invite to the person who will manage this group.
-      </div>
-    </div>
-    <div class="card">
-      <h2>📤 Admin invite</h2>
-      <button class="primary full" onclick="shareAdminInvite()">📤 Share Admin Invite</button>
-      <button class="secondary full" onclick="copyAdminInvite()">📋 Copy Admin Invite</button>
-      <button class="ghost full" onclick="show('settings')">Back to Settings</button>
-    </div>`;
-
+  page="admininvite";
+  adminInvitePage();
   window.scrollTo(0,0);
 }
 
