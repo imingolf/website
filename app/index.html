@@ -240,6 +240,10 @@ async function save(){
 async function refresh(){
  if(!db)return;
 
+ // Keep the newly-created Admin Invite screen on display.
+ // Do not let the 5-second background sync redraw the page while it is open.
+ if(page==="admininvite")return;
+
  const editing=document.activeElement &&
    document.activeElement.tagName==="INPUT";
 
