@@ -3083,7 +3083,11 @@ async function manageGroupsPage(){
             </div>
           ` : ""}
           ${g.created_at?`<div class="muted">Created: ${esc(formatOwnerDate(g.created_at))}</div>`:""}
-          ${g.trial_expiry_date?`<div class="muted">Trial expiry: ${esc(formatOwnerDate(g.trial_expiry_date))}</div>`:""}
+          ${plan==="trial" && g.trial_expiry_date
+            ? `<div class="muted">Trial expiry: ${esc(formatOwnerDate(g.trial_expiry_date))}</div>`
+            : plan==="paid" && g.renewal_date
+              ? `<div class="muted">Renewal date: ${esc(formatOwnerDate(g.renewal_date))}</div>`
+              : ""}
           ${trialText?`<div class="notice ${trialText.startsWith("Trial expired")?"warning":""}">${esc(trialText)}</div>`:""}
 
           <button class="secondary full" onclick="openEditGroup('${escAttr(g.group_pin||"")}')">
