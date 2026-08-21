@@ -2985,7 +2985,7 @@ async function manageGroupsPage(){
     <div class="card">
       <h2>👥 Manage Groups</h2>
       <div class="muted">${groups.length} group${groups.length===1?"":"s"} in I'm In Golf</div>
-      <div class="notice">Owner management — edit customer and subscription details. Delete is not enabled.</div>
+      <div class="notice">Owner management — edit customer and subscription details. Test/customer groups can also be deleted.</div>
     </div>
 
     ${groups.length ? groups.map(g=>{
@@ -3033,6 +3033,16 @@ async function manageGroupsPage(){
           <button class="secondary full" onclick="openEditGroup('${escAttr(g.group_pin||"")}')">
             ✏️ Edit Group
           </button>
+
+          ${String(g.group_pin)!=="1010" ? `
+            <button class="red full" onclick="deleteOwnerGroup('${escAttr(g.group_pin||"")}')">
+              🗑️ Delete Group
+            </button>
+          ` : `
+            <div class="notice" style="margin-top:10px;">
+              🔐 Owner group protected — cannot be deleted.
+            </div>
+          `}
         </div>`;
     }).join("") : `<div class="card"><div class="muted">No groups found.</div></div>`}
 
@@ -3043,6 +3053,73 @@ async function manageGroupsPage(){
   window.scrollTo(0,0);
 }
 
+
+
+async function deleteOwnerGroup(groupPin){
+
+  if(!db || !isAdmin || !isOwner || !ownerCreationCode){
+    alert("I'm In Golf Owner access required.");
+    return;
+  }
+
+  const cleanPin=String(groupPin||"");
+
+  if(cleanPin==="1010"){
+    alert("🔐 The Owner group cannot be deleted.");
+    return;
+  }
+
+  const g=ownerGroups.find(
+    x=>String(x.group_pin)===cleanPin
+  );
+
+  if(!g){
+    alert("Group could not be found.");
+    return;
+  }
+
+  const groupName=String(g.group_name||"Unnamed Group");
+
+  const firstConfirm=confirm(
+    "🗑️ Delete " + groupName + "?\n\n" +
+    "Group PIN: " + cleanPin + "\n\n" +
+    "This permanently removes this group and its saved group data.\n\n" +
+    "This cannot be undone."
+  );
+
+  if(!firstConfirm)return;
+
+  const typed=prompt(
+    "Final confirmation\n\n" +
+    "Type the Group PIN " + cleanPin + " to permanently delete " + groupName + "."
+  );
+
+  if(typed===null)return;
+
+  if(String(typed).trim()!==cleanPin){
+    alert("Group PIN did not match. Nothing was deleted.");
+    return;
+  }
+
+  const {error}=await db.rpc(
+    "owner_delete_group",
+    {
+      p_creation_code:ownerCreationCode,
+      p_group_pin:cleanPin
+    }
+  );
+
+  if(error){
+    alert(
+      "Group could not be deleted.\n\n" +
+      (error.message||"Please try again.")
+    );
+    return;
+  }
+
+  alert("✅ " + groupName + " deleted.");
+  await manageGroupsPage();
+}
 
 function openEditGroup(groupPin){
   ownerEditGroupPin=String(groupPin||"");
