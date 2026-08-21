@@ -242,7 +242,7 @@ async function refresh(){
 
  // Keep Owner utility screens on display.
  // Do not let the 5-second background sync redraw them while they are open.
- if(page==="admininvite" || page==="managegroups")return;
+ if(page==="admininvite" || page==="managegroups" || page==="editgroup")return;
 
  const editing=document.activeElement &&
    document.activeElement.tagName==="INPUT";
@@ -276,6 +276,7 @@ function render(){
   if(page==="settings")settingsPage();
   if(page==="admininvite")adminInvitePage();
   if(page==="managegroups")manageGroupsPage();
+  if(page==="editgroup")editGroupPage();
 }
 function roundLocked(){
   return state.players.some(p=>p.stableford!=null || p.netScore!=null);
@@ -2929,10 +2930,18 @@ ${isOwner ? `
   </button>
 </div>`;
  }
+let ownerGroups=[];
+let ownerEditGroupPin="";
+
 function leaveManageGroups(){
   page="settings";
   if(db && !poller) startPolling();
   show("settings");
+}
+
+function backToManageGroups(){
+  ownerEditGroupPin="";
+  manageGroupsPage();
 }
 
 async function manageGroupsPage(){
@@ -2970,12 +2979,13 @@ async function manageGroupsPage(){
   }
 
   const groups=Array.isArray(data) ? data : [];
+  ownerGroups=groups;
 
   $("screen").innerHTML=`
     <div class="card">
       <h2>👥 Manage Groups</h2>
       <div class="muted">${groups.length} group${groups.length===1?"":"s"} in I'm In Golf</div>
-      <div class="notice">View only for now — no group can be edited or deleted from this screen.</div>
+      <div class="notice">Owner management — edit customer and subscription details. Delete is not enabled.</div>
     </div>
 
     ${groups.length ? groups.map(g=>{
@@ -3013,14 +3023,142 @@ async function manageGroupsPage(){
           ${g.created_at?`<div class="muted">Created: ${esc(formatOwnerDate(g.created_at))}</div>`:""}
           ${g.trial_expiry_date?`<div class="muted">Trial expiry: ${esc(formatOwnerDate(g.trial_expiry_date))}</div>`:""}
           ${trialText?`<div class="notice ${trialText.startsWith("Trial expired")?"warning":""}">${esc(trialText)}</div>`:""}
+
+          <button class="secondary full" onclick="openEditGroup('${escAttr(g.group_pin||"")}')">
+            ✏️ Edit Group
+          </button>
         </div>`;
     }).join("") : `<div class="card"><div class="muted">No groups found.</div></div>`}
 
     <div class="card">
-      <button class="ghost full" onclick="show('settings')">← Back to Owner Controls</button>
+      <button class="ghost full" onclick="leaveManageGroups()">← Back to Owner Controls</button>
     </div>`;
 
   window.scrollTo(0,0);
+}
+
+
+function openEditGroup(groupPin){
+  ownerEditGroupPin=String(groupPin||"");
+  page="editgroup";
+  clearInterval(poller);
+  poller=null;
+  editGroupPage();
+  window.scrollTo(0,0);
+}
+
+function ownerDateInput(value){
+  if(!value)return "";
+  return String(value).slice(0,10);
+}
+
+function editGroupPage(){
+  if(!isAdmin || !isOwner || !ownerCreationCode){
+    alert("I'm In Golf Owner access required.");
+    leaveManageGroups();
+    return;
+  }
+
+  const g=ownerGroups.find(x=>String(x.group_pin)===String(ownerEditGroupPin));
+
+  if(!g){
+    alert("Group details could not be found.");
+    manageGroupsPage();
+    return;
+  }
+
+  const protectedGroup=String(g.group_pin)==="1010";
+
+  $("screen").innerHTML=`
+    <div class="card">
+      <div class="muted">EDIT GROUP</div>
+      <h2 style="font-size:24px;margin:3px 0;">${esc(g.group_name||"Unnamed Group")}</h2>
+      <div class="muted">PIN ${esc(g.group_pin||"")}</div>
+      ${protectedGroup ? `<div class="notice">🔐 Owner group protection is active for this group.</div>` : ""}
+    </div>
+
+    <div class="card">
+      <label class="muted">Admin / customer name</label>
+      <input id="ownerAdminName" value="${escAttr(g.admin_name||"")}" placeholder="Name">
+
+      <label class="muted">Contact</label>
+      <input id="ownerAdminContact" value="${escAttr(g.admin_contact||"")}" placeholder="Email or phone">
+
+      <label class="muted">Plan</label>
+      <select id="ownerPlanType" ${protectedGroup?"disabled":""} style="width:100%;padding:11px;border:1px solid var(--line);border-radius:10px;font-size:16px;background:white;margin:5px 0 11px;">
+        <option value="trial" ${String(g.plan_type)==="trial"?"selected":""}>Free Trial</option>
+        <option value="paid" ${String(g.plan_type)==="paid"?"selected":""}>Paid</option>
+        <option value="internal" ${String(g.plan_type)==="internal"?"selected":""}>Internal</option>
+      </select>
+
+      <label class="muted">Trial expiry date</label>
+      <input id="ownerTrialExpiry" type="date" value="${escAttr(ownerDateInput(g.trial_expiry_date))}">
+
+      <label class="muted">Payment status</label>
+      <select id="ownerPaidStatus" style="width:100%;padding:11px;border:1px solid var(--line);border-radius:10px;font-size:16px;background:white;margin:5px 0 11px;">
+        <option value="unpaid" ${String(g.paid_status)==="unpaid"?"selected":""}>Unpaid</option>
+        <option value="paid" ${String(g.paid_status)==="paid"?"selected":""}>Paid</option>
+        <option value="not_applicable" ${String(g.paid_status)==="not_applicable"?"selected":""}>N/A</option>
+      </select>
+
+      <label class="muted">Renewal date</label>
+      <input id="ownerRenewalDate" type="date" value="${escAttr(ownerDateInput(g.renewal_date))}">
+
+      <label class="muted">Status</label>
+      <select id="ownerGroupStatus" ${protectedGroup?"disabled":""} style="width:100%;padding:11px;border:1px solid var(--line);border-radius:10px;font-size:16px;background:white;margin:5px 0 11px;">
+        <option value="active" ${String(g.status||"active")==="active"?"selected":""}>Active</option>
+        <option value="suspended" ${String(g.status)==="suspended"?"selected":""}>Suspended</option>
+      </select>
+
+      <label class="muted">Notes</label>
+      <input id="ownerNotes" value="${escAttr(g.notes||"")}" placeholder="Optional notes">
+
+      <button class="primary full" onclick="saveOwnerGroupEdit()">💾 Save Changes</button>
+      <button class="ghost full" onclick="backToManageGroups()">← Cancel</button>
+    </div>`;
+}
+
+async function saveOwnerGroupEdit(){
+  if(!db || !isOwner || !ownerCreationCode)return;
+
+  const g=ownerGroups.find(x=>String(x.group_pin)===String(ownerEditGroupPin));
+  if(!g)return;
+
+  const protectedGroup=String(g.group_pin)==="1010";
+
+  const args={
+    p_creation_code:ownerCreationCode,
+    p_group_pin:String(g.group_pin),
+    p_admin_name:$("ownerAdminName").value.trim(),
+    p_admin_contact:$("ownerAdminContact").value.trim(),
+    p_plan_type:protectedGroup ? "internal" : $("ownerPlanType").value,
+    p_trial_expiry_date:$("ownerTrialExpiry").value || null,
+    p_paid_status:$("ownerPaidStatus").value,
+    p_renewal_date:$("ownerRenewalDate").value || null,
+    p_status:protectedGroup ? "active" : $("ownerGroupStatus").value,
+    p_notes:$("ownerNotes").value.trim()
+  };
+
+  const saveButton=document.querySelector('#screen button.primary');
+  if(saveButton){
+    saveButton.disabled=true;
+    saveButton.textContent="Saving…";
+  }
+
+  const {error}=await db.rpc("owner_update_group",args);
+
+  if(error){
+    if(saveButton){
+      saveButton.disabled=false;
+      saveButton.textContent="💾 Save Changes";
+    }
+    alert("Group changes could not be saved.\n\n" + (error.message||"Please try again."));
+    return;
+  }
+
+  alert("✅ Group details updated.");
+  ownerEditGroupPin="";
+  await manageGroupsPage();
 }
 
 function formatOwnerDate(value){
