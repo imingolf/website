@@ -1,0 +1,3947 @@
+<!doctype html>
+<html lang="en">
+<head>
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>I'm In Golf</title>
+<style>
+:root{--bg:#f4f6f3;--card:#fff;--ink:#17231b;--muted:#68736c;--green:#176b3a;--green2:#23864e;--line:#dce3dd;--amber:#8a6500;--amberbg:#fff1c7;--red:#a83b34;--redbg:#fbe4e1}
+*{box-sizing:border-box} body{margin:0;background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--ink)}
+.app{max-width:520px;margin:auto;min-height:100vh;padding-bottom:76px}
+header{background:linear-gradient(135deg,#10592f,#23864e);color:white;padding:calc(24px + env(safe-area-inset-top)) 18px 20px;border-radius:0 0 24px 24px}
+header h1{margin:0;font-size:30px} header p{margin:5px 0 0;opacity:.85}
+main{padding:14px}.card{background:white;border:1px solid var(--line);border-radius:18px;padding:16px;margin-bottom:13px;box-shadow:0 2px 8px rgba(0,0,0,.03)}
+.row{display:flex;justify-content:space-between;align-items:center;gap:10px}.wrap{flex-wrap:wrap}
+h2{font-size:18px;margin:0 0 12px}.muted{font-size:13px;color:var(--muted)}.big{font-size:28px;font-weight:800}
+.pill{font-size:12px;font-weight:800;padding:6px 9px;border-radius:999px}.paid{background:#def4e5;color:var(--green)}.pending{background:var(--amberbg);color:var(--amber)}.danger{background:var(--redbg);color:var(--red)}
+.player{padding:12px 0;border-top:1px solid var(--line)}.player:first-child{border-top:0}
+button{border:0;border-radius:12px;padding:11px 13px;font-weight:750;font-size:14px}.primary{background:var(--green);color:white}.secondary{background:#edf4ef;color:var(--green)}.ghost{background:#f3f4f3;color:#536058}.red{background:var(--redbg);color:var(--red)}
+.full{width:100%;margin-top:10px}.small{padding:8px 10px;font-size:12px}
+input{width:100%;padding:11px;border:1px solid var(--line);border-radius:10px;font-size:16px;background:white;margin:5px 0 11px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}.notice{background:#edf5ef;padding:11px;border-radius:12px;font-size:13px;margin:10px 0}.warning{background:#fff5dc}
+nav{position:fixed;left:50%;transform:translateX(-50%);bottom:0;width:min(520px,100%);padding:8px 8px calc(8px + env(safe-area-inset-bottom));background:white;border-top:1px solid var(--line);display:flex;z-index:20}
+nav button{flex:1;background:transparent;color:#6d756f;padding:11px 2px;font-size:13px;line-height:1.35}nav button.active{color:var(--green);font-weight:800}
+.score{width:78px;margin:0}.pos{font-weight:800;font-size:18px;min-width:24px}.money{font-weight:800}
+#setupOverlay{position:fixed;inset:0;background:#f4f6f3;z-index:50;display:flex;align-items:flex-start;justify-content:center;padding:45px 16px;overflow:auto}
+.setup{width:min(480px,100%)}.hidden{display:none!important}
+</style>
+</head>
+<body>
+<div id="setupOverlay">
+ <div class="setup">
+  <div class="card">
+   <h1 style="margin-top:0">⛳ I'm In Golf</h1>
+   <p>Golf. Mates. You're In.</p>
+   <div id="configMissing" class="notice warning hidden"><b>One-time setup needed.</b><br>This shared version needs your Supabase project details added to <code>config.js</code>.</div>
+   <label><b>Group PIN</b></label>
+<input id="pinInput" inputmode="numeric" autocomplete="off" placeholder="Enter your shared PIN">
+<button class="primary full" onclick="connect()">Open I'm In Golf</button>
+<div id="connectMsg" class="muted" style="margin-top:10px"></div>
+     </div>
+ </div>
+</div>
+
+<div class="app">
+<header>
+  <h1>
+    I'm In Golf ⛳
+    <span id="demoBadge" class="hidden" style="
+      font-size:12px;
+      background:#fff1c7;
+      color:#8a6500;
+      padding:5px 9px;
+      border-radius:999px;
+      vertical-align:middle;
+      margin-left:6px;
+    ">DEMO</span>
+  </h1>
+  <p id="syncText">Shared golf group</p>
+</header>
+<main><div id="screen"></div></main>
+<nav>
+<button id="nround" onclick="show('round')">⛳<br>Round</button>
+<button id="npay" onclick="show('pay')">💷<br>Pay</button>
+<button id="nscores" onclick="show('scores')">🏌️<br>Scores</button>
+<button id="nleague" onclick="show('league')">🏆<br>League</button>
+<button id="nplayers" onclick="show('players')">👥<br>Players</button>
+<button id="nsettings" class="hidden" onclick="show('settings')">⚙️<br>Settings</button>
+</nav>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="./config.js"></script>
+<script>
+let db=null, pin="", page="round", poller=null;
+let leagueView="points";
+
+function demoReadOnly(){
+  return pin==="2026" && !isAdmin;
+}
+function demoCanEdit(){
+  if(demoReadOnly()){
+    alert("👀 Demo Mode\n\nThis demo is read-only.\nYou can explore the app without changing anything.");
+    return false;
+  }
+  return true;
+}
+let lastWinnerRecord=null;
+let statsPlayerId=null;
+let myPlayerId=localStorage.getItem("tensInPlayerId")||"";
+function chooseMyPlayer(){
+  const existing=state.players.find(p=>p.id===myPlayerId);
+  if(existing)return;
+
+  $("screen").innerHTML=`
+    <div class="card">
+      <h2>👤 Who are you?</h2>
+      <div class="muted">Tap your name below.</div>
+
+      ${[...state.players].sort((a,b)=>a.name.localeCompare(b.name)).map(p=>`
+        <button class="secondary full" onclick="selectMyPlayer('${p.id}')">
+          ${esc(p.name)}
+        </button>
+      `).join("")}
+
+      <div class="muted" style="margin-top:16px;text-align:center;">
+        Can't see your name?
+      </div>
+      <button class="primary full" onclick="addPlayer()">
+              👋 Join Group
+      </button>
+    </div>
+  `;
+}
+function selectMyPlayer(id){
+  const player=state.players.find(p=>p.id===id);
+  if(!player)return;
+
+  myPlayerId=player.id;
+  localStorage.setItem("tensInPlayerId",myPlayerId);
+
+  alert("Welcome " + player.name + "!");
+  show("round");
+}
+let state={
+ course:"Hazel Grove Golf Club",
+ date:"Saturday",
+ stake:20,
+ gameType:"money",
+ pointsCompetition:"stableford",
+ pointsValue:10,
+ players:[
+{id:"ga",name:"Greg A",handicap:11,paid:false,stableford:null,netScore:null,wins:0,leaguePoints:0,netWinnings:0},
+{id:"gr",name:"Greg R",handicap:14,paid:false,stableford:null,netScore:null,wins:0,leaguePoints:0,netWinnings:0},
+{id:"to",name:"Tony",handicap:16,paid:false,stableford:null,netScore:null,wins:0,leaguePoints:0,netWinnings:0},
+{id:"bi",name:"Billy",handicap:18,paid:false,stableford:null,netScore:null,wins:0,leaguePoints:0,netWinnings:0}
+   ],
+ history:[]
+};
+
+const $=id=>document.getElementById(id);
+function configured(){return window.TENS_IN_CONFIG && TENS_IN_CONFIG.supabaseUrl && !TENS_IN_CONFIG.supabaseUrl.includes("PASTE_")}
+window.addEventListener("load",()=>{
+  if(!configured()) $("configMissing").classList.remove("hidden");
+
+  const urlPin=new URLSearchParams(window.location.search).get("pin");
+  const saved=localStorage.getItem("tensInPin");
+
+  if(urlPin){
+    $("pinInput").value=urlPin;
+    connect();
+  }else if(saved){
+    $("pinInput").value=saved;
+  }
+});
+
+async function connect(){
+ if(!configured()){ $("connectMsg").textContent="Please complete the one-time database setup first."; return; }
+ pin=$("pinInput").value.trim(); if(!pin){$("connectMsg").textContent="Enter your group PIN.";return}
+ $("connectMsg").textContent="Opening shared group…";
+ db=supabase.createClient(TENS_IN_CONFIG.supabaseUrl,TENS_IN_CONFIG.supabaseKey);
+ const {data,error}=await db.rpc("get_group_state",{p_pin:pin});
+ if(error || !data){$("connectMsg").textContent="PIN not recognised, or database setup is incomplete.";return}
+state=data;
+localStorage.setItem("tensInPin",pin);
+$("demoBadge").classList.toggle("hidden", pin!=="2026");
+$("setupOverlay").classList.add("hidden");
+$("syncText").textContent="Shared • everyone sees the same game";
+
+const setupTokenFromUrl=
+  new URLSearchParams(window.location.search).get("adminsetup");
+
+if(!state.adminPin && setupTokenFromUrl){
+  if(String(state.adminSetupToken||"")===String(setupTokenFromUrl)){
+    const first=prompt("Welcome, Group Admin!\\n\\nChoose your own 4-digit Admin PIN.");
+    if(first!==null){
+      const clean=String(first).trim();
+      if(!validAdminPin(clean)){
+        alert("Please choose exactly 4 numbers. Reopen the private setup link and try again.");
+      }else{
+        const second=prompt("Enter your new 4-digit Admin PIN again");
+        if(second!==null && String(second).trim()===clean){
+          state.adminPin=clean;
+          state.adminSetupToken="";
+          const saved=await save();
+          if(saved){
+            isAdmin=true;
+            sessionStorage.setItem("tensInAdmin","yes");
+            history.replaceState({},document.title,location.pathname+"?pin="+encodeURIComponent(pin));
+            alert("✅ Admin PIN created. You are now the Admin for this golf group.");
+          }else{
+            state.adminPin="";
+            alert("Admin PIN could not be saved. Reopen the setup link and try again.");
+          }
+        }else if(second!==null){
+          alert("The two PINs did not match. Reopen the private setup link and try again.");
+        }
+      }
+    }
+  }else{
+    alert("This Admin setup link is no longer valid.");
+  }
+}
+
+const existing=state.players.find(p=>p.id===myPlayerId);
+
+if(existing){
+  show("round");
+}else{
+  page="players";
+  chooseMyPlayer();
+}
+
+startPolling();
+ }
+async function save(){
+
+  if(!db)return;
+
+  if(demoReadOnly()){
+    $("syncText").textContent="Demo • read only";
+    return false;
+  }
+
+  $("syncText").textContent="Saving…";
+
+  const {data,error}=await db.rpc(
+    "save_group_state",
+    {p_pin:pin,p_state:state}
+  );
+
+  $("syncText").textContent=
+    error ? "Couldn't sync" : "Shared • synced";
+
+  return !error;
+}
+async function refresh(){
+ if(!db)return;
+
+ const editing=document.activeElement &&
+   document.activeElement.tagName==="INPUT";
+
+ if(editing)return;
+
+ const {data,error}=await db.rpc("get_group_state",{p_pin:pin});
+if(!error && data){
+  state=data;
+
+  if(myPlayerId){
+    render();
+  }
+
+  $("syncText").textContent=
+  demoReadOnly() ? "Demo • read only" : "Shared • synced";
+}
+
+ }
+function startPolling(){ clearInterval(poller); poller=setInterval(refresh,5000); }
+function show(p){page=p;document.querySelectorAll("nav button").forEach(b=>b.classList.remove("active"));$("n"+p).classList.add("active");render();}
+function render(){
+  updateAdminUI();
+
+  if(page==="round")round();
+  if(page==="pay")pay();
+  if(page==="scores")scores();
+  if(page==="league")league();
+  if(page==="playerstats" && statsPlayerId)showPlayerStats(statsPlayerId);
+  if(page==="players")playersPage();
+  if(page==="settings")settingsPage();
+}
+function roundLocked(){
+  return state.players.some(p=>p.stableford!=null || p.netScore!=null);
+}
+function paidCount(){return state.players.filter(p=>p.paid).length}
+function potentialPot(){return Number(state.stake||0)*state.players.length}
+function pot(){return Number(state.stake||0)*paidCount()}
+function stablefordPaidCount(){
+  return state.players.filter(p=>p.paid && p.competition==="stableford").length;
+}
+
+function netPaidCount(){
+  return state.players.filter(p=>p.paid && p.competition==="net").length;
+}
+
+function stablefordPot(){
+  return Number(state.stake||0)*stablefordPaidCount();
+}
+
+function netPot(){
+  return Number(state.stake||0)*netPaidCount();
+}
+function round(){
+
+  const pointsFirst=Number(state.pointsValue||10);
+  const pointsSecond=Math.round(pointsFirst*0.6);
+  const pointsThird=Math.round(pointsFirst*0.3);
+$("screen").innerHTML=`
+
+  ${state.trip?.active ? `
+    <div class="card" style="text-align:center;">
+      <div style="font-size:28px;">✈️</div>
+      <div class="muted">TRIP MODE</div>
+
+      <h2 style="margin:4px 0;">
+        ${esc(state.trip.name)}
+      </h2>
+
+      <div style="font-weight:800;">
+        Round ${state.trip.currentRound} of ${state.trip.totalRounds}
+      </div>
+    </div>
+  ` : ""}
+
+  <div class="card">
+
+      <div class="row">
+      <div>
+        <div class="muted">CURRENT ROUND</div>
+        <h2>${esc(state.course)}</h2>
+        <div class="muted">${esc(formatDate(state.date))} • ${state.players.length} players</div>
+
+        <div style="margin-top:8px;">
+          <span class="pill paid">
+            ${state.gameType==="points" ? "🏆 POINTS GAME" : "💷 MONEY GAME"}
+          </span>
+        </div>
+      </div>
+
+      <span class="pill ${roundLocked()?'pending':'paid'}">
+        ${roundLocked()?'🔒 ENTRIES CLOSED':'OPEN'}
+      </span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Round details</h2>
+
+    ${isAdmin ? `
+      <label class="muted">Course</label>
+      <input value="${escAttr(state.course)}" onchange="state.course=this.value;save()">
+
+      <div>
+        <label class="muted">Date</label>
+        <input type="date" value="${escAttr(state.date)}" onchange="state.date=this.value;save();render()">
+
+        ${state.gameType==="money" ? `
+          <label class="muted">Stake per player (£)</label>
+          <input type="number" min="0" step="1" value="${state.stake}" onchange="state.stake=+this.value;save();render()">
+        ` : `
+          <div class="notice">
+            <b>${state.pointsCompetition==="stableford" ? "🏆 Stableford" : "⛳ Net"}</b><br>
+            Points Game • Top 3 score league points
+          </div>
+        `}
+      </div>
+    ` : `
+      <div class="muted">Course</div>
+      <b>${esc(state.course)}</b>
+
+      <div style="height:10px"></div>
+
+      ${state.gameType==="money" ? `
+        <div class="grid2">
+          <div>
+            <div class="muted">Date</div>
+            <b>${esc(formatDate(state.date))}</b>
+          </div>
+          <div>
+            <div class="muted">Stake per player</div>
+            <b>£${state.stake}</b>
+          </div>
+        </div>
+      ` : `
+        <div class="grid2">
+          <div>
+            <div class="muted">Date</div>
+            <b>${esc(formatDate(state.date))}</b>
+          </div>
+          <div>
+            <div class="muted">Competition</div>
+            <b>${state.pointsCompetition==="stableford" ? "Stableford" : "Net"}</b>
+          </div>
+        </div>
+      `}
+    `}
+  </div>
+
+  ${state.gameType==="money" ? `
+    <div class="card">
+      <h2>💷 Pay Before Play</h2>
+
+      <div class="row">
+        <div>
+          <div class="big">£${pot()}</div>
+          <div class="muted">Paid pot • £${potentialPot()} if everyone pays</div>
+          <div class="muted" style="margin-top:6px;">
+            🏆 Stableford pot: £${stablefordPot()} • ⛳ Net pot: £${netPot()}
+          </div>
+        </div>
+
+        <span class="pill ${paidCount()===state.players.length?'paid':'pending'}">
+          ${paidCount()}/${state.players.length} PAID
+        </span>
+      </div>
+
+      <div class="notice">
+        ${paidCount()===state.players.length
+          ? "🔒 Everyone is paid — ready to play."
+          : "Payments must be marked before tee-off."}
+      </div>
+
+      <button class="primary full" onclick="show('pay')">Manage payments</button>
+    </div>
+  ` : `
+    <div class="card">
+      <h2>🏆 Points Game</h2>
+
+      <div class="notice">
+        <b>${state.pointsCompetition==="stableford" ? "🏆 Stableford" : "⛳ Net"}</b><br>
+        Everyone plays the same competition.
+      </div>
+
+      <div class="player row">
+        <div>
+          <b>🥇 1st place</b>
+        </div>
+        <span class="money">${pointsFirst} pts</span>
+      </div>
+
+      <div class="player row">
+        <div>
+          <b>🥈 2nd place</b>
+        </div>
+        <span class="money">${pointsSecond} pts</span>
+      </div>
+
+      <div class="player row">
+        <div>
+          <b>🥉 3rd place</b>
+        </div>
+        <span class="money">${pointsThird} pts</span>
+      </div>
+
+      <div class="muted" style="margin-top:10px;">
+        Top 3 players score league points.
+      </div>
+    </div>
+  `}
+
+  <div class="card">
+    <button class="secondary full" onclick="shareApp()">📤 Share I'm In Golf</button>
+    <button class="ghost full" onclick="adminLogin()">🔐 Admin</button>
+  </div>`;
+}
+function shareApp(){
+  const url="https://imingolf.co.uk/app/?pin="+encodeURIComponent(pin);
+
+  const message=`⛳ I'm In Golf
+
+Join our golf group.
+
+Group PIN: ${pin}
+
+Open I'm In Golf here:
+${url}`;
+
+  if(navigator.share){
+    navigator.share({
+      title:"I'm In Golf",
+      text:message
+    });
+  }else{
+    navigator.clipboard?.writeText(message);
+    alert("Invite copied. Paste it into WhatsApp.");
+  }
+
+}
+function pay(){
+
+ const sortedPlayers=[...state.players]
+   .sort((a,b)=>a.name.localeCompare(b.name));
+
+ $("screen").innerHTML=`
+ <div class="card">
+   <h2>💷 Pay Before Play</h2>
+   <div class="big">£${pot()}</div>
+   <div class="muted">Paid pot • £${potentialPot()} if everyone pays • £${state.stake} each</div>
+   <div class="muted" style="margin-top:6px;">
+     🏆 Stableford pot: £${stablefordPot()} • ⛳ Net pot: £${netPot()}
+   </div>
+ </div>
+
+ <div class="card">
+   ${sortedPlayers.map(p=>{
+
+     const i=state.players.findIndex(x=>x.id===p.id);
+
+     return `
+       <div class="player">
+         <div class="row">
+           <div>
+             <b>${esc(p.name)}</b>
+             <div class="muted">£${state.stake} stake</div>
+           </div>
+
+           ${(isAdmin || p.id===myPlayerId)
+             ? `<button class="${p.paid?'secondary':'primary'} small" onclick="togglePaid(${i})">${p.paid?'✓ Paid':'Mark paid'}</button>`
+             : `<span class="pill ${p.paid?'paid':'pending'}">${p.paid?'✓ Paid':'Not paid'}</span>`
+           }
+         </div>
+       </div>
+     `;
+   }).join("")}
+
+   ${pin==="2026"
+     ? `<button class="secondary full" onclick="alert('👀 Demo Mode\\n\\nPayments are disabled in the demo.')">🔒 Demo — Payments Disabled</button>`
+     : `<a href="https://monzo.me/gregoryaspinall?h=ImsHfW&account_type=personal" target="_blank"><button class="primary full">💳 Pay Entry Fee</button></a>`
+   }
+
+   ${pin==="2026"
+     ? '<div class="notice"><b>👀 Demo Mode — no real payments are taken.</b></div>'
+     : (paidCount()===state.players.length
+         ? '<div class="notice"><b>🔒 All paid. Ready to play.</b></div>'
+         : '<button class="secondary full" onclick="reminder()">🔔 Copy payment reminder</button>')
+   }
+ </div>`;
+}
+async function togglePaid(i){
+
+  if(!demoCanEdit())return;
+
+  const p=state.players[i];
+
+ if(!isAdmin && p.id!==myPlayerId){
+   alert("You can only change your own payment.");
+   return;
+ }
+
+ if(roundLocked() && !isAdmin){
+   alert("🔒 Entries are closed — scoring has started.");
+   return;
+ }
+
+ p.paid=!p.paid;
+ render();
+ await save();
+}
+
+function reminder(){const names=state.players.filter(p=>!p.paid).map(p=>p.name).join(", ");const txt=`I'm In Golf: ${names} — your £${state.stake} golf stake is still due for ${state.course}. Please pay before tee-off.`;navigator.clipboard?.writeText(txt);alert("Reminder copied. Paste it into WhatsApp.");}
+function scores(){
+
+  const isPointsGame=state.gameType==="points";
+  const pointsComp=state.pointsCompetition || "stableford";
+
+  const sortedPlayers=[...state.players]
+    .sort((a,b)=>a.name.localeCompare(b.name));
+
+  const stablefordRanked=[...state.players]
+    .filter(p=>
+      p.stableford!=null &&
+      (!isPointsGame || pointsComp==="stableford")
+    )
+    .sort((a,b)=>Number(b.stableford)-Number(a.stableford));
+
+  const netRanked=[...state.players]
+    .filter(p=>
+      p.netScore!=null &&
+      (!isPointsGame || pointsComp==="net")
+    )
+    .sort((a,b)=>Number(a.netScore)-Number(b.netScore));
+
+  $("screen").innerHTML=`
+    <div class="card">
+      <h2>🏌️ Scores</h2>
+
+      ${isPointsGame ? `
+        <div class="notice">
+          <b>🏆 POINTS GAME — ${pointsComp==="stableford" ? "STABLEFORD" : "NET"}</b><br>
+          Everyone plays the same competition.
+        </div>
+      ` : `
+        <div class="muted">Choose Stableford or Net, then enter your score.</div>
+        <div class="notice">💷 Only paid players are eligible to win the pot.</div>
+      `}
+
+      ${roundLocked() ? `
+        <div class="notice warning">
+          🔒 <b>Scoring has started.</b>
+        </div>
+      ` : ""}
+
+      ${sortedPlayers.map(p=>{
+
+        const i=state.players.findIndex(x=>x.id===p.id);
+
+        return `
+        <div class="player">
+          <div>
+            <b>${esc(p.name)}</b>
+            <div class="muted">HCP ${p.handicap}</div>
+
+            ${isPointsGame ? `
+              <div class="muted">
+                Competition: ${pointsComp==="stableford" ? "Stableford" : "Net"}
+              </div>
+            ` : `
+              <div class="muted">
+                Competition: ${
+                  p.competition==="net"
+                    ? "Net"
+                    : p.competition==="stableford"
+                    ? "Stableford"
+                    : "Choose competition"
+                }
+              </div>
+
+              ${(isAdmin || p.id===myPlayerId) ? `
+                <div class="grid2" style="margin-top:10px;">
+                  <button
+                    class="${p.competition==="stableford" ? "primary" : "ghost"} small"
+                    onclick="setCompetition(${i},'stableford')">
+                    Stableford
+                  </button>
+
+                  <button
+                    class="${p.competition==="net" ? "primary" : "ghost"} small"
+                    onclick="setCompetition(${i},'net')">
+                    Net
+                  </button>
+                </div>
+              ` : ""}
+            `}
+          </div>
+
+          ${(isAdmin || p.id===myPlayerId) ? `
+            <div style="margin-top:10px;">
+
+              ${isPointsGame ? `
+
+                ${pointsComp==="stableford" ? `
+                  <label class="muted">🏆 Stableford</label>
+                  <input
+                    type="number"
+                    placeholder="Points"
+                    value="${p.stableford??""}"
+                    onchange="setStableford(${i},this.value)">
+                ` : `
+                  <label class="muted">⛳ Net Score</label>
+                  <input
+                    type="number"
+                    placeholder="Net"
+                    value="${p.netScore??""}"
+                    onchange="setNetScore(${i},this.value)">
+                `}
+
+              ` : `
+
+                ${p.competition==="net" ? `
+                  <label class="muted">⛳ Net Score</label>
+                  <input
+                    type="number"
+                    placeholder="Net"
+                    value="${p.netScore??""}"
+                    onchange="setNetScore(${i},this.value)">
+                ` : p.competition==="stableford" ? `
+                  <label class="muted">🏆 Stableford</label>
+                  <input
+                    type="number"
+                    placeholder="Points"
+                    value="${p.stableford??""}"
+                    onchange="setStableford(${i},this.value)">
+                ` : `
+                  <div class="notice">
+                    Choose Stableford or Net above before entering a score.
+                  </div>
+                `}
+
+              `}
+            </div>
+          ` : `
+            <div class="muted" style="margin-top:6px;">
+              ${isPointsGame
+                ? pointsComp==="stableford"
+                  ? `Stableford: ${p.stableford??"—"}`
+                  : `Net: ${p.netScore??"—"}`
+                : p.competition==="net"
+                ? `Net: ${p.netScore??"—"}`
+                : p.competition==="stableford"
+                ? `Stableford: ${p.stableford??"—"}`
+                : "Competition not chosen"
+              }
+            </div>
+          `}
+        </div>
+        `;
+      }).join("")}
+    </div>
+
+    ${(!isPointsGame || pointsComp==="stableford") ? `
+      <div class="card">
+        <h2>🏆 Stableford Leaderboard</h2>
+
+        ${stablefordRanked.length
+          ? stablefordRanked.map((p,i)=>`
+            <div class="player row">
+              <span class="pos">${i+1}</span>
+
+              <div style="flex:1">
+                <b>${esc(p.name)}</b>
+
+                ${!isPointsGame ? `
+                  <div class="muted">
+                    ${p.paid ? "✓ Paid • Eligible" : "⚠️ Unpaid • Not eligible"}
+                  </div>
+                ` : ""}
+              </div>
+
+              <span class="money">${p.stableford} pts</span>
+            </div>
+          `).join("")
+          : '<div class="muted">No Stableford scores yet.</div>'
+        }
+      </div>
+    ` : ""}
+
+    ${(!isPointsGame || pointsComp==="net") ? `
+      <div class="card">
+        <h2>⛳ Net Score Leaderboard</h2>
+
+        ${netRanked.length
+          ? netRanked.map((p,i)=>`
+            <div class="player row">
+              <span class="pos">${i+1}</span>
+
+              <div style="flex:1">
+                <b>${esc(p.name)}</b>
+
+                ${!isPointsGame ? `
+                  <div class="muted">
+                    ${p.paid ? "✓ Paid • Eligible" : "⚠️ Unpaid • Not eligible"}
+                  </div>
+                ` : ""}
+              </div>
+
+              <span class="money">${p.netScore}</span>
+            </div>
+          `).join("")
+          : '<div class="muted">No Net scores yet.</div>'
+        }
+      </div>
+    ` : ""}
+
+    ${isAdmin ? `
+      <div class="card">
+        <button class="primary full" onclick="finishRound()">
+          🏁 Finish Round & Save Result
+        </button>
+      </div>
+    ` : ""}
+  `;
+}
+
+async function setCompetition(i,type){
+if(!demoCanEdit())return;
+  const p=state.players[i];
+
+  if(!isAdmin && p.id!==myPlayerId)return;
+
+  if(roundLocked() && !isAdmin){
+    alert("🔒 Entries are closed — scoring has started.");
+    return;
+  }
+
+  p.competition=type;
+
+  render();
+  await save();
+}
+async function setStableford(i,v){
+if(!demoCanEdit())return;
+
+  
+
+  const p=state.players[i];
+ if(!isAdmin && p.id!==myPlayerId)return;
+ p.stableford=v===""?null:Number(v);
+ render();
+ await save();
+}
+
+async function setNetScore(i,v){
+if(!demoCanEdit())return;
+ const p=state.players[i];
+ if(!isAdmin && p.id!==myPlayerId)return;
+ p.netScore=v===""?null:Number(v);
+ render();
+ await save();
+}
+async function finishRound(){
+
+  const isPointsGame=state.gameType==="points";
+  const pointsComp=state.pointsCompetition || "stableford";
+  const isTrip=Boolean(state.trip?.active);
+
+  function chooseCountbackWinner(players,competition,score,position){
+    const names=players.map((p,i)=>`${i+1}. ${p.name}`).join("\n");
+
+    const answer=prompt(
+      `${competition} tie for ${position} on ${score}.\n\n` +
+      `Check the scorecards and choose the player on countback:\n\n` +
+      names +
+      `\n\nEnter the player's number.`
+    );
+
+    if(answer===null)return null;
+
+    const selected=Number(answer)-1;
+
+    if(selected<0 || selected>=players.length){
+      alert("Please choose one of the listed players.");
+      return chooseCountbackWinner(
+        players,
+        competition,
+        score,
+        position
+      );
+    }
+
+    return players[selected];
+  }
+
+
+  // =====================================
+  // 🏆 POINTS GAME
+  // =====================================
+
+  if(isPointsGame){
+
+    const scoredPlayers=state.players.filter(p=>
+      pointsComp==="stableford"
+        ? p.stableford!=null
+        : p.netScore!=null
+    );
+
+    if(!scoredPlayers.length){
+      alert(
+        pointsComp==="stableford"
+          ? "Enter at least one Stableford score first."
+          : "Enter at least one Net score first."
+      );
+      return;
+    }
+
+    let remaining=[...scoredPlayers];
+
+    const places=[];
+    const placeNames=["1st","2nd","3rd"];
+
+    for(let place=0; place<3 && remaining.length; place++){
+
+      const bestScore=
+        pointsComp==="stableford"
+          ? Math.max(...remaining.map(p=>Number(p.stableford)))
+          : Math.min(...remaining.map(p=>Number(p.netScore)));
+
+      const tied=remaining.filter(p=>
+        pointsComp==="stableford"
+          ? Number(p.stableford)===bestScore
+          : Number(p.netScore)===bestScore
+      );
+
+      let selectedPlayer=tied[0];
+      let countback=false;
+
+      if(tied.length>1){
+
+        selectedPlayer=chooseCountbackWinner(
+          tied,
+          pointsComp==="stableford" ? "Stableford" : "Net",
+          pointsComp==="stableford"
+            ? bestScore + " points"
+            : bestScore,
+          placeNames[place]
+        );
+
+        if(!selectedPlayer)return;
+
+        countback=true;
+      }
+
+      places.push({
+        name:selectedPlayer.name,
+        score:
+          pointsComp==="stableford"
+            ? Number(selectedPlayer.stableford)
+            : Number(selectedPlayer.netScore),
+        position:place+1,
+        countback:countback
+      });
+
+      remaining=remaining.filter(p=>p!==selectedPlayer);
+    }
+
+    const firstPoints=Number(state.pointsValue||10);
+    const secondPoints=Math.round(firstPoints*0.6);
+    const thirdPoints=Math.round(firstPoints*0.3);
+
+    const pointsAwards=[
+      firstPoints,
+      secondPoints,
+      thirdPoints
+    ];
+places.forEach((place,i)=>{
+  place.points=pointsAwards[i];
+
+  if(isTrip){
+
+    state.trip.standings=state.trip.standings || {};
+
+    state.trip.standings[place.name]=
+      Number(state.trip.standings[place.name]||0)+place.points;
+
+  }else{
+
+    const player=state.players.find(p=>p.name===place.name);
+
+    if(player){
+      player.leaguePoints=
+        Number(player.leaguePoints||0)+place.points;
+    }
+  }
+});
+        const record={
+      date:state.date,
+      course:state.course,
+
+      gameType:"points",
+      pointsCompetition:pointsComp,
+      pointsValue:firstPoints,
+      pointsResults:places,
+
+      winners:places.length ? [places[0].name] : [],
+
+      stablefordWinnerNames:
+        pointsComp==="stableford" && places.length
+          ? [places[0].name]
+          : [],
+
+      netWinnerNames:
+        pointsComp==="net" && places.length
+          ? [places[0].name]
+          : [],
+
+      stablefordCountback:
+        pointsComp==="stableford"
+          ? Boolean(places[0]?.countback)
+          : false,
+
+      netCountback:
+        pointsComp==="net"
+          ? Boolean(places[0]?.countback)
+          : false,
+
+      players:state.players.map(p=>({
+        name:p.name,
+        handicap:p.handicap,
+        competition:pointsComp,
+        stableford:p.stableford,
+        netScore:p.netScore
+      }))
+    };
+if(isTrip){
+  state.trip.rounds=state.trip.rounds || [];
+  state.trip.rounds.push(record);
+}else{
+  state.history=state.history || [];
+  state.history.unshift(record);
+}
+    
+// Normal Points Game winner counts as a weekly win
+// Trip Points Game winner stays inside Trip Mode only
+if(!isTrip && places[0]){
+  const winner=state.players.find(
+    p=>p.name===places[0].name
+  );
+
+  if(winner){
+    winner.wins=(winner.wins||0)+1;
+  }
+}
+
+    state.players.forEach(p=>{
+  p.paid=false;
+  p.stableford=null;
+  p.netScore=null;
+  p.competition=null;
+});
+
+if(isTrip){
+  if(state.trip.currentRound < state.trip.totalRounds){
+    state.trip.currentRound += 1;
+  }else{
+    state.trip.completed=true;
+    state.trip.active=false;
+  }
+}
+        await save();
+    showWinnerScreen(record);
+    return;
+  }
+
+
+  // =====================================
+  // 💷 MONEY GAME
+  // =====================================
+
+  const stablefordPlayers=state.players.filter(
+    p=>p.paid &&
+       p.competition==="stableford" &&
+       p.stableford!=null
+  );
+
+  const netPlayers=state.players.filter(
+    p=>p.paid &&
+       p.competition==="net" &&
+       p.netScore!=null
+  );
+
+  if(!stablefordPlayers.length && !netPlayers.length){
+    alert("Enter at least one Stableford or Net score first.");
+    return;
+  }
+
+  const stablefordBest=stablefordPlayers.length
+    ? Math.max(
+        ...stablefordPlayers.map(
+          p=>Number(p.stableford)
+        )
+      )
+    : null;
+
+  const netBest=netPlayers.length
+    ? Math.min(
+        ...netPlayers.map(
+          p=>Number(p.netScore)
+        )
+      )
+    : null;
+
+  let stablefordWinners=
+    stablefordBest===null
+      ? []
+      : stablefordPlayers.filter(
+          p=>Number(p.stableford)===stablefordBest
+        );
+
+  let netWinners=
+    netBest===null
+      ? []
+      : netPlayers.filter(
+          p=>Number(p.netScore)===netBest
+        );
+
+  let stablefordCountback=false;
+  let netCountback=false;
+
+
+  if(stablefordWinners.length>1){
+
+    const winner=chooseCountbackWinner(
+      stablefordWinners,
+      "Stableford",
+      stablefordBest + " points",
+      "1st"
+    );
+
+    if(!winner)return;
+
+    stablefordWinners=[winner];
+    stablefordCountback=true;
+  }
+
+
+  if(netWinners.length>1){
+
+    const winner=chooseCountbackWinner(
+      netWinners,
+      "Net",
+      netBest,
+      "1st"
+    );
+
+    if(!winner)return;
+
+    netWinners=[winner];
+    netCountback=true;
+  }
+
+const winners=[
+  ...stablefordWinners.map(p=>p.name),
+  ...netWinners.map(p=>p.name)
+];
+
+
+// =====================================
+// ✈️ TRIP MONEY GAME POINTS
+// =====================================
+
+let tripPlaces=[];
+
+if(isTrip){
+
+  const tripComp=state.trip.competition || "stableford";
+
+  let tripPlayers=state.players.filter(p=>
+    tripComp==="stableford"
+      ? p.stableford!=null
+      : p.netScore!=null
+  );
+
+  tripPlayers.sort((a,b)=>
+    tripComp==="stableford"
+      ? Number(b.stableford)-Number(a.stableford)
+      : Number(a.netScore)-Number(b.netScore)
+  );
+
+  let remainingTrip=[...tripPlayers];
+tripPlaces=[];
+
+const tripPlaceNames=["1st","2nd","3rd"];
+
+for(let place=0; place<3 && remainingTrip.length; place++){
+
+  const bestScore=
+    tripComp==="stableford"
+      ? Math.max(...remainingTrip.map(p=>Number(p.stableford)))
+      : Math.min(...remainingTrip.map(p=>Number(p.netScore)));
+
+  const tied=remainingTrip.filter(p=>
+    tripComp==="stableford"
+      ? Number(p.stableford)===bestScore
+      : Number(p.netScore)===bestScore
+  );
+
+  let selectedPlayer=tied[0];
+
+  if(tied.length>1){
+
+    selectedPlayer=chooseCountbackWinner(
+      tied,
+      tripComp==="stableford" ? "Stableford" : "Net",
+      tripComp==="stableford"
+        ? bestScore + " points"
+        : bestScore,
+      tripPlaceNames[place]
+    );
+
+    if(!selectedPlayer)return;
+  }
+
+  tripPlaces.push(selectedPlayer);
+
+  remainingTrip=
+    remainingTrip.filter(p=>p!==selectedPlayer);
+}
+
+  const tripFirst=Number(state.trip.tripPointsValue||10);
+
+  const tripAwards=[
+  tripFirst,
+  Math.round(tripFirst*0.6),
+  Math.round(tripFirst*0.3)
+];
+  state.trip.standings=state.trip.standings || {};
+
+  tripPlaces.forEach((p,i)=>{
+    const points=tripAwards[i];
+
+    state.trip.standings[p.name]=
+      Number(state.trip.standings[p.name]||0)+points;
+  });
+}
+
+
+const record={
+      date:state.date,
+    course:state.course,
+    stake:state.stake,
+
+    gameType:"money",
+
+    stablefordPot:stablefordPot(),
+    netPot:netPot(),
+
+    winners:winners,
+
+    stablefordWinnerNames:
+      stablefordWinners.map(p=>p.name),
+
+    netWinnerNames:
+      netWinners.map(p=>p.name),
+
+    stablefordCountback:
+      stablefordCountback,
+
+    netCountback:
+      netCountback,
+
+    players:state.players.map(p=>({
+      name:p.name,
+      handicap:p.handicap,
+      competition:p.competition || null,
+      stableford:p.stableford,
+      netScore:p.netScore
+    }))
+  };
+
+if(isTrip){
+  state.trip.rounds=state.trip.rounds || [];
+  state.trip.rounds.push(record);
+}else{
+  state.history=state.history || [];
+  state.history.unshift(record);
+
+  winners.forEach(name=>{
+
+    const p=state.players.find(
+      x=>x.name===name
+    );
+
+    if(p){
+      p.wins=(p.wins||0)+1;
+    }
+  });
+}
+  
+
+  state.players.forEach(p=>{
+    p.paid=false;
+    p.stableford=null;
+    p.netScore=null;
+    p.competition=null;
+  });
+
+if(isTrip){
+  if(state.trip.currentRound < state.trip.totalRounds){
+    state.trip.currentRound += 1;
+  }else{
+    state.trip.completed=true;
+    state.trip.active=false;
+  }
+}
+  await save();
+  showWinnerScreen(record);
+}
+function showWinnerScreen(record){
+
+  page="winner";
+  lastWinnerRecord=record;
+
+  const isPointsGame=record.gameType==="points";
+
+  // =====================================
+  // 🏆 POINTS GAME RESULT
+  // =====================================
+
+  if(isPointsGame){
+
+    const results=record.pointsResults || [];
+    const competition=
+      record.pointsCompetition==="net"
+        ? "NET"
+        : "STABLEFORD";
+
+    $("screen").innerHTML=`
+      <div class="card" style="text-align:center;">
+        <div style="font-size:54px;">🏆</div>
+        <h2 style="font-size:24px;margin-bottom:4px;">
+          POINTS GAME RESULT
+        </h2>
+        <div class="muted">
+          ${esc(record.course)} • ${esc(formatDate(record.date))}
+        </div>
+        <div style="margin-top:8px;">
+          <span class="pill paid">
+            ${competition}
+          </span>
+        </div>
+      </div>
+
+      ${results.map((r,i)=>`
+        <div class="card">
+          <div class="row">
+            <div style="display:flex;align-items:center;gap:12px;">
+              <div style="font-size:34px;">
+                ${i===0 ? "🥇" : i===1 ? "🥈" : "🥉"}
+              </div>
+
+              <div>
+                <div class="muted">
+                  ${i===0 ? "1ST PLACE" : i===1 ? "2ND PLACE" : "3RD PLACE"}
+                </div>
+
+                <div style="font-size:21px;font-weight:800;">
+                  ${esc(r.name)}
+                </div>
+
+                <div class="muted">
+                  ${
+                    record.pointsCompetition==="stableford"
+                      ? r.score + " pts"
+                      : "Net " + r.score
+                  }
+                </div>
+              </div>
+            </div>
+
+            <div style="text-align:right;">
+              <div class="money" style="font-size:22px;">
+                +${r.points}
+              </div>
+              <div class="muted">
+                league pts
+              </div>
+            </div>
+          </div>
+
+          ${r.countback ? `
+            <div class="notice" style="margin-top:12px;">
+              Winner on countback — Admin declared
+            </div>
+          ` : ""}
+        </div>
+      `).join("")}
+
+      <div class="card" style="text-align:center;">
+        <div style="font-size:28px;">🎉 ⛳ 🎉</div>
+        <div style="font-weight:800;margin-top:8px;">
+          Well played!
+        </div>
+
+        <button
+          class="primary full"
+          onclick="shareWinnerImage()">
+          📤 Share Result
+        </button>
+
+        <button
+          class="secondary full"
+          onclick="show('league')">
+          View League
+        </button>
+      </div>
+    `;
+
+    return;
+  }
+
+
+  // =====================================
+  // 💷 MONEY GAME RESULT
+  // =====================================
+
+  const stablefordWinner=
+    record.stablefordWinnerNames?.[0] || "";
+
+  const netWinner=
+    record.netWinnerNames?.[0] || "";
+
+  const stablefordPlayer=
+    (record.players||[]).find(
+      p=>p.name===stablefordWinner
+    );
+
+  const netPlayer=
+    (record.players||[]).find(
+      p=>p.name===netWinner
+    );
+
+  const stablefordScore=
+    stablefordPlayer?.stableford ?? "";
+
+  const netScore=
+    netPlayer?.netScore ?? "";
+
+  const stablefordPotValue=
+    Number(record.stablefordPot||0);
+
+  const netPotValue=
+    Number(record.netPot||0);
+
+
+  $("screen").innerHTML=`
+    <div class="card" style="text-align:center;">
+      <div style="font-size:54px;">🏆</div>
+
+      <h2 style="font-size:24px;margin-bottom:4px;">
+        TODAY'S RESULT
+      </h2>
+
+      <div class="muted">
+        ${esc(record.course)} • ${esc(formatDate(record.date))}
+      </div>
+    </div>
+
+    ${stablefordWinner ? `
+      <div class="card" style="text-align:center;">
+        <div style="font-size:34px;">🏆</div>
+
+        <div class="muted">
+          STABLEFORD WINNER
+        </div>
+
+        <div style="font-size:24px;font-weight:800;margin-top:6px;">
+          ${esc(stablefordWinner)}
+        </div>
+
+        <div class="big" style="margin-top:8px;">
+          ${stablefordScore} pts
+        </div>
+
+        <div class="money">
+          Wins £${stablefordPotValue}
+        </div>
+
+        ${record.stablefordCountback ? `
+          <div class="notice" style="margin-top:12px;">
+            Winner on countback — Admin declared
+          </div>
+        ` : ""}
+      </div>
+    ` : ""}
+
+    ${netWinner ? `
+      <div class="card" style="text-align:center;">
+        <div style="font-size:34px;">⛳</div>
+
+        <div class="muted">
+          NET WINNER
+        </div>
+
+        <div style="font-size:24px;font-weight:800;margin-top:6px;">
+          ${esc(netWinner)}
+        </div>
+
+        <div class="big" style="margin-top:8px;">
+          ${netScore}
+        </div>
+
+        <div class="money">
+          Wins £${netPotValue}
+        </div>
+
+        ${record.netCountback ? `
+          <div class="notice" style="margin-top:12px;">
+            Winner on countback — Admin declared
+          </div>
+        ` : ""}
+      </div>
+    ` : ""}
+
+    <div class="card" style="text-align:center;">
+      <div style="font-size:28px;">🎉 ⛳ 🎉</div>
+
+      <div style="font-weight:800;margin-top:8px;">
+        Congratulations!
+      </div>
+
+      <button
+        class="primary full"
+        onclick="shareWinnerImage()">
+        📤 Share Result
+      </button>
+
+      <button
+        class="secondary full"
+        onclick="show('league')">
+        View League
+      </button>
+    </div>
+  `;
+}
+async function shareWinnerImage(){
+
+  const record=lastWinnerRecord;
+
+  if(!record){
+    alert("No result available to share.");
+    return;
+  }
+
+  const isPointsGame=record.gameType==="points";
+
+  const canvas=document.createElement("canvas");
+  canvas.width=1080;
+
+  if(isPointsGame){
+    const count=(record.pointsResults||[]).length;
+    canvas.height=count>=3 ? 1500 : count===2 ? 1250 : 1000;
+  }else{
+    const resultCount=
+      (record.stablefordWinnerNames?.length ? 1 : 0) +
+      (record.netWinnerNames?.length ? 1 : 0);
+
+    canvas.height=resultCount===2 ? 1500 : 950;
+  }
+
+  const ctx=canvas.getContext("2d");
+
+  const green="#176b3a";
+  const dark="#17231b";
+  const muted="#68736c";
+  const pale="#edf5ef";
+  const white="#ffffff";
+  const line="#dce3dd";
+
+  function roundedRect(x,y,w,h,r,fill,stroke){
+    ctx.beginPath();
+    ctx.roundRect(x,y,w,h,r);
+
+    if(fill){
+      ctx.fillStyle=fill;
+      ctx.fill();
+    }
+
+    if(stroke){
+      ctx.strokeStyle=stroke;
+      ctx.lineWidth=2;
+      ctx.stroke();
+    }
+  }
+
+  function centreText(text,y,size,weight="700",colour=dark){
+    ctx.fillStyle=colour;
+    ctx.font=`${weight} ${size}px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif`;
+    ctx.textAlign="center";
+    ctx.fillText(text,canvas.width/2,y);
+  }
+
+  function fitText(text,maxWidth,startSize,weight="800"){
+    let size=startSize;
+
+    while(size>32){
+      ctx.font=`${weight} ${size}px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif`;
+
+      if(ctx.measureText(text).width<=maxWidth)break;
+
+      size-=2;
+    }
+
+    return size;
+  }
+
+  ctx.fillStyle="#f4f6f3";
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  roundedRect(
+    24,
+    24,
+    1032,
+    canvas.height-48,
+    42,
+    white,
+    green
+  );
+
+  roundedRect(
+    24,
+    24,
+    1032,
+    190,
+    42,
+    green
+  );
+
+  ctx.fillStyle=white;
+  ctx.textAlign="left";
+
+  ctx.font='800 62px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';
+  ctx.fillText("I'M IN GOLF",85,105);
+
+  ctx.font='700 26px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';
+  ctx.fillText("GOLF. MATES. YOU'RE IN.",88,151);
+
+  ctx.font='60px Arial';
+  ctx.textAlign="right";
+  ctx.fillText("⛳",980,125);
+
+
+  // =====================================
+  // 🏆 POINTS GAME SHARE IMAGE
+  // =====================================
+
+  if(isPointsGame){
+
+    const results=record.pointsResults || [];
+
+    centreText(
+      "🏆  POINTS GAME RESULT",
+      290,
+      54,
+      "800",
+      green
+    );
+
+    centreText(
+      formatDate(record.date),
+      350,
+      31,
+      "700",
+      muted
+    );
+
+    const courseSize=
+      fitText(
+        String(record.course||""),
+        900,
+        42,
+        "800"
+      );
+
+    centreText(
+      String(record.course||"").toUpperCase(),
+      410,
+      courseSize,
+      "800",
+      dark
+    );
+
+    centreText(
+      record.pointsCompetition==="net"
+        ? "⛳ NET"
+        : "🏆 STABLEFORD",
+      465,
+      28,
+      "800",
+      green
+    );
+
+    let y=510;
+
+    results.forEach((r,i)=>{
+
+      roundedRect(
+        72,
+        y,
+        936,
+        220,
+        28,
+        white,
+        line
+      );
+
+      roundedRect(
+        72,
+        y,
+        220,
+        220,
+        28,
+        pale
+      );
+
+      ctx.textAlign="center";
+      ctx.font="66px Arial";
+
+      ctx.fillText(
+        i===0 ? "🥇" : i===1 ? "🥈" : "🥉",
+        182,
+        y+90
+      );
+
+      ctx.fillStyle=green;
+      ctx.font='800 26px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';
+
+      ctx.fillText(
+        i===0 ? "1ST PLACE" :
+        i===1 ? "2ND PLACE" :
+        "3RD PLACE",
+        182,
+        y+150
+      );
+
+      const nameSize=
+        fitText(
+          String(r.name||""),
+          570,
+          48,
+          "800"
+        );
+
+      ctx.fillStyle=dark;
+      ctx.font=`800 ${nameSize}px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif`;
+
+      ctx.fillText(
+        String(r.name||"").toUpperCase(),
+        645,
+        y+65
+      );
+
+      ctx.fillStyle=muted;
+      ctx.font='700 28px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';
+
+      ctx.fillText(
+        record.pointsCompetition==="stableford"
+          ? `${r.score} PTS`
+          : `NET ${r.score}`,
+        645,
+        y+112
+      );
+
+      roundedRect(
+        440,
+        y+135,
+        410,
+        62,
+        18,
+        green
+      );
+
+      ctx.fillStyle=white;
+      ctx.font='800 32px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';
+
+      ctx.fillText(
+        `+${r.points} LEAGUE PTS`,
+        645,
+        y+177
+      );
+
+      y+=240;
+
+      if(r.countback){
+
+        roundedRect(
+          120,
+          y,
+          840,
+          58,
+          18,
+          pale,
+          green
+        );
+
+        centreText(
+          "★  COUNTBACK — ADMIN DECLARED",
+          y+38,
+          22,
+          "800",
+          green
+        );
+
+        y+=78;
+      }
+    });
+
+    centreText(
+      "🎉  WELL PLAYED!  🎉",
+      canvas.height-105,
+      34,
+      "800",
+      green
+    );
+
+    centreText(
+      "League points updated",
+      canvas.height-60,
+      25,
+      "600",
+      muted
+    );
+  }
+
+
+  // =====================================
+  // 💷 MONEY GAME SHARE IMAGE
+  // =====================================
+
+  else{
+
+    const stablefordWinner=
+      record.stablefordWinnerNames?.[0] || "";
+
+    const netWinner=
+      record.netWinnerNames?.[0] || "";
+
+    const stablefordPlayer=
+      (record.players||[]).find(
+        p=>p.name===stablefordWinner
+      );
+
+    const netPlayer=
+      (record.players||[]).find(
+        p=>p.name===netWinner
+      );
+
+    const stablefordScore=
+      stablefordPlayer?.stableford ?? "";
+
+    const netScore=
+      netPlayer?.netScore ?? "";
+
+    const stablefordPotValue=
+      Number(record.stablefordPot||0);
+
+    const netPotValue=
+      Number(record.netPot||0);
+
+
+    centreText(
+      "🏆  TODAY'S RESULT",
+      290,
+      58,
+      "800",
+      green
+    );
+
+    centreText(
+      formatDate(record.date),
+      350,
+      31,
+      "700",
+      muted
+    );
+
+    const courseSize=
+      fitText(
+        String(record.course||""),
+        900,
+        42,
+        "800"
+      );
+
+    centreText(
+      String(record.course||"").toUpperCase(),
+      410,
+      courseSize,
+      "800",
+      dark
+    );
+
+    let y=470;
+
+    function drawWinnerCard(
+      type,
+      name,
+      score,
+      pot,
+      countback
+    ){
+
+      roundedRect(
+        72,
+        y,
+        936,
+        285,
+        28,
+        white,
+        line
+      );
+
+      roundedRect(
+        72,
+        y,
+        250,
+        285,
+        28,
+        pale
+      );
+
+      ctx.textAlign="center";
+      ctx.fillStyle=green;
+      ctx.font="64px Arial";
+
+      ctx.fillText(
+        type==="stableford" ? "🏆" : "⛳",
+        197,
+        y+82
+      );
+
+      ctx.font='800 27px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';
+
+      ctx.fillText(
+        type==="stableford"
+          ? "STABLEFORD"
+          : "NET",
+        197,
+        y+145
+      );
+
+      ctx.fillText(
+        "WINNER",
+        197,
+        y+182
+      );
+
+      const nameSize=
+        fitText(
+          name,
+          570,
+          55,
+          "800"
+        );
+
+      ctx.fillStyle=dark;
+
+      ctx.font=`800 ${nameSize}px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif`;
+
+      ctx.fillText(
+        name.toUpperCase(),
+        645,
+        y+78
+      );
+
+      roundedRect(
+        410,
+        y+105,
+        470,
+        90,
+        20,
+        green
+      );
+
+      ctx.fillStyle=white;
+
+      ctx.font='800 55px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';
+
+      ctx.fillText(
+        type==="stableford"
+          ? `${score} PTS`
+          : `${score}`,
+        645,
+        y+168
+      );
+
+      ctx.fillStyle=green;
+
+      ctx.font='800 27px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';
+
+      ctx.fillText(
+        "WON",
+        645,
+        y+222
+      );
+
+      ctx.fillStyle=dark;
+
+      ctx.font='800 48px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';
+
+      ctx.fillText(
+        `£${pot}`,
+        645,
+        y+270
+      );
+
+      y+=305;
+
+      if(countback){
+
+        roundedRect(
+          100,
+          y,
+          880,
+          68,
+          20,
+          pale,
+          green
+        );
+
+        centreText(
+          "★  WINNER ON COUNTBACK — ADMIN DECLARED",
+          y+44,
+          24,
+          "800",
+          green
+        );
+
+        y+=90;
+      }
+    }
+
+    if(stablefordWinner){
+
+      drawWinnerCard(
+        "stableford",
+        stablefordWinner,
+        stablefordScore,
+        stablefordPotValue,
+        record.stablefordCountback
+      );
+    }
+
+    if(netWinner){
+
+      drawWinnerCard(
+        "net",
+        netWinner,
+        netScore,
+        netPotValue,
+        record.netCountback
+      );
+    }
+
+    centreText(
+      "🎉  WELL PLAYED!  🎉",
+      canvas.height-115,
+      34,
+      "800",
+      green
+    );
+
+    centreText(
+      "Thanks for playing — see you next time!",
+      canvas.height-65,
+      25,
+      "600",
+      muted
+    );
+  }
+
+
+  // =====================================
+  // SHARE THE CREATED PNG
+  // =====================================
+
+  canvas.toBlob(async blob=>{
+
+    if(!blob){
+      alert("Couldn't create the result image.");
+      return;
+    }
+
+    const file=new File(
+      [blob],
+      "Im-In-Golf-Result.png",
+      {type:"image/png"}
+    );
+
+    try{
+
+      if(
+        navigator.share &&
+        navigator.canShare &&
+        navigator.canShare({files:[file]})
+      ){
+
+        await navigator.share({
+          title:"I'm In Golf — Result",
+          text:"🏆 I'm In Golf — Result",
+          files:[file]
+        });
+
+      }else{
+
+        const url=
+          URL.createObjectURL(blob);
+
+        window.open(
+          url,
+          "_blank"
+        );
+
+        alert(
+          "Result image created. Use your phone's Share button to send it to WhatsApp."
+        );
+      }
+
+    }catch(err){
+
+      if(err.name!=="AbortError"){
+        alert(
+          "Couldn't share the image. Please try again."
+        );
+      }
+    }
+
+  },"image/png");
+}
+function league(){
+
+  // Count games played separately
+  const pointsPlayed=(playerName)=>{
+    return (state.history||[]).filter(h=>{
+      if(h.gameType!=="points")return false;
+
+      return (h.players||[]).some(p=>
+        p.name===playerName &&
+        (
+          p.stableford!=null ||
+          p.netScore!=null
+        )
+      );
+    }).length;
+  };
+
+  const moneyPlayed=(playerName)=>{
+    return (state.history||[]).filter(h=>{
+      if(h.gameType==="points")return false;
+
+      return (h.players||[]).some(p=>
+        p.name===playerName &&
+        (
+          p.stableford!=null ||
+          p.netScore!=null
+        )
+      );
+    }).length;
+  };
+
+  // Points League
+  const pointsSorted=[...state.players].sort((a,b)=>{
+    const pointsDiff=
+      Number(b.leaguePoints||0)-
+      Number(a.leaguePoints||0);
+
+    if(pointsDiff!==0)return pointsDiff;
+
+    return pointsPlayed(b.name)-pointsPlayed(a.name);
+  });
+
+  // Money League
+  const moneyWins=(playerName)=>{
+    return (state.history||[]).filter(h=>
+      h.gameType!=="points" &&
+      (h.winners||[]).includes(playerName)
+    ).length;
+  };
+const moneyWon=(playerName)=>{
+  return (state.history||[]).reduce((total,h)=>{
+
+    if(h.gameType==="points")return total;
+
+    let won=0;
+
+    if((h.stablefordWinnerNames||[]).includes(playerName)){
+      won+=Number(h.stablefordPot||0);
+    }
+
+    if((h.netWinnerNames||[]).includes(playerName)){
+      won+=Number(h.netPot||0);
+    }
+
+    return total+won;
+
+  },0);
+};
+  const moneySorted=[...state.players].sort((a,b)=>{
+    const winDiff=
+      moneyWins(b.name)-moneyWins(a.name);
+
+    if(winDiff!==0)return winDiff;
+
+    return moneyPlayed(b.name)-moneyPlayed(a.name);
+  });
+// Trip League
+const hasTrip=Boolean(
+  state.trip &&
+  (
+    state.trip.active ||
+    state.trip.completed ||
+    (state.trip.rounds||[]).length
+  )
+);
+
+if(leagueView==="trip" && !hasTrip){
+  leagueView="points";
+}
+
+const tripPlayed=(playerName)=>{
+  if(!state.trip)return 0;
+
+  return (state.trip.rounds||[]).filter(h=>{
+    const player=(h.players||[]).find(
+      p=>p.name===playerName
+    );
+
+    if(!player)return false;
+
+    return (
+      player.stableford!=null ||
+      player.netScore!=null
+    );
+  }).length;
+};
+
+const tripSorted=[...state.players].sort((a,b)=>{
+  const aPoints=
+    Number(state.trip?.standings?.[a.name]||0);
+
+  const bPoints=
+    Number(state.trip?.standings?.[b.name]||0);
+
+  if(bPoints!==aPoints){
+    return bPoints-aPoints;
+  }
+
+  return tripPlayed(b.name)-tripPlayed(a.name);
+});
+  $("screen").innerHTML=`
+
+   <div class="card">
+
+  <div style="
+    display:grid;
+    grid-template-columns:${hasTrip ? "1fr 1fr 1fr" : "1fr 1fr"};
+    gap:8px;
+    margin-bottom:14px;
+  ">
+
+    <button
+      class="${leagueView==="points" ? "primary" : "secondary"}"
+      onclick="leagueView='points';league()">
+      🏆 Points
+    </button>
+
+    <button
+      class="${leagueView==="money" ? "primary" : "secondary"}"
+      onclick="leagueView='money';league()">
+      💷 Money
+    </button>
+
+    ${hasTrip ? `
+      <button
+        class="${leagueView==="trip" ? "primary" : "secondary"}"
+        onclick="leagueView='trip';league()">
+        ✈️ Trip
+      </button>
+    ` : ""}
+
+  </div>
+
+  <h2>
+    ${
+      leagueView==="trip"
+        ? "✈️ Trip League"
+        : leagueView==="money"
+        ? "💷 Money League"
+        : "🏆 Points League"
+    }
+  </h2>
+
+  <div class="muted" style="margin-bottom:10px;">
+    ${
+      leagueView==="trip"
+        ? esc(state.trip?.name || "Trip Championship")
+        : leagueView==="money"
+        ? "Money Games only"
+        : "Points Games only"
+    }
+  </div>
+
+${leagueView==="points" ? `
+
+  ${pointsSorted.map((p,i)=>`
+    <div class="player row">
+      <div>
+<b>
+  ${i===0 && Number(p.leaguePoints||0)>0 ? "👑 " : ""}
+  <span onclick="showPlayerStats('${p.id}')" style="cursor:pointer;text-decoration:underline;">
+    ${i+1}. ${esc(p.name)}
+  </span>
+</b>
+               <div class="muted">
+          Handicap ${p.handicap}
+        </div>
+      </div>
+
+      <div style="text-align:right;">
+        <div class="money">
+          ${Number(p.leaguePoints||0)} pts
+        </div>
+
+        <div style="font-weight:800;">
+          Played ${pointsPlayed(p.name)}
+        </div>
+      </div>
+    </div>
+  `).join("")}
+
+` : leagueView==="money" ? `
+
+  ${moneySorted.map((p,i)=>`
+    <div class="player row">
+      <div>
+        <b>
+  <span onclick="showPlayerStats('${p.id}')" style="cursor:pointer;text-decoration:underline;">
+    ${i+1}. ${esc(p.name)}
+  </span>
+</b>
+
+        <div class="muted">
+          Handicap ${p.handicap}
+        </div>
+      </div>
+<div style="text-align:right;">
+  <div style="font-weight:800;">
+    ${moneyWins(p.name)} win${moneyWins(p.name)===1 ? "" : "s"}
+  </div>
+
+  <div style="font-weight:800;">
+    Played ${moneyPlayed(p.name)}
+  </div>
+
+  <div class="money" style="margin-top:3px;color:var(--green);">
+    Won £${moneyWon(p.name)}
+  </div>
+</div>
+          </div>
+  `).join("")}
+
+` : `
+${state.trip ? `
+  <div class="notice" style="margin-bottom:12px;">
+    <b>✈️ ${esc(state.trip.name || "Trip Championship")}</b><br>
+    ${
+      state.trip.completed
+        ? "🏁 Trip complete"
+        : "Round " + state.trip.currentRound + " of " + state.trip.totalRounds
+    }
+  </div>
+` : ""}
+
+${tripSorted.map((p,i)=>`
+  <div class="player row">
+    <div>
+      <b>
+        ${i===0 && Number(state.trip?.standings?.[p.name]||0)>0 ? "👑 " : ""}
+        ${i+1}. ${esc(p.name)}
+      </b>
+
+      <div class="muted">
+        Handicap ${p.handicap}
+      </div>
+    </div>
+
+    <div style="text-align:right;">
+      <div class="money">
+        ${Number(state.trip?.standings?.[p.name]||0)} pts
+      </div>
+
+      <div style="font-weight:800;">
+        Played ${tripPlayed(p.name)}
+      </div>
+    </div>
+  </div>
+`).join("")}
+  `}
+      
+      
+
+</div>
+
+    <div class="card">
+      <h2>Previous rounds</h2>
+
+      ${(state.history&&state.history.length)
+        ? state.history.slice(0,10).map(h=>`
+          <div class="player">
+
+            <b>${esc(h.course)}</b>
+
+            <div class="muted">
+              ${esc(formatDate(h.date))}
+              •
+              ${h.gameType==="points"
+                ? "🏆 Points Game"
+                : "💷 Money Game"}
+            </div>
+
+            ${h.gameType==="points" ? `
+
+              <div class="muted" style="margin-top:5px;">
+                ${h.pointsCompetition==="stableford"
+                  ? "🏆 Stableford"
+                  : "⛳ Net"}
+              </div>
+
+              ${(h.pointsResults||[]).map((r,i)=>`
+                <div class="muted">
+                  ${i===0 ? "🥇" : i===1 ? "🥈" : "🥉"}
+                  ${esc(r.name)}
+                  •
+                  ${
+                    h.pointsCompetition==="stableford"
+                      ? r.score + " pts"
+                      : "Net " + r.score
+                  }
+                  •
+                  +${r.points} league pts
+                  ${r.countback ? " • Countback" : ""}
+                </div>
+              `).join("")}
+
+            ` : `
+
+              ${h.stablefordWinnerNames?.length ? `
+                <div class="muted">
+                  🏆 Stableford:
+                  ${h.stablefordWinnerNames.map(esc).join(", ")}
+                  ${h.stablefordCountback
+                    ? " • Winner on countback — Admin declared"
+                    : ""}
+                </div>
+              ` : ""}
+
+              ${h.netWinnerNames?.length ? `
+                <div class="muted">
+                  ⛳ Net:
+                  ${h.netWinnerNames.map(esc).join(", ")}
+                  ${h.netCountback
+                    ? " • Winner on countback — Admin declared"
+                    : ""}
+                </div>
+              ` : ""}
+
+            `}
+
+          </div>
+        `).join("")
+        : '<div class="muted">No completed rounds yet.</div>'
+      }
+
+    </div>`;
+}
+function showPlayerStats(id){
+
+  statsPlayerId=id;
+  page="playerstats";
+
+  const p=state.players.find(x=>x.id===id);
+
+  if(!p){
+    alert("Player not found.");
+    return;
+  }
+
+  const rounds=(state.history||[]).filter(h=>
+    (h.players||[]).some(x=>
+      x.name===p.name &&
+      (
+        x.stableford!=null ||
+        x.netScore!=null
+      )
+    )
+  );
+
+  const totalPlayed=rounds.length;
+
+  const totalWon=(state.history||[]).reduce((total,h)=>{
+
+    if(h.gameType==="points")return total;
+
+    let won=0;
+
+    if((h.stablefordWinnerNames||[]).includes(p.name)){
+      won+=Number(h.stablefordPot||0);
+    }
+
+    if((h.netWinnerNames||[]).includes(p.name)){
+      won+=Number(h.netPot||0);
+    }
+
+    return total+won;
+
+  },0);
+
+  const stablefordScores=[];
+const netScores=[];
+
+rounds.forEach(h=>{
+  const player=(h.players||[]).find(x=>x.name===p.name);
+
+  if(player?.stableford!=null){
+    stablefordScores.push(Number(player.stableford));
+  }
+
+  if(player?.netScore!=null){
+    netScores.push(Number(player.netScore));
+  }
+});
+
+const bestStableford=
+  stablefordScores.length
+    ? Math.max(...stablefordScores)
+    : null;
+
+const bestNet=
+  netScores.length
+    ? Math.min(...netScores)
+    : null;
+  const recent=rounds
+    .slice(0,5)
+    .map(h=>{
+
+      if(h.gameType==="points"){
+
+        const result=(h.pointsResults||[]).find(
+          r=>r.name===p.name
+        );
+
+        if(result){
+          return result.position===1
+            ? "🥇 1st"
+            : result.position===2
+            ? "🥈 2nd"
+            : result.position===3
+            ? "🥉 3rd"
+            : "Played";
+        }
+
+        return "Played";
+      }
+
+      if((h.winners||[]).includes(p.name)){
+        return "🏆 Win";
+      }
+
+      return "Played";
+    });
+
+  $("screen").innerHTML=`
+
+    <div class="card">
+      <div class="muted">PLAYER STATS</div>
+
+      <h2 style="font-size:24px;margin-bottom:4px;">
+        ${esc(p.name)}
+      </h2>
+
+      <div class="muted">
+        Handicap ${p.handicap}
+      </div>
+    </div>
+
+
+    <div class="card">
+
+      <div class="grid2">
+
+        <div class="notice" style="text-align:center;">
+          <div class="muted">PLAYED</div>
+          <div class="big">${totalPlayed}</div>
+        </div>
+
+        <div class="notice" style="text-align:center;">
+          <div class="muted">WINS</div>
+          <div class="big">${Number(p.wins||0)}</div>
+        </div>
+
+        <div class="notice" style="text-align:center;">
+          <div class="muted">TOTAL WON</div>
+          <div class="big">£${totalWon}</div>
+        </div>
+
+        <div class="notice" style="text-align:center;">
+          <div class="muted">LEAGUE POINTS</div>
+          <div class="big">${Number(p.leaguePoints||0)}</div>
+        </div>
+
+      </div>
+
+    </div>
+
+<div class="card">
+  <h2>⛳ Golf stats</h2>
+
+  <div class="player row">
+    <div>
+      <b>Best Stableford</b>
+    </div>
+
+    <div class="money">
+      ${bestStableford!==null ? bestStableford + " pts" : "—"}
+    </div>
+  </div>
+
+  <div class="player row">
+    <div>
+      <b>Best Net Score</b>
+    </div>
+
+    <div class="money">
+      ${bestNet!==null ? bestNet : "—"}
+    </div>
+  </div>
+</div>
+    
+
+    <div class="card">
+      <h2>📈 Recent results</h2>
+
+      ${
+        recent.length
+          ? recent.map(result=>`
+              <div class="player">
+                <b>${result}</b>
+              </div>
+            `).join("")
+          : '<div class="muted">No completed rounds yet.</div>'
+      }
+    </div>
+
+
+    <div class="card">
+      <button class="secondary full" onclick="show('league')">
+        ← Back to League
+      </button>
+    </div>
+  `;
+}
+function playersPage(){
+
+ const sortedPlayers=[...state.players]
+   .sort((a,b)=>a.name.localeCompare(b.name));
+
+ $("screen").innerHTML=`
+ <div class="card">
+   <h2>👥 Players</h2>
+
+   <div class="notice">
+     👤 You: ${esc(state.players.find(p=>p.id===myPlayerId)?.name || "Not selected")}
+   </div>
+
+   <button class="secondary full" onclick="changeMyPlayer()">
+     🔄 Change who I am
+   </button>
+
+   ${sortedPlayers.map(p=>{
+
+     const i=state.players.findIndex(x=>x.id===p.id);
+
+     return `
+       <div class="player">
+         <div class="row">
+           <div>
+             <b>${esc(p.name)}</b>
+             <div class="muted">Handicap ${p.handicap}</div>
+           </div>
+
+           ${isAdmin ? `
+             <div>
+               <button class="secondary small" onclick="editPlayer(${i})">Edit</button>
+               ${state.players.length>2 ? `
+                 <button class="red small" onclick="removePlayer(${i})">Remove</button>
+               ` : ""}
+             </div>
+           ` : p.id===myPlayerId ? `
+             <button class="secondary small" onclick="changeMyHandicap(${i})">
+               ✏️ Change Handicap
+             </button>
+           ` : ""}
+
+         </div>
+       </div>
+     `;
+   }).join("")}
+
+   <button class="primary full" onclick="addPlayer()">👋 Join Group</button>
+ </div>`;
+}
+function changeMyPlayer(){
+  localStorage.removeItem("tensInPlayerId");
+  myPlayerId="";
+  chooseMyPlayer();
+}
+async function changeMyHandicap(i){
+ const p=state.players[i];
+
+ if(p.id!==myPlayerId && !isAdmin)return;
+
+ const h=prompt("Enter your new handicap",p.handicap);
+ if(h===null)return;
+
+ const newHandicap=Number(h);
+if(!Number.isFinite(newHandicap) || newHandicap < -10 || newHandicap > 60){
+  alert("Please enter a valid handicap between -10 and 60.");
+  return;
+}
+p.handicap=newHandicap;
+
+ render();
+ await save();
+}
+async function addPlayer(){
+const firstName=prompt("First name:");
+if(firstName===null)return;
+
+const cleanFirstName=firstName.trim();
+
+if(!cleanFirstName){
+  alert("Please enter your first name.");
+  return;
+}
+
+const surname=prompt("Surname:");
+if(surname===null)return;
+
+const cleanSurname=surname.trim();
+
+if(!cleanSurname){
+  alert("Please enter your surname.");
+  return;
+}
+
+const cleanName=cleanFirstName + " " + cleanSurname;
+
+const duplicate=state.players.some(
+  p=>p.name.trim().toLowerCase()===cleanName.toLowerCase()
+);
+    if(duplicate){
+    alert("That name is already in the group. Please choose your existing name.");
+    return;
+  }
+
+  const h=prompt("Handicap","18");
+  if(h===null)return;
+
+  const handicap=Number(h);
+
+  if(!Number.isFinite(handicap) || handicap < -10 || handicap > 60){
+  alert("Please enter a valid handicap between -10 and 60.");
+  return;
+}
+  const newPlayer={
+    id:Date.now().toString(36),
+    name:cleanName,
+    handicap:handicap,
+    competition:null,
+    paid:false,
+    stableford:null,
+    netScore:null,
+    wins:0,
+    leaguePoints:0,
+    netWinnings:0
+  };
+
+  state.players.push(newPlayer);
+
+  myPlayerId=newPlayer.id;
+  localStorage.setItem("tensInPlayerId",myPlayerId);
+
+  render();
+  await save();
+
+  alert("Welcome " + newPlayer.name + "!");
+  show("round");
+}
+async function editPlayer(i){const p=state.players[i];const name=prompt("Player name",p.name);if(!name)return;const h=prompt("Handicap",p.handicap);p.name=name.trim();p.handicap=Number(h)||0;render();await save()}
+async function removePlayer(i){if(!confirm("Remove "+state.players[i].name+"? Their past round history will stay saved."))return;state.players.splice(i,1);render();await save()}
+
+
+let isAdmin = sessionStorage.getItem("tensInAdmin")==="yes";
+let isOwner=false;
+let ownerCreationCode="";
+function updateAdminUI(){
+
+  const settingsButton=$("nsettings");
+  const payButton=$("npay");
+
+  if(settingsButton){
+    if(isAdmin){
+      settingsButton.classList.remove("hidden");
+    }else{
+      settingsButton.classList.add("hidden");
+    }
+  }
+
+  if(payButton){
+    if(state.gameType==="points"){
+      payButton.classList.add("hidden");
+
+      if(page==="pay"){
+        page="round";
+      }
+    }else{
+      payButton.classList.remove("hidden");
+    }
+  }
+}
+function adminPinForGroup(){
+  if(Object.prototype.hasOwnProperty.call(state,"adminPin")){
+    return String(state.adminPin || "");
+  }
+  return "8888";
+}
+function validAdminPin(value){
+  return /^\\d{4}$/.test(String(value||""));
+}
+function adminLogin(){
+ const entered=prompt("Enter Admin PIN");
+ if(entered===null)return;
+ if(String(entered).trim()===adminPinForGroup()){
+   isAdmin=true;
+   sessionStorage.setItem("tensInAdmin","yes");
+   updateAdminUI();
+   show("settings");
+ }else{
+   alert("Incorrect Admin PIN");
+ }
+}
+async function changeAdminPin(){
+  if(!isAdmin)return;
+  const current=prompt("Enter current Admin PIN");
+  if(current===null)return;
+  if(String(current).trim()!==adminPinForGroup()){
+    alert("Current Admin PIN is incorrect.");
+    return;
+  }
+  const first=prompt("Choose a new 4-digit Admin PIN");
+  if(first===null)return;
+  const clean=String(first).trim();
+  if(!validAdminPin(clean)){
+    alert("Please choose exactly 4 numbers.");
+    return;
+  }
+  const second=prompt("Enter the new 4-digit PIN again");
+  if(second===null)return;
+  if(String(second).trim()!==clean){
+    alert("The two PINs did not match.");
+    return;
+  }
+  state.adminPin=clean;
+  const ok=await save();
+  alert(ok ? "✅ Admin PIN changed for this golf group." : "The new Admin PIN could not be saved. Please try again.");
+}
+function adminLogout(){
+ isAdmin=false;
+ isOwner=false;
+ ownerCreationCode="";
+ sessionStorage.removeItem("tensInAdmin");
+ updateAdminUI();
+ show("round");
+}
+
+function settingsPage(){
+ if(!isAdmin){adminLogin();return}
+ $("screen").innerHTML=`<div class="card"><h2>⚙️ Admin / Settings</h2>
+ <div class="muted">Shared controls for your golf group.</div>
+ <label class="muted">Course</label><input value="${escAttr(state.course)}" onchange="state.course=this.value;save()">
+ <label class="muted">Default/current stake (£)</label><input type="number" min="0" value="${state.stake}" onchange="state.stake=+this.value;save()">
+ </div>
+ <div class="card"><h2>Round controls</h2>
+ ${!state.trip?.active && !state.trip?.completed ? `
+  <button class="secondary full" onclick="newRound()">
+    Start new round
+  </button>
+` : ""}
+${state.trip?.active && Number(state.trip.currentRound)>1 ? `
+  <button class="primary full" onclick="nextTripRound()">
+    ✈️ Start Trip Round ${state.trip.currentRound} of ${state.trip.totalRounds}
+  </button>
+` : ""}
+${state.trip?.active ? `
+  <button class="red full" onclick="cancelTrip()">
+    🗑️ Cancel Current Trip
+  </button>
+` : ""}
+${state.trip?.completed ? `
+  <button class="primary full" onclick="finishTrip()">
+    🏁 Finish Trip & Return to Normal Round
+  </button>
+` : ""}
+${state.trip?.pastTrips?.length ? `
+  <button class="red full" onclick="deletePastTrip()">
+    🗑️ Delete Past Trip
+  </button>
+` : ""}
+<button class="primary full" onclick="competitionReminder()">🔔 Competition Reminder</button>
+ <button class="red full" onclick="resetPayments()">Reset payments</button>
+<button class="red full" onclick="resetScores()">Clear scores</button>
+<button class="red full" onclick="deleteLastRound()">↩️ Delete Last Round</button>
+<button class="red full" onclick="clearLeague()">🗑️ Clear League & History</button></div>
+ <div class="card"><h2>Players</h2><button class="primary full" onclick="show('players')">Manage players & handicaps</button></div>
+<div class="card">
+  <h2>Group access</h2>
+
+  <div class="notice warning">
+    <b>Group PIN: ${pin}</b><br>
+    Share this only with your golf group.
+  </div>
+
+  <button class="ghost full" onclick="copyInvite()">
+    Copy invite message
+  </button>
+  <button class="secondary full" onclick="changeAdminPin()">
+    🔐 Change Admin PIN
+  </button>
+</div>
+
+${isOwner ? `
+<div class="card">
+  <h2>🔐 Owner Controls</h2>
+
+  <div class="notice">
+    Owner access active.
+  </div>
+
+  <button class="primary full" onclick="createNewGolfGroup()">
+    ➕ Create New Group
+  </button>
+
+  <button class="ghost full" onclick="ownerLogout()">
+    Leave Owner Mode
+  </button>
+</div>
+` : `
+<div class="card">
+  <button class="ghost full" onclick="ownerLogin()">
+    🔐 Owner Access
+  </button>
+</div>
+`}
+
+<div class="card">
+  <button class="red full" onclick="adminLogout()">
+    Log out of Admin
+  </button>
+</div>`;
+ }
+function ownerLogin(){
+  if(!isAdmin){
+    alert("Admin access required first.");
+    return;
+  }
+
+  const entered=prompt("Enter your private I'm In Golf owner creation code");
+  if(entered===null)return;
+
+  const clean=entered.trim();
+
+  if(!clean){
+    alert("Owner creation code is required.");
+    return;
+  }
+
+  ownerCreationCode=clean;
+  isOwner=true;
+  render();
+}
+
+function ownerLogout(){
+  isOwner=false;
+  ownerCreationCode="";
+  render();
+}
+
+async function createNewGolfGroup(){
+
+  if(!isAdmin || !isOwner || !ownerCreationCode){
+    alert("I'm In Golf Owner access required.");
+    return;
+  }
+
+  if(!db){
+    alert("Database connection is not available.");
+    return;
+  }
+
+  const groupName=prompt("New golf group name:");
+  if(groupName===null)return;
+
+  const cleanGroupName=groupName.trim();
+
+  if(!cleanGroupName){
+    alert("Please enter a group name.");
+    return;
+  }
+
+  const newState={
+    course:"",
+    date:"",
+    stake:20,
+    gameType:"money",
+    pointsCompetition:"stableford",
+    pointsValue:10,
+    adminPin:"",
+    adminSetupToken:"",
+    players:[],
+    history:[]
+  };
+
+  const {data,error}=await db.rpc(
+    "create_golf_group",
+    {
+      p_group_name:cleanGroupName,
+      p_state:newState,
+      p_creation_code:ownerCreationCode
+    }
+  );
+
+  if(error){
+    isOwner=false;
+    ownerCreationCode="";
+    render();
+    alert("Owner access was not accepted.\n\nCheck your private owner creation code and try again.");
+    return;
+  }
+
+  const newPin=String(data);
+  const setupToken=
+    (crypto.randomUUID ? crypto.randomUUID() :
+      (Date.now().toString(36)+Math.random().toString(36).slice(2)));
+
+  const createdState={...newState,adminSetupToken:setupToken};
+  const {error:setupError}=await db.rpc(
+    "save_group_state",
+    {p_pin:newPin,p_state:createdState}
+  );
+
+  if(setupError){
+    alert("The group was created, but Admin setup could not be prepared. Please try again before sending the invite.");
+    return;
+  }
+
+  const invite=
+`⛳ I'm In Golf
+
+You've been invited to manage: ${cleanGroupName}
+
+Group PIN: ${newPin}
+
+Open this private Admin setup link:
+https://imingolf.co.uk/app/?pin=${encodeURIComponent(newPin)}&adminsetup=${encodeURIComponent(setupToken)}
+
+On first opening, you'll be asked to choose your own 4-digit Admin PIN.
+
+Keep this setup link private.`;
+
+  navigator.clipboard?.writeText(invite);
+
+  alert(
+    "✅ New group created!\n\n" +
+    cleanGroupName +
+    "\n\nGroup PIN: " + newPin +
+    "\n\nThe invite message has been copied."
+  );
+}
+
+function competitionReminder(){
+if(roundLocked()){
+    alert("🔒 Entries are closed — scoring has started.");
+    return;
+  }
+
+  const notPaid=state.players
+    .filter(p=>!p.paid)
+    .map(p=>p.name);
+
+  const noCompetition=state.players
+    .filter(p=>p.paid && !p.competition)
+    .map(p=>p.name);
+
+  if(!notPaid.length && !noCompetition.length){
+    alert("Everyone is paid and entered into a competition.");
+    return;
+  }
+
+  let message=`⛳ I'm In Golf — Competition Reminder
+
+${state.course}
+${formatDate(state.date)}
+
+`;
+
+  if(notPaid.length){
+    message+=`💷 Still to pay:
+${notPaid.join(", ")}
+
+`;
+  }
+
+  if(noCompetition.length){
+    message+=`🏆 Still to choose Stableford or Net:
+${noCompetition.join(", ")}
+
+`;
+  }
+
+  message+="Please pay your entry and choose Stableford or Net before scoring starts.";
+
+  if(navigator.share){
+    navigator.share({
+      title:"I'm In Golf — Competition Reminder",
+      text:message
+    });
+  }else{
+    navigator.clipboard?.writeText(message);
+    alert("Competition reminder copied. Paste it into WhatsApp.");
+  }
+}
+function pickTripDate(title,initialValue=""){
+  return new Promise(resolve=>{
+
+    const overlay=document.createElement("div");
+
+    overlay.style.cssText=
+      "position:fixed;inset:0;background:rgba(0,0,0,.35);" +
+      "z-index:9999;display:flex;align-items:center;" +
+      "justify-content:center;padding:20px;";
+
+    overlay.innerHTML=`
+      <div style="
+        background:white;
+        width:min(420px,100%);
+        padding:20px;
+        border-radius:18px;
+      ">
+        <h2>${esc(title)}</h2>
+
+        <input
+          id="tripDatePicker"
+          type="date"
+          value="${escAttr(initialValue)}"
+          style="font-size:18px;"
+        >
+
+        <div class="grid2">
+          <button class="secondary" id="tripDateCancel">
+            Cancel
+          </button>
+
+          <button class="primary" id="tripDateOK">
+            OK
+          </button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    const input=overlay.querySelector("#tripDatePicker");
+
+    overlay.querySelector("#tripDateCancel").onclick=()=>{
+      overlay.remove();
+      resolve(null);
+    };
+
+    overlay.querySelector("#tripDateOK").onclick=()=>{
+      const value=input.value;
+
+      if(!value){
+        alert("Please choose a date.");
+        return;
+      }
+
+      overlay.remove();
+      resolve(value);
+    };
+  });
+}
+async function newRound(){
+
+  const choice=prompt(
+    "Choose Game Type:\n\n" +
+    "1. 💷 Money Game\n" +
+    "2. 🏆 Points Game\n" +
+    "3. ✈️ Trip Mode\n\n" +
+    "Enter 1, 2 or 3"
+  );
+
+  if(choice===null)return;
+
+  if(choice!=="1" && choice!=="2" && choice!=="3"){
+    alert("Please enter 1 for Money Game, 2 for Points Game or 3 for Trip Mode.");
+    return;
+  }
+
+
+  // =====================================
+  // ✈️ TRIP MODE SETUP
+  // =====================================
+
+  if(choice==="3"){
+
+    const tripName=prompt(
+      "Trip name",
+      state.trip?.name || "Golf Trip"
+    );
+
+    if(tripName===null)return;
+    if(!tripName.trim()){
+      alert("Please enter a trip name.");
+      return;
+    }
+
+const roundsAnswer=prompt(
+  "How many rounds on the trip?",
+  state.trip?.totalRounds || 3
+);
+
+if(roundsAnswer===null)return;
+
+const totalRounds=Number(roundsAnswer);
+
+if(!Number.isInteger(totalRounds) || totalRounds<1){
+  alert("Please enter a valid number of rounds (1 or more).");
+  return;
+}
+    
+    const firstGame=prompt(
+      "Choose Round 1 Game:\n\n" +
+      "1. 💷 Money Game\n" +
+      "2. 🏆 Points Game\n\n" +
+      "Enter 1 or 2"
+    );
+
+    if(firstGame===null)return;
+
+    if(firstGame!=="1" && firstGame!=="2"){
+      alert("Please enter 1 for Money Game or 2 for Points Game.");
+      return;
+    }
+
+    const selectedType=
+      firstGame==="2" ? "points" : "money";
+let tripCompetition="stableford";
+let tripPointsValue=10;
+
+if(selectedType==="money"){
+
+  const tripComp=prompt(
+    "Choose Trip Championship Competition:\n\n" +
+    "1. 🏆 Stableford\n" +
+    "2. ⛳ Net\n\n" +
+    "This decides the Trip 1st, 2nd and 3rd.\n\n" +
+    "Enter 1 or 2"
+  );
+
+  if(tripComp===null)return;
+
+  if(tripComp!=="1" && tripComp!=="2"){
+    alert("Please enter 1 for Stableford or 2 for Net.");
+    return;
+  }
+tripCompetition=
+  tripComp==="1" ? "stableford" : "net";
+}
+
+const tripPoints=prompt(
+  "How many Trip Championship points is Round 1 worth to the winner?",
+  tripPointsValue
+);
+
+if(tripPoints===null)return;
+
+const tripValue=Number(tripPoints);
+
+if(!Number.isFinite(tripValue) || tripValue<=0){
+  alert("Please enter a valid Trip points value.");
+  return;
+}
+
+tripPointsValue=tripValue;
+
+let selectedCompetition=
+  state.pointsCompetition || "stableford";
+     let selectedPointsValue=
+      Number(state.pointsValue || 10);
+
+
+    // Points setup for Round 1
+    if(selectedType==="points"){
+
+      const competition=prompt(
+        "Choose Points Competition:\n\n" +
+        "1. 🏆 Stableford\n" +
+        "2. ⛳ Net\n\n" +
+        "Enter 1 or 2"
+      );
+
+      if(competition===null)return;
+
+      if(competition!=="1" && competition!=="2"){
+        alert("Please enter 1 for Stableford or 2 for Net.");
+        return;
+      }
+
+      selectedCompetition=
+        competition==="1" ? "stableford" : "net";
+tripCompetition=selectedCompetition;
+selectedPointsValue=tripPointsValue;
+
+          }
+
+
+    const second=Math.round(selectedPointsValue*0.6);
+    const third=Math.round(selectedPointsValue*0.3);
+
+    let tripMessage=
+      "✈️ Start Trip Mode?\n\n" +
+      tripName.trim() +
+      "\n" +
+      totalRounds + " rounds\n\n" +
+      "Round 1: " +
+      (selectedType==="points"
+        ? "🏆 Points Game"
+        : "💷 Money Game");
+
+    if(selectedType==="points"){
+      tripMessage+=
+        "\n" +
+        (selectedCompetition==="stableford"
+          ? "Stableford"
+          : "Net") +
+        "\n\n🥇 " + selectedPointsValue + " pts" +
+        "\n🥈 " + second + " pts" +
+        "\n🥉 " + third + " pts";
+    }
+
+    tripMessage+=
+      "\n\nThis starts a new trip and clears the current round entries.";
+
+    if(!confirm(tripMessage))return;
+
+
+// Trip Round 1 course
+const tripCourse=prompt(
+  "Round 1 course",
+  ""
+);
+
+if(tripCourse===null)return;
+
+if(!tripCourse.trim()){
+  alert("Please enter the Round 1 course.");
+  return;
+}
+
+// Trip Round 1 date
+const tripDate=await pickTripDate(
+  "Round 1 date"
+);
+
+if(tripDate===null)return;
+
+state.trip={
+
+  active:true,
+  name:tripName.trim(),
+  totalRounds:totalRounds,
+  currentRound:1,
+  competition:tripCompetition,
+  tripPointsValue:tripPointsValue,
+
+  // Backup of the normal weekly round
+  normalRoundBackup:{
+    course:state.course,
+    date:state.date,
+    stake:state.stake,
+    gameType:state.gameType,
+    pointsCompetition:state.pointsCompetition,
+    pointsValue:state.pointsValue,
+
+    players:state.players.map(p=>({
+      id:p.id,
+      name:p.name,
+      handicap:p.handicap,
+      paid:p.paid,
+      competition:p.competition || null,
+      stableford:p.stableford,
+      netScore:p.netScore,
+      wins:p.wins || 0,
+      leaguePoints:p.leaguePoints || 0,
+      netWinnings:p.netWinnings || 0
+    }))
+  },
+
+  // Completed rounds for this trip
+  rounds:[],
+
+  // Running Trip Championship points
+  standings:{},
+
+  // Filled when the trip is finished
+  champion:null,
+  completed:false,
+
+  // Keeps old completed trips separate
+  pastTrips:state.trip?.pastTrips || []
+};
+state.course=tripCourse.trim();
+state.date=tripDate.trim();
+   
+    state.gameType=selectedType;
+
+    if(selectedType==="points"){
+      state.pointsCompetition=selectedCompetition;
+      state.pointsValue=selectedPointsValue;
+    }
+
+    state.players.forEach(p=>{
+      p.paid=false;
+      p.stableford=null;
+      p.netScore=null;
+      p.competition=null;
+    });
+
+    await save();
+    show("round");
+    return;
+  }
+
+
+  // =====================================
+  // NORMAL MONEY / POINTS ROUND
+  // =====================================
+
+  const selectedType=
+    choice==="2" ? "points" : "money";
+
+  let selectedCompetition=
+    state.pointsCompetition || "stableford";
+
+  let selectedPointsValue=
+    Number(state.pointsValue || 10);
+
+
+  if(selectedType==="points"){
+
+    const competition=prompt(
+      "Choose Points Competition:\n\n" +
+      "1. 🏆 Stableford\n" +
+      "2. ⛳ Net\n\n" +
+      "Enter 1 or 2"
+    );
+
+    if(competition===null)return;
+
+    if(competition!=="1" && competition!=="2"){
+      alert("Please enter 1 for Stableford or 2 for Net.");
+      return;
+    }
+
+    selectedCompetition=
+      competition==="1" ? "stableford" : "net";
+
+    const points=prompt(
+      "How many points is this game worth to the winner?",
+      selectedPointsValue
+    );
+
+    if(points===null)return;
+
+    const value=Number(points);
+
+    if(!Number.isFinite(value) || value<=0){
+      alert("Please enter a valid points value.");
+      return;
+    }
+
+    selectedPointsValue=value;
+
+    const second=Math.round(value*0.6);
+    const third=Math.round(value*0.3);
+
+    if(!confirm(
+      "Points Game Setup\n\n" +
+      (selectedCompetition==="stableford"
+        ? "🏆 Stableford"
+        : "⛳ Net") +
+      "\n\n🥇 1st — " + value + " pts" +
+      "\n🥈 2nd — " + second + " pts" +
+      "\n🥉 3rd — " + third + " pts" +
+      "\n\nContinue?"
+    ))return;
+  }
+
+
+  if(!confirm(
+    "Start a new " +
+    (selectedType==="points"
+      ? "Points Game"
+      : "Money Game") +
+    "?\n\nThis clears current payments, scores and competition choices."
+  ))return;
+
+
+  // Normal round means we're outside Trip Mode
+  if(state.trip){
+    state.trip.active=false;
+  }
+
+  state.gameType=selectedType;
+
+  if(selectedType==="points"){
+    state.pointsCompetition=selectedCompetition;
+    state.pointsValue=selectedPointsValue;
+  }
+
+  state.players.forEach(p=>{
+    p.paid=false;
+    p.stableford=null;
+    p.netScore=null;
+    p.competition=null;
+  });
+
+  await save();
+  show("round");
+}
+async function nextTripRound(){
+
+  if(!state.trip?.active){
+    alert("There is no active trip.");
+    return;
+  }
+
+  const roundNumber=Number(state.trip.currentRound||1);
+
+  // Trip Round course
+  const tripCourse=prompt(
+    "Round " + roundNumber + " course",
+    ""
+  );
+
+  if(tripCourse===null)return;
+
+  if(!tripCourse.trim()){
+    alert("Please enter the Round " + roundNumber + " course.");
+    return;
+  }
+// Trip Round date
+const tripDate=await pickTripDate(
+  "Round " + roundNumber + " date"
+);
+
+if(tripDate===null)return;
+
+    const game=prompt(
+    "✈️ " + state.trip.name +
+    "\nRound " + roundNumber + " of " + state.trip.totalRounds +
+    "\n\nChoose Game Type:\n\n" +
+    "1. 💷 Money Game\n" +
+    "2. 🏆 Points Game\n\n" +
+    "Enter 1 or 2"
+  );
+
+  if(game===null)return;
+
+  if(game!=="1" && game!=="2"){
+    alert("Please enter 1 for Money Game or 2 for Points Game.");
+    return;
+  }
+
+  const selectedType=
+    game==="2" ? "points" : "money";
+
+  const competition=prompt(
+    "Choose Trip Championship Competition:\n\n" +
+    "1. 🏆 Stableford\n" +
+    "2. ⛳ Net\n\n" +
+    "Enter 1 or 2"
+  );
+
+  if(competition===null)return;
+
+  if(competition!=="1" && competition!=="2"){
+    alert("Please enter 1 for Stableford or 2 for Net.");
+    return;
+  }
+
+  const selectedCompetition=
+    competition==="1" ? "stableford" : "net";
+
+  const points=prompt(
+    "How many Trip Championship points is Round " +
+    roundNumber +
+    " worth to the winner?",
+    Number(state.trip.tripPointsValue||10)
+  );
+
+  if(points===null)return;
+
+  const tripPointsValue=Number(points);
+
+  if(!Number.isFinite(tripPointsValue) || tripPointsValue<=0){
+    alert("Please enter a valid Trip points value.");
+    return;
+  }
+
+  const second=Math.round(tripPointsValue*0.6);
+  const third=Math.round(tripPointsValue*0.3);
+
+  const message=
+    "✈️ " + state.trip.name +
+    "\n\nRound " + roundNumber +
+    " of " + state.trip.totalRounds +
+    "\n" + tripCourse.trim() +
+    "\n" + tripDate.trim() +
+    "\n\n" +
+    (selectedType==="points"
+      ? "🏆 Points Game"
+      : "💷 Money Game") +
+    "\n" +
+    (selectedCompetition==="stableford"
+      ? "🏆 Stableford"
+      : "⛳ Net") +
+    "\n\nTrip Championship Points:" +
+    "\n🥇 " + tripPointsValue + " pts" +
+    "\n🥈 " + second + " pts" +
+    "\n🥉 " + third + " pts" +
+    "\n\nStart this round?";
+
+  if(!confirm(message))return;
+
+  state.course=tripCourse.trim();
+  state.date=tripDate.trim();
+
+  state.gameType=selectedType;
+
+  state.trip.competition=selectedCompetition;
+  state.trip.tripPointsValue=tripPointsValue;
+
+  if(selectedType==="points"){
+    state.pointsCompetition=selectedCompetition;
+    state.pointsValue=tripPointsValue;
+  }
+
+  state.players.forEach(p=>{
+    p.paid=false;
+    p.stableford=null;
+    p.netScore=null;
+    p.competition=null;
+  });
+
+  await save();
+  show("round");
+}
+async function deletePastTrip(){
+
+  const pastTrips=state.trip?.pastTrips || [];
+
+  if(!pastTrips.length){
+    alert("There are no past trips to delete.");
+    return;
+  }
+
+  const names=pastTrips.map((t,i)=>
+    (i+1) + ". " + (t.name || "Unnamed Trip")
+  ).join("\n");
+
+  const answer=prompt(
+    "Delete which past trip?\n\n" +
+    names +
+    "\n\nEnter the trip number."
+  );
+
+  if(answer===null)return;
+
+  const index=Number(answer)-1;
+
+  if(index<0 || index>=pastTrips.length){
+    alert("Please enter a valid trip number.");
+    return;
+  }
+
+  const tripName=pastTrips[index].name || "Trip";
+
+  if(!confirm(
+    "Delete " + tripName + "?\n\n" +
+    "This removes only this past Trip.\n\n" +
+    "Normal leagues, players and current round will not be changed."
+  ))return;
+
+  pastTrips.splice(index,1);
+
+  state.trip.pastTrips=pastTrips;
+
+  await save();
+  render();
+
+  alert(tripName + " deleted.");
+}
+async function finishTrip(){
+
+  if(!state.trip?.completed){
+    alert("The Trip is not complete yet.");
+    return;
+  }
+
+  const tripName=state.trip.name || "Trip";
+
+  if(!confirm(
+    "🏁 Finish " + tripName + "?\n\n" +
+    "The completed Trip and final standings will be saved.\n\n" +
+    "Your normal round will then be restored."
+  ))return;
+
+  // Find the normal round backup
+  const backup=
+    state.trip?.normalRoundBackup ||
+    state.trip?.pastTrips?.[0]?.normalRoundBackup;
+
+  if(!backup){
+    alert(
+      "Normal round backup could not be found.\n\n" +
+      "The Trip has not been closed."
+    );
+    return;
+  }
+
+  // Keep existing archived trips separate
+  const existingPastTrips=[
+    ...(state.trip?.pastTrips || [])
+  ];
+
+  // Create a clean completed Trip copy.
+  // IMPORTANT: do not copy pastTrips into itself.
+  const completedTrip={
+    name:state.trip.name,
+    totalRounds:state.trip.totalRounds,
+    currentRound:state.trip.currentRound,
+    competition:state.trip.competition,
+    tripPointsValue:state.trip.tripPointsValue,
+    rounds:[...(state.trip.rounds || [])],
+    standings:{...(state.trip.standings || {})},
+    champion:state.trip.champion || null,
+    completed:true,
+    active:false,
+    normalRoundBackup:state.trip.normalRoundBackup || backup
+  };
+
+  const pastTrips=[
+    completedTrip,
+    ...existingPastTrips
+  ];
+
+  // Restore the normal weekly round
+  state.course=backup.course;
+  state.date=backup.date;
+  state.stake=backup.stake;
+  state.gameType=backup.gameType;
+  state.pointsCompetition=backup.pointsCompetition;
+  state.pointsValue=backup.pointsValue;
+
+  state.players=backup.players.map(p=>({
+    id:p.id,
+    name:p.name,
+    handicap:p.handicap,
+    paid:p.paid,
+    competition:p.competition,
+    stableford:p.stableford,
+    netScore:p.netScore,
+    wins:p.wins,
+    leaguePoints:p.leaguePoints,
+    netWinnings:p.netWinnings
+  }));
+
+  // Trip Mode is now closed,
+  // but completed Trips remain archived.
+  state.trip={
+    active:false,
+    name:"",
+    totalRounds:0,
+    currentRound:0,
+    competition:null,
+    tripPointsValue:10,
+    rounds:[],
+    standings:{},
+    champion:null,
+    completed:false,
+    pastTrips:pastTrips
+  };
+
+  await save();
+  show("round");
+
+  alert(
+    "🏁 " + tripName + " saved.\n\n" +
+    "Your normal round has been restored."
+  );
+}
+async function cancelTrip(){
+
+  if(!state.trip?.active){
+    alert("There is no active trip to cancel.");
+    return;
+  }
+
+  const tripName=state.trip.name || "Current Trip";
+
+  if(!confirm(
+    "Cancel " + tripName + "?\n\n" +
+    "This will remove the current Trip setup and Trip standings.\n\n" +
+    "Your normal Points League, Money League and previous rounds will not be changed."
+  ))return;
+const backup=state.trip?.normalRoundBackup;
+const pastTrips=state.trip?.pastTrips || [];
+
+if(backup){
+
+  state.course=backup.course;
+  state.date=backup.date;
+  state.stake=backup.stake;
+  state.gameType=backup.gameType;
+  state.pointsCompetition=backup.pointsCompetition;
+  state.pointsValue=backup.pointsValue;
+
+  state.players=backup.players.map(p=>({
+    id:p.id,
+    name:p.name,
+    handicap:p.handicap,
+    paid:p.paid,
+    competition:p.competition,
+    stableford:p.stableford,
+    netScore:p.netScore,
+    wins:p.wins,
+    leaguePoints:p.leaguePoints,
+    netWinnings:p.netWinnings
+  }));
+}
+
+state.trip={
+  active:false,
+  name:"",
+  totalRounds:0,
+  currentRound:0,
+  competition:null,
+  tripPointsValue:10,
+  rounds:[],
+  standings:{},
+  champion:null,
+  completed:false,
+  pastTrips:pastTrips
+};
+
+await save();
+show("round");
+
+alert("Trip cancelled. Your normal round has been restored.");
+}
+  async function resetPayments(){
+ if(!confirm("Mark everyone unpaid?"))return;
+ state.players.forEach(p=>p.paid=false);
+ render();
+ await save();
+}
+async function resetScores(){
+ if(!confirm("Clear all scores?"))return;
+ state.players.forEach(p=>{
+   p.stableford=null;
+   p.netScore=null;
+ });
+ render();
+ await save();
+}
+async function deleteLastRound(){
+  if(!state.history || !state.history.length){
+    alert("There are no completed rounds to delete.");
+    return;
+  }
+
+  const lastRound=state.history[0];
+
+  const winnerNames=(lastRound.winners||[]).join(", ") || "No winner recorded";
+
+  let extraText="";
+
+  if(lastRound.gameType==="points" && lastRound.pointsResults?.length){
+    extraText=
+      "\n\nPoints to be removed:\n" +
+      lastRound.pointsResults.map(r=>
+        r.name + " -" + r.points + " pts"
+      ).join("\n");
+  }
+
+  const deleteMessage=
+    "Delete this completed round?\n\n" +
+    lastRound.course + " • " + formatDate(lastRound.date) + "\n" +
+    "Winner: " + winnerNames +
+    extraText +
+    "\n\nThis will remove the round and correct the league stats.\n\n" +
+    "Are you sure?";
+
+  if(!confirm(deleteMessage))return;
+
+  // Undo winner win
+  (lastRound.winners||[]).forEach(name=>{
+    const p=state.players.find(x=>x.name===name);
+
+    if(p && (p.wins||0)>0){
+      p.wins=p.wins-1;
+    }
+  });
+
+  // Undo Points Game league points
+  if(lastRound.gameType==="points" && lastRound.pointsResults?.length){
+
+    lastRound.pointsResults.forEach(result=>{
+      const p=state.players.find(x=>x.name===result.name);
+
+      if(p){
+        p.leaguePoints=Math.max(
+          0,
+          Number(p.leaguePoints||0)-Number(result.points||0)
+        );
+      }
+    });
+  }
+
+  state.history.shift();
+
+  render();
+  await save();
+
+  alert("Last round deleted and league stats corrected.");
+}
+async function clearLeague(){
+ if(!confirm("Clear the entire league table and previous round history?"))return;
+
+ state.players.forEach(p=>{
+   p.wins=0;
+   p.leaguePoints=0;
+   p.netWinnings=0;
+ });
+
+ state.history=[];
+
+ render();
+ await save();
+
+ alert("League and previous round history cleared.");
+}
+function copyInvite(){
+  const url="https://imingolf.co.uk/app/?pin="+encodeURIComponent(pin);
+
+  const message=`⛳ I'm In Golf
+
+Join our golf group.
+
+Group PIN: ${pin}
+
+Open I'm In Golf here:
+${url}`;
+
+  navigator.clipboard?.writeText(message);
+  alert("Invite copied. Paste it into WhatsApp.");
+}
+function formatDate(d){
+ if(!d || !d.includes("-"))return d;
+ const [y,m,day]=d.split("-");
+ return `${Number(day)}.${Number(m)}.${y.slice(2)}`;
+}
+function esc(s){return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
+function escAttr(s){return esc(s)}
+</script>
+</body></html>
