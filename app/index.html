@@ -2785,7 +2785,7 @@ function adminPinForGroup(){
   return "8888";
 }
 function validAdminPin(value){
-  return /^\\d{4}$/.test(String(value||""));
+  return /^\d{4}$/.test(String(value||""));
 }
 function adminLogin(){
  const entered=prompt("Enter Admin PIN");
