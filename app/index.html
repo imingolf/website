@@ -68,7 +68,7 @@ nav button{flex:1;background:transparent;color:#6d756f;padding:11px 2px;font-siz
 <button id="nscores" onclick="show('scores')">🏌️<br>Scores</button>
 <button id="nleague" onclick="show('league')">🏆<br>League</button>
 <button id="nplayers" onclick="show('players')">👥<br>Players</button>
-<button id="nsettings" class="hidden" onclick="show('settings')">⚙️<br>Settings</button>
+<button id="nsettings" class="hidden" onclick="leaveManageGroups()">⚙️<br>Settings</button>
 </nav>
 </div>
 
@@ -2929,6 +2929,12 @@ ${isOwner ? `
   </button>
 </div>`;
  }
+function leaveManageGroups(){
+  page="settings";
+  if(db && !poller) startPolling();
+  show("settings");
+}
+
 async function manageGroupsPage(){
   if(!isAdmin || !isOwner || !ownerCreationCode){
     alert("I'm In Golf Owner access required.");
@@ -2941,19 +2947,23 @@ async function manageGroupsPage(){
   }
 
   page="managegroups";
+  clearInterval(poller);
+  poller=null;
+
   $("screen").innerHTML=`
     <div class="card">
       <h2>👥 Manage Groups</h2>
       <div class="muted">Loading groups…</div>
     </div>
     <div class="card">
-      <button class="ghost full" onclick="show('settings')">← Back to Owner Controls</button>
+      <button class="ghost full" onclick="leaveManageGroups()">← Back to Owner Controls</button>
     </div>`;
 
   const {data,error}=await db.rpc("owner_list_groups",{p_creation_code:ownerCreationCode});
 
   if(error){
     page="settings";
+    if(db && !poller) startPolling();
     render();
     alert("Manage Groups is ready in the app, but the Owner database function still needs to be added in Supabase.");
     return;
@@ -3044,6 +3054,7 @@ function ownerLogin(){
 function ownerLogout(){
   isOwner=false;
   ownerCreationCode="";
+  if(db && !poller) startPolling();
   render();
 }
 
