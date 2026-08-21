@@ -24,7 +24,7 @@ button{border:0;border-radius:12px;padding:11px 13px;font-weight:750;font-size:1
 input{width:100%;padding:11px;border:1px solid var(--line);border-radius:10px;font-size:16px;background:white;margin:5px 0 11px}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}.notice{background:#edf5ef;padding:11px;border-radius:12px;font-size:13px;margin:10px 0}.warning{background:#fff5dc}
 nav{position:fixed;left:50%;transform:translateX(-50%);bottom:0;width:min(520px,100%);padding:8px 8px calc(8px + env(safe-area-inset-bottom));background:white;border-top:1px solid var(--line);display:flex;z-index:20}
-nav button{flex:1;background:transparent;color:#6d756f;padding:11px 2px;font-size:13px;line-height:1.35}nav button.active{color:var(--green);font-weight:800}
+nav button{flex:1;background:transparent;color:#6d756f;padding:8px 2px;font-size:11px}nav button.active{color:var(--green);font-weight:800}
 .score{width:78px;margin:0}.pos{font-weight:800;font-size:18px;min-width:24px}.money{font-weight:800}
 #setupOverlay{position:fixed;inset:0;background:#f4f6f3;z-index:50;display:flex;align-items:flex-start;justify-content:center;padding:45px 16px;overflow:auto}
 .setup{width:min(480px,100%)}.hidden{display:none!important}
@@ -68,7 +68,7 @@ nav button{flex:1;background:transparent;color:#6d756f;padding:11px 2px;font-siz
 <button id="nscores" onclick="show('scores')">🏌️<br>Scores</button>
 <button id="nleague" onclick="show('league')">🏆<br>League</button>
 <button id="nplayers" onclick="show('players')">👥<br>Players</button>
-<button id="nsettings" class="hidden" onclick="leaveManageGroups()">⚙️<br>Settings</button>
+<button id="nsettings" class="hidden" onclick="show('settings')">⚙️<br>Settings</button>
 </nav>
 </div>
 
@@ -162,6 +162,41 @@ async function connect(){
  pin=$("pinInput").value.trim(); if(!pin){$("connectMsg").textContent="Enter your group PIN.";return}
  $("connectMsg").textContent="Opening shared group…";
  db=supabase.createClient(TENS_IN_CONFIG.supabaseUrl,TENS_IN_CONFIG.supabaseKey);
+
+ const {data:accessRows,error:accessError}=await db.rpc("get_group_access_status",{p_pin:pin});
+ if(accessError){$("connectMsg").textContent="Couldn't check group access. Please try again.";return}
+
+ const access=Array.isArray(accessRows) ? accessRows[0] : accessRows;
+ if(!access){$("connectMsg").textContent="PIN not recognised.";return}
+
+ if(access.access_allowed===false){
+   clearInterval(poller); poller=null;
+   $("setupOverlay").classList.add("hidden");
+   document.querySelector("nav").classList.add("hidden");
+   $("syncText").textContent="Group access unavailable";
+
+   if(access.access_reason==="trial_expired"){
+     $("screen").innerHTML=`
+       <div class="card" style="text-align:center;margin-top:18px;">
+         <div style="font-size:42px;margin-bottom:8px;">⏳</div>
+         <h2>Your free trial has ended</h2>
+         <p class="muted">${esc(access.group_name||"This group")}'s free trial has finished.</p>
+         <div class="notice"><b>Continue with I'm In Golf for £19.99 per year.</b><br>Annual subscription payment will be available here soon.</div>
+         <button class="secondary full" onclick="location.reload()">← Use a different Group PIN</button>
+       </div>`;
+   }else{
+     $("screen").innerHTML=`
+       <div class="card" style="text-align:center;margin-top:18px;">
+         <div style="font-size:42px;margin-bottom:8px;">🔒</div>
+         <h2>Group access suspended</h2>
+         <p class="muted">${esc(access.group_name||"This group")} is currently suspended.</p>
+         <div class="notice warning">Please contact the I'm In Golf administrator if you believe this is a mistake.</div>
+         <button class="secondary full" onclick="location.reload()">← Use a different Group PIN</button>
+       </div>`;
+   }
+   return;
+ }
+
  const {data,error}=await db.rpc("get_group_state",{p_pin:pin});
  if(error || !data){$("connectMsg").textContent="PIN not recognised, or database setup is incomplete.";return}
 state=data;
@@ -169,41 +204,6 @@ localStorage.setItem("tensInPin",pin);
 $("demoBadge").classList.toggle("hidden", pin!=="2026");
 $("setupOverlay").classList.add("hidden");
 $("syncText").textContent="Shared • everyone sees the same game";
-
-const setupTokenFromUrl=
-  new URLSearchParams(window.location.search).get("adminsetup");
-
-if(!state.adminPin && setupTokenFromUrl){
-  if(String(state.adminSetupToken||"")===String(setupTokenFromUrl)){
-    const first=prompt("Welcome, Group Admin!\\n\\nChoose your own 4-digit Admin PIN.");
-    if(first!==null){
-      const clean=String(first).trim();
-      if(!validAdminPin(clean)){
-        alert("Please choose exactly 4 numbers. Reopen the private setup link and try again.");
-      }else{
-        const second=prompt("Enter your new 4-digit Admin PIN again");
-        if(second!==null && String(second).trim()===clean){
-          state.adminPin=clean;
-          state.adminSetupToken="";
-          const saved=await save();
-          if(saved){
-            isAdmin=true;
-            sessionStorage.setItem("tensInAdmin","yes");
-            history.replaceState({},document.title,location.pathname+"?pin="+encodeURIComponent(pin));
-            alert("✅ Admin PIN created. You are now the Admin for this golf group.");
-          }else{
-            state.adminPin="";
-            alert("Admin PIN could not be saved. Reopen the setup link and try again.");
-          }
-        }else if(second!==null){
-          alert("The two PINs did not match. Reopen the private setup link and try again.");
-        }
-      }
-    }
-  }else{
-    alert("This Admin setup link is no longer valid.");
-  }
-}
 
 const existing=state.players.find(p=>p.id===myPlayerId);
 
@@ -240,10 +240,6 @@ async function save(){
 async function refresh(){
  if(!db)return;
 
- // Keep Owner utility screens on display.
- // Do not let the 5-second background sync redraw them while they are open.
- if(page==="admininvite" || page==="managegroups" || page==="editgroup")return;
-
  const editing=document.activeElement &&
    document.activeElement.tagName==="INPUT";
 
@@ -274,9 +270,6 @@ function render(){
   if(page==="playerstats" && statsPlayerId)showPlayerStats(statsPlayerId);
   if(page==="players")playersPage();
   if(page==="settings")settingsPage();
-  if(page==="admininvite")adminInvitePage();
-  if(page==="managegroups")manageGroupsPage();
-  if(page==="editgroup")editGroupPage();
 }
 function roundLocked(){
   return state.players.some(p=>p.stableford!=null || p.netScore!=null);
@@ -2758,9 +2751,6 @@ async function removePlayer(i){if(!confirm("Remove "+state.players[i].name+"? Th
 
 
 let isAdmin = sessionStorage.getItem("tensInAdmin")==="yes";
-let isOwner=false;
-let ownerCreationCode="";
-let lastAdminInvite="";
 function updateAdminUI(){
 
   const settingsButton=$("nsettings");
@@ -2786,59 +2776,14 @@ function updateAdminUI(){
     }
   }
 }
-function adminPinForGroup(){
-  if(Object.prototype.hasOwnProperty.call(state,"adminPin")){
-    return String(state.adminPin || "");
-  }
-  return "8888";
-}
-function validAdminPin(value){
-  return /^\d{4}$/.test(String(value||""));
-}
 function adminLogin(){
  const entered=prompt("Enter Admin PIN");
- if(entered===null)return;
- if(String(entered).trim()===adminPinForGroup()){
-   isAdmin=true;
-   sessionStorage.setItem("tensInAdmin","yes");
-   updateAdminUI();
-   show("settings");
- }else{
-   alert("Incorrect Admin PIN");
- }
-}
-async function changeAdminPin(){
-  if(!isAdmin)return;
-  const current=prompt("Enter current Admin PIN");
-  if(current===null)return;
-  if(String(current).trim()!==adminPinForGroup()){
-    alert("Current Admin PIN is incorrect.");
-    return;
-  }
-  const first=prompt("Choose a new 4-digit Admin PIN");
-  if(first===null)return;
-  const clean=String(first).trim();
-  if(!validAdminPin(clean)){
-    alert("Please choose exactly 4 numbers.");
-    return;
-  }
-  const second=prompt("Enter the new 4-digit PIN again");
-  if(second===null)return;
-  if(String(second).trim()!==clean){
-    alert("The two PINs did not match.");
-    return;
-  }
-  state.adminPin=clean;
-  const ok=await save();
-  alert(ok ? "✅ Admin PIN changed for this golf group." : "The new Admin PIN could not be saved. Please try again.");
+ if(entered==="8888"){
+   isAdmin=true; sessionStorage.setItem("tensInAdmin","yes"); updateAdminUI(); show("settings");
+ } else if(entered!==null){ alert("Incorrect Admin PIN"); }
 }
 function adminLogout(){
- isAdmin=false;
- isOwner=false;
- ownerCreationCode="";
- sessionStorage.removeItem("tensInAdmin");
- updateAdminUI();
- show("round");
+ isAdmin=false; sessionStorage.removeItem("tensInAdmin"); updateAdminUI(); show("round");
 }
 
 function settingsPage(){
@@ -2891,38 +2836,19 @@ ${state.trip?.pastTrips?.length ? `
   <button class="ghost full" onclick="copyInvite()">
     Copy invite message
   </button>
-  <button class="secondary full" onclick="changeAdminPin()">
-    🔐 Change Admin PIN
-  </button>
 </div>
 
-${isOwner ? `
 <div class="card">
-  <h2>🔐 Owner Controls</h2>
+  <h2>➕ New Golf Group</h2>
 
-  <div class="notice">
-    Owner access active.
+  <div class="muted">
+    Owner only. Create a separate group with its own unique PIN.
   </div>
 
   <button class="primary full" onclick="createNewGolfGroup()">
     ➕ Create New Group
   </button>
-
-  <button class="secondary full" onclick="manageGroupsPage()">
-    👥 Manage Groups
-  </button>
-
-  <button class="ghost full" onclick="ownerLogout()">
-    Leave Owner Mode
-  </button>
 </div>
-` : `
-<div class="card">
-  <button class="ghost full" onclick="ownerLogin()">
-    🔐 Owner Access
-  </button>
-</div>
-`}
 
 <div class="card">
   <button class="red full" onclick="adminLogout()">
@@ -2930,418 +2856,10 @@ ${isOwner ? `
   </button>
 </div>`;
  }
-let ownerGroups=[];
-let ownerEditGroupPin="";
-
-function leaveManageGroups(){
-  page="settings";
-  if(db && !poller) startPolling();
-  show("settings");
-}
-
-function backToManageGroups(){
-  ownerEditGroupPin="";
-  manageGroupsPage();
-}
-
-async function manageGroupsPage(){
-  if(!isAdmin || !isOwner || !ownerCreationCode){
-    alert("I'm In Golf Owner access required.");
-    show("settings");
-    return;
-  }
-  if(!db){
-    alert("Database connection is not available.");
-    return;
-  }
-
-  page="managegroups";
-  clearInterval(poller);
-  poller=null;
-
-  $("screen").innerHTML=`
-    <div class="card">
-      <h2>👥 Manage Groups</h2>
-      <div class="muted">Loading groups…</div>
-    </div>
-    <div class="card">
-      <button class="ghost full" onclick="leaveManageGroups()">← Back to Owner Controls</button>
-    </div>`;
-
-  const {data,error}=await db.rpc("owner_list_groups",{p_creation_code:ownerCreationCode});
-
-  if(error){
-    page="settings";
-    if(db && !poller) startPolling();
-    render();
-    alert("Manage Groups is ready in the app, but the Owner database function still needs to be added in Supabase.");
-    return;
-  }
-
-  const groups=Array.isArray(data) ? data : [];
-  ownerGroups=groups;
-
-  $("screen").innerHTML=`
-    <div class="card">
-      <h2>👥 Manage Groups</h2>
-      <div class="muted">${groups.length} group${groups.length===1?"":"s"} in I'm In Golf</div>
-      <div class="notice">Owner management — edit customer and subscription details. Test/customer groups can also be deleted.</div>
-    </div>
-
-    ${groups.length ? groups.map(g=>{
-      const plan=String(g.plan_type||"trial");
-      const status=String(g.status||"active");
-      const paid=String(g.paid_status||"unpaid");
-      let trialText="";
-
-      if(plan==="trial" && g.trial_expiry_date){
-        const today=new Date(); today.setHours(0,0,0,0);
-        const expiry=new Date(String(g.trial_expiry_date)+"T00:00:00");
-        const days=Math.ceil((expiry-today)/86400000);
-        trialText=days<0
-          ? `Trial expired ${Math.abs(days)} day${Math.abs(days)===1?"":"s"} ago`
-          : days===0 ? "Trial expires today"
-          : `${days} day${days===1?"":"s"} remaining`;
-      }
-
-      return `
-        <div class="card">
-          <div class="row">
-            <div>
-              <div class="muted">GROUP</div>
-              <h2 style="margin:2px 0 4px;">${esc(g.group_name||"Unnamed Group")}</h2>
-              <div class="muted">PIN ${esc(g.group_pin||"")}</div>
-            </div>
-            <span class="pill ${status==="active"?"paid":"danger"}">${esc(status.toUpperCase())}</span>
-          </div>
-
-          <div class="player row">
-            <div><div class="muted">Plan</div><b>${plan==="internal"?"Internal":plan==="trial"?"Free Trial":esc(plan)}</b></div>
-            <div style="text-align:right;"><div class="muted">Payment</div><b>${paid==="not_applicable"?"N/A":esc(paid)}</b></div>
-          </div>
-
-          ${(g.admin_name||g.admin_contact) ? `
-            <div class="player">
-              ${g.admin_name?`<div><span class="muted">Admin/Customer: </span><b>${esc(g.admin_name)}</b></div>`:""}
-              ${g.admin_contact?`<div class="muted" style="margin-top:4px;">Contact: ${esc(g.admin_contact)}</div>`:""}
-            </div>
-          ` : ""}
-          ${g.created_at?`<div class="muted">Created: ${esc(formatOwnerDate(g.created_at))}</div>`:""}
-          ${g.trial_expiry_date?`<div class="muted">Trial expiry: ${esc(formatOwnerDate(g.trial_expiry_date))}</div>`:""}
-          ${trialText?`<div class="notice ${trialText.startsWith("Trial expired")?"warning":""}">${esc(trialText)}</div>`:""}
-
-          <button class="secondary full" onclick="openEditGroup('${escAttr(g.group_pin||"")}')">
-            ✏️ Edit Group
-          </button>
-
-          ${String(g.group_pin)!=="1010" ? `
-            <button class="red full" onclick="deleteOwnerGroup('${escAttr(g.group_pin||"")}')">
-              🗑️ Delete Group
-            </button>
-          ` : `
-            <div class="notice" style="margin-top:10px;">
-              🔐 Owner group protected — cannot be deleted.
-            </div>
-          `}
-        </div>`;
-    }).join("") : `<div class="card"><div class="muted">No groups found.</div></div>`}
-
-    <div class="card">
-      <button class="ghost full" onclick="leaveManageGroups()">← Back to Owner Controls</button>
-    </div>`;
-
-  window.scrollTo(0,0);
-}
-
-
-
-async function deleteOwnerGroup(groupPin){
-
-  if(!db || !isAdmin || !isOwner || !ownerCreationCode){
-    alert("I'm In Golf Owner access required.");
-    return;
-  }
-
-  const cleanPin=String(groupPin||"");
-
-  if(cleanPin==="1010"){
-    alert("🔐 The Owner group cannot be deleted.");
-    return;
-  }
-
-  const g=ownerGroups.find(
-    x=>String(x.group_pin)===cleanPin
-  );
-
-  if(!g){
-    alert("Group could not be found.");
-    return;
-  }
-
-  const groupName=String(g.group_name||"Unnamed Group");
-
-  const firstConfirm=confirm(
-    "🗑️ Delete " + groupName + "?\n\n" +
-    "Group PIN: " + cleanPin + "\n\n" +
-    "This permanently removes this group and its saved group data.\n\n" +
-    "This cannot be undone."
-  );
-
-  if(!firstConfirm)return;
-
-  const typed=prompt(
-    "Final confirmation\n\n" +
-    "Type the Group PIN " + cleanPin + " to permanently delete " + groupName + "."
-  );
-
-  if(typed===null)return;
-
-  if(String(typed).trim()!==cleanPin){
-    alert("Group PIN did not match. Nothing was deleted.");
-    return;
-  }
-
-  const {error}=await db.rpc(
-    "owner_delete_group",
-    {
-      p_creation_code:ownerCreationCode,
-      p_group_pin:cleanPin
-    }
-  );
-
-  if(error){
-    alert(
-      "Group could not be deleted.\n\n" +
-      (error.message||"Please try again.")
-    );
-    return;
-  }
-
-  alert("✅ " + groupName + " deleted.");
-  await manageGroupsPage();
-}
-
-function openEditGroup(groupPin){
-  ownerEditGroupPin=String(groupPin||"");
-  page="editgroup";
-  clearInterval(poller);
-  poller=null;
-  editGroupPage();
-  window.scrollTo(0,0);
-}
-
-function ownerDateInput(value){
-  if(!value)return "";
-  return String(value).slice(0,10);
-}
-
-function editGroupPage(){
-  if(!isAdmin || !isOwner || !ownerCreationCode){
-    alert("I'm In Golf Owner access required.");
-    leaveManageGroups();
-    return;
-  }
-
-  const g=ownerGroups.find(x=>String(x.group_pin)===String(ownerEditGroupPin));
-
-  if(!g){
-    alert("Group details could not be found.");
-    manageGroupsPage();
-    return;
-  }
-
-  const protectedGroup=String(g.group_pin)==="1010";
-
-  $("screen").innerHTML=`
-    <div class="card">
-      <div class="muted">EDIT GROUP</div>
-      <h2 style="font-size:24px;margin:3px 0;">${esc(g.group_name||"Unnamed Group")}</h2>
-      <div class="muted">PIN ${esc(g.group_pin||"")}</div>
-      ${protectedGroup ? `<div class="notice">🔐 Owner group protection is active for this group.</div>` : ""}
-    </div>
-
-    <div class="card">
-      <label class="muted">Admin / customer name</label>
-      <input id="ownerAdminName" value="${escAttr(g.admin_name||"")}" placeholder="Name">
-
-      <label class="muted">Contact</label>
-      <input id="ownerAdminContact" value="${escAttr(g.admin_contact||"")}" placeholder="Email or phone">
-
-      <label class="muted">Plan</label>
-      <select id="ownerPlanType" ${protectedGroup?"disabled":""} style="width:100%;padding:11px;border:1px solid var(--line);border-radius:10px;font-size:16px;background:white;margin:5px 0 11px;">
-        <option value="trial" ${String(g.plan_type)==="trial"?"selected":""}>Free Trial</option>
-        <option value="paid" ${String(g.plan_type)==="paid"?"selected":""}>Paid</option>
-        <option value="internal" ${String(g.plan_type)==="internal"?"selected":""}>Internal</option>
-      </select>
-
-      <label class="muted">Trial expiry date</label>
-      <input id="ownerTrialExpiry" type="date" value="${escAttr(ownerDateInput(g.trial_expiry_date))}">
-
-      <label class="muted">Payment status</label>
-      <select id="ownerPaidStatus" style="width:100%;padding:11px;border:1px solid var(--line);border-radius:10px;font-size:16px;background:white;margin:5px 0 11px;">
-        <option value="unpaid" ${String(g.paid_status)==="unpaid"?"selected":""}>Unpaid</option>
-        <option value="paid" ${String(g.paid_status)==="paid"?"selected":""}>Paid</option>
-        <option value="not_applicable" ${String(g.paid_status)==="not_applicable"?"selected":""}>N/A</option>
-      </select>
-
-      <label class="muted">Renewal date</label>
-      <input id="ownerRenewalDate" type="date" value="${escAttr(ownerDateInput(g.renewal_date))}">
-
-      <label class="muted">Status</label>
-      <select id="ownerGroupStatus" ${protectedGroup?"disabled":""} style="width:100%;padding:11px;border:1px solid var(--line);border-radius:10px;font-size:16px;background:white;margin:5px 0 11px;">
-        <option value="active" ${String(g.status||"active")==="active"?"selected":""}>Active</option>
-        <option value="suspended" ${String(g.status)==="suspended"?"selected":""}>Suspended</option>
-      </select>
-
-      <label class="muted">Notes</label>
-      <input id="ownerNotes" value="${escAttr(g.notes||"")}" placeholder="Optional notes">
-
-      <button class="primary full" onclick="saveOwnerGroupEdit()">💾 Save Changes</button>
-      <button class="ghost full" onclick="backToManageGroups()">← Cancel</button>
-    </div>`;
-}
-
-async function saveOwnerGroupEdit(){
-  if(!db || !isOwner || !ownerCreationCode)return;
-
-  const g=ownerGroups.find(x=>String(x.group_pin)===String(ownerEditGroupPin));
-  if(!g)return;
-
-  const protectedGroup=String(g.group_pin)==="1010";
-
-  const args={
-    p_creation_code:ownerCreationCode,
-    p_group_pin:String(g.group_pin),
-    p_admin_name:$("ownerAdminName").value.trim(),
-    p_admin_contact:$("ownerAdminContact").value.trim(),
-    p_plan_type:protectedGroup ? "internal" : $("ownerPlanType").value,
-    p_trial_expiry_date:$("ownerTrialExpiry").value || null,
-    p_paid_status:$("ownerPaidStatus").value,
-    p_renewal_date:$("ownerRenewalDate").value || null,
-    p_status:protectedGroup ? "active" : $("ownerGroupStatus").value,
-    p_notes:$("ownerNotes").value.trim()
-  };
-
-  const saveButton=document.querySelector('#screen button.primary');
-  if(saveButton){
-    saveButton.disabled=true;
-    saveButton.textContent="Saving…";
-  }
-
-  const {error}=await db.rpc("owner_update_group",args);
-
-  if(error){
-    if(saveButton){
-      saveButton.disabled=false;
-      saveButton.textContent="💾 Save Changes";
-    }
-    alert("Group changes could not be saved.\n\n" + (error.message||"Please try again."));
-    return;
-  }
-
-  alert("✅ Group details updated.");
-  ownerEditGroupPin="";
-  await manageGroupsPage();
-}
-
-function formatOwnerDate(value){
-  if(!value)return "";
-  const d=new Date(value);
-  if(Number.isNaN(d.getTime()))return String(value);
-  return d.toLocaleDateString("en-GB",{day:"2-digit",month:"2-digit",year:"numeric"});
-}
-
-function ownerLogin(){
-  if(!isAdmin){
-    alert("Admin access required first.");
-    return;
-  }
-
-  const entered=prompt("Enter your private I'm In Golf owner creation code");
-  if(entered===null)return;
-
-  const clean=entered.trim();
-
-  if(!clean){
-    alert("Owner creation code is required.");
-    return;
-  }
-
-  ownerCreationCode=clean;
-  isOwner=true;
-  render();
-}
-
-function ownerLogout(){
-  isOwner=false;
-  ownerCreationCode="";
-  if(db && !poller) startPolling();
-  render();
-}
-
-function adminInvitePage(){
-  if(!lastAdminInvite){
-    show("settings");
-    return;
-  }
-
-  const lines=lastAdminInvite.split("\n");
-  const groupLine=lines.find(line=>line.startsWith("You've been invited to manage:")) || "";
-  const pinLine=lines.find(line=>line.startsWith("Group PIN:")) || "";
-
-  const groupName=groupLine.replace("You've been invited to manage:","").trim();
-  const newPin=pinLine.replace("Group PIN:","").trim();
-
-  $("screen").innerHTML=`
-    <div class="card">
-      <h2>✅ New group created!</h2>
-      <div class="big">${esc(groupName || "New Golf Group")}</div>
-      <div class="notice">
-        <b>Group PIN: ${esc(newPin)}</b><br>
-        Send the private Admin invite to the person who will manage this group.
-      </div>
-    </div>
-
-    <div class="card">
-      <h2>📤 Admin invite</h2>
-      <button class="primary full" onclick="shareAdminInvite()">
-        📤 Share Admin Invite
-      </button>
-      <button class="secondary full" onclick="copyAdminInvite()">
-        📋 Copy Admin Invite
-      </button>
-      <button class="ghost full" onclick="show('settings')">
-        Back to Settings
-      </button>
-    </div>`;
-}
-
-async function copyAdminInvite(){
-  if(!lastAdminInvite){ alert("Create a new group first."); return; }
-  try{
-    await navigator.clipboard.writeText(lastAdminInvite);
-    alert("✅ Admin invite copied.");
-  }catch(e){
-    prompt("Copy this Admin invite:",lastAdminInvite);
-  }
-}
-async function shareAdminInvite(){
-  if(!lastAdminInvite){ alert("Create a new group first."); return; }
-  if(navigator.share){
-    try{
-      await navigator.share({title:"I'm In Golf – Admin Invite",text:lastAdminInvite});
-      return;
-    }catch(e){
-      if(e && e.name==="AbortError")return;
-    }
-  }
-  await copyAdminInvite();
-}
-
 async function createNewGolfGroup(){
 
-  if(!isAdmin || !isOwner || !ownerCreationCode){
-    alert("I'm In Golf Owner access required.");
+  if(!isAdmin){
+    alert("Admin access required.");
     return;
   }
 
@@ -3360,6 +2878,14 @@ async function createNewGolfGroup(){
     return;
   }
 
+  const creationCode=prompt("Enter your private owner creation code:");
+  if(creationCode===null)return;
+
+  if(!creationCode.trim()){
+    alert("Creation code is required.");
+    return;
+  }
+
   const newState={
     course:"",
     date:"",
@@ -3367,8 +2893,6 @@ async function createNewGolfGroup(){
     gameType:"money",
     pointsCompetition:"stableford",
     pointsValue:10,
-    adminPin:"",
-    adminSetupToken:"",
     players:[],
     history:[]
   };
@@ -3378,52 +2902,35 @@ async function createNewGolfGroup(){
     {
       p_group_name:cleanGroupName,
       p_state:newState,
-      p_creation_code:ownerCreationCode
+      p_creation_code:creationCode.trim()
     }
   );
 
   if(error){
-    isOwner=false;
-    ownerCreationCode="";
-    render();
-    alert("Owner access was not accepted.\n\nCheck your private owner creation code and try again.");
+    alert("Group could not be created.\n\nCheck your private creation code and try again.");
     return;
   }
 
   const newPin=String(data);
-  const setupToken=
-    (crypto.randomUUID ? crypto.randomUUID() :
-      (Date.now().toString(36)+Math.random().toString(36).slice(2)));
-
-  const createdState={...newState,adminSetupToken:setupToken};
-  const {error:setupError}=await db.rpc(
-    "save_group_state",
-    {p_pin:newPin,p_state:createdState}
-  );
-
-  if(setupError){
-    alert("The group was created, but Admin setup could not be prepared. Please try again before sending the invite.");
-    return;
-  }
 
   const invite=
 `⛳ I'm In Golf
 
-You've been invited to manage: ${cleanGroupName}
+Join our golf group: ${cleanGroupName}
 
 Group PIN: ${newPin}
 
-Open this private Admin setup link:
-https://imingolf.co.uk/app/?pin=${encodeURIComponent(newPin)}&adminsetup=${encodeURIComponent(setupToken)}
+Open I'm In Golf here:
+https://imingolf.co.uk/app/?pin=${encodeURIComponent(newPin)}`;
 
-On first opening, you'll be asked to choose your own 4-digit Admin PIN.
+  navigator.clipboard?.writeText(invite);
 
-Keep this setup link private.`;
-
-  lastAdminInvite=invite;
-  page="admininvite";
-  adminInvitePage();
-  window.scrollTo(0,0);
+  alert(
+    "✅ New group created!\n\n" +
+    cleanGroupName +
+    "\n\nGroup PIN: " + newPin +
+    "\n\nThe invite message has been copied."
+  );
 }
 
 function competitionReminder(){
