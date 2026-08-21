@@ -170,6 +170,41 @@ $("demoBadge").classList.toggle("hidden", pin!=="2026");
 $("setupOverlay").classList.add("hidden");
 $("syncText").textContent="Shared • everyone sees the same game";
 
+const setupTokenFromUrl=
+  new URLSearchParams(window.location.search).get("adminsetup");
+
+if(!state.adminPin && setupTokenFromUrl){
+  if(String(state.adminSetupToken||"")===String(setupTokenFromUrl)){
+    const first=prompt("Welcome, Group Admin!\\n\\nChoose your own 4-digit Admin PIN.");
+    if(first!==null){
+      const clean=String(first).trim();
+      if(!validAdminPin(clean)){
+        alert("Please choose exactly 4 numbers. Reopen the private setup link and try again.");
+      }else{
+        const second=prompt("Enter your new 4-digit Admin PIN again");
+        if(second!==null && String(second).trim()===clean){
+          state.adminPin=clean;
+          state.adminSetupToken="";
+          const saved=await save();
+          if(saved){
+            isAdmin=true;
+            sessionStorage.setItem("tensInAdmin","yes");
+            history.replaceState({},document.title,location.pathname+"?pin="+encodeURIComponent(pin));
+            alert("✅ Admin PIN created. You are now the Admin for this golf group.");
+          }else{
+            state.adminPin="";
+            alert("Admin PIN could not be saved. Reopen the setup link and try again.");
+          }
+        }else if(second!==null){
+          alert("The two PINs did not match. Reopen the private setup link and try again.");
+        }
+      }
+    }
+  }else{
+    alert("This Admin setup link is no longer valid.");
+  }
+}
+
 const existing=state.players.find(p=>p.id===myPlayerId);
 
 if(existing){
@@ -2743,11 +2778,51 @@ function updateAdminUI(){
     }
   }
 }
+function adminPinForGroup(){
+  if(Object.prototype.hasOwnProperty.call(state,"adminPin")){
+    return String(state.adminPin || "");
+  }
+  return "8888";
+}
+function validAdminPin(value){
+  return /^\\d{4}$/.test(String(value||""));
+}
 function adminLogin(){
  const entered=prompt("Enter Admin PIN");
- if(entered==="8888"){
-   isAdmin=true; sessionStorage.setItem("tensInAdmin","yes"); updateAdminUI(); show("settings");
- } else if(entered!==null){ alert("Incorrect Admin PIN"); }
+ if(entered===null)return;
+ if(String(entered).trim()===adminPinForGroup()){
+   isAdmin=true;
+   sessionStorage.setItem("tensInAdmin","yes");
+   updateAdminUI();
+   show("settings");
+ }else{
+   alert("Incorrect Admin PIN");
+ }
+}
+async function changeAdminPin(){
+  if(!isAdmin)return;
+  const current=prompt("Enter current Admin PIN");
+  if(current===null)return;
+  if(String(current).trim()!==adminPinForGroup()){
+    alert("Current Admin PIN is incorrect.");
+    return;
+  }
+  const first=prompt("Choose a new 4-digit Admin PIN");
+  if(first===null)return;
+  const clean=String(first).trim();
+  if(!validAdminPin(clean)){
+    alert("Please choose exactly 4 numbers.");
+    return;
+  }
+  const second=prompt("Enter the new 4-digit PIN again");
+  if(second===null)return;
+  if(String(second).trim()!==clean){
+    alert("The two PINs did not match.");
+    return;
+  }
+  state.adminPin=clean;
+  const ok=await save();
+  alert(ok ? "✅ Admin PIN changed for this golf group." : "The new Admin PIN could not be saved. Please try again.");
 }
 function adminLogout(){
  isAdmin=false;
@@ -2808,11 +2883,14 @@ ${state.trip?.pastTrips?.length ? `
   <button class="ghost full" onclick="copyInvite()">
     Copy invite message
   </button>
+  <button class="secondary full" onclick="changeAdminPin()">
+    🔐 Change Admin PIN
+  </button>
 </div>
 
 ${isOwner ? `
 <div class="card">
-  <h2>👑 I'm In Golf Owner</h2>
+  <h2>🔐 Owner Controls</h2>
 
   <div class="notice">
     Owner access active.
@@ -2829,7 +2907,7 @@ ${isOwner ? `
 ` : `
 <div class="card">
   <button class="ghost full" onclick="ownerLogin()">
-    👑 I'm In Golf Owner
+    🔐 Owner Access
   </button>
 </div>
 `}
@@ -2896,6 +2974,8 @@ async function createNewGolfGroup(){
     gameType:"money",
     pointsCompetition:"stableford",
     pointsValue:10,
+    adminPin:"",
+    adminSetupToken:"",
     players:[],
     history:[]
   };
@@ -2918,16 +2998,34 @@ async function createNewGolfGroup(){
   }
 
   const newPin=String(data);
+  const setupToken=
+    (crypto.randomUUID ? crypto.randomUUID() :
+      (Date.now().toString(36)+Math.random().toString(36).slice(2)));
+
+  const createdState={...newState,adminSetupToken:setupToken};
+  const {error:setupError}=await db.rpc(
+    "save_group_state",
+    {p_pin:newPin,p_state:createdState}
+  );
+
+  if(setupError){
+    alert("The group was created, but Admin setup could not be prepared. Please try again before sending the invite.");
+    return;
+  }
 
   const invite=
 `⛳ I'm In Golf
 
-Join our golf group: ${cleanGroupName}
+You've been invited to manage: ${cleanGroupName}
 
 Group PIN: ${newPin}
 
-Open I'm In Golf here:
-https://imingolf.co.uk/app/?pin=${encodeURIComponent(newPin)}`;
+Open this private Admin setup link:
+https://imingolf.co.uk/app/?pin=${encodeURIComponent(newPin)}&adminsetup=${encodeURIComponent(setupToken)}
+
+On first opening, you'll be asked to choose your own 4-digit Admin PIN.
+
+Keep this setup link private.`;
 
   navigator.clipboard?.writeText(invite);
 
