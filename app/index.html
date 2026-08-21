@@ -2753,6 +2753,7 @@ async function removePlayer(i){if(!confirm("Remove "+state.players[i].name+"? Th
 let isAdmin = sessionStorage.getItem("tensInAdmin")==="yes";
 let isOwner=false;
 let ownerCreationCode="";
+let lastAdminInvite="";
 function updateAdminUI(){
 
   const settingsButton=$("nsettings");
@@ -2945,6 +2946,28 @@ function ownerLogout(){
   render();
 }
 
+async function copyAdminInvite(){
+  if(!lastAdminInvite){ alert("Create a new group first."); return; }
+  try{
+    await navigator.clipboard.writeText(lastAdminInvite);
+    alert("✅ Admin invite copied.");
+  }catch(e){
+    prompt("Copy this Admin invite:",lastAdminInvite);
+  }
+}
+async function shareAdminInvite(){
+  if(!lastAdminInvite){ alert("Create a new group first."); return; }
+  if(navigator.share){
+    try{
+      await navigator.share({title:"I'm In Golf – Admin Invite",text:lastAdminInvite});
+      return;
+    }catch(e){
+      if(e && e.name==="AbortError")return;
+    }
+  }
+  await copyAdminInvite();
+}
+
 async function createNewGolfGroup(){
 
   if(!isAdmin || !isOwner || !ownerCreationCode){
@@ -3027,14 +3050,25 @@ On first opening, you'll be asked to choose your own 4-digit Admin PIN.
 
 Keep this setup link private.`;
 
-  navigator.clipboard?.writeText(invite);
+  lastAdminInvite=invite;
 
-  alert(
-    "✅ New group created!\n\n" +
-    cleanGroupName +
-    "\n\nGroup PIN: " + newPin +
-    "\n\nThe invite message has been copied."
-  );
+  $("screen").innerHTML=`
+    <div class="card">
+      <h2>✅ New group created!</h2>
+      <div class="big">${esc(cleanGroupName)}</div>
+      <div class="notice">
+        <b>Group PIN: ${esc(newPin)}</b><br>
+        Send the private Admin invite to the person who will manage this group.
+      </div>
+    </div>
+    <div class="card">
+      <h2>📤 Admin invite</h2>
+      <button class="primary full" onclick="shareAdminInvite()">📤 Share Admin Invite</button>
+      <button class="secondary full" onclick="copyAdminInvite()">📋 Copy Admin Invite</button>
+      <button class="ghost full" onclick="show('settings')">Back to Settings</button>
+    </div>`;
+
+  window.scrollTo(0,0);
 }
 
 function competitionReminder(){
