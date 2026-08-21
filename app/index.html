@@ -2716,6 +2716,8 @@ async function removePlayer(i){if(!confirm("Remove "+state.players[i].name+"? Th
 
 
 let isAdmin = sessionStorage.getItem("tensInAdmin")==="yes";
+let isOwner=false;
+let ownerCreationCode="";
 function updateAdminUI(){
 
   const settingsButton=$("nsettings");
@@ -2748,7 +2750,12 @@ function adminLogin(){
  } else if(entered!==null){ alert("Incorrect Admin PIN"); }
 }
 function adminLogout(){
- isAdmin=false; sessionStorage.removeItem("tensInAdmin"); updateAdminUI(); show("round");
+ isAdmin=false;
+ isOwner=false;
+ ownerCreationCode="";
+ sessionStorage.removeItem("tensInAdmin");
+ updateAdminUI();
+ show("round");
 }
 
 function settingsPage(){
@@ -2803,17 +2810,29 @@ ${state.trip?.pastTrips?.length ? `
   </button>
 </div>
 
+${isOwner ? `
 <div class="card">
-  <h2>➕ New Golf Group</h2>
+  <h2>👑 I'm In Golf Owner</h2>
 
-  <div class="muted">
-    Owner only. Create a separate group with its own unique PIN.
+  <div class="notice">
+    Owner access active.
   </div>
 
   <button class="primary full" onclick="createNewGolfGroup()">
     ➕ Create New Group
   </button>
+
+  <button class="ghost full" onclick="ownerLogout()">
+    Leave Owner Mode
+  </button>
 </div>
+` : `
+<div class="card">
+  <button class="ghost full" onclick="ownerLogin()">
+    👑 I'm In Golf Owner
+  </button>
+</div>
+`}
 
 <div class="card">
   <button class="red full" onclick="adminLogout()">
@@ -2821,10 +2840,37 @@ ${state.trip?.pastTrips?.length ? `
   </button>
 </div>`;
  }
+function ownerLogin(){
+  if(!isAdmin){
+    alert("Admin access required first.");
+    return;
+  }
+
+  const entered=prompt("Enter your private I'm In Golf owner creation code");
+  if(entered===null)return;
+
+  const clean=entered.trim();
+
+  if(!clean){
+    alert("Owner creation code is required.");
+    return;
+  }
+
+  ownerCreationCode=clean;
+  isOwner=true;
+  render();
+}
+
+function ownerLogout(){
+  isOwner=false;
+  ownerCreationCode="";
+  render();
+}
+
 async function createNewGolfGroup(){
 
-  if(!isAdmin){
-    alert("Admin access required.");
+  if(!isAdmin || !isOwner || !ownerCreationCode){
+    alert("I'm In Golf Owner access required.");
     return;
   }
 
@@ -2840,14 +2886,6 @@ async function createNewGolfGroup(){
 
   if(!cleanGroupName){
     alert("Please enter a group name.");
-    return;
-  }
-
-  const creationCode=prompt("Enter your private owner creation code:");
-  if(creationCode===null)return;
-
-  if(!creationCode.trim()){
-    alert("Creation code is required.");
     return;
   }
 
@@ -2867,12 +2905,15 @@ async function createNewGolfGroup(){
     {
       p_group_name:cleanGroupName,
       p_state:newState,
-      p_creation_code:creationCode.trim()
+      p_creation_code:ownerCreationCode
     }
   );
 
   if(error){
-    alert("Group could not be created.\n\nCheck your private creation code and try again.");
+    isOwner=false;
+    ownerCreationCode="";
+    render();
+    alert("Owner access was not accepted.\n\nCheck your private owner creation code and try again.");
     return;
   }
 
