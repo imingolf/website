@@ -440,6 +440,7 @@ function render(){
   if(page==="admininvite")adminInvitePage();
   if(page==="managegroups")manageGroupsPage();
   if(page==="editgroup")editGroupPage();
+  if(page==="tripsummary")showTripSummary();
 }
 function roundLocked(){
   return state.players.some(p=>
@@ -528,7 +529,148 @@ function stablefordPot(){
 function netPot(){
   return Number(state.stake||0)*netPaidCount();
 }
+function tripStandingsSorted(){
+  const standings=state.trip?.standings || {};
+  return Object.entries(standings)
+    .map(([name,points])=>({name,points:Number(points||0)}))
+    .sort((a,b)=>b.points-a.points || a.name.localeCompare(b.name));
+}
+
+function tripRoundWinner(record){
+  if(!record)return null;
+
+  if(record.gameType==="points"){
+    const first=(record.pointsResults||[])[0];
+    if(!first)return null;
+    return {
+      name:first.name,
+      score:record.pointsCompetition==="net"
+        ? "Net " + first.score
+        : first.score + " pts",
+      label:record.pointsCompetition==="net" ? "Net" : "Stableford"
+    };
+  }
+
+  const comp=state.trip?.competition || "stableford";
+
+  if(comp==="net"){
+    const name=(record.netWinnerNames||[])[0];
+    if(!name)return null;
+    const p=(record.players||[]).find(x=>x.name===name);
+    return {
+      name,
+      score:p?.noReturn===true ? "NR" : (p?.netScore!=null ? "Net "+p.netScore : ""),
+      label:"Net"
+    };
+  }
+
+  const name=(record.stablefordWinnerNames||[])[0];
+  if(!name)return null;
+  const p=(record.players||[]).find(x=>x.name===name);
+  return {
+    name,
+    score:p?.stableford!=null ? p.stableford+" pts" : "",
+    label:"Stableford"
+  };
+}
+
+function setTripChampion(){
+  if(!state.trip)return;
+  const sorted=tripStandingsSorted();
+  state.trip.champion=sorted.length ? sorted[0].name : null;
+}
+
+function showTripSummary(){
+  const trip=state.trip || {};
+  const rounds=trip.rounds || [];
+  const standings=tripStandingsSorted();
+  const champion=trip.champion || standings[0]?.name || null;
+
+  page="tripsummary";
+  clearInterval(poller);
+  poller=null;
+
+  $("screen").innerHTML=`
+    <div class="card" style="text-align:center;">
+      <div style="font-size:50px;">🏆</div>
+      <div class="muted">TRIP COMPLETE</div>
+      <h2 style="font-size:28px;margin:6px 0;">${esc(trip.name || "Golf Trip")}</h2>
+      <div class="muted">${rounds.length} round${rounds.length===1?"":"s"} completed</div>
+    </div>
+
+    ${champion ? `
+      <div class="card" style="text-align:center;">
+        <div style="font-size:38px;">👑</div>
+        <div class="muted">TRIP WINNER</div>
+        <h2 style="font-size:28px;margin:6px 0;">${esc(champion)}</h2>
+        <div class="big">${Number((trip.standings||{})[champion]||0)} pts</div>
+      </div>
+    ` : ""}
+
+    <div class="card">
+      <h2>📅 Daily results</h2>
+      ${rounds.length ? rounds.map((r,i)=>{
+        const w=tripRoundWinner(r);
+        const gameLabel=r.gameType==="points" ? "🏆 Points Game" : "💷 Money Game";
+        const compLabel=r.gameType==="points"
+          ? (r.pointsCompetition==="net" ? "Net" : "Stableford")
+          : (trip.competition==="net" ? "Net" : "Stableford");
+        return `
+          <div class="player">
+            <div class="row">
+              <div>
+                <b>Round ${i+1}${r.course ? " — "+esc(r.course) : ""}</b>
+                <div class="muted">
+                  ${r.date ? esc(formatDate(r.date))+" • " : ""}${gameLabel} • ${compLabel}
+                </div>
+              </div>
+            </div>
+            ${w ? `
+              <div style="margin-top:7px;">
+                🏆 <b>${esc(w.name)}</b>${w.score ? " • "+esc(String(w.score)) : ""}
+              </div>
+            ` : `<div class="muted" style="margin-top:7px;">No winner recorded</div>`}
+          </div>
+        `;
+      }).join("") : `<div class="muted">No completed trip rounds saved.</div>`}
+    </div>
+
+    <div class="card">
+      <h2>🏆 Final Trip standings</h2>
+      ${standings.length ? standings.map((s,i)=>`
+        <div class="player row">
+          <div>
+            <b>${i===0?"👑 ":i===1?"🥈 ":i===2?"🥉 ":""}${i+1}. ${esc(s.name)}</b>
+          </div>
+          <div class="money">${s.points} pts</div>
+        </div>
+      `).join("") : `<div class="muted">No Trip standings recorded.</div>`}
+    </div>
+
+    ${isAdmin ? `
+      <div class="card">
+        <button class="primary full" onclick="finishTrip()">
+          ✅ Save Trip & Return to Normal Golf
+        </button>
+      </div>
+    ` : `
+      <div class="card">
+        <div class="notice">
+          The organiser will close and archive the completed trip.
+        </div>
+      </div>
+    `}
+  `;
+
+  window.scrollTo(0,0);
+}
+
 function round(){
+
+  if(state.trip?.completed){
+    showTripSummary();
+    return;
+  }
 
   if(waitingForNextCompetition()){
     waitingScreen();
@@ -1430,10 +1572,15 @@ if(isTrip){
   }else{
     state.trip.completed=true;
     state.trip.active=false;
+    setTripChampion();
   }
 }
         await save();
-    showWinnerScreen(record);
+    if(isTrip && state.trip?.completed){
+      showTripSummary();
+    }else{
+      showWinnerScreen(record);
+    }
     return;
   }
 
@@ -1684,10 +1831,15 @@ if(isTrip){
   }else{
     state.trip.completed=true;
     state.trip.active=false;
+    setTripChampion();
   }
 }
   await save();
-  showWinnerScreen(record);
+  if(isTrip && state.trip?.completed){
+    showTripSummary();
+  }else{
+    showWinnerScreen(record);
+  }
 }
 function showRoundHistory(historyIndex){
   const h=(state.history||[])[Number(historyIndex)];
@@ -4376,6 +4528,7 @@ state.trip={
     gameType:state.gameType,
     pointsCompetition:state.pointsCompetition,
     pointsValue:state.pointsValue,
+    roundOpen:roundOpenNow(),
 
     players:state.players.map(p=>({
       id:p.id,
@@ -4385,6 +4538,8 @@ state.trip={
       competition:p.competition || null,
       stableford:p.stableford,
       netScore:p.netScore,
+      noReturn:Boolean(p.noReturn),
+      scoreSubmitted:Boolean(p.scoreSubmitted),
       wins:p.wins || 0,
       leaguePoints:p.leaguePoints || 0,
       netWinnings:p.netWinnings || 0
@@ -4634,6 +4789,9 @@ if(tripDate===null)return;
 
   if(!confirm(message))return;
 
+  state.trip.active=true;
+  state.trip.completed=false;
+  state.roundOpen=true;
   state.course=tripCourse.trim();
   state.date=tripDate.trim();
 
@@ -4747,7 +4905,7 @@ async function finishTrip(){
     tripPointsValue:state.trip.tripPointsValue,
     rounds:[...(state.trip.rounds || [])],
     standings:{...(state.trip.standings || {})},
-    champion:state.trip.champion || null,
+    champion:state.trip.champion || tripStandingsSorted()[0]?.name || null,
     completed:true,
     active:false,
     normalRoundBackup:state.trip.normalRoundBackup || backup
@@ -4765,6 +4923,7 @@ async function finishTrip(){
   state.gameType=backup.gameType;
   state.pointsCompetition=backup.pointsCompetition;
   state.pointsValue=backup.pointsValue;
+  state.roundOpen=backup.roundOpen===false ? false : true;
 
   state.players=backup.players.map(p=>({
     id:p.id,
@@ -4774,6 +4933,8 @@ async function finishTrip(){
     competition:p.competition,
     stableford:p.stableford,
     netScore:p.netScore,
+    noReturn:Boolean(p.noReturn),
+    scoreSubmitted:Boolean(p.scoreSubmitted),
     wins:p.wins,
     leaguePoints:p.leaguePoints,
     netWinnings:p.netWinnings
