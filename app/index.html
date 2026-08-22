@@ -97,12 +97,13 @@ function chooseMyPlayer(){
 
   $("screen").innerHTML=`
     <div class="card">
-      <h2>👤 Who are you?</h2>
-      <div class="notice" style="margin-bottom:12px;">
-        <b>Already in the group?</b><br>Tap your name below.
+      <div style="text-align:center;margin-bottom:16px;">
+        <div style="font-size:42px;">👋</div>
+        <h2 style="margin:6px 0 8px;">Join your golf group</h2>
+        <div class="muted">Tell us who you are to get started.</div>
       </div>
-      <div class="muted" style="margin-bottom:8px;">
-        New to the group? Use <b>Join Group</b> at the bottom.
+      <div class="notice" style="margin-bottom:12px;">
+        <b>Already been added by the organiser?</b><br>Tap your name below.
       </div>
 
       ${[...state.players].sort((a,b)=>a.name.localeCompare(b.name)).map(p=>`
@@ -111,11 +112,12 @@ function chooseMyPlayer(){
         </button>
       `).join("")}
 
-      <div class="muted" style="margin-top:16px;text-align:center;">
-        Can't see your name?
+      <div class="notice" style="margin-top:18px;">
+        <b>Can't see your name?</b><br>
+        Add yourself with your name and handicap.
       </div>
       <button class="primary full" onclick="addPlayer()">
-              👋 Join Group
+        ➕ Add myself to the group
       </button>
     </div>
   `;
@@ -191,6 +193,7 @@ function selectMyPlayer(id){
   myPlayerId=player.id;
   localStorage.setItem("tensInPlayerId",myPlayerId);
 
+  document.querySelector("nav").classList.remove("hidden");
   showInstallHelp(player.name);
 }
 let state={
@@ -2746,6 +2749,26 @@ function playersPage(){
  const sortedPlayers=[...state.players]
    .sort((a,b)=>a.name.localeCompare(b.name));
 
+ const me=state.players.find(p=>p.id===myPlayerId);
+ if(!me && !isAdmin){
+   document.querySelector("nav").classList.add("hidden");
+   $("screen").innerHTML=`
+     <div class="card">
+       <div style="text-align:center;margin-bottom:18px;">
+         <div style="font-size:42px;">👋</div>
+         <h2 style="margin:6px 0 8px;">Join your golf group</h2>
+         <div class="muted">Tell us who you are to get started.</div>
+       </div>
+       <div class="notice"><b>Already been added by the organiser?</b><br>Find and select your name.</div>
+       <button class="secondary full" onclick="chooseMyPlayer()">👤 Find my name</button>
+       <div class="notice" style="margin-top:18px;"><b>Not been added yet?</b><br>Add yourself with your name and handicap.</div>
+       <button class="primary full" onclick="addPlayer()">➕ Add myself to the group</button>
+     </div>`;
+   return;
+ }
+
+ document.querySelector("nav").classList.remove("hidden");
+
  $("screen").innerHTML=`
  <div class="card">
    <h2>👥 Players</h2>
@@ -2875,6 +2898,7 @@ const duplicate=state.players.some(
   render();
   await save();
 
+  document.querySelector("nav").classList.remove("hidden");
   showInstallHelp(newPlayer.name);
 }
 async function editPlayer(i){const p=state.players[i];const name=prompt("Player name",p.name);if(!name)return;const h=prompt("Handicap",p.handicap);p.name=name.trim();p.handicap=Number(h)||0;render();await save()}
