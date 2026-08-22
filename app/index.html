@@ -3433,29 +3433,25 @@ async function ownerResetAdminPin(){
   if(!ok)return;
 
   const {data,error}=await db.rpc(
-    "get_group_state",
-    {p_pin:groupPin}
+    "owner_reset_admin_pin",
+    {
+      p_creation_code:ownerCreationCode,
+      p_group_pin:groupPin,
+      p_new_admin_pin:clean
+    }
   );
 
-  if(error || !data){
-    alert("The group's game data could not be loaded. No PIN was changed.");
-    return;
-  }
-
-  const nextState={...data,adminPin:clean};
-
-  const {error:saveError}=await db.rpc(
-    "save_group_state",
-    {p_pin:groupPin,p_state:nextState}
-  );
-
-  if(saveError){
-    alert("Admin PIN could not be reset. Please try again.");
+  if(error || data!==true){
+    alert(
+      "Admin PIN could not be reset.\n\n" +
+      (error?.message || "Please try again.")
+    );
     return;
   }
 
   if(groupPin===String(pin)){
-    state=nextState;
+    state.adminPin=clean;
+    state.adminSetupToken="";
   }
 
   alert("✅ Admin PIN reset for group " + groupPin + ".");
