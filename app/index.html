@@ -491,7 +491,11 @@ function waitingScreen(){
         <button class="primary full" style="margin-top:18px;" onclick="newRound()">
           ➕ Set Up Next Competition
         </button>
-      ` : ""}
+      ` : `
+        <button class="ghost full" style="margin-top:18px;" onclick="adminLoginFromWaiting()">
+          🔐 Admin
+        </button>
+      `}
     </div>
 
     <div class="card">
@@ -3339,6 +3343,20 @@ function adminPinForGroup(){
 function validAdminPin(value){
   return /^\d{4}$/.test(String(value||""));
 }
+function adminLoginFromWaiting(){
+ const entered=prompt("Enter Admin PIN");
+ if(entered===null)return;
+ if(String(entered).trim()===adminPinForGroup()){
+   isAdmin=true;
+   sessionStorage.setItem("tensInAdmin","yes");
+   updateAdminUI();
+   page="round";
+   render();
+ }else{
+   alert("Incorrect Admin PIN");
+ }
+}
+
 function adminLogin(){
  const entered=prompt("Enter Admin PIN");
  if(entered===null)return;
