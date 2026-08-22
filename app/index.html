@@ -3395,8 +3395,71 @@ function editGroupPage(){
       <input id="ownerNotes" value="${escAttr(g.notes||"")}" placeholder="Optional notes">
 
       <button class="primary full" onclick="saveOwnerGroupEdit()">💾 Save Changes</button>
+      <button class="secondary full" onclick="ownerResetAdminPin()">🔐 Reset Admin PIN</button>
       <button class="ghost full" onclick="backToManageGroups()">← Cancel</button>
     </div>`;
+}
+
+async function ownerResetAdminPin(){
+  if(!db || !isAdmin || !isOwner || !ownerCreationCode){
+    alert("I'm In Golf Owner access required.");
+    return;
+  }
+
+  const groupPin=String(ownerEditGroupPin||"");
+  if(!groupPin){
+    alert("Group could not be identified.");
+    return;
+  }
+
+  const first=prompt("Choose a new 4-digit Admin PIN for group " + groupPin);
+  if(first===null)return;
+
+  const clean=String(first).trim();
+  if(!validAdminPin(clean)){
+    alert("Please choose exactly 4 numbers.");
+    return;
+  }
+
+  const second=prompt("Enter the new 4-digit Admin PIN again");
+  if(second===null)return;
+
+  if(String(second).trim()!==clean){
+    alert("The two PINs did not match.");
+    return;
+  }
+
+  const ok=confirm("Reset the Admin PIN for group " + groupPin + "?");
+  if(!ok)return;
+
+  const {data,error}=await db
+    .from("games")
+    .select("state")
+    .eq("pin",groupPin)
+    .maybeSingle();
+
+  if(error || !data || !data.state){
+    alert("The group's game data could not be loaded. No PIN was changed.");
+    return;
+  }
+
+  const nextState={...data.state,adminPin:clean};
+
+  const {error:saveError}=await db
+    .from("games")
+    .update({state:nextState})
+    .eq("pin",groupPin);
+
+  if(saveError){
+    alert("Admin PIN could not be reset. Please try again.");
+    return;
+  }
+
+  if(groupPin===String(pin)){
+    state=nextState;
+  }
+
+  alert("✅ Admin PIN reset for group " + groupPin + ".");
 }
 
 async function saveOwnerGroupEdit(){
