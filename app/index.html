@@ -1551,9 +1551,10 @@ function showWinnerScreen(record){
         <h2 style="font-size:24px;margin-bottom:4px;">
           POINTS GAME RESULT
         </h2>
+        ${(record.course || record.date) ? `
         <div class="muted">
-          ${esc(record.course)} • ${esc(formatDate(record.date))}
-        </div>
+          ${record.course ? esc(record.course) : ""}${record.course && record.date ? " • " : ""}${record.date ? esc(formatDate(record.date)) : ""}
+        </div>` : ""}
         <div style="margin-top:8px;">
           <span class="pill paid">
             ${competition}
