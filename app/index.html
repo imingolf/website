@@ -398,7 +398,14 @@ async function refresh(){
 if(!error && data){
   state=data;
 
-  if(myPlayerId){
+  // Only redraw the app if this phone's saved player still exists
+  // in the current group. This prevents "Find my name" from being
+  // replaced by the join screen every 5 seconds when a stale player
+  // ID is stored from another group.
+  const currentPlayerExists=
+    myPlayerId && state.players.some(p=>p.id===myPlayerId);
+
+  if(currentPlayerExists){
     render();
   }
 
