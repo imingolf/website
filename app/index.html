@@ -95,6 +95,8 @@ function chooseMyPlayer(){
   const existing=state.players.find(p=>p.id===myPlayerId);
   if(existing)return;
 
+  document.querySelector("nav").style.display="none";
+
   $("screen").innerHTML=`
     <div class="card">
       <div style="text-align:center;margin-bottom:16px;">
