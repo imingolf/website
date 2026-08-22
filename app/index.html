@@ -699,7 +699,7 @@ async function togglePaid(i){
    return;
  }
 
- if(roundLocked() && !isAdmin){
+ if(roundLocked()){
    alert("🔒 Entries are closed — scoring has started.");
    return;
  }
@@ -938,7 +938,7 @@ if(!demoCanEdit())return;
     return;
   }
 
-  if(roundLocked() && !isAdmin){
+  if(roundLocked()){
     alert("🔒 Entries are closed — scoring has started.");
     return;
   }
