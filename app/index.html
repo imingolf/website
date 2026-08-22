@@ -3432,23 +3432,22 @@ async function ownerResetAdminPin(){
   const ok=confirm("Reset the Admin PIN for group " + groupPin + "?");
   if(!ok)return;
 
-  const {data,error}=await db
-    .from("games")
-    .select("state")
-    .eq("pin",groupPin)
-    .maybeSingle();
+  const {data,error}=await db.rpc(
+    "get_group_state",
+    {p_pin:groupPin}
+  );
 
-  if(error || !data || !data.state){
+  if(error || !data){
     alert("The group's game data could not be loaded. No PIN was changed.");
     return;
   }
 
-  const nextState={...data.state,adminPin:clean};
+  const nextState={...data,adminPin:clean};
 
-  const {error:saveError}=await db
-    .from("games")
-    .update({state:nextState})
-    .eq("pin",groupPin);
+  const {error:saveError}=await db.rpc(
+    "save_group_state",
+    {p_pin:groupPin,p_state:nextState}
+  );
 
   if(saveError){
     alert("Admin PIN could not be reset. Please try again.");
