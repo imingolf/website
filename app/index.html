@@ -482,9 +482,14 @@ function waitingScreen(){
     <div class="card" style="text-align:center;padding:28px 18px;">
       <div style="font-size:46px;">⛳</div>
       <div class="muted">NEXT COMPETITION</div>
-      <h2 style="font-size:28px;margin:8px 0;">Coming soon…</h2>
+      <h2 style="font-size:28px;margin:8px 0;">
+        ${isAdmin ? "Ready for the next one?" : "Coming soon…"}
+      </h2>
       <div class="muted">
-        Your organiser will set up the next competition.
+        ${isAdmin
+          ? "Set up your group's next competition."
+          : "Your organiser will set up the next competition."
+        }
       </div>
 
       ${isAdmin ? `
