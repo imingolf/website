@@ -5,8 +5,6 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>I'm In Golf</title>
 <meta name="description" content="I'm In Golf makes golf with your mates simple: join, pay, score and see who wins.">
-
-<!-- Home Screen / app icons for iPhone and Android -->
 <link rel="apple-touch-icon" href="/app/apple-touch-icon.png">
 <link rel="icon" type="image/png" sizes="192x192" href="/app/icon-192.png">
 <link rel="icon" type="image/png" sizes="512x512" href="/app/icon-512.png">
@@ -37,6 +35,19 @@ section{padding:55px 0}
 .how{background:var(--green);color:#fff;border-radius:30px;padding:40px;display:grid;grid-template-columns:repeat(4,1fr);gap:18px}.step{background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.13);border-radius:18px;padding:22px}.step b{display:block;font-size:13px;opacity:.75;margin-bottom:8px}.step h3{margin:0 0 8px;font-size:21px}.step p{margin:0;opacity:.82;line-height:1.45}
 .cta{text-align:center;padding-top:25px}.cta-box{background:#fff;border:1px solid var(--line);border-radius:28px;padding:48px 26px}.cta h2{font-size:42px;margin:0 0 12px}.cta p{font-size:18px;color:var(--muted);margin:0 0 24px}
 footer{padding:28px 0 42px;color:var(--muted);font-size:14px}.footer-row{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;border-top:1px solid var(--line);padding-top:24px}
+.install-box{background:#fff;border:1px solid var(--line);border-radius:28px;padding:34px;max-width:820px;margin:auto}
+.device-buttons{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:22px 0}
+.device-btn{font-size:18px;padding:16px;border:1px solid var(--line);border-radius:14px;background:#fff;color:var(--dark);font-weight:900;cursor:pointer}
+.device-btn.active{background:var(--green);color:#fff}
+.install-guide{display:none;text-align:left}
+.install-guide.active{display:block}
+.install-step{display:flex;gap:14px;align-items:center;padding:15px 0;border-top:1px solid var(--line)}
+.install-step:first-child{border-top:0}
+.stepno{width:36px;height:36px;flex:0 0 36px;border-radius:50%;display:grid;place-items:center;background:#e2f2e6;color:var(--green);font-weight:900}
+.real-icon{width:38px;height:38px;display:inline-grid;place-items:center;vertical-align:middle;margin:0 5px}
+.real-icon svg{width:34px;height:34px}
+.menu-dots{font-size:32px;line-height:1;font-weight:900;letter-spacing:2px}
+.install-note{text-align:center;color:var(--muted);font-size:14px;margin-top:12px}
 @media(max-width:820px){.hero-grid{grid-template-columns:1fr;gap:38px}.hero{text-align:center;padding-top:48px}.hero p{margin-left:auto;margin-right:auto}.actions{justify-content:center;flex-wrap:nowrap;gap:10px}.features{grid-template-columns:1fr}.how{grid-template-columns:1fr 1fr}}
 @media(max-width:520px){
   .wrap{padding:0 16px}
@@ -75,7 +86,10 @@ footer{padding:28px 0 42px;color:var(--muted);font-size:14px}.footer-row{display
 
   .phone{width:min(330px,100%)}
   .screen{min-height:auto}
+  .install-box{padding:24px 18px}
+  .device-buttons{grid-template-columns:1fr}
 }
+
 </style>
 </head>
 <body>
@@ -186,6 +200,65 @@ footer{padding:28px 0 42px;color:var(--muted);font-size:14px}.footer-row{display
     </div>
   </div>
 </section>
+<section id="install">
+  <div class="wrap">
+    <div class="section-title">
+      <h2>📱 Put I'm In Golf on your phone</h2>
+      <p>Choose your phone. It only takes a few seconds.</p>
+    </div>
+
+    <div class="install-box">
+      <div class="device-buttons">
+        <button class="device-btn active" id="iphoneBtn" onclick="showInstallGuide('iphone')"> iPhone</button>
+        <button class="device-btn" id="androidBtn" onclick="showInstallGuide('android')">Android</button>
+      </div>
+
+      <div class="install-guide active" id="iphoneGuide">
+        <div class="install-step">
+          <div class="stepno">1</div>
+          <div><b>Tap Open App</b><br><span class="small">Open I'm In Golf in Safari.</span></div>
+        </div>
+        <div class="install-step">
+          <div class="stepno">2</div>
+          <div>
+            <b>Tap the Safari Share button</b>
+            <span class="real-icon" aria-label="Safari Share icon">
+              <svg viewBox="0 0 24 24" fill="none">
+                <path d="M12 16V3M12 3L8.5 6.5M12 3l3.5 3.5M6.5 10H5a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-1.5"
+                  stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </span>
+            <br><span class="small">This is the square with the arrow pointing up.</span>
+          </div>
+        </div>
+        <div class="install-step">
+          <div class="stepno">3</div>
+          <div><b>Tap “Add to Home Screen”</b><br><span class="small">Then tap <b>Add</b>. You're done.</span></div>
+        </div>
+        <a class="primary" style="display:block;text-align:center;margin-top:18px" href="https://imingolf.co.uk/app/">Open App</a>
+      </div>
+
+      <div class="install-guide" id="androidGuide">
+        <div class="install-step">
+          <div class="stepno">1</div>
+          <div><b>Tap Open App</b><br><span class="small">Open I'm In Golf in Chrome.</span></div>
+        </div>
+        <div class="install-step">
+          <div class="stepno">2</div>
+          <div><b>Tap the Chrome menu</b> <span class="real-icon menu-dots" aria-label="three-dot menu">⋮</span><br><span class="small">Look for the three vertical dots.</span></div>
+        </div>
+        <div class="install-step">
+          <div class="stepno">3</div>
+          <div><b>Tap “Add to Home screen”</b><br><span class="small">On some Android phones it may say <b>Install app</b>. Then confirm.</span></div>
+        </div>
+        <a class="primary" style="display:block;text-align:center;margin-top:18px" href="https://imingolf.co.uk/app/">Open App</a>
+      </div>
+
+      <div class="install-note">You'll then see the I'm In Golf icon on your Home Screen.</div>
+    </div>
+  </div>
+</section>
+
 <section class="cta">
   <div class="wrap">
     <div class="cta-box">
@@ -201,5 +274,15 @@ footer{padding:28px 0 42px;color:var(--muted);font-size:14px}.footer-row{display
 </section>
 </main>
 <footer><div class="wrap footer-row"><div>© 2026 I'm In Golf</div></div></footer>
+
+<script>
+function showInstallGuide(device){
+  const iphone=device==="iphone";
+  document.getElementById("iphoneGuide").classList.toggle("active",iphone);
+  document.getElementById("androidGuide").classList.toggle("active",!iphone);
+  document.getElementById("iphoneBtn").classList.toggle("active",iphone);
+  document.getElementById("androidBtn").classList.toggle("active",!iphone);
+}
+</script>
 </body>
 </html>
