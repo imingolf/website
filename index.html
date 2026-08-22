@@ -44,8 +44,8 @@ footer{padding:28px 0 42px;color:var(--muted);font-size:14px}.footer-row{display
 .install-step{display:flex;gap:14px;align-items:center;padding:15px 0;border-top:1px solid var(--line)}
 .install-step:first-child{border-top:0}
 .stepno{width:36px;height:36px;flex:0 0 36px;border-radius:50%;display:grid;place-items:center;background:#e2f2e6;color:var(--green);font-weight:900}
-.real-icon{width:38px;height:38px;display:inline-grid;place-items:center;vertical-align:middle;margin:0 5px}
-.real-icon svg{width:34px;height:34px}
+.real-icon{width:46px;height:46px;display:inline-grid;place-items:center;vertical-align:middle;margin:0 5px}
+.real-icon svg{width:42px;height:42px}
 .menu-dots{font-size:32px;line-height:1;font-weight:900;letter-spacing:2px}
 .install-note{text-align:center;color:var(--muted);font-size:14px;margin-top:12px}
 @media(max-width:820px){.hero-grid{grid-template-columns:1fr;gap:38px}.hero{text-align:center;padding-top:48px}.hero p{margin-left:auto;margin-right:auto}.actions{justify-content:center;flex-wrap:nowrap;gap:10px}.features{grid-template-columns:1fr}.how{grid-template-columns:1fr 1fr}}
@@ -209,7 +209,7 @@ footer{padding:28px 0 42px;color:var(--muted);font-size:14px}.footer-row{display
 
     <div class="install-box">
       <div class="device-buttons">
-        <button class="device-btn active" id="iphoneBtn" onclick="showInstallGuide('iphone')"> iPhone</button>
+        <button class="device-btn active" id="iphoneBtn" onclick="showInstallGuide('iphone')">iPhone</button>
         <button class="device-btn" id="androidBtn" onclick="showInstallGuide('android')">Android</button>
       </div>
 
@@ -221,14 +221,15 @@ footer{padding:28px 0 42px;color:var(--muted);font-size:14px}.footer-row{display
         <div class="install-step">
           <div class="stepno">2</div>
           <div>
-            <b>Tap the Safari Share button</b>
+            <b>Find Share</b><br>
+            <span class="small">If you see the <b>•••</b> button at the bottom-right, tap it first.</span>
+            <span class="real-icon menu-dots" aria-label="three-dot menu">•••</span><br>
+            <span class="small">Then tap <b>Share</b></span>
             <span class="real-icon" aria-label="Safari Share icon">
               <svg viewBox="0 0 24 24" fill="none">
-                <path d="M12 16V3M12 3L8.5 6.5M12 3l3.5 3.5M6.5 10H5a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-1.5"
-                  stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M12 16V3M12 3L8.5 6.5M12 3l3.5 3.5M6.5 10H5a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-1.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
             </span>
-            <br><span class="small">This is the square with the arrow pointing up.</span>
           </div>
         </div>
         <div class="install-step">
