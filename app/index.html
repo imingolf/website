@@ -1433,6 +1433,99 @@ if(isTrip){
   await save();
   showWinnerScreen(record);
 }
+function showRoundHistory(historyIndex){
+  const h=(state.history||[])[Number(historyIndex)];
+  if(!h){
+    alert("Round details could not be found.");
+    return;
+  }
+
+  page="roundhistory";
+  clearInterval(poller);
+  poller=null;
+
+  const isPoints=h.gameType==="points";
+  const players=(h.players||[]).filter(p=>
+    p.stableford!=null || p.netScore!=null
+  );
+
+  $("screen").innerHTML=`
+    <div class="card">
+      <div class="muted">PREVIOUS ROUND</div>
+      <h2 style="font-size:24px;margin:3px 0;">${esc(h.course || "Completed round")}</h2>
+      <div class="muted">
+        ${h.date ? esc(formatDate(h.date)) : ""}
+        ${h.date ? " • " : ""}
+        ${isPoints ? "🏆 Points Game" : "💷 Money Game"}
+      </div>
+    </div>
+
+    ${!isPoints ? `
+      <div class="card">
+        <h2>🏆 Result</h2>
+
+        ${h.stablefordWinnerNames?.length ? `
+          <div class="notice" style="margin-bottom:10px;">
+            <b>Stableford winner${h.stablefordWinnerNames.length>1 ? "s" : ""}</b><br>
+            ${h.stablefordWinnerNames.map(esc).join(", ")}
+            ${h.stablefordPot!=null ? `<br><span class="money">Pot £${Number(h.stablefordPot||0)}</span>` : ""}
+            ${h.stablefordCountback ? `<br><span class="muted">Won on countback</span>` : ""}
+          </div>` : ""}
+
+        ${h.netWinnerNames?.length ? `
+          <div class="notice">
+            <b>Net winner${h.netWinnerNames.length>1 ? "s" : ""}</b><br>
+            ${h.netWinnerNames.map(esc).join(", ")}
+            ${h.netPot!=null ? `<br><span class="money">Pot £${Number(h.netPot||0)}</span>` : ""}
+            ${h.netCountback ? `<br><span class="muted">Won on countback</span>` : ""}
+          </div>` : ""}
+      </div>
+    ` : `
+      <div class="card">
+        <h2>🏆 Result</h2>
+        ${(h.pointsResults||[]).map((r,i)=>`
+          <div class="player">
+            <b>${i===0 ? "🥇" : i===1 ? "🥈" : "🥉"} ${esc(r.name)}</b>
+            <div class="muted">
+              ${h.pointsCompetition==="stableford" ? Number(r.score)+" pts" : "Net "+Number(r.score)}
+              • +${Number(r.points||0)} league pts
+              ${r.countback ? " • Countback" : ""}
+            </div>
+          </div>
+        `).join("") || `<div class="muted">No result details saved.</div>`}
+      </div>
+    `}
+
+    <div class="card">
+      <h2>🏌️ Players & scores</h2>
+
+      ${players.length ? players.map(p=>`
+        <div class="player">
+          <div class="row">
+            <div>
+              <b>${esc(p.name)}</b>
+              <div class="muted">
+                HCP ${Number(p.handicap||0)}
+                ${p.competition ? " • "+(p.competition==="stableford" ? "Stableford" : "Net") : ""}
+              </div>
+            </div>
+            <div style="text-align:right;font-weight:800;">
+              ${p.stableford!=null ? esc(String(p.stableford))+" pts" : ""}
+              ${p.netScore!=null ? "Net "+esc(String(p.netScore)) : ""}
+            </div>
+          </div>
+        </div>
+      `).join("") : `<div class="muted">No player scores saved for this round.</div>`}
+    </div>
+
+    <div class="card">
+      <button class="secondary full" onclick="league()">← Back to League</button>
+    </div>
+  `;
+
+  window.scrollTo(0,0);
+}
+
 function showWinnerScreen(record){
 
   page="winner";
@@ -2534,9 +2627,12 @@ ${tripSorted.map((p,i)=>`
 
       ${(state.history&&state.history.length)
         ? state.history.slice(0,10).map(h=>`
-          <div class="player">
+          <div class="player" style="cursor:pointer;" onclick="showRoundHistory(${state.history.indexOf(h)})">
 
-            <b>${esc(h.course)}</b>
+            <div class="row">
+              <b>${esc(h.course || "Completed round")}</b>
+              <span class="muted">View details ›</span>
+            </div>
 
             <div class="muted">
               ${esc(formatDate(h.date))}
