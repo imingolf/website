@@ -4146,6 +4146,13 @@ function pickTripDate(title,initialValue=""){
 }
 async function newRound(){
 
+  // Security/permissions guard: only the group Admin can create a competition.
+  // This protects the action itself, even if a non-admin somehow calls it.
+  if(!isAdmin){
+    alert("🔒 Only the group Admin can set up the next competition.");
+    return;
+  }
+
   const choice=prompt(
     "Choose Game Type:\n\n" +
     "1. 💷 Money Game\n" +
