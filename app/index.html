@@ -145,6 +145,10 @@ function iosShareIcon(){
 }
 
 function showInstallHelp(playerName){
+  page="installhelp";
+  clearInterval(poller);
+  poller=null;
+
   const device=installDeviceType();
 
   let steps="";
@@ -184,13 +188,19 @@ function showInstallHelp(playerName){
 
       ${steps}
 
-      <button class="primary full" onclick="show('round')">
+      <button class="primary full" onclick="finishInstallHelp()">
         Continue to I'm In Golf
       </button>
-      <button class="ghost full" onclick="show('round')">
+      <button class="ghost full" onclick="finishInstallHelp()">
         I'll do this later
       </button>
     </div>`;
+}
+
+function finishInstallHelp(){
+  page="round";
+  if(db && !poller) startPolling();
+  show("round");
 }
 
 function selectMyPlayer(id){
