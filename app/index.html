@@ -770,7 +770,7 @@ function scores(){
                 }
               </div>
 
-              ${(isAdmin || p.id===myPlayerId) ? `
+              ${(isAdmin || p.id===myPlayerId) && p.paid ? `
                 <div class="grid2" style="margin-top:10px;">
                   <button
                     class="${p.competition==="stableford" ? "primary" : "ghost"} small"
@@ -809,6 +809,10 @@ function scores(){
                     onchange="setNetScore(${i},this.value)">
                 `}
 
+              ` : !p.paid ? `
+                <div class="notice warning">
+                  💷 <b>Pay before entering the competition or a score.</b>
+                </div>
               ` : `
 
                 ${p.competition==="net" ? `
@@ -922,6 +926,11 @@ if(!demoCanEdit())return;
 
   if(!isAdmin && p.id!==myPlayerId)return;
 
+  if(state.gameType==="money" && !p.paid){
+    alert("Pay before choosing Stableford or Net.");
+    return;
+  }
+
   if(roundLocked() && !isAdmin){
     alert("🔒 Entries are closed — scoring has started.");
     return;
@@ -939,6 +948,10 @@ if(!demoCanEdit())return;
 
   const p=state.players[i];
  if(!isAdmin && p.id!==myPlayerId)return;
+ if(state.gameType==="money" && !p.paid){
+   alert("Pay before entering a score.");
+   return;
+ }
  p.stableford=v===""?null:Number(v);
  render();
  await save();
@@ -948,6 +961,10 @@ async function setNetScore(i,v){
 if(!demoCanEdit())return;
  const p=state.players[i];
  if(!isAdmin && p.id!==myPlayerId)return;
+ if(state.gameType==="money" && !p.paid){
+   alert("Pay before entering a score.");
+   return;
+ }
  p.netScore=v===""?null:Number(v);
  render();
  await save();
