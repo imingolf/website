@@ -102,20 +102,25 @@ function chooseMyPlayer(){
         <h2 style="margin:6px 0 8px;">Join your golf group</h2>
         <div class="muted">Tell us who you are to get started.</div>
       </div>
-      <div class="notice" style="margin-bottom:12px;">
-        <b>Already been added by the organiser?</b><br>Tap your name below.
-      </div>
-
-      ${[...state.players].sort((a,b)=>a.name.localeCompare(b.name)).map(p=>`
-        <button class="secondary full" onclick="selectMyPlayer('${p.id}')">
-          ${esc(p.name)}
-        </button>
-      `).join("")}
-
-      <div class="notice" style="margin-top:18px;">
-        <b>Can't see your name?</b><br>
-        Add yourself with your name and handicap.
-      </div>
+      ${state.players.length ? `
+        <div class="notice" style="margin-bottom:12px;">
+          <b>Already been added by the organiser?</b><br>Tap your name below.
+        </div>
+        ${[...state.players].sort((a,b)=>a.name.localeCompare(b.name)).map(p=>`
+          <button class="secondary full" onclick="selectMyPlayer('${p.id}')">
+            ${esc(p.name)}
+          </button>
+        `).join("")}
+        <div class="notice" style="margin-top:18px;">
+          <b>Can't see your name?</b><br>
+          Add yourself with your name and handicap.
+        </div>
+      ` : `
+        <div class="notice" style="margin-top:12px;">
+          <b>You're the first player joining this group.</b><br>
+          Add your name and handicap to get started.
+        </div>
+      `}
       <button class="primary full" onclick="addPlayer()">
         ➕ Add myself to the group
       </button>
@@ -193,7 +198,7 @@ function selectMyPlayer(id){
   myPlayerId=player.id;
   localStorage.setItem("tensInPlayerId",myPlayerId);
 
-  document.querySelector("nav").classList.remove("hidden");
+  document.querySelector("nav").style.display="";
   showInstallHelp(player.name);
 }
 let state={
@@ -255,7 +260,7 @@ async function connect(){
    poller=null;
 
    $("setupOverlay").classList.add("hidden");
-   document.querySelector("nav").classList.add("hidden");
+   document.querySelector("nav").style.display="none";
    $("syncText").textContent="Group access unavailable";
 
    if(access.access_reason==="trial_expired"){
@@ -2751,7 +2756,7 @@ function playersPage(){
 
  const me=state.players.find(p=>p.id===myPlayerId);
  if(!me && !isAdmin){
-   document.querySelector("nav").classList.add("hidden");
+   document.querySelector("nav").style.display="none";
    $("screen").innerHTML=`
      <div class="card">
        <div style="text-align:center;margin-bottom:18px;">
@@ -2759,15 +2764,19 @@ function playersPage(){
          <h2 style="margin:6px 0 8px;">Join your golf group</h2>
          <div class="muted">Tell us who you are to get started.</div>
        </div>
-       <div class="notice"><b>Already been added by the organiser?</b><br>Find and select your name.</div>
-       <button class="secondary full" onclick="chooseMyPlayer()">👤 Find my name</button>
-       <div class="notice" style="margin-top:18px;"><b>Not been added yet?</b><br>Add yourself with your name and handicap.</div>
+       ${sortedPlayers.length ? `
+         <div class="notice"><b>Already been added by the organiser?</b><br>Find and select your name.</div>
+         <button class="secondary full" onclick="chooseMyPlayer()">👤 Find my name</button>
+         <div class="notice" style="margin-top:18px;"><b>Not been added yet?</b><br>Add yourself with your name and handicap.</div>
+       ` : `
+         <div class="notice"><b>You're the first player joining this group.</b><br>Add yourself with your name and handicap.</div>
+       `}
        <button class="primary full" onclick="addPlayer()">➕ Add myself to the group</button>
      </div>`;
    return;
  }
 
- document.querySelector("nav").classList.remove("hidden");
+ document.querySelector("nav").style.display="";
 
  $("screen").innerHTML=`
  <div class="card">
@@ -2898,7 +2907,7 @@ const duplicate=state.players.some(
   render();
   await save();
 
-  document.querySelector("nav").classList.remove("hidden");
+  document.querySelector("nav").style.display="";
   showInstallHelp(newPlayer.name);
 }
 async function editPlayer(i){const p=state.players[i];const name=prompt("Player name",p.name);if(!name)return;const h=prompt("Handicap",p.handicap);p.name=name.trim();p.handicap=Number(h)||0;render();await save()}
