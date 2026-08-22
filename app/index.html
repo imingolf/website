@@ -385,6 +385,10 @@ async function save(){
 async function refresh(){
  if(!db)return;
 
+ // Never redraw while someone is typing a score draft.
+ // This prevents the 5-second sync from wiping or replacing an unsent score.
+ if(scoreDraftActive)return;
+
  // Keep Owner utility screens on display.
  // Do not let the 5-second background sync redraw them while they are open.
  if(page==="admininvite" || page==="managegroups" || page==="editgroup")return;
@@ -414,8 +418,15 @@ if(!error && data){
 }
 
  }
+let scoreDraftActive=false;
 function startPolling(){ clearInterval(poller); poller=setInterval(refresh,5000); }
-function show(p){page=p;document.querySelectorAll("nav button").forEach(b=>b.classList.remove("active"));$("n"+p).classList.add("active");render();}
+function show(p){
+  scoreDraftActive=false;
+  page=p;
+  document.querySelectorAll("nav button").forEach(b=>b.classList.remove("active"));
+  $("n"+p)?.classList.add("active");
+  render();
+}
 function render(){
   updateAdminUI();
 
@@ -431,7 +442,11 @@ function render(){
   if(page==="editgroup")editGroupPage();
 }
 function roundLocked(){
-  return state.players.some(p=>p.stableford!=null || p.netScore!=null);
+  return state.players.some(p=>
+    p.stableford!=null ||
+    p.netScore!=null ||
+    p.noReturn===true
+  );
 }
 function paidCount(){return state.players.filter(p=>p.paid).length}
 function potentialPot(){return Number(state.stake||0)*state.players.length}
@@ -715,12 +730,33 @@ function scores(){
   const isPointsGame=state.gameType==="points";
   const pointsComp=state.pointsCompetition || "stableford";
 
+  const submitted=(p,type)=>{
+    if(p.noReturn===true && type==="net")return true;
+    if(p.scoreSubmitted===true)return true;
+    return type==="stableford"
+      ? p.stableford!=null
+      : p.netScore!=null;
+  };
+
+  const eligiblePlayers=isPointsGame
+    ? [...state.players]
+    : state.players.filter(p=>
+        p.paid &&
+        (p.competition==="stableford" || p.competition==="net")
+      );
+
+  const stillToEnter=eligiblePlayers.filter(p=>{
+    const type=isPointsGame ? pointsComp : p.competition;
+    return !submitted(p,type);
+  });
+
   const sortedPlayers=[...state.players]
     .sort((a,b)=>a.name.localeCompare(b.name));
 
   const stablefordRanked=[...state.players]
     .filter(p=>
       p.stableford!=null &&
+      p.noReturn!==true &&
       (!isPointsGame || pointsComp==="stableford")
     )
     .sort((a,b)=>Number(b.stableford)-Number(a.stableford));
@@ -728,6 +764,7 @@ function scores(){
   const netRanked=[...state.players]
     .filter(p=>
       p.netScore!=null &&
+      p.noReturn!==true &&
       (!isPointsGame || pointsComp==="net")
     )
     .sort((a,b)=>Number(a.netScore)-Number(b.netScore));
@@ -742,19 +779,31 @@ function scores(){
           Everyone plays the same competition.
         </div>
       ` : `
-        <div class="muted">Choose Stableford or Net, then enter your score.</div>
+        <div class="muted">Choose Stableford or Net, then submit your score.</div>
         <div class="notice">💷 Only paid players are eligible to win the pot.</div>
       `}
 
       ${roundLocked() ? `
         <div class="notice warning">
-          🔒 <b>Scoring has started.</b>
+          🔒 <b>Scoring has started. Entries are closed.</b>
+        </div>
+      ` : ""}
+
+      ${eligiblePlayers.length ? `
+        <div class="notice ${stillToEnter.length ? "warning" : ""}">
+          ${stillToEnter.length
+            ? `<b>⏳ Still to enter (${stillToEnter.length})</b><br>${stillToEnter.map(p=>esc(p.name)).join(", ")}`
+            : `<b>✅ All entered players have submitted.</b>`
+          }
         </div>
       ` : ""}
 
       ${sortedPlayers.map(p=>{
 
         const i=state.players.findIndex(x=>x.id===p.id);
+        const type=isPointsGame ? pointsComp : p.competition;
+        const isSubmitted=type ? submitted(p,type) : false;
+        const canControl=isAdmin || p.id===myPlayerId;
 
         return `
         <div class="player">
@@ -777,7 +826,7 @@ function scores(){
                 }
               </div>
 
-              ${(isAdmin || p.id===myPlayerId) && p.paid ? `
+              ${canControl && p.paid && !roundLocked() ? `
                 <div class="grid2" style="margin-top:10px;">
                   <button
                     class="${p.competition==="stableford" ? "primary" : "ghost"} small"
@@ -795,66 +844,66 @@ function scores(){
             `}
           </div>
 
-          ${(isAdmin || p.id===myPlayerId) ? `
+          ${canControl ? `
             <div style="margin-top:10px;">
 
-              ${isPointsGame ? `
-
-                ${pointsComp==="stableford" ? `
-                  <label class="muted">🏆 Stableford</label>
-                  <input
-                    type="number"
-                    placeholder="Points"
-                    value="${p.stableford??""}"
-                    onchange="setStableford(${i},this.value)">
-                ` : `
-                  <label class="muted">⛳ Net Score</label>
-                  <input
-                    type="number"
-                    placeholder="Net"
-                    value="${p.netScore??""}"
-                    onchange="setNetScore(${i},this.value)">
-                `}
-
-              ` : !p.paid ? `
+              ${!isPointsGame && !p.paid ? `
                 <div class="notice warning">
                   💷 <b>Pay before entering the competition or a score.</b>
                 </div>
+              ` : !type ? `
+                <div class="notice">
+                  Choose Stableford or Net before entering a score.
+                </div>
+              ` : isSubmitted ? `
+                <div class="notice">
+                  ✅ <b>Score submitted</b><br>
+                  ${p.noReturn===true
+                    ? "NR — No Return"
+                    : type==="stableford"
+                    ? esc(String(p.stableford))+" pts"
+                    : "Net "+esc(String(p.netScore))
+                  }
+                </div>
+                ${isAdmin ? `
+                  <button class="secondary small" onclick="adminEditSubmittedScore(${i},'${type}')">
+                    ✏️ Correct score
+                  </button>
+                ` : ""}
               ` : `
+                <label class="muted">
+                  ${type==="stableford" ? "🏆 Stableford" : "⛳ Net Score"}
+                </label>
+                <input
+                  id="scoreInput_${i}"
+                  type="number"
+                  inputmode="numeric"
+                  placeholder="${type==="stableford" ? "Points" : "Net"}"
+                  oninput="scoreDraftActive=true">
 
-                ${p.competition==="net" ? `
-                  <label class="muted">⛳ Net Score</label>
-                  <input
-                    type="number"
-                    placeholder="Net"
-                    value="${p.netScore??""}"
-                    onchange="setNetScore(${i},this.value)">
-                ` : p.competition==="stableford" ? `
-                  <label class="muted">🏆 Stableford</label>
-                  <input
-                    type="number"
-                    placeholder="Points"
-                    value="${p.stableford??""}"
-                    onchange="setStableford(${i},this.value)">
-                ` : `
-                  <div class="notice">
-                    Choose Stableford or Net above before entering a score.
-                  </div>
-                `}
+                <button class="primary full" style="margin-top:8px;"
+                  onclick="submitPlayerScore(${i},'${type}')">
+                  Submit score
+                </button>
 
+                ${type==="net" ? `
+                  <button class="ghost full" onclick="submitNoReturn(${i})">
+                    NR — No Return
+                  </button>
+                ` : ""}
               `}
             </div>
           ` : `
             <div class="muted" style="margin-top:6px;">
-              ${isPointsGame
-                ? pointsComp==="stableford"
-                  ? `Stableford: ${p.stableford??"—"}`
-                  : `Net: ${p.netScore??"—"}`
-                : p.competition==="net"
-                ? `Net: ${p.netScore??"—"}`
-                : p.competition==="stableford"
-                ? `Stableford: ${p.stableford??"—"}`
-                : "Competition not chosen"
+              ${!type
+                ? "Competition not chosen"
+                : isSubmitted
+                ? (p.noReturn===true
+                    ? "NR — No Return"
+                    : type==="stableford"
+                    ? `Stableford: ${p.stableford}`
+                    : `Net: ${p.netScore}`)
+                : "⏳ Score still to enter"
               }
             </div>
           `}
@@ -871,17 +920,14 @@ function scores(){
           ? stablefordRanked.map((p,i)=>`
             <div class="player row">
               <span class="pos">${i+1}</span>
-
               <div style="flex:1">
                 <b>${esc(p.name)}</b>
-
                 ${!isPointsGame ? `
                   <div class="muted">
                     ${p.paid ? "✓ Paid • Eligible" : "⚠️ Unpaid • Not eligible"}
                   </div>
                 ` : ""}
               </div>
-
               <span class="money">${p.stableford} pts</span>
             </div>
           `).join("")
@@ -898,34 +944,46 @@ function scores(){
           ? netRanked.map((p,i)=>`
             <div class="player row">
               <span class="pos">${i+1}</span>
-
               <div style="flex:1">
                 <b>${esc(p.name)}</b>
-
                 ${!isPointsGame ? `
                   <div class="muted">
                     ${p.paid ? "✓ Paid • Eligible" : "⚠️ Unpaid • Not eligible"}
                   </div>
                 ` : ""}
               </div>
-
               <span class="money">${p.netScore}</span>
             </div>
           `).join("")
           : '<div class="muted">No Net scores yet.</div>'
         }
+
+        ${eligiblePlayers.some(p=>(isPointsGame ? pointsComp : p.competition)==="net" && p.noReturn===true) ? `
+          <div class="muted" style="margin-top:8px;">
+            NR: ${eligiblePlayers
+              .filter(p=>(isPointsGame ? pointsComp : p.competition)==="net" && p.noReturn===true)
+              .map(p=>esc(p.name)).join(", ")}
+          </div>
+        ` : ""}
       </div>
     ` : ""}
 
     ${isAdmin ? `
       <div class="card">
-        <button class="primary full" onclick="finishRound()">
-          🏁 Finish Round & Save Result
-        </button>
+        ${eligiblePlayers.length && stillToEnter.length===0 ? `
+          <button class="primary full" onclick="finishRound()">
+            🏁 Finish Round & Save Result
+          </button>
+        ` : `
+          <div class="notice warning">
+            ⏳ Finish Round will be available when every entered player has submitted a score${pointsComp==="net" || !isPointsGame ? " or NR" : ""}.
+          </div>
+        `}
       </div>
     ` : ""}
   `;
 }
+
 
 async function setCompetition(i,type){
 if(!demoCanEdit())return;
@@ -948,34 +1006,139 @@ if(!demoCanEdit())return;
   render();
   await save();
 }
-async function setStableford(i,v){
-if(!demoCanEdit())return;
-
-  
+async function submitPlayerScore(i,type){
+  if(!demoCanEdit())return;
 
   const p=state.players[i];
- if(!isAdmin && p.id!==myPlayerId)return;
- if(state.gameType==="money" && !p.paid){
-   alert("Pay before entering a score.");
-   return;
- }
- p.stableford=v===""?null:Number(v);
- render();
- await save();
+  if(!p)return;
+  if(!isAdmin && p.id!==myPlayerId)return;
+
+  if(state.gameType==="money" && !p.paid){
+    alert("Pay before entering a score.");
+    return;
+  }
+
+  const input=$("scoreInput_"+i);
+  const raw=String(input?.value||"").trim();
+  const value=Number(raw);
+
+  if(!raw || !Number.isFinite(value) || value<0){
+    alert("Please enter a valid score.");
+    return;
+  }
+
+  const label=type==="stableford"
+    ? "Stableford score " + value + " points"
+    : "Net score " + value;
+
+  if(!confirm("Submit " + label + "?\n\nAre you sure?"))return;
+
+  if(type==="stableford"){
+    p.stableford=value;
+    p.netScore=null;
+  }else{
+    p.netScore=value;
+    p.stableford=null;
+  }
+
+  p.noReturn=false;
+  p.scoreSubmitted=true;
+  scoreDraftActive=false;
+
+  render();
+  await save();
 }
 
-async function setNetScore(i,v){
-if(!demoCanEdit())return;
- const p=state.players[i];
- if(!isAdmin && p.id!==myPlayerId)return;
- if(state.gameType==="money" && !p.paid){
-   alert("Pay before entering a score.");
-   return;
- }
- p.netScore=v===""?null:Number(v);
- render();
- await save();
+async function submitNoReturn(i){
+  if(!demoCanEdit())return;
+
+  const p=state.players[i];
+  if(!p)return;
+  if(!isAdmin && p.id!==myPlayerId)return;
+
+  const type=state.gameType==="points"
+    ? (state.pointsCompetition||"stableford")
+    : p.competition;
+
+  if(type!=="net"){
+    alert("No Return is available for Net competitions.");
+    return;
+  }
+
+  if(state.gameType==="money" && !p.paid){
+    alert("Pay before submitting No Return.");
+    return;
+  }
+
+  if(!confirm("Submit NR — No Return?\n\nThis player will count as submitted but cannot win the Net competition."))return;
+
+  p.netScore=null;
+  p.stableford=null;
+  p.noReturn=true;
+  p.scoreSubmitted=true;
+  scoreDraftActive=false;
+
+  render();
+  await save();
 }
+
+async function adminEditSubmittedScore(i,type){
+  if(!isAdmin || !demoCanEdit())return;
+
+  const p=state.players[i];
+  if(!p)return;
+
+  const current=p.noReturn===true
+    ? "NR"
+    : type==="stableford"
+    ? String(p.stableford??"")
+    : String(p.netScore??"");
+
+  const answer=prompt(
+    "Correct " + p.name + "'s submitted " +
+    (type==="stableford" ? "Stableford score" : "Net score") +
+    (type==="net" ? ".\n\nEnter a number or NR." : "."),
+    current
+  );
+
+  if(answer===null)return;
+
+  const clean=String(answer).trim().toUpperCase();
+
+  if(type==="net" && clean==="NR"){
+    if(!confirm("Change " + p.name + "'s result to NR — No Return?"))return;
+    p.netScore=null;
+    p.stableford=null;
+    p.noReturn=true;
+    p.scoreSubmitted=true;
+    render();
+    await save();
+    return;
+  }
+
+  const value=Number(clean);
+  if(clean==="" || !Number.isFinite(value) || value<0){
+    alert("Please enter a valid score" + (type==="net" ? " or NR." : "."));
+    return;
+  }
+
+  if(!confirm("Change " + p.name + "'s submitted score to " + value + "?"))return;
+
+  if(type==="stableford"){
+    p.stableford=value;
+    p.netScore=null;
+  }else{
+    p.netScore=value;
+    p.stableford=null;
+  }
+
+  p.noReturn=false;
+  p.scoreSubmitted=true;
+
+  render();
+  await save();
+}
+
 async function finishRound(){
 
   const isPointsGame=state.gameType==="points";
@@ -1146,7 +1309,9 @@ places.forEach((place,i)=>{
         handicap:p.handicap,
         competition:pointsComp,
         stableford:p.stableford,
-        netScore:p.netScore
+        netScore:p.netScore,
+      noReturn:Boolean(p.noReturn),
+      scoreSubmitted:Boolean(p.scoreSubmitted)
       }))
     };
 if(isTrip){
@@ -1391,7 +1556,9 @@ const record={
       handicap:p.handicap,
       competition:p.competition || null,
       stableford:p.stableford,
-      netScore:p.netScore
+      netScore:p.netScore,
+      noReturn:Boolean(p.noReturn),
+      scoreSubmitted:Boolean(p.scoreSubmitted)
     }))
   };
 
@@ -1419,6 +1586,8 @@ if(isTrip){
     p.paid=false;
     p.stableford=null;
     p.netScore=null;
+    p.noReturn=false;
+    p.scoreSubmitted=false;
     p.competition=null;
   });
 
@@ -1446,7 +1615,7 @@ function showRoundHistory(historyIndex){
 
   const isPoints=h.gameType==="points";
   const players=(h.players||[]).filter(p=>
-    p.stableford!=null || p.netScore!=null
+    p.stableford!=null || p.netScore!=null || p.noReturn===true
   );
 
   $("screen").innerHTML=`
@@ -1510,8 +1679,13 @@ function showRoundHistory(historyIndex){
               </div>
             </div>
             <div style="text-align:right;font-weight:800;">
-              ${p.stableford!=null ? esc(String(p.stableford))+" pts" : ""}
-              ${p.netScore!=null ? "Net "+esc(String(p.netScore)) : ""}
+              ${p.noReturn===true
+                ? "NR"
+                : p.stableford!=null
+                ? esc(String(p.stableford))+" pts"
+                : p.netScore!=null
+                ? "Net "+esc(String(p.netScore))
+                : ""}
             </div>
           </div>
         </div>
@@ -4235,6 +4409,8 @@ state.date=tripDate.trim();
     p.paid=false;
     p.stableford=null;
     p.netScore=null;
+    p.noReturn=false;
+    p.scoreSubmitted=false;
     p.competition=null;
   });
 
@@ -4363,6 +4539,8 @@ if(tripDate===null)return;
     p.paid=false;
     p.stableford=null;
     p.netScore=null;
+    p.noReturn=false;
+    p.scoreSubmitted=false;
     p.competition=null;
   });
 
@@ -4583,6 +4761,8 @@ async function resetScores(){
  state.players.forEach(p=>{
    p.stableford=null;
    p.netScore=null;
+   p.noReturn=false;
+   p.scoreSubmitted=false;
  });
  render();
  await save();
