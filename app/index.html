@@ -98,7 +98,12 @@ function chooseMyPlayer(){
   $("screen").innerHTML=`
     <div class="card">
       <h2>👤 Who are you?</h2>
-      <div class="muted">Tap your name below.</div>
+      <div class="notice" style="margin-bottom:12px;">
+        <b>Already in the group?</b><br>Tap your name below.
+      </div>
+      <div class="muted" style="margin-bottom:8px;">
+        New to the group? Use <b>Join Group</b> at the bottom.
+      </div>
 
       ${[...state.players].sort((a,b)=>a.name.localeCompare(b.name)).map(p=>`
         <button class="secondary full" onclick="selectMyPlayer('${p.id}')">
@@ -115,6 +120,70 @@ function chooseMyPlayer(){
     </div>
   `;
 }
+function installDeviceType(){
+  const ua=navigator.userAgent||"";
+  if(/iPhone|iPad|iPod/i.test(ua))return "iphone";
+  if(/Android/i.test(ua))return "android";
+  return "other";
+}
+
+function iosShareIcon(){
+  return `<svg width="34" height="34" viewBox="0 0 24 24" fill="none" aria-hidden="true"
+    style="vertical-align:middle">
+    <path d="M12 16V3M12 3L8.5 6.5M12 3l3.5 3.5M6.5 10H5a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-1.5"
+      stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>`;
+}
+
+function showInstallHelp(playerName){
+  const device=installDeviceType();
+
+  let steps="";
+  if(device==="iphone"){
+    steps=`
+      <div class="notice" style="text-align:left;margin-top:14px;">
+        <b>iPhone — 3 simple steps</b><br><br>
+        <b>1.</b> Make sure this page is open in <b>Safari</b>.<br><br>
+        <b>2.</b> Tap the <b>Share</b> button ${iosShareIcon()} at the bottom of Safari.<br><br>
+        <b>3.</b> Scroll down and tap <b>Add to Home Screen</b>, then tap <b>Add</b>.
+      </div>`;
+  }else if(device==="android"){
+    steps=`
+      <div class="notice" style="text-align:left;margin-top:14px;">
+        <b>Android — 3 simple steps</b><br><br>
+        <b>1.</b> Make sure this page is open in <b>Chrome</b>.<br><br>
+        <b>2.</b> Tap the <b>⋮ three-dot menu</b>.<br><br>
+        <b>3.</b> Tap <b>Add to Home screen</b> (or <b>Install app</b>), then confirm.
+      </div>`;
+  }else{
+    steps=`
+      <div class="notice" style="text-align:left;margin-top:14px;">
+        <b>Add I'm In Golf to your Home Screen</b><br><br>
+        <b>iPhone:</b> Safari → Share ${iosShareIcon()} → Add to Home Screen.<br><br>
+        <b>Android:</b> Chrome → ⋮ → Add to Home screen.
+      </div>`;
+  }
+
+  $("screen").innerHTML=`
+    <div class="card" style="text-align:center;">
+      <div style="font-size:44px;">✅</div>
+      <h2 style="font-size:24px;margin-top:8px;">You're in, ${esc(playerName)}!</h2>
+      <div class="muted">Your phone will remember who you are.</div>
+
+      <h2 style="margin-top:24px;">📱 Put I'm In Golf on your Home Screen</h2>
+      <div class="muted">It only takes a few seconds.</div>
+
+      ${steps}
+
+      <button class="primary full" onclick="show('round')">
+        Continue to I'm In Golf
+      </button>
+      <button class="ghost full" onclick="show('round')">
+        I'll do this later
+      </button>
+    </div>`;
+}
+
 function selectMyPlayer(id){
   const player=state.players.find(p=>p.id===id);
   if(!player)return;
@@ -122,8 +191,7 @@ function selectMyPlayer(id){
   myPlayerId=player.id;
   localStorage.setItem("tensInPlayerId",myPlayerId);
 
-  alert("Welcome " + player.name + "!");
-  show("round");
+  showInstallHelp(player.name);
 }
 let state={
  course:"Hazel Grove Golf Club",
@@ -521,14 +589,15 @@ $("screen").innerHTML=`
 function shareApp(){
   const url="https://imingolf.co.uk/app/?pin="+encodeURIComponent(pin);
 
-  const message=`⛳ I'm In Golf
+  const message=`⛳ You're invited to I'm In Golf
 
-Join our golf group.
+Tap the link below to join our golf group:
+${url}
 
-Group PIN: ${pin}
+Already in the group? Choose your name.
+New to the group? Tap "Join Group" and add your name + handicap.
 
-Open I'm In Golf here:
-${url}`;
+Group PIN: ${pin}`;
 
   if(navigator.share){
     navigator.share({
@@ -2806,8 +2875,7 @@ const duplicate=state.players.some(
   render();
   await save();
 
-  alert("Welcome " + newPlayer.name + "!");
-  show("round");
+  showInstallHelp(newPlayer.name);
 }
 async function editPlayer(i){const p=state.players[i];const name=prompt("Player name",p.name);if(!name)return;const h=prompt("Handicap",p.handicap);p.name=name.trim();p.handicap=Number(h)||0;render();await save()}
 async function removePlayer(i){if(!confirm("Remove "+state.players[i].name+"? Their past round history will stay saved."))return;state.players.splice(i,1);render();await save()}
