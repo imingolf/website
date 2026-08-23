@@ -90,7 +90,25 @@ function demoCanEdit(){
 }
 let lastWinnerRecord=null;
 let statsPlayerId=null;
-let myPlayerId=localStorage.getItem("tensInPlayerId")||"";
+let myPlayerId="";
+
+function playerIdentityKey(groupPin){
+  return "tensInPlayerId_" + String(groupPin||"").trim();
+}
+
+function loadMyPlayerForGroup(){
+  myPlayerId=localStorage.getItem(playerIdentityKey(pin))||"";
+}
+
+function saveMyPlayerForGroup(){
+  if(!pin || !myPlayerId)return;
+  localStorage.setItem(playerIdentityKey(pin),myPlayerId);
+}
+
+function clearMyPlayerForGroup(){
+  if(pin)localStorage.removeItem(playerIdentityKey(pin));
+  myPlayerId="";
+}
 function chooseMyPlayer(){
   const existing=state.players.find(p=>p.id===myPlayerId);
   if(existing)return;
@@ -209,7 +227,7 @@ function selectMyPlayer(id){
   if(!player)return;
 
   myPlayerId=player.id;
-  localStorage.setItem("tensInPlayerId",myPlayerId);
+  saveMyPlayerForGroup();
 
   document.querySelector("nav").style.display="";
   showInstallHelp(player.name);
@@ -311,6 +329,7 @@ async function connect(){
  if(error || !data){$("connectMsg").textContent="PIN not recognised, or database setup is incomplete.";return}
 state=data;
 localStorage.setItem("tensInPin",pin);
+loadMyPlayerForGroup();
 $("demoBadge").classList.toggle("hidden", pin!=="2026");
 $("setupOverlay").classList.add("hidden");
 $("syncText").textContent="Shared • everyone sees the same game";
@@ -3375,8 +3394,7 @@ function playersPage(){
  </div>`;
 }
 function changeMyPlayer(){
-  localStorage.removeItem("tensInPlayerId");
-  myPlayerId="";
+  clearMyPlayerForGroup();
   chooseMyPlayer();
 }
 async function changeMyHandicap(i){
@@ -3459,7 +3477,7 @@ const duplicate=state.players.some(
   state.players.push(newPlayer);
 
   myPlayerId=newPlayer.id;
-  localStorage.setItem("tensInPlayerId",myPlayerId);
+  saveMyPlayerForGroup();
 
   render();
   await save();
