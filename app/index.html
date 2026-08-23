@@ -604,21 +604,21 @@ function tripRoundWinner(record){
   const comp=state.trip?.competition || "stableford";
 
   if(comp==="net"){
-    const name=(record.netWinnerNames||[])[0];
-    if(!name)return null;
-    const p=(record.players||[]).find(x=>x.name===name);
+    const names=record.netWinnerNames||[];
+    if(!names.length)return null;
+    const p=(record.players||[]).find(x=>x.name===names[0]);
     return {
-      name,
+      name:names.join(" & "),
       score:p?.noReturn===true ? "NR" : (p?.netScore!=null ? "Net "+p.netScore : ""),
       label:"Net"
     };
   }
 
-  const name=(record.stablefordWinnerNames||[])[0];
-  if(!name)return null;
-  const p=(record.players||[]).find(x=>x.name===name);
+  const names=record.stablefordWinnerNames||[];
+  if(!names.length)return null;
+  const p=(record.players||[]).find(x=>x.name===names[0]);
   return {
-    name,
+    name:names.join(" & "),
     score:p?.stableford!=null ? p.stableford+" pts" : "",
     label:"Stableford"
   };
@@ -1457,7 +1457,7 @@ async function finishRound(){
 
     const answer=prompt(
       `${competition} tie for ${position} on ${score}.\n\n` +
-      `Check the scorecards and choose the player on countback:\n\n` +
+      `Use your normal scorecard countback and choose the winner.\nNo hole-by-hole entry is needed in the app.\n\n` +
       names +
       `\n\nEnter the player's number.`
     );
@@ -1477,6 +1477,36 @@ async function finishRound(){
     }
 
     return players[selected];
+  }
+
+  function resolveMoneyTie(players,competition,score,pot){
+    const each=players.length ? Number(pot||0)/players.length : 0;
+    const answer=prompt(
+      `${competition} tie on ${score}.\n\n` +
+      `1. Split the pot equally — £${each.toFixed(2).replace(/\\.00$/,"")} each\n` +
+      `2. Admin declares the countback winner\n\n` +
+      `Enter 1 or 2`
+    );
+
+    if(answer===null)return null;
+
+    if(String(answer).trim()==="1"){
+      return {winners:[...players],countback:false,split:true};
+    }
+
+    if(String(answer).trim()==="2"){
+      const winner=chooseCountbackWinner(
+        players,
+        competition,
+        score,
+        "1st"
+      );
+      if(!winner)return null;
+      return {winners:[winner],countback:true,split:false};
+    }
+
+    alert("Please enter 1 to split the pot or 2 for countback.");
+    return resolveMoneyTie(players,competition,score,pot);
   }
 
 
@@ -1728,35 +1758,39 @@ if(isTrip){
   let netCountback=false;
 
 
-  if(stablefordWinners.length>1){
+  let stablefordSplit=false;
 
-    const winner=chooseCountbackWinner(
+  if(stablefordWinners.length>1){
+    const resolution=resolveMoneyTie(
       stablefordWinners,
       "Stableford",
       stablefordBest + " points",
-      "1st"
+      stablefordPot()
     );
 
-    if(!winner)return;
+    if(!resolution)return;
 
-    stablefordWinners=[winner];
-    stablefordCountback=true;
+    stablefordWinners=resolution.winners;
+    stablefordCountback=resolution.countback;
+    stablefordSplit=resolution.split;
   }
 
 
-  if(netWinners.length>1){
+  let netSplit=false;
 
-    const winner=chooseCountbackWinner(
+  if(netWinners.length>1){
+    const resolution=resolveMoneyTie(
       netWinners,
       "Net",
       netBest,
-      "1st"
+      netPot()
     );
 
-    if(!winner)return;
+    if(!resolution)return;
 
-    netWinners=[winner];
-    netCountback=true;
+    netWinners=resolution.winners;
+    netCountback=resolution.countback;
+    netSplit=resolution.split;
   }
 
 const winners=[
@@ -1866,8 +1900,14 @@ const record={
     stablefordCountback:
       stablefordCountback,
 
+    stablefordSplit:
+      stablefordSplit,
+
     netCountback:
       netCountback,
+
+    netSplit:
+      netSplit,
 
     players:state.players.map(p=>({
       name:p.name,
@@ -1965,7 +2005,8 @@ function showRoundHistory(historyIndex){
             <b>Stableford winner${h.stablefordWinnerNames.length>1 ? "s" : ""}</b><br>
             ${h.stablefordWinnerNames.map(esc).join(", ")}
             ${h.stablefordPot!=null ? `<br><span class="money">Pot £${Number(h.stablefordPot||0)}</span>` : ""}
-            ${h.stablefordCountback ? `<br><span class="muted">Won on countback</span>` : ""}
+            ${h.stablefordWinnerNames.length>1 ? `<br><span class="muted">Split equally • £${(Number(h.stablefordPot||0)/h.stablefordWinnerNames.length).toFixed(2).replace(/\.00$/,"")} each</span>` : ""}
+            ${h.stablefordCountback ? `<br><span class="muted">Won on countback — Admin declared</span>` : ""}
           </div>` : ""}
 
         ${h.netWinnerNames?.length ? `
@@ -1973,7 +2014,8 @@ function showRoundHistory(historyIndex){
             <b>Net winner${h.netWinnerNames.length>1 ? "s" : ""}</b><br>
             ${h.netWinnerNames.map(esc).join(", ")}
             ${h.netPot!=null ? `<br><span class="money">Pot £${Number(h.netPot||0)}</span>` : ""}
-            ${h.netCountback ? `<br><span class="muted">Won on countback</span>` : ""}
+            ${h.netWinnerNames.length>1 ? `<br><span class="muted">Split equally • £${(Number(h.netPot||0)/h.netWinnerNames.length).toFixed(2).replace(/\.00$/,"")} each</span>` : ""}
+            ${h.netCountback ? `<br><span class="muted">Won on countback — Admin declared</span>` : ""}
           </div>` : ""}
       </div>
     ` : `
@@ -2136,20 +2178,20 @@ function showWinnerScreen(record){
   // 💷 MONEY GAME RESULT
   // =====================================
 
-  const stablefordWinner=
-    record.stablefordWinnerNames?.[0] || "";
+  const stablefordNames=record.stablefordWinnerNames||[];
+  const netNames=record.netWinnerNames||[];
 
-  const netWinner=
-    record.netWinnerNames?.[0] || "";
+  const stablefordWinner=stablefordNames.join(" & ");
+  const netWinner=netNames.join(" & ");
 
   const stablefordPlayer=
     (record.players||[]).find(
-      p=>p.name===stablefordWinner
+      p=>p.name===stablefordNames[0]
     );
 
   const netPlayer=
     (record.players||[]).find(
-      p=>p.name===netWinner
+      p=>p.name===netNames[0]
     );
 
   const stablefordScore=
@@ -2163,6 +2205,9 @@ function showWinnerScreen(record){
 
   const netPotValue=
     Number(record.netPot||0);
+
+  const stablefordEach=stablefordNames.length ? stablefordPotValue/stablefordNames.length : 0;
+  const netEach=netNames.length ? netPotValue/netNames.length : 0;
 
 
   $("screen").innerHTML=`
@@ -2196,7 +2241,7 @@ function showWinnerScreen(record){
         </div>
 
         <div class="money">
-          Wins £${stablefordPotValue}
+          ${stablefordNames.length>1 ? `Split pot • £${stablefordEach.toFixed(2).replace(/\.00$/,"")} each` : `Wins £${stablefordPotValue}`}
         </div>
 
         ${record.stablefordCountback ? `
@@ -2224,7 +2269,7 @@ function showWinnerScreen(record){
         </div>
 
         <div class="money">
-          Wins £${netPotValue}
+          ${netNames.length>1 ? `Split pot • £${netEach.toFixed(2).replace(/\.00$/,"")} each` : `Wins £${netPotValue}`}
         </div>
 
         ${record.netCountback ? `
@@ -3008,12 +3053,15 @@ const moneyWon=(playerName)=>{
 
     let won=0;
 
-    if((h.stablefordWinnerNames||[]).includes(playerName)){
-      won+=Number(h.stablefordPot||0);
+    const sfNames=h.stablefordWinnerNames||[];
+    const netNames=h.netWinnerNames||[];
+
+    if(sfNames.includes(playerName)){
+      won+=sfNames.length ? Number(h.stablefordPot||0)/sfNames.length : 0;
     }
 
-    if((h.netWinnerNames||[]).includes(playerName)){
-      won+=Number(h.netPot||0);
+    if(netNames.includes(playerName)){
+      won+=netNames.length ? Number(h.netPot||0)/netNames.length : 0;
     }
 
     return total+won;
