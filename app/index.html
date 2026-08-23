@@ -77,6 +77,7 @@ nav button{flex:1;background:transparent;color:#6d756f;padding:11px 2px;font-siz
 <script>
 let db=null, pin="", page="round", poller=null;
 let leagueView="points";
+let selectedPastTripIndex=0;
 
 function demoReadOnly(){
   return pin==="2026" && !isAdmin;
@@ -2852,7 +2853,9 @@ async function shareWinnerImage(){
 async function shareTripSummary(){
   const past=state.trip?.pastTrips||[];
   const live=Boolean(state.trip&&(state.trip.active||state.trip.completed||(state.trip.rounds||[]).length));
-  const trip=live?state.trip:(past[0]||null);
+  const safeIndex=(selectedPastTripIndex>=0 && selectedPastTripIndex<past.length)
+    ? selectedPastTripIndex : 0;
+  const trip=live?state.trip:(past[safeIndex]||null);
   if(!trip){alert("No Trip is available to share.");return;}
 
   const rounds=trip.rounds||[];
@@ -3036,7 +3039,12 @@ const currentTripAvailable=Boolean(
   )
 );
 const hasTrip=Boolean(currentTripAvailable || pastTrips.length);
-const leagueTrip=currentTripAvailable ? state.trip : (pastTrips[0] || null);
+if(selectedPastTripIndex<0 || selectedPastTripIndex>=pastTrips.length){
+  selectedPastTripIndex=0;
+}
+const leagueTrip=currentTripAvailable
+  ? state.trip
+  : (pastTrips[selectedPastTripIndex] || null);
 
 if(leagueView==="trip" && !hasTrip){
   leagueView="points";
@@ -3223,7 +3231,23 @@ ${tripSorted.map((p,i)=>`
 
     <div style="margin-top:16px">
       <button class="primary full" onclick="shareTripSummary()">📤 Share Trip Summary</button>
-    </div>`}
+    </div>
+
+    ${pastTrips.length ? `
+      <div style="margin-top:18px;border-top:1px solid #d9e2dc;padding-top:16px;">
+        <h3 style="margin:0 0 10px;">📚 Past Trips</h3>
+        ${pastTrips.map((pt,i)=>`
+          <button
+            class="${!currentTripAvailable && i===selectedPastTripIndex ? "primary" : "secondary"} full"
+            style="margin-top:8px;text-align:left;"
+            onclick="selectedPastTripIndex=${i};leagueView='trip';league()">
+            ${esc(pt.name || ("Trip "+(i+1)))}
+            ${pt.champion ? ` — 👑 ${esc(pt.champion)}` : ""}
+            ${pt.totalRounds ? ` • ${pt.totalRounds} rounds` : ""}
+          </button>
+        `).join("")}
+      </div>
+    ` : ""}`}
       
       
 
