@@ -330,6 +330,7 @@ async function connect(){
 state=data;
 localStorage.setItem("tensInPin",pin);
 loadMyPlayerForGroup();
+loadAdminForGroup();
 $("demoBadge").classList.toggle("hidden", pin!=="2026");
 $("setupOverlay").classList.add("hidden");
 $("syncText").textContent="Shared • everyone sees the same game";
@@ -352,7 +353,7 @@ if(!state.adminPin && setupTokenFromUrl){
           const saved=await save();
           if(saved){
             isAdmin=true;
-            sessionStorage.setItem("tensInAdmin","yes");
+            saveAdminForGroup();
             history.replaceState({},document.title,location.pathname+"?pin="+encodeURIComponent(pin));
             alert("✅ Admin PIN created. You are now the Admin for this golf group.");
           }else{
@@ -3540,7 +3541,28 @@ async function editPlayer(i){const p=state.players[i];const name=prompt("Player 
 async function removePlayer(i){if(!confirm("Remove "+state.players[i].name+"? Their past round history will stay saved."))return;state.players.splice(i,1);render();await save()}
 
 
-let isAdmin = sessionStorage.getItem("tensInAdmin")==="yes";
+let isAdmin=false;
+
+function adminSessionKey(groupPin){
+  return "tensInAdmin_" + String(groupPin||"").trim();
+}
+
+function loadAdminForGroup(){
+  isAdmin=!!pin && sessionStorage.getItem(adminSessionKey(pin))==="yes";
+  if(!isAdmin){
+    isOwner=false;
+    ownerCreationCode="";
+  }
+}
+
+function saveAdminForGroup(){
+  if(pin && isAdmin)sessionStorage.setItem(adminSessionKey(pin),"yes");
+}
+
+function clearAdminForGroup(){
+  if(pin)sessionStorage.removeItem(adminSessionKey(pin));
+  isAdmin=false;
+}
 let isOwner=false;
 let ownerCreationCode="";
 let lastAdminInvite="";
@@ -3583,7 +3605,7 @@ function adminLoginFromWaiting(){
  if(entered===null)return;
  if(String(entered).trim()===adminPinForGroup()){
    isAdmin=true;
-   sessionStorage.setItem("tensInAdmin","yes");
+   saveAdminForGroup();
    updateAdminUI();
    newRound();
  }else{
@@ -3596,7 +3618,7 @@ function adminLogin(){
  if(entered===null)return;
  if(String(entered).trim()===adminPinForGroup()){
    isAdmin=true;
-   sessionStorage.setItem("tensInAdmin","yes");
+   saveAdminForGroup();
    updateAdminUI();
    show("settings");
  }else{
@@ -3632,7 +3654,7 @@ function adminLogout(){
  isAdmin=false;
  isOwner=false;
  ownerCreationCode="";
- sessionStorage.removeItem("tensInAdmin");
+ clearAdminForGroup();
  updateAdminUI();
  show("round");
 }
