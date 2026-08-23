@@ -331,6 +331,27 @@ state=data;
 localStorage.setItem("tensInPin",pin);
 loadMyPlayerForGroup();
 loadAdminForGroup();
+
+// Clean up a stale blank round left behind by older Trip Mode versions.
+// This only closes an OPEN round when there is no course/date and nobody
+// has paid, chosen a competition, or entered a score.
+const staleBlankRound =
+  state.roundOpen===true &&
+  !String(state.course||"").trim() &&
+  !String(state.date||"").trim() &&
+  (state.players||[]).every(p =>
+    !p.paid &&
+    !p.competition &&
+    p.stableford==null &&
+    p.netScore==null &&
+    p.noReturn!==true &&
+    p.scoreSubmitted!==true
+  );
+
+if(staleBlankRound){
+  state.roundOpen=false;
+  await db.rpc("set_group_state",{p_pin:pin,p_state:state});
+}
 $("demoBadge").classList.toggle("hidden", pin!=="2026");
 $("setupOverlay").classList.add("hidden");
 $("syncText").textContent="Shared • everyone sees the same game";
