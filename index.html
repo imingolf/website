@@ -307,8 +307,11 @@ footer{padding:28px 0 42px;color:var(--muted);font-size:14px}.footer-row{display
     const div = document.createElement("div");
     div.className = "help-msg " + who;
     div.innerHTML = html;
-    body.insertBefore(div, document.getElementById("helpQuick"));
-    body.scrollTop = body.scrollHeight;
+    const quick = document.getElementById("helpQuick");
+    body.insertBefore(div, quick);
+    requestAnimationFrame(() => {
+      div.scrollIntoView({behavior:"smooth", block:"nearest"});
+    });
   }
 
   function answerKey(key){
