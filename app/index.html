@@ -5170,25 +5170,26 @@ async function finishTrip(){
     ...existingPastTrips
   ];
 
-  // Restore the normal weekly round
-  state.course=backup.course;
-  state.date=backup.date;
+  // Return cleanly to normal golf after the Trip.
+  // Keep the normal defaults/players, but do not reopen a stale or blank round.
+  state.course=backup.course || "";
+  state.date="";
   state.stake=backup.stake;
-  state.gameType=backup.gameType;
-  state.pointsCompetition=backup.pointsCompetition;
-  state.pointsValue=backup.pointsValue;
-  state.roundOpen=backup.roundOpen===false ? false : true;
+  state.gameType=backup.gameType || "points";
+  state.pointsCompetition=backup.pointsCompetition || "stableford";
+  state.pointsValue=backup.pointsValue || 10;
+  state.roundOpen=false;
 
   state.players=backup.players.map(p=>({
     id:p.id,
     name:p.name,
     handicap:p.handicap,
-    paid:p.paid,
-    competition:p.competition,
-    stableford:p.stableford,
-    netScore:p.netScore,
-    noReturn:Boolean(p.noReturn),
-    scoreSubmitted:Boolean(p.scoreSubmitted),
+    paid:false,
+    competition:null,
+    stableford:null,
+    netScore:null,
+    noReturn:false,
+    scoreSubmitted:false,
     wins:p.wins,
     leaguePoints:p.leaguePoints,
     netWinnings:p.netWinnings
@@ -5215,7 +5216,7 @@ async function finishTrip(){
 
   alert(
     "🏁 " + tripName + " saved.\n\n" +
-    "Your normal round has been restored."
+    "You're ready to set up the next competition."
   );
 }
 async function cancelTrip(){
