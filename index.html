@@ -321,29 +321,51 @@ footer{padding:28px 0 42px;color:var(--muted);font-size:14px}.footer-row{display
     setTimeout(() => addMessage(item.a, "bot"), 120);
   }
 
-  function answerTyped(text){
-    const q = text.trim();
-    if(!q) return;
-    addMessage(q, "user");
-    const s = q.toLowerCase();
+  async function answerTyped(text){
+  const q = text.trim();
+  if(!q) return;
 
-    let key = "";
-    if(/join|pin|invite|name/.test(s)) key = "join";
-    else if(/pay|paid|money|fee|stake|pot/.test(s)) key = "pay";
-    else if(/score|stableford|net|result/.test(s)) key = "score";
-    else if(/trip|holiday|tour/.test(s)) key = "trip";
-    else if(/start|create|new group|own group/.test(s)) key = "start";
-    else if(/wrong player|who i am|stuck|problem|help|admin/.test(s)) key = "stuck";
+  addMessage(q, "user");
+  addMessage("Thinking…", "bot");
 
-    if(key){
-      setTimeout(() => addMessage(answers[key].a, "bot"), 120);
-    }else{
-      setTimeout(() => addMessage(
-        `I can currently help with joining, paying, entering a final score, Trip Mode and starting a group. For anything else, email <a href="mailto:hello@imingolf.co.uk">hello@imingolf.co.uk</a>.`,
-        "bot"
-      ), 120);
+  const thinking = body.querySelector(".help-msg.bot:last-of-type");
+
+  try{
+    const response = await fetch(
+      "https://kzzputsqxdntfqppnnz.supabase.co/functions/v1/help-assistant",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": "sb_publishable_8_sOgkTbTiKyJqo0zjhHBQ_GqTMEbSz",
+          "Authorization": "Bearer sb_publishable_8_sOgkTbTiKyJqo0zjhHBQ_GqTMEbSz"
+        },
+        body: JSON.stringify({ question: q })
+      }
+    );
+
+    const data = await response.json();
+
+    if(thinking) thinking.remove();
+
+    if(!response.ok){
+      throw new Error(data?.error || "Help Assistant unavailable");
     }
+
+    addMessage(
+      data.answer || "I don't have that information yet.",
+      "bot"
+    );
+
+  }catch(err){
+    if(thinking) thinking.remove();
+
+    addMessage(
+      `Sorry, the Help Assistant is temporarily unavailable. Please try again.`,
+      "bot"
+    );
   }
+}
 
   function openHelp(){
     panel.classList.add("open");
