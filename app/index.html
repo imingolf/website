@@ -3359,6 +3359,10 @@ function playersPage(){
      🔄 Change who I am
    </button>
 
+   <button class="secondary full" onclick="switchGolfGroup()">
+     🔁 Switch Golf Group
+   </button>
+
    ${sortedPlayers.map(p=>{
 
      const i=state.players.findIndex(x=>x.id===p.id);
@@ -3397,6 +3401,23 @@ function playersPage(){
 function changeMyPlayer(){
   clearMyPlayerForGroup();
   chooseMyPlayer();
+}
+
+function switchGolfGroup(){
+  clearInterval(poller);
+  poller=null;
+  isAdmin=false;
+  isOwner=false;
+  ownerCreationCode="";
+  pin="";
+  db=null;
+  page="round";
+
+  document.querySelector("nav").style.display="";
+  $("setupOverlay").classList.remove("hidden");
+  $("pinInput").value="";
+  $("connectMsg").textContent="";
+  $("pinInput").focus();
 }
 async function changeMyHandicap(i){
  const p=state.players[i];
