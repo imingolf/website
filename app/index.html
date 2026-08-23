@@ -2931,7 +2931,7 @@ const currentTripAvailable=Boolean(
   state.trip &&
   (
     state.trip.active ||
-    leagueTrip.completed ||
+    state.trip.completed ||
     (state.trip.rounds||[]).length
   )
 );
@@ -2961,10 +2961,10 @@ const tripPlayed=(playerName)=>{
 
 const tripSorted=[...state.players].sort((a,b)=>{
   const aPoints=
-    Number(state.trip?.standings?.[a.name]||0);
+    Number(leagueTrip?.standings?.[a.name]||0);
 
   const bPoints=
-    Number(state.trip?.standings?.[b.name]||0);
+    Number(leagueTrip?.standings?.[b.name]||0);
 
   if(bPoints!==aPoints){
     return bPoints-aPoints;
