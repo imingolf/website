@@ -1066,7 +1066,7 @@ function scores(){
                 }
               </div>
 
-              ${canControl && p.paid && !roundLocked() ? `
+              ${canControl && p.paid && (!roundLocked() || (isAdmin && !isSubmitted)) ? `
                 <div class="grid2" style="margin-top:10px;">
                   <button
                     class="${p.competition==="stableford" ? "primary" : "ghost"} small"
@@ -1236,8 +1236,13 @@ if(!demoCanEdit())return;
     return;
   }
 
-  if(roundLocked()){
+  if(roundLocked() && !isAdmin){
     alert("🔒 Entries are closed — scoring has started.");
+    return;
+  }
+
+  if(roundLocked() && isAdmin && (p.scoreSubmitted===true || p.stableford!=null || p.netScore!=null || p.noReturn===true)){
+    alert("This player has already submitted. Use Correct score if a change is needed.");
     return;
   }
 
