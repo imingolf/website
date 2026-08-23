@@ -1552,7 +1552,7 @@ async function finishRound(){
       let selectedPlayer=tied[0];
       let countback=false;
 
-      if(tied.length>1){
+      if(state.gameType==="points" && (tied.length>1)){
 
         selectedPlayer=chooseCountbackWinner(
           tied,
@@ -1841,7 +1841,7 @@ for(let place=0; place<3 && remainingTrip.length; place++){
 
   let selectedPlayer=tied[0];
 
-  if(tied.length>1){
+  if(state.gameType==="points" && (tied.length>1)){
 
     selectedPlayer=chooseCountbackWinner(
       tied,
