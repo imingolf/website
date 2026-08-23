@@ -3937,6 +3937,9 @@ function settingsPage(){
   <button class="secondary full" onclick="newRound()">
     Start new round
   </button>
+  <button class="red full" onclick="cancelCurrentRound()">
+    🗑️ Cancel Current Round
+  </button>
 ` : ""}
 ${state.trip?.active && Number(leagueTrip.currentRound)>1 ? `
   <button class="primary full" onclick="nextTripRound()">
@@ -4779,6 +4782,67 @@ function pickTripDate(title,initialValue=""){
     };
   });
 }
+async function cancelCurrentRound(){
+  if(!isAdmin){
+    alert("🔒 Only the group Admin can cancel the current round.");
+    return;
+  }
+
+  if(state.trip?.active){
+    alert("Use Cancel Current Trip for an active trip.");
+    return;
+  }
+
+  const hasRoundSetup=
+    Boolean(String(state.course||"").trim()) ||
+    Boolean(state.date) ||
+    state.players.some(p=>
+      p.paid ||
+      p.scoreSubmitted ||
+      p.stableford!=null ||
+      p.netScore!=null ||
+      p.noReturn===true ||
+      Boolean(p.competition)
+    );
+
+  if(!hasRoundSetup){
+    alert("There is no current round to cancel.");
+    return;
+  }
+
+  if(!confirm(
+    "Cancel the current round?\n\n" +
+    "This clears only the current round setup, payments, competition choices and scores.\n\n" +
+    "Players, league standings and previous-round history will NOT be deleted."
+  ))return;
+
+  state.course="";
+  state.date="";
+  state.gameType="money";
+  state.pointsCompetition="stableford";
+  state.pointsValue=10;
+
+  state.players.forEach(p=>{
+    p.paid=false;
+    p.competition=null;
+    p.stableford=null;
+    p.netScore=null;
+    p.noReturn=false;
+    p.scoreSubmitted=false;
+  });
+
+  scoreDraftActive=false;
+
+  const ok=await save();
+  if(!ok){
+    alert("The current round could not be cancelled. Please try again.");
+    return;
+  }
+
+  alert("✅ Current round cancelled. League and history were kept.");
+  show("round");
+}
+
 async function newRound(){
 
   // Security/permissions guard: only the group Admin can create a competition.
