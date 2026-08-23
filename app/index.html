@@ -1058,6 +1058,12 @@ function scores(){
   const sortedPlayers=[...state.players]
     .sort((a,b)=>a.name.localeCompare(b.name));
 
+  // Keep scoring simple for ordinary players: they only need their own score card.
+  // Admin still sees and can manage the full field.
+  const scorePlayers=isAdmin
+    ? sortedPlayers
+    : sortedPlayers.filter(p=>p.id===myPlayerId);
+
   const stablefordRanked=[...state.players]
     .filter(p=>
       p.stableford!=null &&
@@ -1097,13 +1103,15 @@ function scores(){
       ${eligiblePlayers.length ? `
         <div class="notice ${stillToEnter.length ? "warning" : ""}">
           ${stillToEnter.length
-            ? `<b>⏳ Still to enter (${stillToEnter.length})</b><br>${stillToEnter.map(p=>esc(p.name)).join(", ")}`
+            ? (isAdmin
+                ? `<b>⏳ Still to enter (${stillToEnter.length})</b><br>${stillToEnter.map(p=>esc(p.name)).join(", ")}`
+                : `<b>⏳ ${stillToEnter.length} score${stillToEnter.length===1?"":"s"} still to enter</b>`)
             : `<b>✅ All entered players have submitted.</b>`
           }
         </div>
       ` : ""}
 
-      ${sortedPlayers.map(p=>{
+      ${scorePlayers.map(p=>{
 
         const i=state.players.findIndex(x=>x.id===p.id);
         const type=isPointsGame ? pointsComp : p.competition;
