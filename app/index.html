@@ -607,6 +607,27 @@ function showTripSummary(){
   const standings=tripStandingsSorted();
   const champion=trip.champion || standings[0]?.name || null;
 
+  const tripMoney={};
+  rounds.forEach(r=>{
+    if(r.gameType!=="money")return;
+
+    const stableNames=Array.isArray(r.stablefordWinnerNames) ? r.stablefordWinnerNames : [];
+    const netNames=Array.isArray(r.netWinnerNames) ? r.netWinnerNames : [];
+    const stableShare=stableNames.length ? Number(r.stablefordPot||0)/stableNames.length : 0;
+    const netShare=netNames.length ? Number(r.netPot||0)/netNames.length : 0;
+
+    stableNames.forEach(name=>{
+      tripMoney[name]=(tripMoney[name]||0)+stableShare;
+    });
+    netNames.forEach(name=>{
+      tripMoney[name]=(tripMoney[name]||0)+netShare;
+    });
+  });
+
+  const tripMoneyRows=state.players
+    .map(p=>({name:p.name,won:Number(tripMoney[p.name]||0)}))
+    .sort((a,b)=>b.won-a.won || a.name.localeCompare(b.name));
+
   page="tripsummary";
   clearInterval(poller);
   poller=null;
@@ -666,6 +687,18 @@ function showTripSummary(){
           <div class="money">${s.points} pts</div>
         </div>
       `).join("") : `<div class="muted">No Trip standings recorded.</div>`}
+    </div>
+
+    <div class="card">
+      <h2>💷 Trip Money Summary</h2>
+      ${tripMoneyRows.length ? tripMoneyRows.map((m,i)=>`
+        <div class="player row">
+          <div>
+            <b>${i===0 && m.won>0 ? "💰 " : ""}${esc(m.name)}</b>
+          </div>
+          <div class="money">£${Number(m.won).toFixed(2).replace(/\.00$/,"")}</div>
+        </div>
+      `).join("") : `<div class="muted">No money results recorded for this trip.</div>`}
     </div>
 
     ${isAdmin ? `
