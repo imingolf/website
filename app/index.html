@@ -349,7 +349,15 @@ const staleBlankRound =
 
 if(staleBlankRound){
   state.roundOpen=false;
-  await db.rpc("set_group_state",{p_pin:pin,p_state:state});
+
+  const {error:cleanupError}=await db.rpc(
+    "save_group_state",
+    {p_pin:pin,p_state:state}
+  );
+
+  if(cleanupError){
+    console.error("Stale round cleanup could not be saved:",cleanupError);
+  }
 }
 $("demoBadge").classList.toggle("hidden", pin!=="2026");
 $("setupOverlay").classList.add("hidden");
