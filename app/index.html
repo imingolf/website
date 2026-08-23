@@ -2926,23 +2926,26 @@ const moneyWon=(playerName)=>{
     return moneyPlayed(b.name)-moneyPlayed(a.name);
   });
 // Trip League
-const hasTrip=Boolean(
+const pastTrips=state.trip?.pastTrips || [];
+const currentTripAvailable=Boolean(
   state.trip &&
   (
     state.trip.active ||
-    state.trip.completed ||
+    leagueTrip.completed ||
     (state.trip.rounds||[]).length
   )
 );
+const hasTrip=Boolean(currentTripAvailable || pastTrips.length);
+const leagueTrip=currentTripAvailable ? state.trip : (pastTrips[0] || null);
 
 if(leagueView==="trip" && !hasTrip){
   leagueView="points";
 }
 
 const tripPlayed=(playerName)=>{
-  if(!state.trip)return 0;
+  if(!leagueTrip)return 0;
 
-  return (state.trip.rounds||[]).filter(h=>{
+  return (leagueTrip.rounds||[]).filter(h=>{
     const player=(h.players||[]).find(
       p=>p.name===playerName
     );
@@ -3015,7 +3018,7 @@ const tripSorted=[...state.players].sort((a,b)=>{
   <div class="muted" style="margin-bottom:10px;">
     ${
       leagueView==="trip"
-        ? esc(state.trip?.name || "Trip Championship")
+        ? esc(leagueTrip?.name || "Trip Championship")
         : leagueView==="money"
         ? "Money Games only"
         : "Points Games only"
@@ -3082,13 +3085,13 @@ ${leagueView==="points" ? `
   `).join("")}
 
 ` : `
-${state.trip ? `
+${leagueTrip ? `
   <div class="notice" style="margin-bottom:12px;">
-    <b>✈️ ${esc(state.trip.name || "Trip Championship")}</b><br>
+    <b>✈️ ${esc(leagueTrip.name || "Trip Championship")}</b><br>
     ${
-      state.trip.completed
+      leagueTrip.completed
         ? "🏁 Trip complete"
-        : "Round " + state.trip.currentRound + " of " + state.trip.totalRounds
+        : "Round " + leagueTrip.currentRound + " of " + leagueTrip.totalRounds
     }
   </div>
 ` : ""}
@@ -3097,7 +3100,7 @@ ${tripSorted.map((p,i)=>`
   <div class="player row">
     <div>
       <b>
-        ${i===0 && Number(state.trip?.standings?.[p.name]||0)>0 ? "👑 " : ""}
+        ${i===0 && Number(leagueTrip?.standings?.[p.name]||0)>0 ? "👑 " : ""}
         ${i+1}. ${esc(p.name)}
       </b>
 
@@ -3108,7 +3111,7 @@ ${tripSorted.map((p,i)=>`
 
     <div style="text-align:right;">
       <div class="money">
-        ${Number(state.trip?.standings?.[p.name]||0)} pts
+        ${Number(leagueTrip?.standings?.[p.name]||0)} pts
       </div>
 
       <div style="font-weight:800;">
@@ -3760,9 +3763,9 @@ function settingsPage(){
     Start new round
   </button>
 ` : ""}
-${state.trip?.active && Number(state.trip.currentRound)>1 ? `
+${state.trip?.active && Number(leagueTrip.currentRound)>1 ? `
   <button class="primary full" onclick="nextTripRound()">
-    ✈️ Start Trip Round ${state.trip.currentRound} of ${state.trip.totalRounds}
+    ✈️ Start Trip Round ${leagueTrip.currentRound} of ${leagueTrip.totalRounds}
   </button>
 ` : ""}
 ${state.trip?.active ? `
@@ -4973,7 +4976,7 @@ async function nextTripRound(){
     return;
   }
 
-  const roundNumber=Number(state.trip.currentRound||1);
+  const roundNumber=Number(leagueTrip.currentRound||1);
 
   // Trip Round course
   const tripCourse=prompt(
@@ -4996,7 +4999,7 @@ if(tripDate===null)return;
 
     const game=prompt(
     "✈️ " + state.trip.name +
-    "\nRound " + roundNumber + " of " + state.trip.totalRounds +
+    "\nRound " + roundNumber + " of " + leagueTrip.totalRounds +
     "\n\nChoose Game Type:\n\n" +
     "1. 💷 Money Game\n" +
     "2. 🏆 Points Game\n\n" +
@@ -5052,7 +5055,7 @@ if(tripDate===null)return;
   const message=
     "✈️ " + state.trip.name +
     "\n\nRound " + roundNumber +
-    " of " + state.trip.totalRounds +
+    " of " + leagueTrip.totalRounds +
     "\n" + tripCourse.trim() +
     "\n" + tripDate.trim() +
     "\n\n" +
@@ -5072,7 +5075,7 @@ if(tripDate===null)return;
   if(!confirm(message))return;
 
   state.trip.active=true;
-  state.trip.completed=false;
+  leagueTrip.completed=false;
   state.roundOpen=true;
   state.course=tripCourse.trim();
   state.date=tripDate.trim();
@@ -5181,8 +5184,8 @@ async function finishTrip(){
   // IMPORTANT: do not copy pastTrips into itself.
   const completedTrip={
     name:state.trip.name,
-    totalRounds:state.trip.totalRounds,
-    currentRound:state.trip.currentRound,
+    totalRounds:leagueTrip.totalRounds,
+    currentRound:leagueTrip.currentRound,
     competition:state.trip.competition,
     tripPointsValue:state.trip.tripPointsValue,
     rounds:[...(state.trip.rounds || [])],
