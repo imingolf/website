@@ -5423,8 +5423,8 @@ async function finishTrip(){
   // IMPORTANT: do not copy pastTrips into itself.
   const completedTrip={
     name:state.trip.name,
-    totalRounds:leagueTrip.totalRounds,
-    currentRound:leagueTrip.currentRound,
+    totalRounds:state.trip.totalRounds,
+    currentRound:state.trip.currentRound,
     competition:state.trip.competition,
     tripPointsValue:state.trip.tripPointsValue,
     rounds:[...(state.trip.rounds || [])],
