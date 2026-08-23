@@ -391,7 +391,7 @@ async function refresh(){
 
  // Keep Owner utility screens on display.
  // Do not let the 5-second background sync redraw them while they are open.
- if(page==="admininvite" || page==="managegroups" || page==="editgroup")return;
+ if(page==="admininvite" || page==="managegroups" || page==="editgroup" || page==="adminhelp")return;
 
  const editing=document.activeElement &&
    document.activeElement.tagName==="INPUT";
@@ -441,6 +441,7 @@ function render(){
   if(page==="managegroups")manageGroupsPage();
   if(page==="editgroup")editGroupPage();
   if(page==="tripsummary")showTripSummary();
+  if(page==="adminhelp")adminHelpPage();
 }
 function roundLocked(){
   return state.players.some(p=>
@@ -3368,7 +3369,9 @@ function playersPage(){
      `;
    }).join("")}
 
-   <button class="primary full" onclick="addPlayer()">👋 Join Group</button>
+   ${isAdmin ? `
+     <button class="primary full" onclick="adminAddPlayer()">➕ Add Player</button>
+   ` : ""}
  </div>`;
 }
 function changeMyPlayer(){
@@ -3395,6 +3398,12 @@ p.handicap=newHandicap;
  await save();
 }
 async function addPlayer(){
+const currentMember=state.players.find(p=>p.id===myPlayerId);
+if(currentMember){
+  alert("✅ You're already a member of this group as " + currentMember.name + ".");
+  return;
+}
+
 const firstName=prompt("First name:");
 if(firstName===null)return;
 
@@ -3458,6 +3467,57 @@ const duplicate=state.players.some(
   document.querySelector("nav").style.display="";
   showInstallHelp(newPlayer.name);
 }
+
+async function adminAddPlayer(){
+  if(!isAdmin || !demoCanEdit())return;
+
+  const firstName=prompt("Player first name:");
+  if(firstName===null)return;
+
+  const surname=prompt("Player surname:");
+  if(surname===null)return;
+
+  const cleanName=(firstName.trim()+" "+surname.trim()).trim();
+
+  if(!firstName.trim() || !surname.trim()){
+    alert("Please enter the player's first name and surname.");
+    return;
+  }
+
+  if(state.players.some(p=>p.name.trim().toLowerCase()===cleanName.toLowerCase())){
+    alert("That player is already in this group.");
+    return;
+  }
+
+  const h=prompt("Handicap","18");
+  if(h===null)return;
+
+  const handicap=Number(h);
+  if(!Number.isFinite(handicap) || handicap < -10 || handicap > 60){
+    alert("Please enter a valid handicap between -10 and 60.");
+    return;
+  }
+
+  state.players.push({
+    id:Date.now().toString(36),
+    name:cleanName,
+    handicap,
+    competition:null,
+    paid:false,
+    stableford:null,
+    netScore:null,
+    noReturn:false,
+    scoreSubmitted:false,
+    wins:0,
+    leaguePoints:0,
+    netWinnings:0
+  });
+
+  await save();
+  render();
+  alert("✅ " + cleanName + " added to the group.");
+}
+
 async function editPlayer(i){const p=state.players[i];const name=prompt("Player name",p.name);if(!name)return;const h=prompt("Handicap",p.handicap);p.name=name.trim();p.handicap=Number(h)||0;render();await save()}
 async function removePlayer(i){if(!confirm("Remove "+state.players[i].name+"? Their past round history will stay saved."))return;state.players.splice(i,1);render();await save()}
 
@@ -3564,6 +3624,7 @@ function settingsPage(){
  if(!isAdmin){adminLogin();return}
  $("screen").innerHTML=`<div class="card"><h2>⚙️ Admin / Settings</h2>
  <div class="muted">Shared controls for your golf group.</div>
+ <button class="primary full" onclick="openAdminHelp()">❓ Admin Help</button>
  <label class="muted">Course</label><input value="${escAttr(state.course)}" onchange="state.course=this.value;save()">
  <label class="muted">Default/current stake (£)</label><input type="number" min="0" value="${state.stake}" onchange="state.stake=+this.value;save()">
  </div>
@@ -3649,6 +3710,101 @@ ${isOwner ? `
   </button>
 </div>`;
  }
+
+let adminHelpTopic="";
+
+function openAdminHelp(topic=""){
+  if(!isAdmin){ adminLogin(); return; }
+  adminHelpTopic=topic;
+  page="adminhelp";
+  adminHelpPage();
+  window.scrollTo(0,0);
+}
+
+function adminHelpBack(){
+  if(adminHelpTopic){
+    adminHelpTopic="";
+    adminHelpPage();
+    window.scrollTo(0,0);
+  }else{
+    show("settings");
+  }
+}
+
+function adminHelpTopicContent(topic){
+  const topics={
+    setup:`<h2>⛳ Set up the next competition</h2><div class="notice"><b>1.</b> Go to <b>Round</b>.<br><br><b>2.</b> Tap <b>Set Up Next Competition</b>.<br><br><b>3.</b> Choose Money Game, Points Game or Trip Mode.<br><br><b>4.</b> Enter the course, date and competition details.<br><br><b>5.</b> In a Money Game, make sure players pay and choose Stableford or Net before the first score is submitted.</div><div class="notice warning">Once the first score is submitted, entries close automatically.</div>`,
+    players:`<h2>👥 Add or edit players</h2><div class="notice">Go to <b>Players</b>.<br><br>Players can join themselves, or the organiser can manage names and handicaps while Admin is unlocked.<br><br>A player can use <b>Change who I am</b> if the wrong name is selected on their phone.</div>`,
+    payments:`<h2>💷 Payments</h2><div class="notice">In a Money Game, go to <b>Pay</b> and mark players as paid before scoring starts.<br><br>Only paid players can enter a competition or submit a score.<br><br>Once scoring starts, payment status is locked so nobody can join late.</div><div class="muted">Automatic in-app pot collection is a future feature.</div>`,
+    scoring:`<h2>🏌️ Scores</h2><div class="notice">Players enter their own score and tap <b>Submit score</b>.<br><br>The app asks <b>Are you sure?</b> before saving.<br><br>Once submitted, the player's score is locked.</div><div class="notice">Admin can use <b>Correct score</b> if a genuine mistake needs fixing.</div>`,
+    nr:`<h2>NR — No Return</h2><div class="notice">In a <b>Net</b> competition, a player who does not return a score should tap <b>NR — No Return</b>.<br><br>NR counts as submitted, removes the player from <b>Still to enter</b>, and the player cannot win the Net competition.</div>`,
+    waiting:`<h2>⏳ Still to enter</h2><div class="notice">The Scores screen shows exactly who still needs to submit.<br><br>For a Money Game, only players who are paid and have chosen a competition are included.<br><br>The list updates automatically as scores or NR results are submitted.</div>`,
+    finish:`<h2>🏁 Finish a round</h2><div class="notice">When every entered player has submitted a score or valid NR, Admin will see <b>Finish Round & Save Result</b> at the bottom of Scores.<br><br>Check the leaderboard, tap the button and confirm the result.<br><br>The completed round is saved in <b>League → Previous rounds</b>.</div><div class="notice">After a normal round finishes, players see <b>Next Competition — Coming soon…</b> until the organiser sets up the next one.</div>`,
+    points:`<h2>🏆 Points Games</h2><div class="notice">Everyone plays the same competition — Stableford or Net.<br><br>There is no payment step.<br><br>The top three receive league points based on the value chosen when the round is set up.</div>`,
+    trip:`<h2>✈️ Trip Mode</h2><div class="notice">Choose <b>Trip Mode</b> when setting up a competition, then enter the trip name and number of rounds.<br><br>Each round is saved inside the trip and Trip Championship points build across the trip.<br><br>After the final round, the app shows a Trip Summary with daily winners, final standings and the Trip winner.</div><div class="notice">The organiser then taps <b>Save Trip & Return to Normal Golf</b>.</div>`,
+    pin:`<h2>🔐 Admin PIN</h2><div class="notice">Admin can change the PIN in <b>Settings → Change Admin PIN</b>.<br><br>If the Admin PIN is forgotten, the I'm In Golf owner can reset it securely from Owner Controls.</div>`,
+    install:`<h2>📱 Install on a phone</h2><div class="notice"><b>iPhone:</b> Safari → <b>•••</b> bottom-right → <b>Share</b> → <b>Add to Home Screen</b>.<br><br><b>Android:</b> Chrome → <b>⋮</b> → <b>Add to Home screen</b> or <b>Install app</b>.</div>`,
+    problems:`<h2>🛠️ Something isn't working</h2><div class="notice"><b>1.</b> Check the Group PIN.<br><br><b>2.</b> Refresh or fully close and reopen the app.<br><br><b>3.</b> On a laptop, use <b>Ctrl + F5</b>.<br><br><b>4.</b> Wrong player? Go to <b>Players → Change who I am</b>.<br><br><b>5.</b> Forgotten Admin PIN? Contact the I'm In Golf owner for a reset.</div><div class="muted">The app will not redraw while someone is typing a score.</div>`
+  };
+  return topics[topic] || "";
+}
+
+function adminHelpPage(){
+  if(!isAdmin){ page="round"; render(); return; }
+
+  const topicHtml=adminHelpTopicContent(adminHelpTopic);
+
+  if(topicHtml){
+    $("screen").innerHTML=`
+      <div class="card">
+        <div class="muted">I'M IN GOLF</div>
+        <h2 style="font-size:24px;margin:4px 0 8px;">❓ Admin Help</h2>
+        <div class="muted">Simple help for organisers.</div>
+      </div>
+      <div class="card">${topicHtml}</div>
+      <div class="card">
+        <button class="secondary full" onclick="adminHelpBack()">← Back to Admin Help</button>
+        <button class="ghost full" onclick="show('settings')">⚙️ Back to Settings</button>
+      </div>`;
+    return;
+  }
+
+  const items=[
+    ["setup","⛳","Set up a competition"],
+    ["players","👥","Players & handicaps"],
+    ["payments","💷","Payments"],
+    ["scoring","🏌️","Entering & correcting scores"],
+    ["nr","NR","No Return"],
+    ["waiting","⏳","Still to enter"],
+    ["finish","🏁","Finish a round"],
+    ["points","🏆","Points Games"],
+    ["trip","✈️","Trip Mode"],
+    ["pin","🔐","Admin PIN help"],
+    ["install","📱","Install on a phone"],
+    ["problems","🛠️","Something isn't working"]
+  ];
+
+  $("screen").innerHTML=`
+    <div class="card">
+      <div style="text-align:center;">
+        <div style="font-size:44px;">❓</div>
+        <div class="muted">I'M IN GOLF</div>
+        <h2 style="font-size:26px;margin:5px 0;">Admin Help</h2>
+        <div class="muted">What do you need help with?</div>
+      </div>
+    </div>
+    <div class="card">
+      ${items.map(([key,icon,label])=>`
+        <button class="secondary full" onclick="openAdminHelp('${key}')">
+          <span style="font-size:18px;margin-right:6px;">${icon}</span>${label}
+        </button>`).join("")}
+    </div>
+    <div class="card">
+      <div class="notice"><b>Tip:</b> This help is only visible after Admin access is unlocked.</div>
+      <button class="ghost full" onclick="show('settings')">← Back to Settings</button>
+    </div>`;
+}
+
 let ownerGroups=[];
 let ownerEditGroupPin="";
 
