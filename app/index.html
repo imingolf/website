@@ -341,7 +341,6 @@ const staleBlankRound =
   !String(state.date||"").trim() &&
   (state.players||[]).every(p =>
     !p.paid &&
-    !p.competition &&
     p.stableford==null &&
     p.netScore==null &&
     p.noReturn!==true &&
