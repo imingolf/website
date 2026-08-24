@@ -3208,7 +3208,7 @@ ${leagueView==="points" ? `
 <b>
   ${i===0 && Number(p.leaguePoints||0)>0 ? "👑 " : ""}
   <span onclick="showPlayerStats('${p.id}')" style="cursor:pointer;text-decoration:underline;">
-    ${i+1}. ${esc(p.name)}
+    ${pointsPlayed(p.name)>0 ? (i+1)+". " : ""}${esc(p.name)}
   </span>
 </b>
                <div class="muted">
@@ -3235,7 +3235,7 @@ ${leagueView==="points" ? `
       <div>
         <b>
   <span onclick="showPlayerStats('${p.id}')" style="cursor:pointer;text-decoration:underline;">
-    ${pointsPlayed(p.name)>0 ? (i+1)+". " : ""}${esc(p.name)}
+    ${moneyPlayed(p.name)>0 ? (i+1)+". " : ""}${esc(p.name)}
   </span>
 </b>
 
@@ -3426,11 +3426,11 @@ function showPlayerStats(id){
     let won=0;
 
     if((h.stablefordWinnerNames||[]).includes(p.name)){
-      won+=Number(h.stablefordPot||0);
+      won+=(h.stablefordWinnerNames||[]).length ? Number(h.stablefordPot||0)/(h.stablefordWinnerNames||[]).length : 0;
     }
 
     if((h.netWinnerNames||[]).includes(p.name)){
-      won+=Number(h.netPot||0);
+      won+=(h.netWinnerNames||[]).length ? Number(h.netPot||0)/(h.netWinnerNames||[]).length : 0;
     }
 
     return total+won;
@@ -3960,9 +3960,9 @@ function settingsPage(){
     🗑️ Cancel Current Round
   </button>
 ` : ""}
-${state.trip?.active && Number(leagueTrip.currentRound)>1 ? `
+${state.trip?.active && Number(state.trip.currentRound)>1 ? `
   <button class="primary full" onclick="nextTripRound()">
-    ✈️ Start Trip Round ${leagueTrip.currentRound} of ${leagueTrip.totalRounds}
+    ✈️ Start Trip Round ${state.trip.currentRound} of ${state.trip.totalRounds}
   </button>
 ` : ""}
 ${state.trip?.active ? `
@@ -4840,6 +4840,7 @@ async function cancelCurrentRound(){
   state.gameType="money";
   state.pointsCompetition="stableford";
   state.pointsValue=10;
+  state.roundOpen=false;
 
   state.players.forEach(p=>{
     p.paid=false;
@@ -5234,7 +5235,7 @@ async function nextTripRound(){
     return;
   }
 
-  const roundNumber=Number(leagueTrip.currentRound||1);
+  const roundNumber=Number(state.trip.currentRound||1);
 
   // Trip Round course
   const tripCourse=prompt(
@@ -5257,7 +5258,7 @@ if(tripDate===null)return;
 
     const game=prompt(
     "✈️ " + state.trip.name +
-    "\nRound " + roundNumber + " of " + leagueTrip.totalRounds +
+    "\nRound " + roundNumber + " of " + state.trip.totalRounds +
     "\n\nChoose Game Type:\n\n" +
     "1. 💷 Money Game\n" +
     "2. 🏆 Points Game\n\n" +
@@ -5313,7 +5314,7 @@ if(tripDate===null)return;
   const message=
     "✈️ " + state.trip.name +
     "\n\nRound " + roundNumber +
-    " of " + leagueTrip.totalRounds +
+    " of " + state.trip.totalRounds +
     "\n" + tripCourse.trim() +
     "\n" + tripDate.trim() +
     "\n\n" +
@@ -5333,7 +5334,7 @@ if(tripDate===null)return;
   if(!confirm(message))return;
 
   state.trip.active=true;
-  leagueTrip.completed=false;
+  state.trip.completed=false;
   state.roundOpen=true;
   state.course=tripCourse.trim();
   state.date=tripDate.trim();
