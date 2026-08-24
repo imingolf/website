@@ -26,11 +26,30 @@ h1{font-size:clamp(46px,7vw,78px);line-height:.96;margin:0 0 20px;letter-spacing
 section{padding:55px 0}
 .section-title{text-align:center;max-width:720px;margin:0 auto 38px}.section-title h2{font-size:40px;margin:0 0 12px;letter-spacing:-1px}.section-title p{color:var(--muted);font-size:18px;margin:0}
 .features{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}.feature{background:#fff;border:1px solid var(--line);border-radius:22px;padding:26px}.feature .icon{font-size:32px;margin-bottom:12px}.feature h3{margin:0 0 8px;font-size:22px}.feature p{margin:0;color:var(--muted);line-height:1.55}
+
+.audience{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.audience-item{background:#fff;border:1px solid var(--line);border-radius:18px;padding:18px;text-align:center;font-weight:850}
+.audience-item span{display:block;font-size:28px;margin-bottom:8px}
+.preview-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+.preview-card{background:#fff;border:1px solid var(--line);border-radius:24px;padding:16px;box-shadow:0 8px 24px rgba(16,36,24,.05)}
+.preview-label{font-size:12px;font-weight:900;color:var(--green);letter-spacing:.04em;margin-bottom:10px}
+.preview-screen{background:#f4f6f3;border:1px solid var(--line);border-radius:18px;overflow:hidden}
+.preview-head{background:linear-gradient(135deg,#10592f,#23864e);color:#fff;padding:16px}
+.preview-head b{display:block;font-size:18px;margin-bottom:3px}
+.preview-body{padding:12px}
+.preview-row{background:#fff;border:1px solid var(--line);border-radius:13px;padding:11px 12px;margin-bottom:9px;display:flex;justify-content:space-between;gap:10px;align-items:center}
+.preview-row:last-child{margin-bottom:0}
+.preview-title{font-weight:850}
+.preview-sub{font-size:12px;color:var(--muted);margin-top:2px}
+.preview-money{font-weight:900;color:var(--green)}
+.preview-rank{font-weight:900;font-size:18px;min-width:22px}
+.preview-note{margin-top:10px;color:var(--muted);font-size:14px;line-height:1.45}
+.problem-line{font-weight:900;color:var(--dark)}
 #how{padding-top:45px;padding-bottom:25px}
 .how{background:var(--green);color:#fff;border-radius:30px;padding:40px;display:grid;grid-template-columns:repeat(4,1fr);gap:18px}.step{background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.13);border-radius:18px;padding:22px}.step b{display:block;font-size:13px;opacity:.75;margin-bottom:8px}.step h3{margin:0 0 8px;font-size:21px}.step p{margin:0;opacity:.82;line-height:1.45}
 .cta{text-align:center;padding-top:25px}.cta-box{background:#fff;border:1px solid var(--line);border-radius:28px;padding:48px 26px}.cta h2{font-size:42px;margin:0 0 12px}.cta p{font-size:18px;color:var(--muted);margin:0 0 24px}
 footer{padding:28px 0 42px;color:var(--muted);font-size:14px}.footer-row{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;border-top:1px solid var(--line);padding-top:24px}
-@media(max-width:820px){.hero-grid{grid-template-columns:1fr;gap:38px}.hero{text-align:center;padding-top:48px}.hero p{margin-left:auto;margin-right:auto}.actions{justify-content:center;flex-wrap:nowrap;gap:10px}.features{grid-template-columns:1fr}.how{grid-template-columns:1fr 1fr}}
+@media(max-width:820px){.hero-grid{grid-template-columns:1fr;gap:38px}.hero{text-align:center;padding-top:48px}.hero p{margin-left:auto;margin-right:auto}.actions{justify-content:center;flex-wrap:wrap;gap:10px}.features{grid-template-columns:1fr}.audience{grid-template-columns:1fr 1fr}.preview-grid{grid-template-columns:1fr}.how{grid-template-columns:1fr 1fr}}
 @media(max-width:520px){
   .wrap{padding:0 16px}
   .nav{height:68px}
@@ -50,6 +69,8 @@ footer{padding:28px 0 42px;color:var(--muted);font-size:14px}.footer-row{display
   .section-title p{font-size:16px;line-height:1.45}
 
   .features{gap:12px}
+  .audience{grid-template-columns:1fr 1fr;gap:10px}
+  .preview-grid{grid-template-columns:1fr;gap:12px}
   .feature{padding:20px;border-radius:18px}
   .feature .icon{font-size:28px}
   .feature h3{font-size:20px}
@@ -122,10 +143,10 @@ footer{padding:28px 0 42px;color:var(--muted);font-size:14px}.footer-row{display
 
 <main>
 <section class="hero"><div class="wrap hero-grid">
-<div><span class="eyebrow">⛳ Golf with your mates, made simple</span><h1>Pay. Play.<br>Score. Brag.</h1><p>I'm In Golf keeps your golf group organised without the fuss. Money games, competitions, golf trips and leaderboards — all in one simple app.</p><div class="actions">
+<div><span class="eyebrow">⛳ Golf with your mates, made simple</span><h1>Pay. Play.<br>Score. Brag.</h1><p>I'm In Golf keeps your golf group organised without the fuss. Money games, points competitions, golf trips and leaderboards — all in one simple app.</p><p class="problem-line">No more WhatsApp chasing who's in, who's paid or who won.</p><div class="actions">
   <a class="primary" href="https://imingolf.co.uk/app/">Open My Group</a>
   <a class="secondary" href="https://imingolf.co.uk/app/?pin=2026">Try the Demo</a>
-  <a class="secondary" href="mailto:hello@imingolf.co.uk?subject=Start%20an%20I'm%20In%20Golf%20Group">Start a Group</a>
+  <a class="secondary" href="mailto:hello@imingolf.co.uk?subject=Start%20My%20I'm%20In%20Golf%20Group">Start Your Group</a>
 </div>
 </div>
 
@@ -160,6 +181,21 @@ footer{padding:28px 0 42px;color:var(--muted);font-size:14px}.footer-row{display
 <section>
   <div class="wrap">
     <div class="section-title">
+      <h2>Built for the golf you already play.</h2>
+      <p>Simple enough for a Saturday fourball, useful enough for a full golf trip.</p>
+    </div>
+    <div class="audience">
+      <div class="audience-item"><span>🏌️</span>Regular golf groups</div>
+      <div class="audience-item"><span>👥</span>Society days</div>
+      <div class="audience-item"><span>✈️</span>Golf trips</div>
+      <div class="audience-item"><span>💷</span>Mates playing for a few quid</div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="section-title">
       <h2>Still chasing everyone on WhatsApp?</h2>
       <p>I'm In Golf keeps the important stuff together, so everyone knows what's happening.</p>
     </div>
@@ -185,6 +221,56 @@ footer{padding:28px 0 42px;color:var(--muted);font-size:14px}.footer-row{display
     </div>
   </div>
 </section>
+<section>
+  <div class="wrap">
+    <div class="section-title">
+      <h2>See what your group sees.</h2>
+      <p>Simple screens for money games, season points and golf trips — without asking players to enter every hole.</p>
+    </div>
+
+    <div class="preview-grid">
+      <div class="preview-card">
+        <div class="preview-label">MONEY GAME</div>
+        <div class="preview-screen">
+          <div class="preview-head"><b>💷 Pay Before Play</b><span>£20 each • 4 players</span></div>
+          <div class="preview-body">
+            <div class="preview-row"><div><div class="preview-title">Paid pot</div><div class="preview-sub">Everyone can see the status</div></div><div class="preview-money">£60</div></div>
+            <div class="preview-row"><div><div class="preview-title">Alex</div><div class="preview-sub">Stableford</div></div><b>✓ Paid</b></div>
+            <div class="preview-row"><div><div class="preview-title">Sam</div><div class="preview-sub">Net</div></div><b>Not paid</b></div>
+          </div>
+        </div>
+        <div class="preview-note">Track the pot, who's paid and which competition everyone entered.</div>
+      </div>
+
+      <div class="preview-card">
+        <div class="preview-label">POINTS LEAGUE</div>
+        <div class="preview-screen">
+          <div class="preview-head"><b>🏆 Points League</b><span>Season standings</span></div>
+          <div class="preview-body">
+            <div class="preview-row"><span class="preview-rank">1.</span><div style="flex:1"><div class="preview-title">Alex</div><div class="preview-sub">Played 6</div></div><div class="preview-money">42 pts</div></div>
+            <div class="preview-row"><span class="preview-rank">2.</span><div style="flex:1"><div class="preview-title">Sarah</div><div class="preview-sub">Played 5</div></div><div class="preview-money">36 pts</div></div>
+            <div class="preview-row"><span class="preview-rank">3.</span><div style="flex:1"><div class="preview-title">Sam</div><div class="preview-sub">Played 5</div></div><div class="preview-money">29 pts</div></div>
+          </div>
+        </div>
+        <div class="preview-note">Stableford or Net. Award points to the top three and build a season-long table.</div>
+      </div>
+
+      <div class="preview-card">
+        <div class="preview-label">TRIP MODE</div>
+        <div class="preview-screen">
+          <div class="preview-head"><b>✈️ Algarve Trip</b><span>Round 3 of 4</span></div>
+          <div class="preview-body">
+            <div class="preview-row"><div><div class="preview-title">👑 Alex</div><div class="preview-sub">Trip leader</div></div><div class="preview-money">20 pts</div></div>
+            <div class="preview-row"><div><div class="preview-title">Sarah</div><div class="preview-sub">Played 3</div></div><b>15 pts</b></div>
+            <div class="preview-row"><div><div class="preview-title">Sam</div><div class="preview-sub">Played 3</div></div><b>11 pts</b></div>
+          </div>
+        </div>
+        <div class="preview-note">Run several rounds, keep daily winners and crown the trip champion at the end.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <section id="how">
   <div class="wrap">
     <div class="section-title">
@@ -221,11 +307,11 @@ footer{padding:28px 0 42px;color:var(--muted);font-size:14px}.footer-row{display
   <div class="wrap">
     <div class="cta-box">
       <h2>Golf. Mates. You're In.</h2>
-      <p>Try the demo, then get early access for your own golf group.</p>
+      <p>Try the demo. If you like it, start your own golf group.</p>
 
       <div class="actions" style="justify-content:center;">
         <a class="primary" href="https://imingolf.co.uk/app/?pin=2026">Try the Demo</a>
-        <a class="secondary" href="mailto:hello@imingolf.co.uk?subject=I'm%20In%20Golf%20Early%20Access">Get Early Access</a>
+        <a class="secondary" href="mailto:hello@imingolf.co.uk?subject=Start%20My%20I'm%20In%20Golf%20Group">Start Your Group</a>
       </div>
     </div>
   </div>
@@ -295,7 +381,7 @@ footer{padding:28px 0 42px;color:var(--muted);font-size:14px}.footer-row{display
     },
     start: {
       q: "How do I start a group?",
-      a: `Use the <b>Start a Group</b> button on this website. While access is being rolled out, it will open an email to the I'm In Golf team so we can get your group set up.`
+      a: `Use the <b>Start Your Group</b> button on this website. It will open an email to the I'm In Golf team so we can get your group set up.`
     },
     stuck: {
       q: "I'm stuck",
