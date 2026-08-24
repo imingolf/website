@@ -425,7 +425,20 @@ footer{padding:28px 0 42px;color:var(--muted);font-size:14px}.footer-row{display
           "Content-Type": "text/plain",         
                   
         },
-        body: JSON.stringify({ question: q })
+        body: JSON.stringify({
+          question: `Answer this I'm In Golf help question in plain English.
+
+Keep the answer short and friendly:
+- Answer the question directly in the first sentence.
+- Usually use 2 to 4 short sentences.
+- Give only the information the person needs for this question.
+- Do not overload new users with app rules or technical detail.
+- If a simple yes/no answer is appropriate, start with Yes or No.
+- Use the terms organiser, group, Money Game, Points Game and Trip Mode consistently where relevant.
+- If you are unsure, say so rather than inventing an app feature.
+
+User question: ${q}`
+        })
       }
     );
 
