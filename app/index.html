@@ -2099,7 +2099,8 @@ function showRoundHistory(historyIndex){
     </div>
 
     <div class="card">
-      <button class="secondary full" onclick="league()">← Back to League</button>
+      <button class="primary full" onclick="shareResultFromHistory(${Number(historyIndex)})">📤 Share Result</button>
+<button class="secondary full" onclick="league()">← Back to League</button>
     </div>
   `;
 
@@ -2338,6 +2339,16 @@ function showWinnerScreen(record){
     </div>
   `;
 }
+async function shareResultFromHistory(historyIndex){
+  const record=(state.history||[])[Number(historyIndex)];
+  if(!record){
+    alert("Round details could not be found.");
+    return;
+  }
+  lastWinnerRecord=record;
+  await shareWinnerImage();
+}
+
 async function shareWinnerImage(){
 
   const record=lastWinnerRecord;
