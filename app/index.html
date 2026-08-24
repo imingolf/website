@@ -603,27 +603,44 @@ function tripRoundWinner(record){
     };
   }
 
-  const comp=state.trip?.competition || "stableford";
+  const stableNames=record.stablefordWinnerNames||[];
+  const netNames=record.netWinnerNames||[];
 
-  if(comp==="net"){
-    const names=record.netWinnerNames||[];
-    if(!names.length)return null;
-    const p=(record.players||[]).find(x=>x.name===names[0]);
+  let comp=record.tripCompetition || null;
+  if(!comp){
+    if(stableNames.length && !netNames.length)comp="stableford";
+    else if(netNames.length && !stableNames.length)comp="net";
+    else comp=state.trip?.competition || "stableford";
+  }
+
+  if(comp==="net" && netNames.length){
+    const p=(record.players||[]).find(x=>x.name===netNames[0]);
     return {
-      name:names.join(" & "),
+      name:netNames.join(" & "),
       score:p?.noReturn===true ? "NR" : (p?.netScore!=null ? "Net "+p.netScore : ""),
       label:"Net"
     };
   }
 
-  const names=record.stablefordWinnerNames||[];
-  if(!names.length)return null;
-  const p=(record.players||[]).find(x=>x.name===names[0]);
-  return {
-    name:names.join(" & "),
-    score:p?.stableford!=null ? p.stableford+" pts" : "",
-    label:"Stableford"
-  };
+  if(stableNames.length){
+    const p=(record.players||[]).find(x=>x.name===stableNames[0]);
+    return {
+      name:stableNames.join(" & "),
+      score:p?.stableford!=null ? p.stableford+" pts" : "",
+      label:"Stableford"
+    };
+  }
+
+  if(netNames.length){
+    const p=(record.players||[]).find(x=>x.name===netNames[0]);
+    return {
+      name:netNames.join(" & "),
+      score:p?.noReturn===true ? "NR" : (p?.netScore!=null ? "Net "+p.netScore : ""),
+      label:"Net"
+    };
+  }
+
+  return null;
 }
 
 function setTripChampion(){
@@ -687,7 +704,7 @@ function showTripSummary(){
         const gameLabel=r.gameType==="points" ? "🏆 Points Game" : "💷 Money Game";
         const compLabel=r.gameType==="points"
           ? (r.pointsCompetition==="net" ? "Net" : "Stableford")
-          : (trip.competition==="net" ? "Net" : "Stableford");
+          : (w?.label || (r.tripCompetition==="net" ? "Net" : "Stableford"));
         return `
           <div class="player">
             <div class="row">
@@ -1904,6 +1921,7 @@ const record={
     stake:state.stake,
 
     gameType:"money",
+    tripCompetition:isTrip ? (state.trip?.competition || "stableford") : null,
 
     stablefordPot:stablefordPot(),
     netPot:netPot(),
@@ -2616,20 +2634,20 @@ async function shareWinnerImage(){
 
   else{
 
-    const stablefordWinner=
-      record.stablefordWinnerNames?.[0] || "";
+    const stablefordNames=record.stablefordWinnerNames||[];
+    const netNames=record.netWinnerNames||[];
 
-    const netWinner=
-      record.netWinnerNames?.[0] || "";
+    const stablefordWinner=stablefordNames.join(" & ");
+    const netWinner=netNames.join(" & ");
 
     const stablefordPlayer=
       (record.players||[]).find(
-        p=>p.name===stablefordWinner
+        p=>p.name===stablefordNames[0]
       );
 
     const netPlayer=
       (record.players||[]).find(
-        p=>p.name===netWinner
+        p=>p.name===netNames[0]
       );
 
     const stablefordScore=
@@ -2684,7 +2702,8 @@ async function shareWinnerImage(){
       name,
       score,
       pot,
-      countback
+      countback,
+      winnerCount=1
     ){
 
       roundedRect(
@@ -2776,7 +2795,7 @@ async function shareWinnerImage(){
       ctx.font='800 27px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';
 
       ctx.fillText(
-        "WON",
+        winnerCount>1 ? "SPLIT POT" : "WON",
         645,
         y+222
       );
@@ -2785,8 +2804,12 @@ async function shareWinnerImage(){
 
       ctx.font='800 48px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';
 
+      const payout=winnerCount>1
+        ? `£${Number(pot/winnerCount).toFixed(2).replace(/\\.00$/,"")} EACH`
+        : `£${pot}`;
+
       ctx.fillText(
-        `£${pot}`,
+        payout,
         645,
         y+270
       );
@@ -2824,7 +2847,8 @@ async function shareWinnerImage(){
         stablefordWinner,
         stablefordScore,
         stablefordPotValue,
-        record.stablefordCountback
+        record.stablefordCountback,
+        stablefordNames.length
       );
     }
 
@@ -2835,7 +2859,8 @@ async function shareWinnerImage(){
         netWinner,
         netScore,
         netPotValue,
-        record.netCountback
+        record.netCountback,
+        netNames.length
       );
     }
 
