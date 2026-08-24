@@ -3297,11 +3297,14 @@ ${leagueView==="points" ? `
 
 ` : `
 ${leagueTrip ? `
-  <div class="notice" style="margin-bottom:12px;">
+  <div
+    class="notice"
+    style="margin-bottom:12px;${currentTripAvailable && leagueTrip===state.trip && leagueTrip.completed ? "cursor:pointer;" : ""}"
+    ${currentTripAvailable && leagueTrip===state.trip && leagueTrip.completed ? `onclick="showTripSummary()"` : ""}>
     <b>✈️ ${esc(leagueTrip.name || "Trip Championship")}</b><br>
     ${
       leagueTrip.completed
-        ? "🏁 Trip complete"
+        ? `🏁 Trip complete${currentTripAvailable && leagueTrip===state.trip ? `<br><span class="muted">Tap to view full Trip Summary ›</span>` : ""}`
         : "Round " + leagueTrip.currentRound + " of " + leagueTrip.totalRounds
     }
   </div>
