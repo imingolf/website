@@ -3235,7 +3235,7 @@ ${leagueView==="points" ? `
       <div>
         <b>
   <span onclick="showPlayerStats('${p.id}')" style="cursor:pointer;text-decoration:underline;">
-    ${i+1}. ${esc(p.name)}
+    ${pointsPlayed(p.name)>0 ? (i+1)+". " : ""}${esc(p.name)}
   </span>
 </b>
 
