@@ -5647,10 +5647,19 @@ async function deleteLastRound(){
 }
 async function clearLeague(){
  if(!confirm(
-  "⚠️ Clear League & History?\n\n" +
-  "This will permanently delete the league table and all previous round history.\n\n" +
-  "This cannot be undone.\n\n" +
-  "Are you sure?"
+  "⚠️⚠️ DANGER — PERMANENT DELETION ⚠️⚠️\n\n" +
+  "YOU ARE ABOUT TO DELETE:\n\n" +
+  "• The entire league table\n" +
+  "• ALL previous round history\n\n" +
+  "THIS CANNOT BE UNDONE.\n\n" +
+  "Only continue if you are absolutely sure you want to erase this group's history.\n\n" +
+  "Press OK to continue to the FINAL WARNING."
+))return;
+
+if(!confirm(
+  "🚨 FINAL WARNING 🚨\n\n" +
+  "There is NO undo.\n\n" +
+  "Press OK again to PERMANENTLY DELETE the league and all previous round history."
 ))return;
 
  state.players.forEach(p=>{
