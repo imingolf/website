@@ -5647,13 +5647,10 @@ async function deleteLastRound(){
 }
 async function clearLeague(){
  if(!confirm(
-  "⚠️⚠️ DANGER — PERMANENT DELETION ⚠️⚠️\n\n" +
-  "YOU ARE ABOUT TO DELETE:\n\n" +
-  "• The entire league table\n" +
-  "• ALL previous round history\n\n" +
+  "⚠️ DANGER — PERMANENT DELETION ⚠️\n\n" +
+  "This will delete the ENTIRE league table and ALL previous round history.\n\n" +
   "THIS CANNOT BE UNDONE.\n\n" +
-  "Only continue if you are absolutely sure you want to erase this group's history.\n\n" +
-  "Press OK to continue to the FINAL WARNING."
+  "Press OK for the FINAL WARNING."
 ))return;
 
 if(!confirm(
