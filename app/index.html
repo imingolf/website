@@ -1308,7 +1308,15 @@ function scores(){
 
     ${isAdmin ? `
       <div class="card">
-        ${eligiblePlayers.length && stillToEnter.length===0 ? `
+        ${eligiblePlayers.length===0 ? `
+          <div class="notice">
+            <b>No players have entered this competition.</b><br>
+            You can close it without saving a result.
+          </div>
+          <button class="secondary full" onclick="closeNoEntrantsCompetition()">
+            🏁 Close Competition — No Entrants
+          </button>
+        ` : stillToEnter.length===0 ? `
           <button class="primary full" onclick="finishRound()">
             🏁 Finish Round & Save Result
           </button>
@@ -4802,6 +4810,64 @@ function pickTripDate(title,initialValue=""){
     };
   });
 }
+async function closeNoEntrantsCompetition(){
+  if(!isAdmin){
+    alert("🔒 Only the group Admin can close the competition.");
+    return;
+  }
+
+  if(state.trip?.active){
+    alert("This option is not available during an active Trip.");
+    return;
+  }
+
+  const isPointsGame=state.gameType==="points";
+  const eligiblePlayers=isPointsGame
+    ? [...state.players]
+    : state.players.filter(p=>
+        p.paid &&
+        (p.competition==="stableford" || p.competition==="net")
+      );
+
+  if(eligiblePlayers.length){
+    alert("Players have entered this competition. Finish it through Scores instead.");
+    return;
+  }
+
+  if(!confirm(
+    "Close this competition with no entrants?\n\n" +
+    "No result, winner, payout or league round will be saved.\n\n" +
+    "The group will return to “Next Competition — Coming soon”."
+  ))return;
+
+  state.course="";
+  state.date="";
+  state.gameType="money";
+  state.pointsCompetition="stableford";
+  state.pointsValue=10;
+  state.roundOpen=false;
+
+  state.players.forEach(p=>{
+    p.paid=false;
+    p.competition=null;
+    p.stableford=null;
+    p.netScore=null;
+    p.noReturn=false;
+    p.scoreSubmitted=false;
+  });
+
+  scoreDraftActive=false;
+
+  const ok=await save();
+  if(!ok){
+    alert("The competition could not be closed. Please try again.");
+    return;
+  }
+
+  alert("✅ Competition closed. No result was saved.");
+  show("round");
+}
+
 async function cancelCurrentRound(){
   if(!isAdmin){
     alert("🔒 Only the group Admin can cancel the current round.");
