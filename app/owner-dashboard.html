@@ -36,7 +36,7 @@ button{cursor:pointer}
 .stat{background:white;border:1px solid var(--line);border-radius:18px;padding:18px;min-width:0;box-shadow:0 3px 12px rgba(20,50,30,.04)}
 .stat .k{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:900}.stat .v{font-size:32px;font-weight:950;margin-top:4px}.stat .s{font-size:12px;color:var(--muted);margin-top:3px}
 .attention{margin-top:16px;background:var(--amberbg);border:1px solid #eadca9;border-radius:18px;padding:16px}.attention h3{margin:0 0 10px}.attention-list{display:flex;gap:10px;flex-wrap:wrap}.attention-item{background:white;border:1px solid #efe4be;border-radius:12px;padding:10px 12px;font-size:13px}
-.workspace{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(340px,.82fr);gap:18px;margin-top:18px}
+.workspace{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(390px,.95fr);gap:18px;margin-top:18px}
 .panel{background:white;border:1px solid var(--line);border-radius:20px;padding:18px;min-width:0;box-shadow:0 3px 14px rgba(20,50,30,.04)}
 .panel-head{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:12px}.panel-head h2{margin:0;font-size:22px}
 .primary{border:0;background:var(--green);color:white;padding:11px 14px;border-radius:11px;font-weight:900}
@@ -61,7 +61,7 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
 .modal-back{position:fixed;inset:0;background:rgba(5,25,13,.52);display:grid;place-items:center;padding:20px;z-index:50}
 .modal{width:min(620px,100%);max-height:90vh;overflow:auto;background:white;border-radius:20px;padding:22px;box-shadow:0 24px 70px rgba(0,0,0,.3)}.modal h2{margin:0 0 4px}.modal-actions{display:flex;gap:9px;justify-content:flex-end;flex-wrap:wrap;margin-top:10px}
 .toast{position:fixed;right:24px;bottom:24px;background:#163d26;color:white;padding:12px 16px;border-radius:12px;box-shadow:0 12px 30px rgba(0,0,0,.2);z-index:80;font-weight:800}
-.toolbar{display:flex;gap:8px;flex-wrap:wrap}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap}.filterbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:10px 0 14px}.filterbar label{font-size:12px;color:var(--muted);font-weight:900;text-transform:uppercase;letter-spacing:.04em}.filterbar select{width:auto;min-width:220px;margin:0}.sortable{cursor:pointer;user-select:none}.sortable:hover{text-decoration:underline}
 .small-btn{padding:8px 10px;border-radius:9px}
 .view-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.view-card{border:1px solid var(--line);border-radius:15px;padding:15px;background:#fbfdfb}.view-card h3{margin:0 0 5px}.view-card .big{font-size:27px;font-weight:950}.view-table{margin-top:12px;overflow:auto}.view-table table{min-width:700px}.nav button.active{background:rgba(255,255,255,.18)}
 @media(max-width:1250px){.stats{grid-template-columns:repeat(3,1fr)}.workspace{grid-template-columns:1fr}.shell{grid-template-columns:86px minmax(0,1fr)}.brand span,.brand small,.nav .txt,.side-foot{display:none}.nav button{text-align:center;font-size:20px}}
@@ -245,6 +245,10 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
     $("liveText").textContent="Live • updated "+new Date().toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"});
     if(initial&&!selectedPin&&groups.length)selectedPin=String(groups[0].group_pin);
     if(selectedPin)renderDetail(selectedPin);
+    const active=document.querySelector(".nav button.active")?.id;
+    if(active==="groupsNav")showGroupsView();
+    else if(active==="playersNav")showPlayersView();
+    else if(active==="roundsNav")showRoundsView();
   }
   function realGroups(){return groups.filter(g=>!TEST_PINS.has(String(g.group_pin)))}
   function renderStats(){
@@ -448,27 +452,114 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
       <div class="view-table"><table><thead><tr><th>Group</th><th>PIN</th><th>Admin</th><th>Players</th><th>Rounds</th><th>Plan</th><th>Status</th></tr></thead><tbody>${groups.map(g=>{const pin=String(g.group_pin),s=states.get(pin);return `<tr><td><b>${esc(g.group_name||"Unnamed Group")}</b></td><td>${esc(pin)}</td><td>${esc(g.admin_name||"—")}</td><td>${(s?.players||[]).length}</td><td>${(s?.history||[]).length}</td><td>${planBadge(g)}</td><td>${statusBadge(g)}</td></tr>`}).join("")}</tbody></table></div>`;
     $("altCreate").onclick=createGroup;
   }
+
+  function realGroupOptions(){
+    return ['<option value="all">All Groups</option>'].concat(realGroups().map(g=>`<option value="${esc(String(g.group_pin||""))}">${esc(g.group_name||g.group_pin)}</option>`)).join("");
+  }
+  function niceGameName(v){
+    const s=String(v||"").toLowerCase();
+    if(s==="money")return "Money Game";
+    if(s==="points")return "Points Game";
+    if(s==="trip")return "Trip";
+    return v?String(v):"—";
+  }
+  function getRoundWinner(r){
+    if(!r)return "—";
+    const direct = r.winnerName || r.winner || r.result?.winnerName || r.result?.winner || r.summary?.winnerName || r.summary?.winner;
+    if(direct)return Array.isArray(direct)?direct.join(", "):String(direct);
+    const arrays=[r.winners,r.result?.winners,r.summary?.winners];
+    for(const arr of arrays){
+      if(Array.isArray(arr) && arr.length){
+        return arr.map(x=>typeof x==="string"?x:(x?.name||x?.playerName||"")).filter(Boolean).join(", ") || "—";
+      }
+    }
+    if(Array.isArray(r.players) && r.players.length){
+      const game=String(r.gameType||r.type||"").toLowerCase();
+      const scored=r.players.filter(p=>!p.noReturn);
+      if(game==="points"){
+        const comp=String(r.pointsCompetition||"stableford");
+        if(comp==="net"){
+          const vals=scored.filter(p=>Number.isFinite(Number(p.netScore)));
+          if(vals.length){const best=Math.min(...vals.map(p=>Number(p.netScore)));return vals.filter(p=>Number(p.netScore)===best).map(p=>p.name).filter(Boolean).join(", ")||"—";}
+        }else{
+          const vals=scored.filter(p=>Number.isFinite(Number(p.stableford)));
+          if(vals.length){const best=Math.max(...vals.map(p=>Number(p.stableford)));return vals.filter(p=>Number(p.stableford)===best).map(p=>p.name).filter(Boolean).join(", ")||"—";}
+        }
+      }else if(game==="money"){
+        const vals=scored.filter(p=>p.competition==="stableford"&&Number.isFinite(Number(p.stableford)));
+        if(vals.length){const best=Math.max(...vals.map(p=>Number(p.stableford)));return vals.filter(p=>Number(p.stableford)===best).map(p=>p.name).filter(Boolean).join(", ")||"—";}
+      }
+    }
+    return "—";
+  }
   function showPlayersView(){
     setNavActive("playersNav");
     document.querySelector(".attention").classList.add("hidden");
     $("dashboardWorkspace").classList.add("hidden");
-    const rows=[];
-    realGroups().forEach(g=>{const pin=String(g.group_pin),s=states.get(pin);(s?.players||[]).forEach(p=>rows.push({name:p.name||"Player",hcp:p.handicap??"—",group:g.group_name||pin,pin,paid:p.paid===true}))});
-    rows.sort((a,b)=>String(a.name).localeCompare(String(b.name)));
-    $("altView").classList.remove("hidden");
-    $("altView").innerHTML=`<div class="panel-head"><div><h2>🏌️ All Players</h2><div class="sub">Players across your real groups. Test group 2894 is excluded.</div></div><span class="badge active">${rows.length} players</span></div>
-      <div class="view-table"><table><thead><tr><th>Player</th><th>Handicap</th><th>Group</th><th>PIN</th><th>Current payment mark</th></tr></thead><tbody>${rows.length?rows.map(p=>`<tr><td><b>${esc(p.name)}</b></td><td>${esc(p.hcp)}</td><td>${esc(p.group)}</td><td>${esc(p.pin)}</td><td>${p.paid?'<span class="badge active">Paid</span>':'—'}</td></tr>`).join(""):'<tr><td colspan="5"><div class="empty">No players found.</div></td></tr>'}</tbody></table></div>`;
+    let currentGroup="all", sortKey="name", sortDir=1;
+
+    function collectRows(){
+      const rows=[];
+      realGroups().forEach(g=>{
+        const pin=String(g.group_pin),s=states.get(pin);
+        (s?.players||[]).forEach(p=>rows.push({name:p.name||"Player",hcp:p.handicap??"—",group:g.group_name||pin,pin,paid:p.paid===true}));
+      });
+      return rows;
+    }
+    function renderPlayers(){
+      let rows=collectRows().filter(r=>currentGroup==="all"||r.pin===currentGroup);
+      rows.sort((a,b)=>{
+        let av=a[sortKey],bv=b[sortKey];
+        if(sortKey==="hcp"){av=Number(av);bv=Number(bv); if(!Number.isFinite(av))av=9999;if(!Number.isFinite(bv))bv=9999;return (av-bv)*sortDir;}
+        return String(av).localeCompare(String(bv),undefined,{numeric:true,sensitivity:"base"})*sortDir;
+      });
+      $("altView").classList.remove("hidden");
+      $("altView").innerHTML=`<div class="panel-head"><div><h2>🏌️ All Players</h2><div class="sub">Players across your real groups. Test group 2894 is excluded.</div></div><span class="badge active">${rows.length} player${rows.length===1?"":"s"}</span></div>
+        <div class="filterbar"><label for="playerGroupFilter">Group</label><select id="playerGroupFilter">${realGroupOptions()}</select></div>
+        <div class="view-table"><table><thead><tr>
+          <th class="sortable" data-sort="name">Player ${sortKey==="name"?(sortDir===1?"▲":"▼"):""}</th>
+          <th class="sortable" data-sort="hcp">Handicap ${sortKey==="hcp"?(sortDir===1?"▲":"▼"):""}</th>
+          <th class="sortable" data-sort="group">Group ${sortKey==="group"?(sortDir===1?"▲":"▼"):""}</th>
+          <th>PIN</th><th>Payment</th>
+        </tr></thead><tbody>${rows.length?rows.map(p=>`<tr><td><b>${esc(p.name)}</b></td><td>${esc(p.hcp)}</td><td>${esc(p.group)}</td><td>${esc(p.pin)}</td><td>${p.paid?'<span class="badge active">Paid</span>':'—'}</td></tr>`).join(""):'<tr><td colspan="5"><div class="empty">No players found.</div></td></tr>'}</tbody></table></div>`;
+      $("playerGroupFilter").value=currentGroup;
+      $("playerGroupFilter").addEventListener("change",e=>{currentGroup=e.target.value;renderPlayers()});
+      $("altView").querySelectorAll("[data-sort]").forEach(th=>th.addEventListener("click",()=>{
+        const key=th.dataset.sort;
+        if(sortKey===key)sortDir*=-1; else {sortKey=key;sortDir=1}
+        renderPlayers();
+      }));
+    }
+    renderPlayers();
   }
   function showRoundsView(){
     setNavActive("roundsNav");
     document.querySelector(".attention").classList.add("hidden");
     $("dashboardWorkspace").classList.add("hidden");
-    const rows=[];
-    realGroups().forEach(g=>{const pin=String(g.group_pin),s=states.get(pin);(s?.history||[]).forEach((r,i)=>rows.push({group:g.group_name||pin,pin,date:r.date||"",course:r.course||"",type:r.gameType||r.type||"",winner:r.winner||r.winnerName||"",idx:i}))});
-    rows.sort((a,b)=>String(b.date).localeCompare(String(a.date)));
-    $("altView").classList.remove("hidden");
-    $("altView").innerHTML=`<div class="panel-head"><div><h2>🏆 Saved Rounds</h2><div class="sub">Round history across your real groups.</div></div><span class="badge active">${rows.length} rounds</span></div>
-      <div class="view-table"><table><thead><tr><th>Date</th><th>Group</th><th>PIN</th><th>Course</th><th>Game</th><th>Winner</th></tr></thead><tbody>${rows.length?rows.map(r=>`<tr><td>${esc(fmtDate(r.date))}</td><td><b>${esc(r.group)}</b></td><td>${esc(r.pin)}</td><td>${esc(r.course||"—")}</td><td>${esc(r.type||"—")}</td><td>${esc(r.winner||"—")}</td></tr>`).join(""):'<tr><td colspan="6"><div class="empty">No saved rounds found.</div></td></tr>'}</tbody></table></div>`;
+    let currentGroup="all";
+
+    function collectRows(){
+      const rows=[];
+      realGroups().forEach(g=>{
+        const pin=String(g.group_pin),s=states.get(pin);
+        (s?.history||[]).forEach((r,i)=>rows.push({
+          group:g.group_name||pin,pin,date:r.date||"",course:r.course||"",
+          type:niceGameName(r.gameType||r.type||""),winner:getRoundWinner(r),raw:r,idx:i
+        }));
+      });
+      rows.sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+      return rows;
+    }
+    function renderRounds(){
+      const rows=collectRows().filter(r=>currentGroup==="all"||r.pin===currentGroup);
+      $("altView").classList.remove("hidden");
+      $("altView").innerHTML=`<div class="panel-head"><div><h2>🏆 Saved Rounds</h2><div class="sub">Round history across your real groups.</div></div><span class="badge active">${rows.length} round${rows.length===1?"":"s"}</span></div>
+        <div class="filterbar"><label for="roundGroupFilter">Group</label><select id="roundGroupFilter">${realGroupOptions()}</select></div>
+        <div class="view-table"><table><thead><tr><th>Date</th><th>Group</th><th>PIN</th><th>Course</th><th>Game</th><th>Winner</th></tr></thead><tbody>${rows.length?rows.map(r=>`<tr><td>${esc(fmtDate(r.date))}</td><td><b>${esc(r.group)}</b></td><td>${esc(r.pin)}</td><td>${esc(r.course||"—")}</td><td>${esc(r.type)}</td><td>${esc(r.winner||"—")}</td></tr>`).join(""):'<tr><td colspan="6"><div class="empty">No saved rounds found.</div></td></tr>'}</tbody></table></div>`;
+      $("roundGroupFilter").value=currentGroup;
+      $("roundGroupFilter").addEventListener("change",e=>{currentGroup=e.target.value;renderRounds()});
+    }
+    renderRounds();
   }
   function logout(){clearInterval(timer);timer=null;ownerCode="";db=null;groups=[];states.clear();fingerprints.clear();observedActivity.clear();selectedPin="";$("ownerCodeInput").value="";$("dashView").classList.add("hidden");$("loginView").classList.remove("hidden");$("loginBtn").disabled=false;$("loginBtn").textContent="Open Owner Dashboard";$("loginMsg").textContent=""}
 
