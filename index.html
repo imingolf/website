@@ -334,15 +334,13 @@ footer{padding:28px 0 42px;color:var(--muted);font-size:14px}.footer-row{display
 
   <div class="help-body" id="helpBody" aria-live="polite">
     <div class="help-msg bot">
-      Hi 👋 What do you need help with?
+      Hi 👋 Are you a player or an organiser?
     </div>
     <div class="help-quick" id="helpQuick">
-      <button type="button" data-help="join">How do I join a group?</button>
-      <button type="button" data-help="pay">How do I pay?</button>
-      <button type="button" data-help="score">How do I enter my score?</button>
-      <button type="button" data-help="trip">How does Trip Mode work?</button>
-      <button type="button" data-help="start">How do I start a group?</button>
-      <button type="button" data-help="stuck">I'm stuck</button>
+      <button type="button" data-help="player">🏌️ I'm a player</button>
+      <button type="button" data-help="organiser">🔐 I'm an organiser</button>
+      <button type="button" data-help="start">➕ I want to start a group</button>
+      <button type="button" data-help="stuck">🛠️ I'm stuck</button>
     </div>
   </div>
 
@@ -363,6 +361,14 @@ footer{padding:28px 0 42px;color:var(--muted);font-size:14px}.footer-row{display
   const input = document.getElementById("helpInput");
 
   const answers = {
+    player: {
+      q: "🏌️ I'm a player",
+      a: `<b>Player help</b><br><br>• <b>Join:</b> Open My Group → enter your Group PIN → choose your name.<br>• <b>Pay:</b> Open <b>Pay</b> and follow the payment instructions for a Money Game.<br>• <b>Score:</b> Open <b>Scores</b>, enter your final Stableford or Net score and submit it.<br><br>You can also type your question below.`
+    },
+    organiser: {
+      q: "🔐 I'm an organiser",
+      a: `<b>Organiser help</b><br><br>• <b>First game:</b> Add/check players → Round → Set Up Next Competition.<br>• <b>Points Game:</b> Choose Points Game, Stableford/Net and league points.<br>• <b>Money Game:</b> Set the stake and make sure entrants are marked paid before scoring starts.<br>• <b>Scores:</b> Players submit their own final scores; Admin can correct genuine mistakes.<br>• <b>Finish:</b> When everyone is in, Scores → Finish Round & Save Result.<br>• <b>Trip:</b> Choose Trip Mode when setting up the competition.<br><br>For full step-by-step help, unlock Admin in the app and open <b>Settings → Organiser Help</b>. Or type your question below.`
+    },
     join: {
       q: "How do I join a group?",
       a: `Tap <b>Open My Group</b>, enter the Group PIN your organiser sent you, then tap your name. If your name is not listed, choose <b>Add myself to the group</b>.`
@@ -425,20 +431,7 @@ footer{padding:28px 0 42px;color:var(--muted);font-size:14px}.footer-row{display
           "Content-Type": "text/plain",         
                   
         },
-        body: JSON.stringify({
-          question: `Answer this I'm In Golf help question in plain English.
-
-Keep the answer short and friendly:
-- Answer the question directly in the first sentence.
-- Usually use 2 to 4 short sentences.
-- Give only the information the person needs for this question.
-- Do not overload new users with app rules or technical detail.
-- If a simple yes/no answer is appropriate, start with Yes or No.
-- Use the terms organiser, group, Money Game, Points Game and Trip Mode consistently where relevant.
-- If you are unsure, say so rather than inventing an app feature.
-
-User question: ${q}`
-        })
+        body: JSON.stringify({ question: q })
       }
     );
 
