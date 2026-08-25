@@ -172,6 +172,7 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
   const OWNER_PROTECTED_PIN="1010";
   const PRICE_PER_YEAR=19.99;
   let db=null, ownerCode="", groups=[], states=new Map(), selectedPin="", fingerprints=new Map(), observedActivity=new Map(), timer=null;
+  const viewState={playersGroup:"all",playersSortKey:"name",playersSortDir:1,roundsGroup:"all"};
 
   const $=id=>document.getElementById(id);
   const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -218,7 +219,7 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
     ownerCode=code; groups=Array.isArray(data)?data:[];
     $("loginView").classList.add("hidden");$("dashView").classList.remove("hidden");
     await refreshAll(true);
-    timer=setInterval(()=>refreshAll(false),10000);
+    timer=setInterval(()=>refreshAll(false,false),10000);
   }
   async function loadStates(){
     const results=await Promise.all(groups.map(async g=>{
@@ -234,7 +235,7 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
       }
     });
   }
-  async function refreshAll(initial=false){
+  async function refreshAll(initial=false,redrawView=true){
     if(!db||!ownerCode)return;
     $("liveText").textContent="Refreshing…";
     const {data,error}=await db.rpc("owner_list_groups",{p_creation_code:ownerCode});
@@ -246,9 +247,14 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
     if(initial&&!selectedPin&&groups.length)selectedPin=String(groups[0].group_pin);
     if(selectedPin)renderDetail(selectedPin);
     const active=document.querySelector(".nav button.active")?.id;
-    if(active==="groupsNav")showGroupsView();
-    else if(active==="playersNav")showPlayersView();
-    else if(active==="roundsNav")showRoundsView();
+    // Background refreshes update the data without rebuilding filter views.
+    // This prevents the 10-second live refresh from closing/resetting a group dropdown.
+    // Manual refreshes can still redraw the current view immediately.
+    if(redrawView){
+      if(active==="groupsNav")showGroupsView();
+      else if(active==="playersNav")showPlayersView();
+      else if(active==="roundsNav")showRoundsView();
+    }
   }
   function realGroups(){return groups.filter(g=>!TEST_PINS.has(String(g.group_pin)))}
   function renderStats(){
@@ -496,7 +502,6 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
     setNavActive("playersNav");
     document.querySelector(".attention").classList.add("hidden");
     $("dashboardWorkspace").classList.add("hidden");
-    let currentGroup="all", sortKey="name", sortDir=1;
 
     function collectRows(){
       const rows=[];
@@ -507,26 +512,26 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
       return rows;
     }
     function renderPlayers(){
-      let rows=collectRows().filter(r=>currentGroup==="all"||r.pin===currentGroup);
+      let rows=collectRows().filter(r=>viewState.playersGroup==="all"||r.pin===viewState.playersGroup);
       rows.sort((a,b)=>{
-        let av=a[sortKey],bv=b[sortKey];
-        if(sortKey==="hcp"){av=Number(av);bv=Number(bv); if(!Number.isFinite(av))av=9999;if(!Number.isFinite(bv))bv=9999;return (av-bv)*sortDir;}
-        return String(av).localeCompare(String(bv),undefined,{numeric:true,sensitivity:"base"})*sortDir;
+        let av=a[viewState.playersSortKey],bv=b[viewState.playersSortKey];
+        if(viewState.playersSortKey==="hcp"){av=Number(av);bv=Number(bv); if(!Number.isFinite(av))av=9999;if(!Number.isFinite(bv))bv=9999;return (av-bv)*viewState.playersSortDir;}
+        return String(av).localeCompare(String(bv),undefined,{numeric:true,sensitivity:"base"})*viewState.playersSortDir;
       });
       $("altView").classList.remove("hidden");
       $("altView").innerHTML=`<div class="panel-head"><div><h2>🏌️ All Players</h2><div class="sub">Players across your real groups. Test group 2894 is excluded.</div></div><span class="badge active">${rows.length} player${rows.length===1?"":"s"}</span></div>
         <div class="filterbar"><label for="playerGroupFilter">Group</label><select id="playerGroupFilter">${realGroupOptions()}</select></div>
         <div class="view-table"><table><thead><tr>
-          <th class="sortable" data-sort="name">Player ${sortKey==="name"?(sortDir===1?"▲":"▼"):""}</th>
-          <th class="sortable" data-sort="hcp">Handicap ${sortKey==="hcp"?(sortDir===1?"▲":"▼"):""}</th>
-          <th class="sortable" data-sort="group">Group ${sortKey==="group"?(sortDir===1?"▲":"▼"):""}</th>
+          <th class="sortable" data-sort="name">Player ${viewState.playersSortKey==="name"?(viewState.playersSortDir===1?"▲":"▼"):""}</th>
+          <th class="sortable" data-sort="hcp">Handicap ${viewState.playersSortKey==="hcp"?(viewState.playersSortDir===1?"▲":"▼"):""}</th>
+          <th class="sortable" data-sort="group">Group ${viewState.playersSortKey==="group"?(viewState.playersSortDir===1?"▲":"▼"):""}</th>
           <th>PIN</th><th>Payment</th>
         </tr></thead><tbody>${rows.length?rows.map(p=>`<tr><td><b>${esc(p.name)}</b></td><td>${esc(p.hcp)}</td><td>${esc(p.group)}</td><td>${esc(p.pin)}</td><td>${p.paid?'<span class="badge active">Paid</span>':'—'}</td></tr>`).join(""):'<tr><td colspan="5"><div class="empty">No players found.</div></td></tr>'}</tbody></table></div>`;
-      $("playerGroupFilter").value=currentGroup;
-      $("playerGroupFilter").addEventListener("change",e=>{currentGroup=e.target.value;renderPlayers()});
+      $("playerGroupFilter").value=viewState.playersGroup;
+      $("playerGroupFilter").addEventListener("change",e=>{viewState.playersGroup=e.target.value;renderPlayers()});
       $("altView").querySelectorAll("[data-sort]").forEach(th=>th.addEventListener("click",()=>{
         const key=th.dataset.sort;
-        if(sortKey===key)sortDir*=-1; else {sortKey=key;sortDir=1}
+        if(viewState.playersSortKey===key)viewState.playersSortDir*=-1; else {viewState.playersSortKey=key;viewState.playersSortDir=1}
         renderPlayers();
       }));
     }
@@ -536,8 +541,6 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
     setNavActive("roundsNav");
     document.querySelector(".attention").classList.add("hidden");
     $("dashboardWorkspace").classList.add("hidden");
-    let currentGroup="all";
-
     function collectRows(){
       const rows=[];
       realGroups().forEach(g=>{
@@ -551,17 +554,17 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
       return rows;
     }
     function renderRounds(){
-      const rows=collectRows().filter(r=>currentGroup==="all"||r.pin===currentGroup);
+      const rows=collectRows().filter(r=>viewState.roundsGroup==="all"||r.pin===viewState.roundsGroup);
       $("altView").classList.remove("hidden");
       $("altView").innerHTML=`<div class="panel-head"><div><h2>🏆 Saved Rounds</h2><div class="sub">Round history across your real groups.</div></div><span class="badge active">${rows.length} round${rows.length===1?"":"s"}</span></div>
         <div class="filterbar"><label for="roundGroupFilter">Group</label><select id="roundGroupFilter">${realGroupOptions()}</select></div>
         <div class="view-table"><table><thead><tr><th>Date</th><th>Group</th><th>PIN</th><th>Course</th><th>Game</th><th>Winner</th></tr></thead><tbody>${rows.length?rows.map(r=>`<tr><td>${esc(fmtDate(r.date))}</td><td><b>${esc(r.group)}</b></td><td>${esc(r.pin)}</td><td>${esc(r.course||"—")}</td><td>${esc(r.type)}</td><td>${esc(r.winner||"—")}</td></tr>`).join(""):'<tr><td colspan="6"><div class="empty">No saved rounds found.</div></td></tr>'}</tbody></table></div>`;
-      $("roundGroupFilter").value=currentGroup;
-      $("roundGroupFilter").addEventListener("change",e=>{currentGroup=e.target.value;renderRounds()});
+      $("roundGroupFilter").value=viewState.roundsGroup;
+      $("roundGroupFilter").addEventListener("change",e=>{viewState.roundsGroup=e.target.value;renderRounds()});
     }
     renderRounds();
   }
-  function logout(){clearInterval(timer);timer=null;ownerCode="";db=null;groups=[];states.clear();fingerprints.clear();observedActivity.clear();selectedPin="";$("ownerCodeInput").value="";$("dashView").classList.add("hidden");$("loginView").classList.remove("hidden");$("loginBtn").disabled=false;$("loginBtn").textContent="Open Owner Dashboard";$("loginMsg").textContent=""}
+  function logout(){clearInterval(timer);timer=null;ownerCode="";db=null;groups=[];states.clear();fingerprints.clear();observedActivity.clear();selectedPin="";viewState.playersGroup="all";viewState.playersSortKey="name";viewState.playersSortDir=1;viewState.roundsGroup="all";$("ownerCodeInput").value="";$("dashView").classList.add("hidden");$("loginView").classList.remove("hidden");$("loginBtn").disabled=false;$("loginBtn").textContent="Open Owner Dashboard";$("loginMsg").textContent=""}
 
   $("loginBtn").addEventListener("click",login);
   $("dashboardNav").addEventListener("click",showDashboard);
