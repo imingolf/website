@@ -19,7 +19,7 @@ button{cursor:pointer}
 .hidden{display:none!important}
 .shell{min-height:100vh;display:grid;grid-template-columns:245px minmax(0,1fr)}
 .side{background:linear-gradient(180deg,var(--deep),#062a19);color:white;padding:28px 18px;display:flex;flex-direction:column;gap:18px}
-.brand{font-weight:950;font-size:27px;line-height:1.05}.brand small{display:block;font-size:13px;font-weight:650;opacity:.75;margin-top:8px}
+.brand{font-weight:950;font-size:27px;line-height:1.05;letter-spacing:.01em}.brand-logo{display:flex;align-items:center;gap:11px}.brand-mark{width:58px;height:58px;border:3px solid #9bd23b;border-radius:50%;display:grid;place-items:center;font-size:29px;box-shadow:inset 0 0 0 5px rgba(255,255,255,.04)}.brand-word .lime{color:#9bd23b}.brand small{display:block;font-size:13px;font-weight:650;opacity:.75;margin-top:8px}
 .nav{display:grid;gap:7px;margin-top:12px}.nav button{border:0;background:transparent;color:white;text-align:left;padding:13px 14px;border-radius:12px;font-weight:800}
 .nav button.active,.nav button:hover{background:rgba(255,255,255,.14)}
 .side-foot{margin-top:auto;font-size:13px;opacity:.76;line-height:1.5}
@@ -63,6 +63,7 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
 .toast{position:fixed;right:24px;bottom:24px;background:#163d26;color:white;padding:12px 16px;border-radius:12px;box-shadow:0 12px 30px rgba(0,0,0,.2);z-index:80;font-weight:800}
 .toolbar{display:flex;gap:8px;flex-wrap:wrap}
 .small-btn{padding:8px 10px;border-radius:9px}
+.view-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.view-card{border:1px solid var(--line);border-radius:15px;padding:15px;background:#fbfdfb}.view-card h3{margin:0 0 5px}.view-card .big{font-size:27px;font-weight:950}.view-table{margin-top:12px;overflow:auto}.view-table table{min-width:700px}.nav button.active{background:rgba(255,255,255,.18)}
 @media(max-width:1250px){.stats{grid-template-columns:repeat(3,1fr)}.workspace{grid-template-columns:1fr}.shell{grid-template-columns:86px minmax(0,1fr)}.brand span,.brand small,.nav .txt,.side-foot{display:none}.nav button{text-align:center;font-size:20px}}
 @media(max-width:720px){.shell{display:block}.side{padding:10px 12px;flex-direction:row;align-items:center;position:sticky;top:0;z-index:20}.brand{font-size:20px}.nav{display:flex;margin:0;overflow:auto}.nav button{padding:9px}.content{padding:16px}.hero-inner{padding:24px 16px}.hero h1{font-size:30px}.stats{grid-template-columns:1fr 1fr}.action-grid{grid-template-columns:1fr}.hero{min-height:180px}}
 </style>
@@ -83,9 +84,12 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
 
 <div id="dashView" class="shell hidden">
   <aside class="side">
-    <div class="brand">⛳ <span>I’M IN<br>GOLF</span><small>Owner Control Centre</small></div>
+    <div class="brand"><div class="brand-logo"><div class="brand-mark">⛳</div><div class="brand-word"><span>I’M IN<br><span class="lime">GOLF</span></span></div></div><small>Owner Control Centre</small></div>
     <div class="nav">
-      <button class="active" type="button">📊 <span class="txt">Dashboard</span></button>
+      <button class="active" id="dashboardNav" type="button">📊 <span class="txt">Dashboard</span></button>
+      <button id="groupsNav" type="button">👥 <span class="txt">Groups</span></button>
+      <button id="playersNav" type="button">🏌️ <span class="txt">All Players</span></button>
+      <button id="roundsNav" type="button">🏆 <span class="txt">Rounds</span></button>
       <button id="refreshBtn" type="button">↻ <span class="txt">Refresh</span></button>
       <button id="openAppBtn" type="button">📱 <span class="txt">Open App</span></button>
       <button id="logoutBtn" type="button">↪ <span class="txt">Log out</span></button>
@@ -98,7 +102,7 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
       <div class="hero-inner">
         <div>
           <h1>OWNER DASHBOARD</h1>
-          <p>Golf. Mates. You’re In.</p>
+          <p>Golf. Mates. You’re In. — your groups at a glance.</p>
         </div>
         <div class="hero-actions">
           <div class="owner-pill">👤 Owner</div>
@@ -133,7 +137,9 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
         <div class="attention-list" id="attentionList"><span class="attention-item">Loading…</span></div>
       </section>
 
-      <section class="workspace">
+      <section id="altView" class="panel hidden" style="margin-top:18px"></section>
+
+      <section id="dashboardWorkspace" class="workspace">
         <div class="panel">
           <div class="panel-head">
             <h2>Your Groups</h2>
@@ -420,9 +426,57 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
     $("closeInvite").onclick=async()=>{closeModal();await refreshAll()};
     $("copyInvite").onclick=async()=>{try{await navigator.clipboard.writeText(invite);toast("Admin invite copied")}catch(e){prompt("Copy this invite:",invite)}};
   }
+
+  function setNavActive(id){
+    document.querySelectorAll(".nav button").forEach(b=>b.classList.remove("active"));
+    const b=$(id); if(b)b.classList.add("active");
+  }
+  function showDashboard(){
+    setNavActive("dashboardNav");
+    $("altView").classList.add("hidden");
+    $("dashboardWorkspace").classList.remove("hidden");
+    document.querySelector(".attention").classList.remove("hidden");
+  }
+  function showGroupsView(){
+    setNavActive("groupsNav");
+    document.querySelector(".attention").classList.add("hidden");
+    $("dashboardWorkspace").classList.add("hidden");
+    const real=realGroups(), tests=groups.filter(g=>TEST_PINS.has(String(g.group_pin)));
+    $("altView").classList.remove("hidden");
+    $("altView").innerHTML=`<div class="panel-head"><div><h2>👥 All Groups</h2><div class="sub">A simple overview of every group on I'm In Golf.</div></div><button class="primary" id="altCreate">＋ Create Group</button></div>
+      <div class="view-cards"><div class="view-card"><div class="label">Real groups</div><div class="big">${real.length}</div></div><div class="view-card"><div class="label">Test groups</div><div class="big">${tests.length}</div></div><div class="view-card"><div class="label">Active groups</div><div class="big">${groups.filter(g=>String(g.status||"active")==="active").length}</div></div></div>
+      <div class="view-table"><table><thead><tr><th>Group</th><th>PIN</th><th>Admin</th><th>Players</th><th>Rounds</th><th>Plan</th><th>Status</th></tr></thead><tbody>${groups.map(g=>{const pin=String(g.group_pin),s=states.get(pin);return `<tr><td><b>${esc(g.group_name||"Unnamed Group")}</b></td><td>${esc(pin)}</td><td>${esc(g.admin_name||"—")}</td><td>${(s?.players||[]).length}</td><td>${(s?.history||[]).length}</td><td>${planBadge(g)}</td><td>${statusBadge(g)}</td></tr>`}).join("")}</tbody></table></div>`;
+    $("altCreate").onclick=createGroup;
+  }
+  function showPlayersView(){
+    setNavActive("playersNav");
+    document.querySelector(".attention").classList.add("hidden");
+    $("dashboardWorkspace").classList.add("hidden");
+    const rows=[];
+    realGroups().forEach(g=>{const pin=String(g.group_pin),s=states.get(pin);(s?.players||[]).forEach(p=>rows.push({name:p.name||"Player",hcp:p.handicap??"—",group:g.group_name||pin,pin,paid:p.paid===true}))});
+    rows.sort((a,b)=>String(a.name).localeCompare(String(b.name)));
+    $("altView").classList.remove("hidden");
+    $("altView").innerHTML=`<div class="panel-head"><div><h2>🏌️ All Players</h2><div class="sub">Players across your real groups. Test group 2894 is excluded.</div></div><span class="badge active">${rows.length} players</span></div>
+      <div class="view-table"><table><thead><tr><th>Player</th><th>Handicap</th><th>Group</th><th>PIN</th><th>Current payment mark</th></tr></thead><tbody>${rows.length?rows.map(p=>`<tr><td><b>${esc(p.name)}</b></td><td>${esc(p.hcp)}</td><td>${esc(p.group)}</td><td>${esc(p.pin)}</td><td>${p.paid?'<span class="badge active">Paid</span>':'—'}</td></tr>`).join(""):'<tr><td colspan="5"><div class="empty">No players found.</div></td></tr>'}</tbody></table></div>`;
+  }
+  function showRoundsView(){
+    setNavActive("roundsNav");
+    document.querySelector(".attention").classList.add("hidden");
+    $("dashboardWorkspace").classList.add("hidden");
+    const rows=[];
+    realGroups().forEach(g=>{const pin=String(g.group_pin),s=states.get(pin);(s?.history||[]).forEach((r,i)=>rows.push({group:g.group_name||pin,pin,date:r.date||"",course:r.course||"",type:r.gameType||r.type||"",winner:r.winner||r.winnerName||"",idx:i}))});
+    rows.sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+    $("altView").classList.remove("hidden");
+    $("altView").innerHTML=`<div class="panel-head"><div><h2>🏆 Saved Rounds</h2><div class="sub">Round history across your real groups.</div></div><span class="badge active">${rows.length} rounds</span></div>
+      <div class="view-table"><table><thead><tr><th>Date</th><th>Group</th><th>PIN</th><th>Course</th><th>Game</th><th>Winner</th></tr></thead><tbody>${rows.length?rows.map(r=>`<tr><td>${esc(fmtDate(r.date))}</td><td><b>${esc(r.group)}</b></td><td>${esc(r.pin)}</td><td>${esc(r.course||"—")}</td><td>${esc(r.type||"—")}</td><td>${esc(r.winner||"—")}</td></tr>`).join(""):'<tr><td colspan="6"><div class="empty">No saved rounds found.</div></td></tr>'}</tbody></table></div>`;
+  }
   function logout(){clearInterval(timer);timer=null;ownerCode="";db=null;groups=[];states.clear();fingerprints.clear();observedActivity.clear();selectedPin="";$("ownerCodeInput").value="";$("dashView").classList.add("hidden");$("loginView").classList.remove("hidden");$("loginBtn").disabled=false;$("loginBtn").textContent="Open Owner Dashboard";$("loginMsg").textContent=""}
 
   $("loginBtn").addEventListener("click",login);
+  $("dashboardNav").addEventListener("click",showDashboard);
+  $("groupsNav").addEventListener("click",showGroupsView);
+  $("playersNav").addEventListener("click",showPlayersView);
+  $("roundsNav").addEventListener("click",showRoundsView);
   $("ownerCodeInput").addEventListener("keydown",e=>{if(e.key==="Enter")login()});
   $("refreshBtn").addEventListener("click",()=>refreshAll());
   $("manualRefreshBtn").addEventListener("click",()=>refreshAll());
