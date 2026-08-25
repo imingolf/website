@@ -1,0 +1,435 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>I'm In Golf — Owner Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="./config.js"></script>
+<style>
+:root{
+  --green:#176b3a;--green2:#23864e;--deep:#07351f;--deep2:#0c4b2a;
+  --ink:#142018;--muted:#6d776f;--bg:#f3f6f2;--card:#fff;--line:#dfe7e1;
+  --amber:#9a6a00;--amberbg:#fff4cf;--red:#ad342d;--redbg:#fde9e6;--blue:#285aa8;--bluebg:#eaf1ff;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
+button,input,select,textarea{font:inherit}
+button{cursor:pointer}
+.hidden{display:none!important}
+.shell{min-height:100vh;display:grid;grid-template-columns:245px minmax(0,1fr)}
+.side{background:linear-gradient(180deg,var(--deep),#062a19);color:white;padding:28px 18px;display:flex;flex-direction:column;gap:18px}
+.brand{font-weight:950;font-size:27px;line-height:1.05}.brand small{display:block;font-size:13px;font-weight:650;opacity:.75;margin-top:8px}
+.nav{display:grid;gap:7px;margin-top:12px}.nav button{border:0;background:transparent;color:white;text-align:left;padding:13px 14px;border-radius:12px;font-weight:800}
+.nav button.active,.nav button:hover{background:rgba(255,255,255,.14)}
+.side-foot{margin-top:auto;font-size:13px;opacity:.76;line-height:1.5}
+.main{min-width:0}
+.hero{position:relative;overflow:hidden;min-height:205px;background:linear-gradient(135deg,#edf8ef,#d6eed8 52%,#b9dfbe);border-bottom:1px solid #bdd8c3}
+.hero-art{position:absolute;inset:auto 0 0 0;height:120px;opacity:.98;pointer-events:none}
+.hero-inner{position:relative;z-index:2;padding:32px 38px;display:flex;justify-content:space-between;gap:20px;align-items:flex-start}
+.hero h1{margin:0;font-size:38px;letter-spacing:-1px}.hero p{margin:5px 0 0;color:#3d654a;font-size:18px;font-style:italic;font-weight:700}
+.hero-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.live-pill,.owner-pill{background:rgba(255,255,255,.9);border:1px solid rgba(23,107,58,.15);border-radius:999px;padding:10px 14px;font-weight:850;box-shadow:0 5px 18px rgba(22,82,44,.08)}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;background:#2a9d51;margin-right:7px}
+.content{padding:26px 34px 38px}
+.stats{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:14px}
+.stat{background:white;border:1px solid var(--line);border-radius:18px;padding:18px;min-width:0;box-shadow:0 3px 12px rgba(20,50,30,.04)}
+.stat .k{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:900}.stat .v{font-size:32px;font-weight:950;margin-top:4px}.stat .s{font-size:12px;color:var(--muted);margin-top:3px}
+.attention{margin-top:16px;background:var(--amberbg);border:1px solid #eadca9;border-radius:18px;padding:16px}.attention h3{margin:0 0 10px}.attention-list{display:flex;gap:10px;flex-wrap:wrap}.attention-item{background:white;border:1px solid #efe4be;border-radius:12px;padding:10px 12px;font-size:13px}
+.workspace{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(340px,.82fr);gap:18px;margin-top:18px}
+.panel{background:white;border:1px solid var(--line);border-radius:20px;padding:18px;min-width:0;box-shadow:0 3px 14px rgba(20,50,30,.04)}
+.panel-head{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:12px}.panel-head h2{margin:0;font-size:22px}
+.primary{border:0;background:var(--green);color:white;padding:11px 14px;border-radius:11px;font-weight:900}
+.secondary{border:1px solid #a9cab2;background:#f5faf6;color:var(--green);padding:10px 13px;border-radius:11px;font-weight:850}
+.ghost{border:1px solid var(--line);background:white;color:var(--ink);padding:10px 13px;border-radius:11px;font-weight:800}
+.danger{border:1px solid #e2aaa5;background:var(--redbg);color:var(--red);padding:10px 13px;border-radius:11px;font-weight:850}
+.table-wrap{overflow:auto;border:1px solid #e8ede9;border-radius:14px}
+table{width:100%;border-collapse:collapse;min-width:850px}th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);padding:11px 10px;background:#f7f9f7;border-bottom:1px solid var(--line)}td{padding:13px 10px;border-bottom:1px solid #edf1ee;font-size:14px}tbody tr{cursor:pointer}tbody tr:hover,tbody tr.selected{background:#eef7f0}tbody tr:last-child td{border-bottom:0}
+.group-name{font-weight:900}.sub{font-size:12px;color:var(--muted);margin-top:3px}
+.badge{display:inline-flex;align-items:center;padding:5px 8px;border-radius:999px;font-size:11px;font-weight:900;white-space:nowrap}.trial{background:#e8f5eb;color:var(--green)}.paid{background:var(--bluebg);color:var(--blue)}.internal{background:#f1ebfa;color:#6740a0}.test{background:#f0f0f0;color:#555}.active{background:#e3f5e8;color:var(--green)}.suspended{background:var(--redbg);color:var(--red)}
+.detail-top{display:flex;justify-content:space-between;gap:14px;align-items:flex-start}.detail-top h2{margin:2px 0;font-size:23px}.label{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:900}
+.detail-grid{display:grid;gap:0;margin-top:14px}.detail-row{display:flex;justify-content:space-between;gap:16px;padding:10px 0;border-bottom:1px solid #edf1ee;font-size:14px}.detail-row b{text-align:right;max-width:60%}
+.progress{height:8px;background:#e7ece8;border-radius:99px;overflow:hidden;margin:8px 0}.progress span{display:block;height:100%;background:var(--green2)}
+.members{margin-top:18px}.members h3{margin:0 0 9px}.member{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid #edf1ee}.member:last-child{border-bottom:0}.role{font-size:11px;color:var(--green);font-weight:850}
+.action-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:16px}.action-grid button{width:100%}
+.note{font-size:12px;color:var(--muted);margin-top:12px;line-height:1.45}
+.empty{padding:28px;text-align:center;color:var(--muted)}
+.login{min-height:100vh;display:grid;place-items:center;padding:24px;background:linear-gradient(145deg,#0a4226,#176b3a)}
+.login-card{width:min(460px,100%);background:white;border-radius:24px;padding:28px;box-shadow:0 24px 65px rgba(0,0,0,.22)}
+.login-card h1{margin:0 0 8px;font-size:29px}.login-card p{color:var(--muted);line-height:1.5}
+input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;border-radius:10px;background:white;color:var(--ink);margin:5px 0 12px;min-height:44px}textarea{min-height:84px;resize:vertical}
+.modal-back{position:fixed;inset:0;background:rgba(5,25,13,.52);display:grid;place-items:center;padding:20px;z-index:50}
+.modal{width:min(620px,100%);max-height:90vh;overflow:auto;background:white;border-radius:20px;padding:22px;box-shadow:0 24px 70px rgba(0,0,0,.3)}.modal h2{margin:0 0 4px}.modal-actions{display:flex;gap:9px;justify-content:flex-end;flex-wrap:wrap;margin-top:10px}
+.toast{position:fixed;right:24px;bottom:24px;background:#163d26;color:white;padding:12px 16px;border-radius:12px;box-shadow:0 12px 30px rgba(0,0,0,.2);z-index:80;font-weight:800}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap}
+.small-btn{padding:8px 10px;border-radius:9px}
+@media(max-width:1250px){.stats{grid-template-columns:repeat(3,1fr)}.workspace{grid-template-columns:1fr}.shell{grid-template-columns:86px minmax(0,1fr)}.brand span,.brand small,.nav .txt,.side-foot{display:none}.nav button{text-align:center;font-size:20px}}
+@media(max-width:720px){.shell{display:block}.side{padding:10px 12px;flex-direction:row;align-items:center;position:sticky;top:0;z-index:20}.brand{font-size:20px}.nav{display:flex;margin:0;overflow:auto}.nav button{padding:9px}.content{padding:16px}.hero-inner{padding:24px 16px}.hero h1{font-size:30px}.stats{grid-template-columns:1fr 1fr}.action-grid{grid-template-columns:1fr}.hero{min-height:180px}}
+</style>
+</head>
+<body>
+
+<div id="loginView" class="login">
+  <div class="login-card">
+    <h1>⛳ I'm In Golf</h1>
+    <h2 style="margin:0 0 6px">Owner Dashboard</h2>
+    <p>Enter your private Owner creation code. It is used only for this browser session.</p>
+    <label><b>Owner creation code</b></label>
+    <input id="ownerCodeInput" type="password" autocomplete="current-password" placeholder="Private owner code">
+    <button id="loginBtn" class="primary" style="width:100%">Open Owner Dashboard</button>
+    <div id="loginMsg" class="note"></div>
+  </div>
+</div>
+
+<div id="dashView" class="shell hidden">
+  <aside class="side">
+    <div class="brand">⛳ <span>I’M IN<br>GOLF</span><small>Owner Control Centre</small></div>
+    <div class="nav">
+      <button class="active" type="button">📊 <span class="txt">Dashboard</span></button>
+      <button id="refreshBtn" type="button">↻ <span class="txt">Refresh</span></button>
+      <button id="openAppBtn" type="button">📱 <span class="txt">Open App</span></button>
+      <button id="logoutBtn" type="button">↪ <span class="txt">Log out</span></button>
+    </div>
+    <div class="side-foot">Golf. Mates. You’re In.<br><br>Live data from your I'm In Golf groups.</div>
+  </aside>
+
+  <main class="main">
+    <section class="hero">
+      <div class="hero-inner">
+        <div>
+          <h1>OWNER DASHBOARD</h1>
+          <p>Golf. Mates. You’re In.</p>
+        </div>
+        <div class="hero-actions">
+          <div class="owner-pill">👤 Owner</div>
+          <div class="live-pill"><span class="dot"></span><span id="liveText">Live</span></div>
+        </div>
+      </div>
+      <svg class="hero-art" viewBox="0 0 1600 180" preserveAspectRatio="none" aria-hidden="true">
+        <defs>
+          <linearGradient id="g1" x1="0" x2="1"><stop stop-color="#85c67d"/><stop offset="1" stop-color="#4fae64"/></linearGradient>
+          <linearGradient id="g2" x1="0" x2="1"><stop stop-color="#64b96b"/><stop offset="1" stop-color="#24864e"/></linearGradient>
+        </defs>
+        <path d="M0 120 C220 75 360 138 550 103 C760 62 910 130 1110 92 C1300 58 1430 78 1600 48 L1600 180 L0 180Z" fill="url(#g1)"/>
+        <path d="M0 150 C240 118 420 165 650 127 C880 92 1060 146 1260 112 C1410 88 1500 94 1600 80 L1600 180 L0 180Z" fill="url(#g2)" opacity=".92"/>
+        <ellipse cx="1250" cy="122" rx="120" ry="30" fill="#a8d999"/>
+        <line x1="1260" y1="30" x2="1260" y2="125" stroke="#37483c" stroke-width="4"/>
+        <path d="M1260 31 L1310 46 L1260 61Z" fill="#f05252"/>
+        <circle cx="1050" cy="142" r="12" fill="white" stroke="#d8ded9" stroke-width="2"/>
+      </svg>
+    </section>
+
+    <div class="content">
+      <section class="stats">
+        <div class="stat"><div class="k">Total Groups</div><div class="v" id="statGroups">—</div><div class="s" id="statGroupsSub">Loading…</div></div>
+        <div class="stat"><div class="k">Total Players</div><div class="v" id="statPlayers">—</div><div class="s">Across real groups</div></div>
+        <div class="stat"><div class="k">Rounds Played</div><div class="v" id="statRounds">—</div><div class="s">Saved round history</div></div>
+        <div class="stat"><div class="k">Trial Groups</div><div class="v" id="statTrials">—</div><div class="s">Currently on trial</div></div>
+        <div class="stat"><div class="k">Paid Groups</div><div class="v" id="statPaid">—</div><div class="s" id="statRevenue">Annual value —</div></div>
+      </section>
+
+      <section class="attention">
+        <h3>⚠️ Needs Attention</h3>
+        <div class="attention-list" id="attentionList"><span class="attention-item">Loading…</span></div>
+      </section>
+
+      <section class="workspace">
+        <div class="panel">
+          <div class="panel-head">
+            <h2>Your Groups</h2>
+            <div class="toolbar">
+              <button id="createGroupBtn" class="primary" type="button">＋ Create Group</button>
+              <button id="manualRefreshBtn" class="secondary" type="button">↻ Refresh Live Data</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Group</th><th>PIN</th><th>Players</th><th>Rounds</th><th>Plan</th><th>Trial / Renewal</th><th>Live activity</th><th>Status</th></tr></thead>
+              <tbody id="groupsBody"></tbody>
+            </table>
+          </div>
+          <div class="note">Live player/round changes refresh automatically every 10 seconds. “Live activity” records changes observed while this dashboard is open; the current database does not yet store a permanent last-active timestamp.</div>
+        </div>
+
+        <aside class="panel" id="detailPanel"><div class="empty">Select a group to see its details and members.</div></aside>
+      </section>
+    </div>
+  </main>
+</div>
+
+<div id="modalHost"></div>
+<div id="toast" class="toast hidden"></div>
+
+<script>
+(()=>{
+  const TEST_PINS=new Set(["2894"]);
+  const OWNER_PROTECTED_PIN="1010";
+  const PRICE_PER_YEAR=19.99;
+  let db=null, ownerCode="", groups=[], states=new Map(), selectedPin="", fingerprints=new Map(), observedActivity=new Map(), timer=null;
+
+  const $=id=>document.getElementById(id);
+  const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  const dateOnly=v=>v?String(v).slice(0,10):"";
+  const fmtDate=v=>{
+    if(!v)return "—";
+    const s=dateOnly(v), m=s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    return m?`${m[3]}/${m[2]}/${m[1]}`:String(v);
+  };
+  const todayUtc=()=>{const d=new Date(); return Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())};
+  const daysUntil=v=>{
+    const s=dateOnly(v),m=s.match(/^(\d{4})-(\d{2})-(\d{2})$/); if(!m)return null;
+    return Math.ceil((Date.UTC(+m[1],+m[2]-1,+m[3])-todayUtc())/86400000);
+  };
+  const configured=()=>window.TENS_IN_CONFIG&&TENS_IN_CONFIG.supabaseUrl&&TENS_IN_CONFIG.supabaseKey&&!String(TENS_IN_CONFIG.supabaseUrl).includes("PASTE_");
+  function toast(msg){const t=$("toast");t.textContent=msg;t.classList.remove("hidden");clearTimeout(t._tm);t._tm=setTimeout(()=>t.classList.add("hidden"),3000)}
+  function statusBadge(g){const s=String(g.status||"active");return `<span class="badge ${s==="active"?"active":"suspended"}">${s==="active"?"Active":"Suspended"}</span>`}
+  function planBadge(g){
+    if(TEST_PINS.has(String(g.group_pin)))return `<span class="badge test">TEST</span>`;
+    const p=String(g.plan_type||"trial");
+    if(p==="paid")return `<span class="badge paid">Paid</span>`;
+    if(p==="internal")return `<span class="badge internal">Internal</span>`;
+    return `<span class="badge trial">Free Trial</span>`;
+  }
+  function stateFingerprint(s){
+    if(!s)return "";
+    const slim={
+      players:(s.players||[]).map(p=>[p.id,p.name,p.handicap,p.paid,p.competition,p.stableford,p.netScore,p.scoreSubmitted,p.noReturn]),
+      history:(s.history||[]).length, roundOpen:s.roundOpen, course:s.course,date:s.date,gameType:s.gameType,
+      trip:s.trip?{active:s.trip.active,completed:s.trip.completed,currentRound:s.trip.currentRound,totalRounds:s.trip.totalRounds,rounds:(s.trip.rounds||[]).length}:null
+    };
+    return JSON.stringify(slim);
+  }
+  async function login(){
+    if(!configured()){ $("loginMsg").textContent="config.js could not be loaded. Put this file in the same /app folder as config.js.";return; }
+    const code=$("ownerCodeInput").value.trim(); if(!code){$("loginMsg").textContent="Enter your Owner creation code.";return}
+    $("loginBtn").disabled=true;$("loginBtn").textContent="Checking…";
+    db=supabase.createClient(TENS_IN_CONFIG.supabaseUrl,TENS_IN_CONFIG.supabaseKey);
+    const {data,error}=await db.rpc("owner_list_groups",{p_creation_code:code});
+    if(error){
+      $("loginMsg").textContent="Owner access was not accepted. Check the code and try again.";
+      $("loginBtn").disabled=false;$("loginBtn").textContent="Open Owner Dashboard";return;
+    }
+    ownerCode=code; groups=Array.isArray(data)?data:[];
+    $("loginView").classList.add("hidden");$("dashView").classList.remove("hidden");
+    await refreshAll(true);
+    timer=setInterval(()=>refreshAll(false),10000);
+  }
+  async function loadStates(){
+    const results=await Promise.all(groups.map(async g=>{
+      const pin=String(g.group_pin||"");
+      const {data,error}=await db.rpc("get_group_state",{p_pin:pin});
+      return [pin,error?null:data];
+    }));
+    results.forEach(([pin,s])=>{
+      if(s){
+        const fp=stateFingerprint(s), old=fingerprints.get(pin);
+        if(old!==undefined&&old!==fp)observedActivity.set(pin,new Date());
+        fingerprints.set(pin,fp);states.set(pin,s);
+      }
+    });
+  }
+  async function refreshAll(initial=false){
+    if(!db||!ownerCode)return;
+    $("liveText").textContent="Refreshing…";
+    const {data,error}=await db.rpc("owner_list_groups",{p_creation_code:ownerCode});
+    if(error){$("liveText").textContent="Refresh failed";return}
+    groups=Array.isArray(data)?data:[];
+    await loadStates();
+    renderAll();
+    $("liveText").textContent="Live • updated "+new Date().toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"});
+    if(initial&&!selectedPin&&groups.length)selectedPin=String(groups[0].group_pin);
+    if(selectedPin)renderDetail(selectedPin);
+  }
+  function realGroups(){return groups.filter(g=>!TEST_PINS.has(String(g.group_pin)))}
+  function renderStats(){
+    const real=realGroups();
+    let players=0,rounds=0;
+    real.forEach(g=>{const s=states.get(String(g.group_pin));players+=(s?.players||[]).length;rounds+=(s?.history||[]).length});
+    const trials=real.filter(g=>String(g.plan_type||"trial")==="trial"&&String(g.status||"active")==="active").length;
+    const paid=real.filter(g=>String(g.plan_type)==="paid"&&String(g.paid_status)==="paid"&&String(g.status||"active")==="active").length;
+    $("statGroups").textContent=real.length;
+    $("statGroupsSub").textContent=`${real.length} real • ${groups.length-real.length} test`;
+    $("statPlayers").textContent=players;
+    $("statRounds").textContent=rounds;
+    $("statTrials").textContent=trials;
+    $("statPaid").textContent=paid;
+    $("statRevenue").textContent=`Annual value £${(paid*PRICE_PER_YEAR).toFixed(2)}`;
+  }
+  function trialText(g){
+    const p=String(g.plan_type||"trial");
+    if(p==="trial"&&g.trial_expiry_date){
+      const d=daysUntil(g.trial_expiry_date);
+      if(d===null)return fmtDate(g.trial_expiry_date);
+      if(d<0)return `Expired ${Math.abs(d)}d ago`;
+      if(d===0)return "Expires today";
+      return `${d} day${d===1?"":"s"} left`;
+    }
+    if(p==="paid"&&g.renewal_date)return `Renews ${fmtDate(g.renewal_date)}`;
+    return "—";
+  }
+  function activityText(pin){
+    const d=observedActivity.get(pin); if(!d)return "No change seen";
+    const sec=Math.floor((Date.now()-d.getTime())/1000);
+    if(sec<60)return "Changed just now";
+    const min=Math.floor(sec/60);return `Changed ${min}m ago`;
+  }
+  function renderGroups(){
+    const body=$("groupsBody");
+    if(!groups.length){body.innerHTML=`<tr><td colspan="8"><div class="empty">No groups found.</div></td></tr>`;return}
+    body.innerHTML=groups.map(g=>{
+      const pin=String(g.group_pin||""),s=states.get(pin),test=TEST_PINS.has(pin);
+      return `<tr data-pin="${esc(pin)}" class="${pin===selectedPin?"selected":""}">
+        <td><div class="group-name">${esc(g.group_name||"Unnamed Group")}</div><div class="sub">${test?"Permanent sandbox":(g.admin_name?`Admin: ${esc(g.admin_name)}`:"")}</div></td>
+        <td>${esc(pin)}</td><td>${(s?.players||[]).length}</td><td>${(s?.history||[]).length}</td>
+        <td>${planBadge(g)}</td><td>${esc(trialText(g))}</td><td>${esc(activityText(pin))}</td><td>${statusBadge(g)}</td>
+      </tr>`;
+    }).join("");
+    body.querySelectorAll("tr[data-pin]").forEach(r=>r.addEventListener("click",()=>{selectedPin=r.dataset.pin;renderGroups();renderDetail(selectedPin)}));
+  }
+  function renderAttention(){
+    const items=[];
+    realGroups().forEach(g=>{
+      const pin=String(g.group_pin), p=String(g.plan_type||"trial"), s=states.get(pin);
+      if(p==="trial"&&g.trial_expiry_date){
+        const d=daysUntil(g.trial_expiry_date);
+        if(d!==null&&d<=3)items.push(`<span class="attention-item"><b>${esc(g.group_name||pin)}</b><br>${d<0?"Trial expired":d===0?"Trial expires today":`Trial ends in ${d} day${d===1?"":"s"}`}</span>`);
+      }
+      if(s&&!s.adminPin)items.push(`<span class="attention-item"><b>${esc(g.group_name||pin)}</b><br>Waiting for Admin setup</span>`);
+    });
+    if(TEST_PINS.has("2894")&&groups.some(g=>String(g.group_pin)==="2894"))items.push(`<span class="attention-item"><b>Paid test 2894</b><br>TEST — excluded from business totals</span>`);
+    $("attentionList").innerHTML=items.length?items.join(""):`<span class="attention-item">✅ Nothing needs attention right now.</span>`;
+  }
+  function currentRoundText(s){
+    if(!s)return "—";
+    if(s.trip?.active)return `Trip • Round ${s.trip.currentRound||1} of ${s.trip.totalRounds||"?"}`;
+    if(s.roundOpen===false)return "Waiting for next competition";
+    return `${s.gameType==="points"?"Points Game":"Money Game"}${s.gameType==="points"?" • "+(s.pointsCompetition==="net"?"Net":"Stableford"):""}`;
+  }
+  function submittedCount(s){
+    if(!s)return [0,0];
+    const ps=s.players||[];
+    const eligible=s.gameType==="points"?ps:ps.filter(p=>p.paid&&(p.competition==="stableford"||p.competition==="net"));
+    const n=eligible.filter(p=>p.scoreSubmitted===true||p.stableford!=null||p.netScore!=null||p.noReturn===true).length;
+    return [n,eligible.length];
+  }
+  function renderDetail(pin){
+    const g=groups.find(x=>String(x.group_pin)===String(pin)),s=states.get(String(pin));
+    if(!g){$("detailPanel").innerHTML=`<div class="empty">Select a group.</div>`;return}
+    const players=s?.players||[], [done,total]=submittedCount(s), pct=total?Math.round(done/total*100):0;
+    const adminSetup=s?.adminPin?"Complete":"Waiting";
+    $("detailPanel").innerHTML=`
+      <div class="detail-top"><div><div class="label">GROUP</div><h2>${esc(g.group_name||"Unnamed Group")}</h2><div class="sub">PIN ${esc(pin)}</div></div>${statusBadge(g)}</div>
+      <div class="detail-grid">
+        <div class="detail-row"><span>Admin / customer</span><b>${esc(g.admin_name||"—")}</b></div>
+        <div class="detail-row"><span>Admin setup</span><b>${adminSetup}</b></div>
+        <div class="detail-row"><span>Players</span><b>${players.length}</b></div>
+        <div class="detail-row"><span>Current round</span><b>${esc(currentRoundText(s))}</b></div>
+        <div class="detail-row"><span>Scores submitted</span><b>${done} / ${total}</b></div>
+        <div class="progress"><span style="width:${pct}%"></span></div>
+        <div class="detail-row"><span>Rounds completed</span><b>${(s?.history||[]).length}</b></div>
+        <div class="detail-row"><span>Plan</span><b>${String(g.plan_type||"trial")==="trial"?"Free Trial":String(g.plan_type||"").replace(/^./,c=>c.toUpperCase())}</b></div>
+        <div class="detail-row"><span>Trial / renewal</span><b>${esc(trialText(g))}</b></div>
+        <div class="detail-row"><span>Live activity</span><b>${esc(activityText(pin))}</b></div>
+      </div>
+      <div class="members"><h3>👥 Group Members</h3>
+        ${players.length?players.slice().sort((a,b)=>String(a.name).localeCompare(String(b.name))).map(p=>`<div class="member"><div><b>${esc(p.name||"Player")}</b><div class="role">${p.id===s?.adminPlayerId?"Admin":"Member"}</div></div><div>HCP ${esc(p.handicap??"—")}</div></div>`).join(""):`<div class="empty">No players have joined yet.</div>`}
+      </div>
+      <div class="action-grid">
+        <button class="secondary" data-act="edit">✏️ Edit Group</button>
+        <button class="secondary" data-act="invite">${s?.adminPin?"📤 Copy Player Invite":"📨 Copy Admin Invite"}</button>
+        <button class="secondary" data-act="reset">🔐 Reset Admin PIN</button>
+        <button class="secondary" data-act="refresh">↻ Refresh Group</button>
+        ${pin!==OWNER_PROTECTED_PIN?`<button class="danger" data-act="suspend">${String(g.status)==="suspended"?"▶ Reactivate Group":"⏸ Suspend Group"}</button><button class="danger" data-act="delete">🗑 Delete Group</button>`:`<button class="ghost" disabled>🔐 Owner group protected</button>`}
+      </div>
+      <div class="note">${TEST_PINS.has(pin)?"This group is marked as TEST and excluded from the business totals.":""}</div>`;
+    $("detailPanel").querySelectorAll("[data-act]").forEach(b=>b.addEventListener("click",()=>handleAction(b.dataset.act,g,s)));
+  }
+  function renderAll(){renderStats();renderAttention();renderGroups();if(selectedPin)renderDetail(selectedPin)}
+  function showModal(inner){$("modalHost").innerHTML=`<div class="modal-back"><div class="modal">${inner}</div></div>`}
+  function closeModal(){$("modalHost").innerHTML=""}
+  function editModal(g){
+    const protectedGroup=String(g.group_pin)===OWNER_PROTECTED_PIN;
+    showModal(`<h2>Edit ${esc(g.group_name||"Group")}</h2><div class="sub">PIN ${esc(g.group_pin)}</div><br>
+      <label>Admin / customer name</label><input id="mAdminName" value="${esc(g.admin_name||"")}">
+      <label>Contact</label><input id="mContact" value="${esc(g.admin_contact||"")}">
+      <label>Plan</label><select id="mPlan" ${protectedGroup?"disabled":""}><option value="trial">Free Trial</option><option value="paid">Paid</option><option value="internal">Internal</option></select>
+      <label>Trial expiry</label><input id="mTrial" type="date" value="${esc(dateOnly(g.trial_expiry_date))}">
+      <label>Payment status</label><select id="mPaid"><option value="unpaid">Unpaid</option><option value="paid">Paid</option><option value="not_applicable">N/A</option></select>
+      <label>Renewal date</label><input id="mRenew" type="date" value="${esc(dateOnly(g.renewal_date))}">
+      <label>Status</label><select id="mStatus" ${protectedGroup?"disabled":""}><option value="active">Active</option><option value="suspended">Suspended</option></select>
+      <label>Notes</label><textarea id="mNotes">${esc(g.notes||"")}</textarea>
+      <div class="modal-actions"><button class="ghost" id="mCancel">Cancel</button><button class="primary" id="mSave">💾 Save Changes</button></div>`);
+    $("mPlan").value=protectedGroup?"internal":String(g.plan_type||"trial");$("mPaid").value=String(g.paid_status||"unpaid");$("mStatus").value=protectedGroup?"active":String(g.status||"active");
+    $("mCancel").onclick=closeModal;
+    $("mSave").onclick=async()=>{
+      const args={p_creation_code:ownerCode,p_group_pin:String(g.group_pin),p_admin_name:$("mAdminName").value.trim(),p_admin_contact:$("mContact").value.trim(),p_plan_type:protectedGroup?"internal":$("mPlan").value,p_trial_expiry_date:$("mTrial").value||null,p_paid_status:$("mPaid").value,p_renewal_date:$("mRenew").value||null,p_status:protectedGroup?"active":$("mStatus").value,p_notes:$("mNotes").value.trim()};
+      $("mSave").disabled=true;$("mSave").textContent="Saving…";
+      const {error}=await db.rpc("owner_update_group",args);
+      if(error){alert("Could not save changes.\n\n"+(error.message||"Please try again."));$("mSave").disabled=false;$("mSave").textContent="💾 Save Changes";return}
+      closeModal();toast("✅ Group updated");await refreshAll();
+    };
+  }
+  async function handleAction(act,g,s){
+    const pin=String(g.group_pin);
+    if(act==="edit"){editModal(g);return}
+    if(act==="refresh"){await refreshAll();toast("Live data refreshed");return}
+    if(act==="invite"){
+      let msg="";
+      if(!s?.adminPin&&s?.adminSetupToken){
+        msg=`⛳ I'm In Golf\n\nYou've been invited to manage: ${g.group_name||"your golf group"}\n\nGroup PIN: ${pin}\n\nOpen this private Admin setup link:\nhttps://imingolf.co.uk/app/?pin=${encodeURIComponent(pin)}&adminsetup=${encodeURIComponent(s.adminSetupToken)}\n\nOn first opening, you'll be asked to choose your own 4-digit Admin PIN.\n\nKeep this setup link private.`;
+      }else{
+        msg=`⛳ You're invited to I'm In Golf\n\nTap the link below to join our golf group:\nhttps://imingolf.co.uk/app/?pin=${encodeURIComponent(pin)}\n\nGroup PIN: ${pin}`;
+      }
+      try{await navigator.clipboard.writeText(msg);toast("Invite copied — paste into WhatsApp")}catch(e){prompt("Copy this invite:",msg)}
+      return;
+    }
+    if(act==="reset"){
+      const first=prompt("Choose a new 4-digit Admin PIN for group "+pin);if(first===null)return;
+      const clean=String(first).trim();if(!/^\d{4}$/.test(clean)){alert("Please choose exactly 4 numbers.");return}
+      const second=prompt("Enter the new 4-digit Admin PIN again");if(second===null||String(second).trim()!==clean){alert("The two PINs did not match.");return}
+      if(!confirm("Reset the Admin PIN for group "+pin+"?"))return;
+      const {data,error}=await db.rpc("owner_reset_admin_pin",{p_creation_code:ownerCode,p_group_pin:pin,p_new_admin_pin:clean});
+      if(error||data!==true){alert("Admin PIN could not be reset.\n\n"+(error?.message||"Please try again."));return}
+      toast("✅ Admin PIN reset");await refreshAll();return;
+    }
+    if(act==="suspend"){
+      const newStatus=String(g.status)==="suspended"?"active":"suspended";
+      if(!confirm(`${newStatus==="suspended"?"Suspend":"Reactivate"} ${g.group_name}?`))return;
+      const args={p_creation_code:ownerCode,p_group_pin:pin,p_admin_name:String(g.admin_name||""),p_admin_contact:String(g.admin_contact||""),p_plan_type:String(g.plan_type||"trial"),p_trial_expiry_date:dateOnly(g.trial_expiry_date)||null,p_paid_status:String(g.paid_status||"unpaid"),p_renewal_date:dateOnly(g.renewal_date)||null,p_status:newStatus,p_notes:String(g.notes||"")};
+      const {error}=await db.rpc("owner_update_group",args);if(error){alert(error.message||"Could not update group.");return}toast(newStatus==="suspended"?"Group suspended":"Group reactivated");await refreshAll();return;
+    }
+    if(act==="delete"){
+      if(pin===OWNER_PROTECTED_PIN)return;
+      if(!confirm(`Delete ${g.group_name}?\n\nThis permanently removes the group and its saved data.`))return;
+      const typed=prompt(`Type the Group PIN ${pin} to confirm deletion:`);if(String(typed||"").trim()!==pin){alert("PIN did not match. Nothing was deleted.");return}
+      const {error}=await db.rpc("owner_delete_group",{p_creation_code:ownerCode,p_group_pin:pin});if(error){alert(error.message||"Could not delete group.");return}
+      selectedPin="";toast("Group deleted");await refreshAll();return;
+    }
+  }
+  async function createGroup(){
+    const name=prompt("New golf group name:");if(name===null)return;const clean=name.trim();if(!clean){alert("Please enter a group name.");return}
+    const newState={course:"",date:"",stake:20,gameType:"money",pointsCompetition:"stableford",pointsValue:10,adminPin:"",adminSetupToken:"",players:[],history:[]};
+    const {data,error}=await db.rpc("create_golf_group",{p_group_name:clean,p_state:newState,p_creation_code:ownerCode});
+    if(error){alert("Group could not be created.\n\n"+(error.message||"Please try again."));return}
+    const newPin=String(data);const setupToken=(crypto.randomUUID?crypto.randomUUID():(Date.now().toString(36)+Math.random().toString(36).slice(2)));
+    const createdState={...newState,adminSetupToken:setupToken};
+    const {error:saveError}=await db.rpc("save_group_state",{p_pin:newPin,p_state:createdState});
+    if(saveError){alert("Group created, but Admin setup could not be prepared.");await refreshAll();return}
+    const invite=`⛳ I'm In Golf\n\nYou've been invited to manage: ${clean}\n\nGroup PIN: ${newPin}\n\nOpen this private Admin setup link:\nhttps://imingolf.co.uk/app/?pin=${encodeURIComponent(newPin)}&adminsetup=${encodeURIComponent(setupToken)}\n\nOn first opening, you'll be asked to choose your own 4-digit Admin PIN.\n\nKeep this setup link private.`;
+    showModal(`<h2>✅ New group created</h2><p><b>${esc(clean)}</b><br>Group PIN: <b>${esc(newPin)}</b></p><p class="note">Send this private Admin invite to the person who will manage the group.</p><textarea id="inviteText" readonly>${esc(invite)}</textarea><div class="modal-actions"><button class="ghost" id="closeInvite">Close</button><button class="primary" id="copyInvite">📋 Copy Admin Invite</button></div>`);
+    $("closeInvite").onclick=async()=>{closeModal();await refreshAll()};
+    $("copyInvite").onclick=async()=>{try{await navigator.clipboard.writeText(invite);toast("Admin invite copied")}catch(e){prompt("Copy this invite:",invite)}};
+  }
+  function logout(){clearInterval(timer);timer=null;ownerCode="";db=null;groups=[];states.clear();fingerprints.clear();observedActivity.clear();selectedPin="";$("ownerCodeInput").value="";$("dashView").classList.add("hidden");$("loginView").classList.remove("hidden");$("loginBtn").disabled=false;$("loginBtn").textContent="Open Owner Dashboard";$("loginMsg").textContent=""}
+
+  $("loginBtn").addEventListener("click",login);
+  $("ownerCodeInput").addEventListener("keydown",e=>{if(e.key==="Enter")login()});
+  $("refreshBtn").addEventListener("click",()=>refreshAll());
+  $("manualRefreshBtn").addEventListener("click",()=>refreshAll());
+  $("createGroupBtn").addEventListener("click",createGroup);
+  $("openAppBtn").addEventListener("click",()=>location.href="./");
+  $("logoutBtn").addEventListener("click",logout);
+})();
+</script>
+</body>
+</html>
