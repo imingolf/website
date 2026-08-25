@@ -365,10 +365,14 @@ footer{padding:28px 0 42px;color:var(--muted);font-size:14px}.footer-row{display
       q: "🏌️ I'm a player",
       a: `<b>Player help</b><br><br>• <b>Join:</b> Open My Group → enter your Group PIN → choose your name.<br>• <b>Pay:</b> Open <b>Pay</b> and follow the payment instructions for a Money Game.<br>• <b>Score:</b> Open <b>Scores</b>, enter your final Stableford or Net score and submit it.<br><br>You can also type your question below.`
     },
-    organiser: {
-      q: "🔐 I'm an organiser",
-      a: `<b>Organiser help</b><br><br>• <b>First game:</b> Add/check players → Round → Set Up Next Competition.<br>• <b>Points Game:</b> Choose Points Game, Stableford/Net and league points.<br>• <b>Money Game:</b> Set the stake and make sure entrants are marked paid before scoring starts.<br>• <b>Scores:</b> Players submit their own final scores; Admin can correct genuine mistakes.<br>• <b>Finish:</b> When everyone is in, Scores → Finish Round & Save Result.<br>• <b>Trip:</b> Choose Trip Mode when setting up the competition.<br><br>For full step-by-step help, unlock Admin in the app and open <b>Settings → Organiser Help</b>. Or type your question below.`
-    },
+    organiser: { q: "🔐 I'm an organiser", menu: true },
+    org_first: { q: "👋 Set up my first game", a: `<b>Your first game</b><br><br><b>1.</b> Add/check your players in <b>Players</b>.<br><b>2.</b> Go to <b>Round</b> and tap <b>Set Up Next Competition</b>.<br><b>3.</b> Choose <b>Points Game</b> or <b>Money Game</b>.<br><b>4.</b> Enter the course, date and game details, then start.<br><b>5.</b> After golf, players enter their own final scores in <b>Scores</b>.<br><b>6.</b> When everyone has entered, check the leaderboard and tap <b>Finish Round & Save Result</b>.<br><br><b>That's it.</b> I'm In Golf saves the result and updates the league for you.` },
+    org_points: { q: "🏆 Run a Points Game", a: `<b>Run a Points Game</b><br><br><b>1.</b> Go to <b>Round → Set Up Next Competition</b>.<br><b>2.</b> Choose <b>Points Game</b>.<br><b>3.</b> Choose <b>Stableford</b> or <b>Net</b> and set the league points.<br><b>4.</b> Add the course and date, then start the competition.<br><br>After golf, players submit their own scores and I'm In Golf updates the league when the round is finished.` },
+    org_money: { q: "💷 Run a Money Game", a: `<b>Run a Money Game</b><br><br><b>1.</b> Go to <b>Round → Set Up Next Competition</b>.<br><b>2.</b> Choose <b>Money Game</b> and set the stake.<br><b>3.</b> Make sure entrants are marked <b>paid</b> before scoring starts.<br><b>4.</b> Players submit their own final scores after golf.<br><br>Only players marked paid are eligible for the Money Game pot.` },
+    org_players: { q: "👥 Players & handicaps", a: `<b>Players & handicaps</b><br><br>Open <b>Players</b> to add or manage group members and their handicaps. Players choose their own name on their device.` },
+    org_scores: { q: "🏌️ Scores & corrections", a: `<b>Scores & corrections</b><br><br>Players enter their own final Stableford or Net score in <b>Scores</b>. The organiser can correct a genuine mistake if needed. There is no hole-by-hole scoring.` },
+    org_finish: { q: "🏁 Finish a game", a: `<b>Finish a game</b><br><br>Wait until everyone has entered their score. Go to <b>Scores</b>, check the leaderboard, then tap <b>Finish Round & Save Result</b>.<br><br>I'm In Golf saves the result and updates the league automatically.` },
+    org_trip: { q: "✈️ Golf Trip", a: `<b>Golf Trip</b><br><br>Choose <b>Trip Mode</b> when setting up the competition and choose the number of rounds. Each round adds Trip Championship points. After the final round, I'm In Golf shows the champion, final standings and a shareable Trip Summary.` },
     join: {
       q: "How do I join a group?",
       a: `Tap <b>Open My Group</b>, enter the Group PIN your organiser sent you, then tap your name. If your name is not listed, choose <b>Add myself to the group</b>.`
@@ -406,10 +410,31 @@ footer{padding:28px 0 42px;color:var(--muted);font-size:14px}.footer-row{display
     });
   }
 
+  function showOrganiserMenu(){
+    addMessage(`<b>Organiser Help</b><br><br>Choose what you need help with:`, "bot");
+    document.getElementById("helpQuick").innerHTML = `
+      <button type="button" data-help="org_first">👋 Set up my first game</button>
+      <button type="button" data-help="org_points">🏆 Run a Points Game</button>
+      <button type="button" data-help="org_money">💷 Run a Money Game</button>
+      <button type="button" data-help="org_players">👥 Players &amp; handicaps</button>
+      <button type="button" data-help="org_scores">🏌️ Scores &amp; corrections</button>
+      <button type="button" data-help="org_finish">🏁 Finish a game</button>
+      <button type="button" data-help="org_trip">✈️ Golf Trip</button>
+      <button type="button" data-help="home">← Back</button>`;
+  }
+  function showHomeMenu(){
+    document.getElementById("helpQuick").innerHTML = `
+      <button type="button" data-help="player">🏌️ I'm a player</button>
+      <button type="button" data-help="organiser">🔐 I'm an organiser</button>
+      <button type="button" data-help="start">➕ I want to start a group</button>
+      <button type="button" data-help="stuck">🛠️ I'm stuck</button>`;
+  }
   function answerKey(key){
+    if(key === "home"){ showHomeMenu(); return; }
     const item = answers[key];
     if(!item) return;
     addMessage(item.q, "user");
+    if(item.menu){ setTimeout(showOrganiserMenu, 120); return; }
     setTimeout(() => addMessage(item.a, "bot"), 120);
   }
 
