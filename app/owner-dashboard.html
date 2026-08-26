@@ -350,6 +350,21 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
         <div class="detail-row"><span>Trial / renewal</span><b>${esc(trialText(g))}</b></div>
         <div class="detail-row"><span>Live activity</span><b>${esc(activityText(pin))}</b></div>
       </div>
+      <div class="members"><h3>📝 Live Score Entry</h3>
+        ${s?.roundOpen===false ? `<div class="empty">No competition is currently open.</div>` : players.length ? players.slice().sort((a,b)=>String(a.name).localeCompare(String(b.name))).map(p=>{
+          const eligible=s?.gameType==="points" ? true : (p.paid===true && (p.competition==="stableford"||p.competition==="net"));
+          const submitted=p.scoreSubmitted===true||p.stableford!=null||p.netScore!=null||p.noReturn===true;
+          let result="⏳ Waiting";
+          if(!eligible) result=s?.gameType==="money" ? (p.paid===true?"Waiting for game choice":"Not entered") : "⏳ Waiting";
+          else if(p.noReturn===true) result="✅ NR";
+          else if(submitted){
+            const comp=s?.gameType==="points" ? String(s.pointsCompetition||"stableford") : String(p.competition||"stableford");
+            result=comp==="net" ? `✅ Net ${esc(p.netScore??"—")}` : `✅ ${esc(p.stableford??"—")} pts`;
+          }
+          const compLabel=s?.gameType==="money"&&p.competition ? (p.competition==="net"?"Net":"Stableford") : "";
+          return `<div class="member"><div><b>${esc(p.name||"Player")}</b><div class="role">${compLabel}</div></div><div><b>${result}</b></div></div>`;
+        }).join("") : `<div class="empty">No players have joined yet.</div>`}
+      </div>
       <div class="members"><h3>👥 Group Members</h3>
         ${players.length?players.slice().sort((a,b)=>String(a.name).localeCompare(String(b.name))).map(p=>`<div class="member"><div><b>${esc(p.name||"Player")}</b><div class="role">${p.id===s?.adminPlayerId?"Admin":"Member"}</div></div><div>HCP ${esc(p.handicap??"—")}</div></div>`).join(""):`<div class="empty">No players have joined yet.</div>`}
       </div>
