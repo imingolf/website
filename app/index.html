@@ -61,6 +61,7 @@ nav button{flex:1;background:transparent;color:#6d756f;padding:11px 2px;font-siz
       margin-left:6px;
     ">DEMO</span>
   </h1>
+  <div id="headerGroupName" style="font-size:18px;font-weight:800;margin-top:4px;line-height:1.2"></div>
   <p id="syncText">Shared golf group</p>
 </header>
 <main><div id="screen"></div></main>
@@ -491,6 +492,12 @@ function show(p){
 }
 function render(){
   updateAdminUI();
+  const headerGroupName=$("headerGroupName");
+  if(headerGroupName){
+    const groupName=(state && typeof state.groupName==="string") ? state.groupName.trim() : "";
+    headerGroupName.textContent=groupName;
+    headerGroupName.style.display=groupName ? "block" : "none";
+  }
 
   if(page==="round")round();
   if(page==="pay")pay();
