@@ -197,6 +197,9 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
     if(p==="internal")return `<span class="badge internal">Internal</span>`;
     return `<span class="badge trial">Free Trial</span>`;
   }
+  function displayGroupName(g,s){
+    return String(s?.groupName || g?.group_name || g?.group_pin || "Unnamed Group");
+  }
   function stateFingerprint(s){
     if(!s)return "";
     const slim={
@@ -295,7 +298,7 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
     body.innerHTML=groups.map(g=>{
       const pin=String(g.group_pin||""),s=states.get(pin),test=TEST_PINS.has(pin);
       return `<tr data-pin="${esc(pin)}" class="${pin===selectedPin?"selected":""}">
-        <td><div class="group-name">${esc(g.group_name||"Unnamed Group")}</div><div class="sub">${test?"Permanent sandbox":(g.admin_name?`Admin: ${esc(g.admin_name)}`:"")}</div></td>
+        <td><div class="group-name">${esc(displayGroupName(g,s))}</div><div class="sub">${test?"Permanent sandbox":(g.admin_name?`Admin: ${esc(g.admin_name)}`:"")}</div></td>
         <td>${esc(pin)}</td><td>${(s?.players||[]).length}</td><td>${(s?.history||[]).length}</td>
         <td>${planBadge(g)}</td><td>${esc(trialText(g))}</td><td>${esc(activityText(pin))}</td><td>${statusBadge(g)}</td>
       </tr>`;
@@ -308,9 +311,9 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
       const pin=String(g.group_pin), p=String(g.plan_type||"trial"), s=states.get(pin);
       if(p==="trial"&&g.trial_expiry_date){
         const d=daysUntil(g.trial_expiry_date);
-        if(d!==null&&d<=3)items.push(`<span class="attention-item"><b>${esc(g.group_name||pin)}</b><br>${d<0?"Trial expired":d===0?"Trial expires today":`Trial ends in ${d} day${d===1?"":"s"}`}</span>`);
+        if(d!==null&&d<=3)items.push(`<span class="attention-item"><b>${esc(displayGroupName(g,s))}</b><br>${d<0?"Trial expired":d===0?"Trial expires today":`Trial ends in ${d} day${d===1?"":"s"}`}</span>`);
       }
-      if(s&&!s.adminPin)items.push(`<span class="attention-item"><b>${esc(g.group_name||pin)}</b><br>Waiting for Admin setup</span>`);
+      if(s&&!s.adminPin)items.push(`<span class="attention-item"><b>${esc(displayGroupName(g,s))}</b><br>Waiting for Admin setup</span>`);
     });
     if(TEST_PINS.has("2894")&&groups.some(g=>String(g.group_pin)==="2894"))items.push(`<span class="attention-item"><b>Paid test 2894</b><br>TEST — excluded from business totals</span>`);
     $("attentionList").innerHTML=items.length?items.join(""):`<span class="attention-item">✅ Nothing needs attention right now.</span>`;
@@ -334,7 +337,7 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
     const players=s?.players||[], [done,total]=submittedCount(s), pct=total?Math.round(done/total*100):0;
     const adminSetup=s?.adminPin?"Complete":"Waiting";
     $("detailPanel").innerHTML=`
-      <div class="detail-top"><div><div class="label">GROUP</div><h2>${esc(g.group_name||"Unnamed Group")}</h2><div class="sub">PIN ${esc(pin)}</div></div>${statusBadge(g)}</div>
+      <div class="detail-top"><div><div class="label">GROUP</div><h2>${esc(displayGroupName(g,s))}</h2><div class="sub">PIN ${esc(pin)}</div></div>${statusBadge(g)}</div>
       <div class="detail-grid">
         <div class="detail-row"><span>Admin / customer</span><b>${esc(g.admin_name||"—")}</b></div>
         <div class="detail-row"><span>Admin setup</span><b>${adminSetup}</b></div>
@@ -365,7 +368,7 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
   function closeModal(){$("modalHost").innerHTML=""}
   function editModal(g){
     const protectedGroup=String(g.group_pin)===OWNER_PROTECTED_PIN;
-    showModal(`<h2>Edit ${esc(g.group_name||"Group")}</h2><div class="sub">PIN ${esc(g.group_pin)}</div><br>
+    showModal(`<h2>Edit ${esc(displayGroupName(g,states.get(String(g.group_pin||""))))}</h2><div class="sub">PIN ${esc(g.group_pin)}</div><br>
       <label>Admin / customer name</label><input id="mAdminName" value="${esc(g.admin_name||"")}">
       <label>Contact</label><input id="mContact" value="${esc(g.admin_contact||"")}">
       <label>Plan</label><select id="mPlan" ${protectedGroup?"disabled":""}><option value="trial">Free Trial</option><option value="paid">Paid</option><option value="internal">Internal</option></select>
@@ -393,11 +396,11 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
       let msg="", inviteTitle="Player invite";
       if(!s?.adminPin&&s?.adminSetupToken){
         inviteTitle="Organiser invite";
-        msg=`⛳ I'm In Golf\n\nYou've been invited to manage: ${g.group_name||"your golf group"}\n\nGroup PIN: ${pin}\n\nOpen this private Admin setup link:\nhttps://imingolf.co.uk/app/?pin=${encodeURIComponent(pin)}&adminsetup=${encodeURIComponent(s.adminSetupToken)}\n\nOn first opening, you'll be asked to choose your own 4-digit Admin PIN.\n\nKeep this setup link private.`;
+        msg=`⛳ I'm In Golf\n\nYou've been invited to manage: ${displayGroupName(g,s)}\n\nGroup PIN: ${pin}\n\nOpen this private Admin setup link:\nhttps://imingolf.co.uk/app/?pin=${encodeURIComponent(pin)}&adminsetup=${encodeURIComponent(s.adminSetupToken)}\n\nOn first opening, you'll be asked to choose your own 4-digit Admin PIN.\n\nKeep this setup link private.`;
       }else{
         msg=`⛳ You're invited to I'm In Golf\n\nTap the link below to join our golf group:\nhttps://imingolf.co.uk/app/?pin=${encodeURIComponent(pin)}\n\nGroup PIN: ${pin}`;
       }
-      showModal(`<h2>📨 ${esc(inviteTitle)}</h2><p><b>${esc(g.group_name||"Golf group")}</b><br>Group PIN: <b>${esc(pin)}</b></p><textarea id="inviteText" readonly>${esc(msg)}</textarea><div class="modal-actions"><button class="ghost" id="closeInvite">Close</button><button class="secondary" id="copyInvite">📋 Copy Invite</button><button class="primary" id="whatsAppInvite">🟢 Send via WhatsApp</button></div>`);
+      showModal(`<h2>📨 ${esc(inviteTitle)}</h2><p><b>${esc(displayGroupName(g,s))}</b><br>Group PIN: <b>${esc(pin)}</b></p><textarea id="inviteText" readonly>${esc(msg)}</textarea><div class="modal-actions"><button class="ghost" id="closeInvite">Close</button><button class="secondary" id="copyInvite">📋 Copy Invite</button><button class="primary" id="whatsAppInvite">🟢 Send via WhatsApp</button></div>`);
       $("closeInvite").onclick=closeModal;
       $("copyInvite").onclick=async()=>{try{await navigator.clipboard.writeText(msg);toast("Invite copied")}catch(e){prompt("Copy this invite:",msg)}};
       $("whatsAppInvite").onclick=()=>window.open("https://wa.me/?text="+encodeURIComponent(msg),"_blank","noopener");
@@ -414,13 +417,13 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
     }
     if(act==="suspend"){
       const newStatus=String(g.status)==="suspended"?"active":"suspended";
-      if(!confirm(`${newStatus==="suspended"?"Suspend":"Reactivate"} ${g.group_name}?`))return;
+      if(!confirm(`${newStatus==="suspended"?"Suspend":"Reactivate"} ${displayGroupName(g,s)}?`))return;
       const args={p_creation_code:ownerCode,p_group_pin:pin,p_admin_name:String(g.admin_name||""),p_admin_contact:String(g.admin_contact||""),p_plan_type:String(g.plan_type||"trial"),p_trial_expiry_date:dateOnly(g.trial_expiry_date)||null,p_paid_status:String(g.paid_status||"unpaid"),p_renewal_date:dateOnly(g.renewal_date)||null,p_status:newStatus,p_notes:String(g.notes||"")};
       const {error}=await db.rpc("owner_update_group",args);if(error){alert(error.message||"Could not update group.");return}toast(newStatus==="suspended"?"Group suspended":"Group reactivated");await refreshAll();return;
     }
     if(act==="delete"){
       if(pin===OWNER_PROTECTED_PIN)return;
-      if(!confirm(`Delete ${g.group_name}?\n\nThis permanently removes the group and its saved data.`))return;
+      if(!confirm(`Delete ${displayGroupName(g,s)}?\n\nThis permanently removes the group and its saved data.`))return;
       const typed=prompt(`Type the Group PIN ${pin} to confirm deletion:`);if(String(typed||"").trim()!==pin){alert("PIN did not match. Nothing was deleted.");return}
       const {error}=await db.rpc("owner_delete_group",{p_creation_code:ownerCode,p_group_pin:pin});if(error){alert(error.message||"Could not delete group.");return}
       selectedPin="";toast("Group deleted");await refreshAll();return;
@@ -430,7 +433,7 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
     const name=prompt("New golf group name:");if(name===null)return;const clean=name.trim();if(!clean){alert("Please enter a group name.");return}
     const adminNameInput=prompt("Organiser / customer name:");if(adminNameInput===null)return;const adminName=adminNameInput.trim();if(!adminName){alert("Please enter the organiser's name.");return}
     const contactInput=prompt("Organiser contact (mobile or email):");if(contactInput===null)return;const adminContact=contactInput.trim();if(!adminContact){alert("Please enter a mobile number or email address.");return}
-    const newState={course:"",date:"",stake:20,gameType:"money",pointsCompetition:"stableford",pointsValue:10,adminPin:"",adminSetupToken:"",players:[],history:[]};
+    const newState={groupName:clean,course:"",date:"",stake:20,gameType:"money",pointsCompetition:"stableford",pointsValue:10,adminPin:"",adminSetupToken:"",players:[],history:[]};
     const {data,error}=await db.rpc("create_golf_group",{p_group_name:clean,p_state:newState,p_creation_code:ownerCode});
     if(error){alert("Group could not be created.\n\n"+(error.message||"Please try again."));return}
     const newPin=String(data);const setupToken=(crypto.randomUUID?crypto.randomUUID():(Date.now().toString(36)+Math.random().toString(36).slice(2)));
@@ -484,12 +487,12 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
     $("altView").classList.remove("hidden");
     $("altView").innerHTML=`<div class="panel-head"><div><h2>👥 All Groups</h2><div class="sub">A simple overview of every group on I'm In Golf.</div></div><button class="primary" id="altCreate">＋ Create Group</button></div>
       <div class="view-cards"><div class="view-card"><div class="label">Real groups</div><div class="big">${real.length}</div></div><div class="view-card"><div class="label">Test groups</div><div class="big">${tests.length}</div></div><div class="view-card"><div class="label">Active groups</div><div class="big">${groups.filter(g=>String(g.status||"active")==="active").length}</div></div></div>
-      <div class="view-table"><table><thead><tr><th>Group</th><th>PIN</th><th>Admin</th><th>Players</th><th>Rounds</th><th>Plan</th><th>Status</th></tr></thead><tbody>${groups.map(g=>{const pin=String(g.group_pin),s=states.get(pin);return `<tr><td><b>${esc(g.group_name||"Unnamed Group")}</b></td><td>${esc(pin)}</td><td>${esc(g.admin_name||"—")}</td><td>${(s?.players||[]).length}</td><td>${(s?.history||[]).length}</td><td>${planBadge(g)}</td><td>${statusBadge(g)}</td></tr>`}).join("")}</tbody></table></div>`;
+      <div class="view-table"><table><thead><tr><th>Group</th><th>PIN</th><th>Admin</th><th>Players</th><th>Rounds</th><th>Plan</th><th>Status</th></tr></thead><tbody>${groups.map(g=>{const pin=String(g.group_pin),s=states.get(pin);return `<tr><td><b>${esc(displayGroupName(g,s))}</b></td><td>${esc(pin)}</td><td>${esc(g.admin_name||"—")}</td><td>${(s?.players||[]).length}</td><td>${(s?.history||[]).length}</td><td>${planBadge(g)}</td><td>${statusBadge(g)}</td></tr>`}).join("")}</tbody></table></div>`;
     $("altCreate").onclick=createGroup;
   }
 
   function realGroupOptions(){
-    return ['<option value="all">All Groups</option>'].concat(realGroups().map(g=>`<option value="${esc(String(g.group_pin||""))}">${esc(g.group_name||g.group_pin)}</option>`)).join("");
+    return ['<option value="all">All Groups</option>'].concat(realGroups().map(g=>`<option value="${esc(String(g.group_pin||""))}">${esc(displayGroupName(g,states.get(String(g.group_pin||""))))}</option>`)).join("");
   }
   function niceGameName(v){
     const s=String(v||"").toLowerCase();
@@ -536,7 +539,7 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
       const rows=[];
       realGroups().forEach(g=>{
         const pin=String(g.group_pin),s=states.get(pin);
-        (s?.players||[]).forEach(p=>rows.push({name:p.name||"Player",hcp:p.handicap??"—",group:g.group_name||pin,pin,paid:p.paid===true}));
+        (s?.players||[]).forEach(p=>rows.push({name:p.name||"Player",hcp:p.handicap??"—",group:displayGroupName(g,s),pin,paid:p.paid===true}));
       });
       return rows;
     }
@@ -575,7 +578,7 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
       realGroups().forEach(g=>{
         const pin=String(g.group_pin),s=states.get(pin);
         (s?.history||[]).forEach((r,i)=>rows.push({
-          group:g.group_name||pin,pin,date:r.date||"",course:r.course||"",
+          group:displayGroupName(g,s),pin,date:r.date||"",course:r.course||"",
           type:niceGameName(r.gameType||r.type||""),winner:getRoundWinner(r),raw:r,idx:i
         }));
       });
