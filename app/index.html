@@ -331,6 +331,7 @@ async function connect(){
  const {data,error}=await db.rpc("get_group_state",{p_pin:pin});
  if(error || !data){$("connectMsg").textContent="PIN not recognised, or database setup is incomplete.";return}
 state=data;
+if(!state.groupName && access?.group_name) state.groupName=String(access.group_name);
 localStorage.setItem("tensInPin",pin);
 loadMyPlayerForGroup();
 loadAdminForGroup();
@@ -371,7 +372,22 @@ const setupTokenFromUrl=
 
 if(!state.adminPin && setupTokenFromUrl){
   if(String(state.adminSetupToken||"")===String(setupTokenFromUrl)){
-    const first=prompt("Welcome, Group Admin!\\n\\nChoose your own 4-digit Admin PIN.");
+    const currentSetupName=String(state.groupName||"My Golf Group").trim() || "My Golf Group";
+    const keepName=confirm(
+      "Welcome to I'm In Golf!\n\n" +
+      "Your group is currently called:\\n\\n" + currentSetupName +
+      "\n\nAre you happy with this group name?\n\n" +
+      "OK = Keep this name\nCancel = Change group name"
+    );
+    if(!keepName){
+      const newSetupName=prompt("Enter the name you would like for your golf group:",currentSetupName);
+      if(newSetupName!==null){
+        const cleanSetupName=String(newSetupName).trim();
+        if(cleanSetupName) state.groupName=cleanSetupName;
+        else alert("The group name was left as " + currentSetupName + ".");
+      }
+    }
+    const first=prompt("Now choose your own private 4-digit Admin PIN.");
     if(first!==null){
       const clean=String(first).trim();
       if(!validAdminPin(clean)){
@@ -386,7 +402,7 @@ if(!state.adminPin && setupTokenFromUrl){
             isAdmin=true;
             saveAdminForGroup();
             history.replaceState({},document.title,location.pathname+"?pin="+encodeURIComponent(pin));
-            alert("✅ Admin PIN created. You are now the Admin for this golf group.");
+            alert("✅ Your group is ready!\\n\\nGroup: " + String(state.groupName||currentSetupName) + "\\nGroup PIN: " + pin + "\\n\\nYou are now the Admin for this golf group.");
           }else{
             state.adminPin="";
             alert("Admin PIN could not be saved. Reopen the setup link and try again.");
@@ -558,7 +574,7 @@ function waitingScreen(){
 
     <div class="card">
       <div class="notice">
-        ℹ️ Completed rounds are in <b>League → Previous rounds</b> and completed Trips are in <b>League → Trip → Past Trips</b>.
+        ✅ The last result has been saved in <b>League → Previous rounds</b>.
       </div>
     </div>
   `;
@@ -603,44 +619,27 @@ function tripRoundWinner(record){
     };
   }
 
-  const stableNames=record.stablefordWinnerNames||[];
-  const netNames=record.netWinnerNames||[];
+  const comp=state.trip?.competition || "stableford";
 
-  let comp=record.tripCompetition || null;
-  if(!comp){
-    if(stableNames.length && !netNames.length)comp="stableford";
-    else if(netNames.length && !stableNames.length)comp="net";
-    else comp=state.trip?.competition || "stableford";
-  }
-
-  if(comp==="net" && netNames.length){
-    const p=(record.players||[]).find(x=>x.name===netNames[0]);
+  if(comp==="net"){
+    const names=record.netWinnerNames||[];
+    if(!names.length)return null;
+    const p=(record.players||[]).find(x=>x.name===names[0]);
     return {
-      name:netNames.join(" & "),
+      name:names.join(" & "),
       score:p?.noReturn===true ? "NR" : (p?.netScore!=null ? "Net "+p.netScore : ""),
       label:"Net"
     };
   }
 
-  if(stableNames.length){
-    const p=(record.players||[]).find(x=>x.name===stableNames[0]);
-    return {
-      name:stableNames.join(" & "),
-      score:p?.stableford!=null ? p.stableford+" pts" : "",
-      label:"Stableford"
-    };
-  }
-
-  if(netNames.length){
-    const p=(record.players||[]).find(x=>x.name===netNames[0]);
-    return {
-      name:netNames.join(" & "),
-      score:p?.noReturn===true ? "NR" : (p?.netScore!=null ? "Net "+p.netScore : ""),
-      label:"Net"
-    };
-  }
-
-  return null;
+  const names=record.stablefordWinnerNames||[];
+  if(!names.length)return null;
+  const p=(record.players||[]).find(x=>x.name===names[0]);
+  return {
+    name:names.join(" & "),
+    score:p?.stableford!=null ? p.stableford+" pts" : "",
+    label:"Stableford"
+  };
 }
 
 function setTripChampion(){
@@ -704,7 +703,7 @@ function showTripSummary(){
         const gameLabel=r.gameType==="points" ? "🏆 Points Game" : "💷 Money Game";
         const compLabel=r.gameType==="points"
           ? (r.pointsCompetition==="net" ? "Net" : "Stableford")
-          : (w?.label || (r.tripCompetition==="net" ? "Net" : "Stableford"));
+          : (trip.competition==="net" ? "Net" : "Stableford");
         return `
           <div class="player">
             <div class="row">
@@ -1308,15 +1307,7 @@ function scores(){
 
     ${isAdmin ? `
       <div class="card">
-        ${eligiblePlayers.length===0 ? `
-          <div class="notice">
-            <b>No players have entered this competition.</b><br>
-            You can close it without saving a result.
-          </div>
-          <button class="secondary full" onclick="closeNoEntrantsCompetition()">
-            🏁 Close Competition — No Entrants
-          </button>
-        ` : stillToEnter.length===0 ? `
+        ${eligiblePlayers.length && stillToEnter.length===0 ? `
           <button class="primary full" onclick="finishRound()">
             🏁 Finish Round & Save Result
           </button>
@@ -1929,7 +1920,6 @@ const record={
     stake:state.stake,
 
     gameType:"money",
-    tripCompetition:isTrip ? (state.trip?.competition || "stableford") : null,
 
     stablefordPot:stablefordPot(),
     netPot:netPot(),
@@ -2107,8 +2097,7 @@ function showRoundHistory(historyIndex){
     </div>
 
     <div class="card">
-      <button class="primary full" onclick="shareResultFromHistory(${Number(historyIndex)})">📤 Share Result</button>
-<button class="secondary full" onclick="league()">← Back to League</button>
+      <button class="secondary full" onclick="league()">← Back to League</button>
     </div>
   `;
 
@@ -2347,16 +2336,6 @@ function showWinnerScreen(record){
     </div>
   `;
 }
-async function shareResultFromHistory(historyIndex){
-  const record=(state.history||[])[Number(historyIndex)];
-  if(!record){
-    alert("Round details could not be found.");
-    return;
-  }
-  lastWinnerRecord=record;
-  await shareWinnerImage();
-}
-
 async function shareWinnerImage(){
 
   const record=lastWinnerRecord;
@@ -2653,20 +2632,20 @@ async function shareWinnerImage(){
 
   else{
 
-    const stablefordNames=record.stablefordWinnerNames||[];
-    const netNames=record.netWinnerNames||[];
+    const stablefordWinner=
+      record.stablefordWinnerNames?.[0] || "";
 
-    const stablefordWinner=stablefordNames.join(" & ");
-    const netWinner=netNames.join(" & ");
+    const netWinner=
+      record.netWinnerNames?.[0] || "";
 
     const stablefordPlayer=
       (record.players||[]).find(
-        p=>p.name===stablefordNames[0]
+        p=>p.name===stablefordWinner
       );
 
     const netPlayer=
       (record.players||[]).find(
-        p=>p.name===netNames[0]
+        p=>p.name===netWinner
       );
 
     const stablefordScore=
@@ -2721,8 +2700,7 @@ async function shareWinnerImage(){
       name,
       score,
       pot,
-      countback,
-      winnerCount=1
+      countback
     ){
 
       roundedRect(
@@ -2814,7 +2792,7 @@ async function shareWinnerImage(){
       ctx.font='800 27px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';
 
       ctx.fillText(
-        winnerCount>1 ? "SPLIT POT" : "WON",
+        "WON",
         645,
         y+222
       );
@@ -2823,12 +2801,8 @@ async function shareWinnerImage(){
 
       ctx.font='800 48px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';
 
-      const payout=winnerCount>1
-        ? `£${Number(pot/winnerCount).toFixed(2).replace(/\\.00$/,"")} EACH`
-        : `£${pot}`;
-
       ctx.fillText(
-        payout,
+        `£${pot}`,
         645,
         y+270
       );
@@ -2866,8 +2840,7 @@ async function shareWinnerImage(){
         stablefordWinner,
         stablefordScore,
         stablefordPotValue,
-        record.stablefordCountback,
-        stablefordNames.length
+        record.stablefordCountback
       );
     }
 
@@ -2878,8 +2851,7 @@ async function shareWinnerImage(){
         netWinner,
         netScore,
         netPotValue,
-        record.netCountback,
-        netNames.length
+        record.netCountback
       );
     }
 
@@ -3305,14 +3277,11 @@ ${leagueView==="points" ? `
 
 ` : `
 ${leagueTrip ? `
-  <div
-    class="notice"
-    style="margin-bottom:12px;${currentTripAvailable && leagueTrip===state.trip && leagueTrip.completed ? "cursor:pointer;" : ""}"
-    ${currentTripAvailable && leagueTrip===state.trip && leagueTrip.completed ? `onclick="showTripSummary()"` : ""}>
+  <div class="notice" style="margin-bottom:12px;">
     <b>✈️ ${esc(leagueTrip.name || "Trip Championship")}</b><br>
     ${
       leagueTrip.completed
-        ? `🏁 Trip complete${currentTripAvailable && leagueTrip===state.trip ? `<br><span class="muted">Tap to view full Trip Summary ›</span>` : ""}`
+        ? "🏁 Trip complete"
         : "Round " + leagueTrip.currentRound + " of " + leagueTrip.totalRounds
     }
   </div>
@@ -3990,10 +3959,35 @@ function adminLogout(){
  show("round");
 }
 
+async function changeGroupName(){
+  if(!isAdmin)return;
+  const current=String(state.groupName||"").trim();
+  const entered=prompt("Group name", current || "My Golf Group");
+  if(entered===null)return;
+  const clean=String(entered).trim();
+  if(!clean){
+    alert("Please enter a group name.");
+    return;
+  }
+  state.groupName=clean;
+  const ok=await save();
+  if(!ok){
+    alert("The group name could not be saved. Please try again.");
+    return;
+  }
+  render();
+  alert("✅ Group name changed to " + clean);
+}
+
 function settingsPage(){
  if(!isAdmin){adminLogin();return}
  $("screen").innerHTML=`<div class="card"><h2>⚙️ Admin / Settings</h2>
  <div class="muted">Shared controls for your golf group.</div>
+ <div class="notice" style="margin-top:12px;">
+   <div class="muted">GROUP NAME</div>
+   <b>${esc(state.groupName||"My Golf Group")}</b>
+ </div>
+ <button class="secondary full" onclick="changeGroupName()">✏️ Change Group Name</button>
  <button class="primary full" onclick="openAdminHelp()">❓ Admin Help</button>
  <label class="muted">Course</label><input value="${escAttr(state.course)}" onchange="state.course=this.value;save()">
  <label class="muted">Default/current stake (£)</label><input type="number" min="0" value="${state.stake}" onchange="state.stake=+this.value;save()">
@@ -4106,38 +4100,76 @@ function adminHelpBack(){
 
 function adminHelpTopicContent(topic){
   const topics={
-    first:`<h2>👋 Your first game</h2><div class="notice"><b>1.</b> Add/check your players in <b>Players</b>.<br><br><b>2.</b> Go to <b>Round</b> and tap <b>Set Up Next Competition</b>.<br><br><b>3.</b> Choose <b>Points Game</b> or <b>Money Game</b>.<br><br><b>4.</b> Enter the course, date and game details, then start the competition.<br><br><b>5.</b> After golf, players enter their own final scores in <b>Scores</b>.<br><br><b>6.</b> When everyone has entered, check the leaderboard and tap <b>Finish Round & Save Result</b>.</div><div class="notice"><b>That's it.</b> I'm In Golf saves the result and updates the league for you.</div>`,
-    points:`<h2>🏆 Run a Points Game</h2><div class="notice"><b>1.</b> Go to <b>Round</b>.<br><br><b>2.</b> Tap <b>Set Up Next Competition</b>.<br><br><b>3.</b> Choose <b>Points Game</b>.<br><br><b>4.</b> Choose <b>Stableford</b> or <b>Net</b> and set the league points.<br><br><b>5.</b> Add the course/date and start the competition.<br><br><b>6.</b> Players enter their own final scores after golf.</div><div class="notice">There is no payment step. When the round is finished, I'm In Golf updates the Points League automatically.</div>`,
-    money:`<h2>💷 Run a Money Game</h2><div class="notice"><b>1.</b> Go to <b>Round</b> and tap <b>Set Up Next Competition</b>.<br><br><b>2.</b> Choose <b>Money Game</b>.<br><br><b>3.</b> Set the stake and competition details.<br><br><b>4.</b> Go to <b>Pay</b> and make sure the players taking part are marked paid.<br><br><b>5.</b> Players choose Stableford or Net and enter their final score after golf.<br><br><b>6.</b> Finish the round when everyone has submitted.</div><div class="notice warning">Once the first score is submitted, entries and payment status are locked.</div>`,
-    players:`<h2>👥 Players & handicaps</h2><div class="notice"><b>Add a player:</b> go to <b>Players</b>. Players can also add themselves when they first join the group.<br><br><b>Edit a player:</b> unlock Admin, then use the player controls to change their name or handicap.<br><br><b>Wrong person selected?</b> The player should use <b>Players → Change who I am</b> on their own phone.</div>`,
-    scoring:`<h2>🏌️ Scores & corrections</h2><div class="notice"><b>1.</b> Players enter their own final Stableford or Net score in <b>Scores</b>.<br><br><b>2.</b> They tap <b>Submit score</b> and confirm it.<br><br><b>3.</b> The score then locks.<br><br><b>4.</b> If there is a genuine mistake, Admin can use <b>Correct score</b>.</div><div class="notice">For a Net game, use <b>NR — No Return</b> when a player does not return a score. There is no hole-by-hole scoring.</div>`,
-    finish:`<h2>🏁 Finish a game</h2><div class="notice"><b>1.</b> Go to <b>Scores</b>.<br><br><b>2.</b> Check <b>Still to enter</b>. Wait until everyone taking part has submitted a score or valid NR.<br><br><b>3.</b> Check the leaderboard.<br><br><b>4.</b> Tap <b>Finish Round & Save Result</b> and confirm.</div><div class="notice">I'm In Golf saves the completed round in <b>League → Previous rounds</b> and updates the league automatically.</div>`,
-    trip:`<h2>✈️ Set up a Golf Trip</h2><div class="notice"><b>1.</b> Set up the next competition and choose <b>Trip Mode</b>.<br><br><b>2.</b> Enter the trip name and number of rounds.<br><br><b>3.</b> Run each round normally and finish it after all scores are in.<br><br><b>4.</b> Trip Championship points build after each round.<br><br><b>5.</b> After the final round, check the Trip Summary and final standings.<br><br><b>6.</b> Tap <b>Save Trip & Return to Normal Golf</b>.</div>`,
-    pin:`<h2>🔐 Admin PIN</h2><div class="notice">Change your Admin PIN in <b>Settings → Change Admin PIN</b>.<br><br>If you forget it, contact the I'm In Golf owner so it can be reset securely.</div>`,
-    install:`<h2>📱 Install on a phone</h2><div class="notice"><b>iPhone:</b> Safari → <b>•••</b> → <b>Share</b> → <b>Add to Home Screen</b>.<br><br><b>Android:</b> Chrome → <b>⋮</b> → <b>Add to Home screen</b> or <b>Install app</b>.</div>`,
-    problems:`<h2>🛠️ Something isn't working</h2><div class="notice"><b>1.</b> Check you're using the correct Group PIN.<br><br><b>2.</b> Refresh, or fully close and reopen I'm In Golf.<br><br><b>3.</b> Wrong player? Use <b>Players → Change who I am</b>.<br><br><b>4.</b> Forgotten Admin PIN? Contact the I'm In Golf owner.</div>`
+    setup:`<h2>⛳ Set up the next competition</h2><div class="notice"><b>1.</b> Go to <b>Round</b>.<br><br><b>2.</b> Tap <b>Set Up Next Competition</b>.<br><br><b>3.</b> Choose Money Game, Points Game or Trip Mode.<br><br><b>4.</b> Enter the course, date and competition details.<br><br><b>5.</b> In a Money Game, make sure players pay and choose Stableford or Net before the first score is submitted.</div><div class="notice warning">Once the first score is submitted, entries close automatically.</div>`,
+    players:`<h2>👥 Add or edit players</h2><div class="notice">Go to <b>Players</b>.<br><br>Players can join themselves, or the organiser can manage names and handicaps while Admin is unlocked.<br><br>A player can use <b>Change who I am</b> if the wrong name is selected on their phone.</div>`,
+    payments:`<h2>💷 Payments</h2><div class="notice">In a Money Game, go to <b>Pay</b> and mark players as paid before scoring starts.<br><br>Only paid players can enter a competition or submit a score.<br><br>Once scoring starts, payment status is locked so nobody can join late.</div><div class="muted">Automatic in-app pot collection is a future feature.</div>`,
+    scoring:`<h2>🏌️ Scores</h2><div class="notice">Players enter their own score and tap <b>Submit score</b>.<br><br>The app asks <b>Are you sure?</b> before saving.<br><br>Once submitted, the player's score is locked.</div><div class="notice">Admin can use <b>Correct score</b> if a genuine mistake needs fixing.</div>`,
+    nr:`<h2>NR — No Return</h2><div class="notice">In a <b>Net</b> competition, a player who does not return a score should tap <b>NR — No Return</b>.<br><br>NR counts as submitted, removes the player from <b>Still to enter</b>, and the player cannot win the Net competition.</div>`,
+    waiting:`<h2>⏳ Still to enter</h2><div class="notice">The Scores screen shows exactly who still needs to submit.<br><br>For a Money Game, only players who are paid and have chosen a competition are included.<br><br>The list updates automatically as scores or NR results are submitted.</div>`,
+    finish:`<h2>🏁 Finish a round</h2><div class="notice">When every entered player has submitted a score or valid NR, Admin will see <b>Finish Round & Save Result</b> at the bottom of Scores.<br><br>Check the leaderboard, tap the button and confirm the result.<br><br>The completed round is saved in <b>League → Previous rounds</b>.</div><div class="notice">After a normal round finishes, players see <b>Next Competition — Coming soon…</b> until the organiser sets up the next one.</div>`,
+    points:`<h2>🏆 Points Games</h2><div class="notice">Everyone plays the same competition — Stableford or Net.<br><br>There is no payment step.<br><br>The top three receive league points based on the value chosen when the round is set up.</div>`,
+    trip:`<h2>✈️ Trip Mode</h2><div class="notice">Choose <b>Trip Mode</b> when setting up a competition, then enter the trip name and number of rounds.<br><br>Each round is saved inside the trip and Trip Championship points build across the trip.<br><br>After the final round, the app shows a Trip Summary with daily winners, final standings and the Trip winner.</div><div class="notice">The organiser then taps <b>Save Trip & Return to Normal Golf</b>.</div>`,
+    pin:`<h2>🔐 Admin PIN</h2><div class="notice">Admin can change the PIN in <b>Settings → Change Admin PIN</b>.<br><br>If the Admin PIN is forgotten, the I'm In Golf owner can reset it securely from Owner Controls.</div>`,
+    install:`<h2>📱 Install on a phone</h2><div class="notice"><b>iPhone:</b> Safari → <b>•••</b> bottom-right → <b>Share</b> → <b>Add to Home Screen</b>.<br><br><b>Android:</b> Chrome → <b>⋮</b> → <b>Add to Home screen</b> or <b>Install app</b>.</div>`,
+    problems:`<h2>🛠️ Something isn't working</h2><div class="notice"><b>1.</b> Check the Group PIN.<br><br><b>2.</b> Refresh or fully close and reopen the app.<br><br><b>3.</b> On a laptop, use <b>Ctrl + F5</b>.<br><br><b>4.</b> Wrong player? Go to <b>Players → Change who I am</b>.<br><br><b>5.</b> Forgotten Admin PIN? Contact the I'm In Golf owner for a reset.</div><div class="muted">The app will not redraw while someone is typing a score.</div>`
   };
   return topics[topic] || "";
 }
 
 function adminHelpPage(){
   if(!isAdmin){ page="round"; render(); return; }
+
   const topicHtml=adminHelpTopicContent(adminHelpTopic);
+
   if(topicHtml){
     $("screen").innerHTML=`
-      <div class="card"><div class="muted">I'M IN GOLF</div><h2 style="font-size:24px;margin:4px 0 8px;">🏌️ Organiser Help</h2><div class="muted">Simple, step-by-step help.</div></div>
+      <div class="card">
+        <div class="muted">I'M IN GOLF</div>
+        <h2 style="font-size:24px;margin:4px 0 8px;">❓ Admin Help</h2>
+        <div class="muted">Simple help for organisers.</div>
+      </div>
       <div class="card">${topicHtml}</div>
-      <div class="card"><button class="secondary full" onclick="adminHelpBack()">← Back to Organiser Help</button><button class="ghost full" onclick="show('settings')">⚙️ Back to Settings</button></div>`;
+      <div class="card">
+        <button class="secondary full" onclick="adminHelpBack()">← Back to Admin Help</button>
+        <button class="ghost full" onclick="show('settings')">⚙️ Back to Settings</button>
+      </div>`;
     return;
   }
+
   const items=[
-    ["points","🏆","Run a Points Game"],["money","💷","Run a Money Game"],["players","👥","Players & handicaps"],["scoring","🏌️","Scores & corrections"],["finish","🏁","Finish a game"],["trip","✈️","Golf Trip"],["pin","🔐","Admin PIN help"],["install","📱","Install on a phone"],["problems","🛠️","Something isn't working"]
+    ["setup","⛳","Set up a competition"],
+    ["players","👥","Players & handicaps"],
+    ["payments","💷","Payments"],
+    ["scoring","🏌️","Entering & correcting scores"],
+    ["nr","NR","No Return"],
+    ["waiting","⏳","Still to enter"],
+    ["finish","🏁","Finish a round"],
+    ["points","🏆","Points Games"],
+    ["trip","✈️","Trip Mode"],
+    ["pin","🔐","Admin PIN help"],
+    ["install","📱","Install on a phone"],
+    ["problems","🛠️","Something isn't working"]
   ];
+
   $("screen").innerHTML=`
-    <div class="card"><div style="text-align:center;"><div style="font-size:44px;">🏌️</div><div class="muted">I'M IN GOLF</div><h2 style="font-size:26px;margin:5px 0;">Organiser Help</h2><div class="muted">Running your group made simple.</div></div></div>
-    <div class="card"><div class="notice"><b>New here?</b><br>Start with one short guide to running your first game.</div><button class="primary full" onclick="openAdminHelp('first')">👋 Set up my first game</button></div>
-    <div class="card"><h3 style="margin-top:0;">Quick Help</h3>${items.map(([key,icon,label])=>`<button class="secondary full" onclick="openAdminHelp('${key}')"><span style="font-size:18px;margin-right:6px;">${icon}</span>${label}</button>`).join("")}</div>
-    <div class="card"><div class="notice"><b>Still stuck?</b> Visit <b>imingolf.co.uk</b> and tap <b>💬 Need help?</b>. Choose <b>I'm an organiser</b> or ask your question.</div><button class="ghost full" onclick="show('settings')">← Back to Settings</button></div>`;
+    <div class="card">
+      <div style="text-align:center;">
+        <div style="font-size:44px;">❓</div>
+        <div class="muted">I'M IN GOLF</div>
+        <h2 style="font-size:26px;margin:5px 0;">Admin Help</h2>
+        <div class="muted">What do you need help with?</div>
+      </div>
+    </div>
+    <div class="card">
+      ${items.map(([key,icon,label])=>`
+        <button class="secondary full" onclick="openAdminHelp('${key}')">
+          <span style="font-size:18px;margin-right:6px;">${icon}</span>${label}
+        </button>`).join("")}
+    </div>
+    <div class="card">
+      <div class="notice"><b>Tip:</b> This help is only visible after Admin access is unlocked.</div>
+      <button class="ghost full" onclick="show('settings')">← Back to Settings</button>
+    </div>`;
 }
 
 let ownerGroups=[];
@@ -4633,6 +4665,7 @@ async function createNewGolfGroup(){
   }
 
   const newState={
+    groupName:cleanGroupName,
     course:"",
     date:"",
     stake:20,
@@ -4810,64 +4843,6 @@ function pickTripDate(title,initialValue=""){
     };
   });
 }
-async function closeNoEntrantsCompetition(){
-  if(!isAdmin){
-    alert("🔒 Only the group Admin can close the competition.");
-    return;
-  }
-
-  if(state.trip?.active){
-    alert("This option is not available during an active Trip.");
-    return;
-  }
-
-  const isPointsGame=state.gameType==="points";
-  const eligiblePlayers=isPointsGame
-    ? [...state.players]
-    : state.players.filter(p=>
-        p.paid &&
-        (p.competition==="stableford" || p.competition==="net")
-      );
-
-  if(eligiblePlayers.length){
-    alert("Players have entered this competition. Finish it through Scores instead.");
-    return;
-  }
-
-  if(!confirm(
-    "Close this competition with no entrants?\n\n" +
-    "No result, winner, payout or league round will be saved.\n\n" +
-    "The group will return to “Next Competition — Coming soon”."
-  ))return;
-
-  state.course="";
-  state.date="";
-  state.gameType="money";
-  state.pointsCompetition="stableford";
-  state.pointsValue=10;
-  state.roundOpen=false;
-
-  state.players.forEach(p=>{
-    p.paid=false;
-    p.competition=null;
-    p.stableford=null;
-    p.netScore=null;
-    p.noReturn=false;
-    p.scoreSubmitted=false;
-  });
-
-  scoreDraftActive=false;
-
-  const ok=await save();
-  if(!ok){
-    alert("The competition could not be closed. Please try again.");
-    return;
-  }
-
-  alert("✅ Competition closed. No result was saved.");
-  show("round");
-}
-
 async function cancelCurrentRound(){
   if(!isAdmin){
     alert("🔒 Only the group Admin can cancel the current round.");
@@ -5745,9 +5720,10 @@ if(!confirm(
 function copyInvite(){
   const url="https://imingolf.co.uk/app/?pin="+encodeURIComponent(pin);
 
+  const groupName=String(state.groupName||"our golf group").trim();
   const message=`⛳ I'm In Golf
 
-Join our golf group.
+Join ${groupName}.
 
 Group PIN: ${pin}
 
