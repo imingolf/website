@@ -374,6 +374,14 @@ if(!state.adminPin && setupTokenFromUrl){
   if(String(state.adminSetupToken||"")===String(setupTokenFromUrl)){
     const currentSetupName=String(state.groupName||"My Golf Group").trim() || "My Golf Group";
     state.groupName=await organiserGroupNameSetup(currentSetupName);
+    // Keep the chosen display name in the shared group state immediately.
+    // The Owner Dashboard reads this same live state, so the renamed group
+    // appears everywhere without changing the permanent Group PIN.
+    const nameSaved=await save();
+    if(!nameSaved){
+      alert("The group name could not be saved. Please reopen the private setup link and try again.");
+      return;
+    }
     const first=prompt("Now choose your own private 4-digit Admin PIN.");
     if(first!==null){
       const clean=String(first).trim();
@@ -3956,9 +3964,11 @@ async function changeGroupName(){
     alert("Please enter a group name.");
     return;
   }
+  const previousName=state.groupName;
   state.groupName=clean;
   const ok=await save();
   if(!ok){
+    state.groupName=previousName;
     alert("The group name could not be saved. Please try again.");
     return;
   }
