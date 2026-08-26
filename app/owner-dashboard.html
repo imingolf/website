@@ -352,7 +352,7 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
       </div>
       <div class="action-grid">
         <button class="secondary" data-act="edit">✏️ Edit Group</button>
-        <button class="secondary" data-act="invite">${s?.adminPin?"📤 Copy Player Invite":"📨 Copy Admin Invite"}</button>
+        <button class="secondary" data-act="invite">${s?.adminPin?"📤 Player Invite":"📨 Organiser Invite"}</button>
         <button class="secondary" data-act="reset">🔐 Reset Admin PIN</button>
         <button class="secondary" data-act="refresh">↻ Refresh Group</button>
         ${pin!==OWNER_PROTECTED_PIN?`<button class="danger" data-act="suspend">${String(g.status)==="suspended"?"▶ Reactivate Group":"⏸ Suspend Group"}</button><button class="danger" data-act="delete">🗑 Delete Group</button>`:`<button class="ghost" disabled>🔐 Owner group protected</button>`}
@@ -390,13 +390,17 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
     if(act==="edit"){editModal(g);return}
     if(act==="refresh"){await refreshAll();toast("Live data refreshed");return}
     if(act==="invite"){
-      let msg="";
+      let msg="", inviteTitle="Player invite";
       if(!s?.adminPin&&s?.adminSetupToken){
+        inviteTitle="Organiser invite";
         msg=`⛳ I'm In Golf\n\nYou've been invited to manage: ${g.group_name||"your golf group"}\n\nGroup PIN: ${pin}\n\nOpen this private Admin setup link:\nhttps://imingolf.co.uk/app/?pin=${encodeURIComponent(pin)}&adminsetup=${encodeURIComponent(s.adminSetupToken)}\n\nOn first opening, you'll be asked to choose your own 4-digit Admin PIN.\n\nKeep this setup link private.`;
       }else{
         msg=`⛳ You're invited to I'm In Golf\n\nTap the link below to join our golf group:\nhttps://imingolf.co.uk/app/?pin=${encodeURIComponent(pin)}\n\nGroup PIN: ${pin}`;
       }
-      try{await navigator.clipboard.writeText(msg);toast("Invite copied — paste into WhatsApp")}catch(e){prompt("Copy this invite:",msg)}
+      showModal(`<h2>📨 ${esc(inviteTitle)}</h2><p><b>${esc(g.group_name||"Golf group")}</b><br>Group PIN: <b>${esc(pin)}</b></p><textarea id="inviteText" readonly>${esc(msg)}</textarea><div class="modal-actions"><button class="ghost" id="closeInvite">Close</button><button class="secondary" id="copyInvite">📋 Copy Invite</button><button class="primary" id="whatsAppInvite">🟢 Send via WhatsApp</button></div>`);
+      $("closeInvite").onclick=closeModal;
+      $("copyInvite").onclick=async()=>{try{await navigator.clipboard.writeText(msg);toast("Invite copied")}catch(e){prompt("Copy this invite:",msg)}};
+      $("whatsAppInvite").onclick=()=>window.open("https://wa.me/?text="+encodeURIComponent(msg),"_blank","noopener");
       return;
     }
     if(act==="reset"){
@@ -424,6 +428,8 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
   }
   async function createGroup(){
     const name=prompt("New golf group name:");if(name===null)return;const clean=name.trim();if(!clean){alert("Please enter a group name.");return}
+    const adminNameInput=prompt("Organiser / customer name:");if(adminNameInput===null)return;const adminName=adminNameInput.trim();if(!adminName){alert("Please enter the organiser's name.");return}
+    const contactInput=prompt("Organiser contact (mobile or email):");if(contactInput===null)return;const adminContact=contactInput.trim();if(!adminContact){alert("Please enter a mobile number or email address.");return}
     const newState={course:"",date:"",stake:20,gameType:"money",pointsCompetition:"stableford",pointsValue:10,adminPin:"",adminSetupToken:"",players:[],history:[]};
     const {data,error}=await db.rpc("create_golf_group",{p_group_name:clean,p_state:newState,p_creation_code:ownerCode});
     if(error){alert("Group could not be created.\n\n"+(error.message||"Please try again."));return}
@@ -431,10 +437,33 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
     const createdState={...newState,adminSetupToken:setupToken};
     const {error:saveError}=await db.rpc("save_group_state",{p_pin:newPin,p_state:createdState});
     if(saveError){alert("Group created, but Admin setup could not be prepared.");await refreshAll();return}
-    const invite=`⛳ I'm In Golf\n\nYou've been invited to manage: ${clean}\n\nGroup PIN: ${newPin}\n\nOpen this private Admin setup link:\nhttps://imingolf.co.uk/app/?pin=${encodeURIComponent(newPin)}&adminsetup=${encodeURIComponent(setupToken)}\n\nOn first opening, you'll be asked to choose your own 4-digit Admin PIN.\n\nKeep this setup link private.`;
-    showModal(`<h2>✅ New group created</h2><p><b>${esc(clean)}</b><br>Group PIN: <b>${esc(newPin)}</b></p><p class="note">Send this private Admin invite to the person who will manage the group.</p><textarea id="inviteText" readonly>${esc(invite)}</textarea><div class="modal-actions"><button class="ghost" id="closeInvite">Close</button><button class="primary" id="copyInvite">📋 Copy Admin Invite</button></div>`);
+
+    // Save the organiser/customer details into the Owner group register without
+    // changing any defaults that create_golf_group has already assigned.
+    const {data:listData,error:listError}=await db.rpc("owner_list_groups",{p_creation_code:ownerCode});
+    if(!listError){
+      const createdGroup=(Array.isArray(listData)?listData:[]).find(x=>String(x.group_pin)===newPin);
+      if(createdGroup){
+        await db.rpc("owner_update_group",{
+          p_creation_code:ownerCode,
+          p_group_pin:newPin,
+          p_admin_name:adminName,
+          p_admin_contact:adminContact,
+          p_plan_type:String(createdGroup.plan_type||"trial"),
+          p_trial_expiry_date:dateOnly(createdGroup.trial_expiry_date)||null,
+          p_paid_status:String(createdGroup.paid_status||"unpaid"),
+          p_renewal_date:dateOnly(createdGroup.renewal_date)||null,
+          p_status:String(createdGroup.status||"active"),
+          p_notes:String(createdGroup.notes||"")
+        });
+      }
+    }
+
+    const invite=`⛳ I'm In Golf\n\nHi ${adminName},\n\nYou've been invited to manage: ${clean}\n\nGroup PIN: ${newPin}\n\nOpen this private Admin setup link:\nhttps://imingolf.co.uk/app/?pin=${encodeURIComponent(newPin)}&adminsetup=${encodeURIComponent(setupToken)}\n\nOn first opening, you'll be asked to choose your own 4-digit Admin PIN.\n\nKeep this setup link private.`;
+    showModal(`<h2>✅ New group created</h2><p><b>${esc(clean)}</b><br>Organiser: <b>${esc(adminName)}</b><br>Group PIN: <b>${esc(newPin)}</b></p><p class="note">Send this private organiser invite now, or resend it later from the group panel while Admin setup is still waiting.</p><textarea id="inviteText" readonly>${esc(invite)}</textarea><div class="modal-actions"><button class="ghost" id="closeInvite">Close</button><button class="secondary" id="copyInvite">📋 Copy Admin Invite</button><button class="primary" id="whatsAppInvite">🟢 Send via WhatsApp</button></div>`);
     $("closeInvite").onclick=async()=>{closeModal();await refreshAll()};
     $("copyInvite").onclick=async()=>{try{await navigator.clipboard.writeText(invite);toast("Admin invite copied")}catch(e){prompt("Copy this invite:",invite)}};
+    $("whatsAppInvite").onclick=()=>window.open("https://wa.me/?text="+encodeURIComponent(invite),"_blank","noopener");
   }
 
   function setNavActive(id){
