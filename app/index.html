@@ -3921,7 +3921,7 @@ async function resetDemoGroup(){
   const usa=trip("USA – Florida",["TPC Sawgrass – THE PLAYERS Stadium Course","Arnold Palmer's Bay Hill Club & Lodge","Streamsong Red","Innisbrook – Copperhead Course"],["05 Mar 2025","06 Mar 2025","08 Mar 2025","09 Mar 2025"],["Steve","Simon","Dave","Steve"]);
 
   const league={};
-  normalRounds.forEach(r=>r.pointsResults.forEach(x=>league[x.name]=(league[x.name]||0)+Number(x.points||0)));
+  normalRounds.filter(r=>r.gameType==="points").forEach(r=>(r.pointsResults||[]).forEach(x=>league[x.name]=(league[x.name]||0)+Number(x.points||0)));
   const wins={}; normalRounds.forEach(r=>{if(r.winners?.[0])wins[r.winners[0]]=(wins[r.winners[0]]||0)+1;});
 
   const keepAdminPin=state.adminPin, keepSetupToken=state.adminSetupToken;
