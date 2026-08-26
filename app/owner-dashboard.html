@@ -369,6 +369,7 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
   function editModal(g){
     const protectedGroup=String(g.group_pin)===OWNER_PROTECTED_PIN;
     showModal(`<h2>Edit ${esc(displayGroupName(g,states.get(String(g.group_pin||""))))}</h2><div class="sub">PIN ${esc(g.group_pin)}</div><br>
+      <label>Group name</label><input id="mGroupName" value="${esc(displayGroupName(g,states.get(String(g.group_pin||""))))}" maxlength="80">
       <label>Admin / customer name</label><input id="mAdminName" value="${esc(g.admin_name||"")}">
       <label>Contact</label><input id="mContact" value="${esc(g.admin_contact||"")}">
       <label>Plan</label><select id="mPlan" ${protectedGroup?"disabled":""}><option value="trial">Free Trial</option><option value="paid">Paid</option><option value="internal">Internal</option></select>
@@ -381,10 +382,19 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
     $("mPlan").value=protectedGroup?"internal":String(g.plan_type||"trial");$("mPaid").value=String(g.paid_status||"unpaid");$("mStatus").value=protectedGroup?"active":String(g.status||"active");
     $("mCancel").onclick=closeModal;
     $("mSave").onclick=async()=>{
+      const newGroupName=$("mGroupName").value.trim();
+      if(!newGroupName){alert("Please enter a group name.");return}
       const args={p_creation_code:ownerCode,p_group_pin:String(g.group_pin),p_admin_name:$("mAdminName").value.trim(),p_admin_contact:$("mContact").value.trim(),p_plan_type:protectedGroup?"internal":$("mPlan").value,p_trial_expiry_date:$("mTrial").value||null,p_paid_status:$("mPaid").value,p_renewal_date:$("mRenew").value||null,p_status:protectedGroup?"active":$("mStatus").value,p_notes:$("mNotes").value.trim()};
       $("mSave").disabled=true;$("mSave").textContent="Saving…";
       const {error}=await db.rpc("owner_update_group",args);
       if(error){alert("Could not save changes.\n\n"+(error.message||"Please try again."));$("mSave").disabled=false;$("mSave").textContent="💾 Save Changes";return}
+      const pin=String(g.group_pin);
+      const currentState=states.get(pin);
+      if(currentState && String(currentState.groupName||"")!==newGroupName){
+        const renamedState={...currentState,groupName:newGroupName};
+        const {error:nameError}=await db.rpc("save_group_state",{p_pin:pin,p_state:renamedState});
+        if(nameError){alert("The group details were saved, but the group name could not be updated.\n\n"+(nameError.message||"Please try again."));$("mSave").disabled=false;$("mSave").textContent="💾 Save Changes";return}
+      }
       closeModal();toast("✅ Group updated");await refreshAll();
     };
   }
