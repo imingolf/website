@@ -3880,9 +3880,25 @@ async function resetDemoGroup(){
       noReturn:false,scoreSubmitted:true}))
   });
 
+  const makeMoneyRound=(date,course,competition,scores,winner,stake=10)=>({
+    date,course,stake,gameType:"money",
+    stablefordPot:competition==="stableford" ? stake*demoPlayers.length : 0,
+    netPot:competition==="net" ? stake*demoPlayers.length : 0,
+    winners:[winner],
+    stablefordWinnerNames:competition==="stableford"?[winner]:[],
+    netWinnerNames:competition==="net"?[winner]:[],
+    stablefordCountback:false,stablefordSplit:false,netCountback:false,netSplit:false,
+    players:demoPlayers.map(p=>({name:p.name,handicap:p.handicap,competition,
+      stableford:competition==="stableford"?scores[p.name]:null,
+      netScore:competition==="net"?scores[p.name]:null,
+      noReturn:false,scoreSubmitted:true,paid:true}))
+  });
+
   const normalRounds=[
     makeRound("15 Aug 2026","Hazel Grove Golf Club","stableford",{"Greg Aspinall":38,"Simon":35,"Tony":33,"Dave":31,"Mark":34,"Chris":29,"Steve":36,"Andy":30},["Greg Aspinall","Steve","Simon"]),
+    makeMoneyRound("12 Aug 2026","Stockport Golf Club","stableford",{"Greg Aspinall":35,"Simon":34,"Tony":32,"Dave":30,"Mark":36,"Chris":31,"Steve":38,"Andy":29},"Steve",10),
     makeRound("08 Aug 2026","Bramhall Golf Club","net",{"Greg Aspinall":70,"Simon":68,"Tony":72,"Dave":74,"Mark":69,"Chris":76,"Steve":71,"Andy":75},["Simon","Mark","Greg Aspinall"]),
+    makeMoneyRound("05 Aug 2026","Mellor & Townscliffe Golf Club","net",{"Greg Aspinall":71,"Simon":69,"Tony":73,"Dave":72,"Mark":68,"Chris":75,"Steve":70,"Andy":74},"Mark",20),
     makeRound("01 Aug 2026","Davenport Golf Club","stableford",{"Greg Aspinall":34,"Simon":32,"Tony":37,"Dave":30,"Mark":35,"Chris":31,"Steve":36,"Andy":29},["Tony","Steve","Mark"])
   ];
 
@@ -3892,7 +3908,7 @@ async function resetDemoGroup(){
       const first=winners[i], order=[first,...demoPlayers.map(p=>p.name).filter(n=>n!==first)];
       const scores={}; order.forEach((n,j)=>scores[n]=Math.max(27,38-j));
       const places=order.slice(0,3);
-      const r=makeRound(dates[i],course,"stableford",scores,places);
+      const r=makeMoneyRound(dates[i],course,"stableford",scores,first,10);
       rounds.push(r);
       places.forEach((n,j)=>standings[n]=(standings[n]||0)+[10,6,3][j]);
     });
@@ -3920,7 +3936,7 @@ async function resetDemoGroup(){
   const ok=await save();
   if(!ok){alert("Demo data could not be saved. Nothing else was changed intentionally.");return;}
   render();
-  alert("✅ Demo Group is ready.\n\n8 players, 3 normal previous rounds and 3 completed trips have been loaded.");
+  alert("✅ Demo Group is ready.\n\n8 players, 5 normal previous rounds (including Money Games) and 3 completed Money Game trips have been loaded.");
 }
 
 
