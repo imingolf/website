@@ -238,11 +238,11 @@ function showFirstWelcome(role){
   if(role==="admin"){
     $("screen").innerHTML=`<div class="card" style="text-align:center;padding:26px 18px;">
       <div style="font-size:46px;">👋</div><h2 style="font-size:25px;margin:8px 0;">You're ready to go, ${esc(name)}!</h2>
-      <div class="muted">Your group is set up. Here are your next two steps.</div>
-      <div class="notice" style="text-align:left;margin-top:18px;"><b>1. 👥 Invite your players</b><br>Share your group invite so your mates can join themselves.</div>
-      <button class="primary full" onclick="document.querySelector('nav').style.display='';show('players')">👥 Invite Players</button>
-      <div class="notice" style="text-align:left;margin-top:18px;"><b>2. ⛳ Set up your first round</b><br>Add the course, date and entry fee when you're ready.</div>
-      <button class="secondary full" onclick="document.querySelector('nav').style.display='';show('round')">⛳ Set Up First Round</button>
+      <div class="muted">You're added as a player. Finish setting up your first game.</div>
+      <div class="notice" style="text-align:left;margin-top:18px;"><b>1. ⛳ Set up your first round</b><br>Add the course, date, competition and optional stake.</div>
+      <button class="primary full" onclick="document.querySelector('nav').style.display='';show('round')">⛳ Set Up First Round</button>
+      <div class="notice" style="text-align:left;margin-top:18px;"><b>2. 👥 Invite your players</b><br>Once the round is ready, share your group invite so your mates can join.</div>
+      <button class="secondary full" onclick="document.querySelector('nav').style.display='';show('players')">👥 Invite Players</button>
     </div>`;
   }else{
     $("screen").innerHTML=`<div class="card" style="text-align:center;padding:26px 18px;">
@@ -441,6 +441,11 @@ if(!state.adminPin && setupTokenFromUrl){
   isAdmin=true;
   saveAdminForGroup();
   history.replaceState({},document.title,location.pathname+"?pin="+encodeURIComponent(pin));
+  const setupPaymentLink=await organiserPaymentSetup(state.groupName||currentSetupName);
+  if(setupPaymentLink){
+    state.paymentLink=setupPaymentLink;
+    await save();
+  }
   await organiserAdminSetupComplete(state.groupName||currentSetupName,pin);
 }
 
@@ -588,17 +593,23 @@ async function setupFirstRound(){
   if(!isAdmin)return;
   const course=String($("firstRoundCourse")?.value||"").trim();
   const date=String($("firstRoundDate")?.value||"").trim();
+  const competition=String($("firstRoundCompetition")?.value||"stableford");
   const rawStake=String($("firstRoundStake")?.value||"").trim();
   const stake=rawStake==="" ? 0 : Number(rawStake);
 
   if(!course){ alert("Please enter the course."); $("firstRoundCourse")?.focus(); return; }
   if(!date){ alert("Please choose the date."); $("firstRoundDate")?.focus(); return; }
   if(!Number.isFinite(stake) || stake<0){ alert("Please enter a valid stake, or leave it blank for no money game."); return; }
+  if(stake>0 && !String(state.paymentLink||"").trim()){
+    alert("Please add your payment link in Admin / Settings before starting a money round.");
+    return;
+  }
 
   state.course=course;
   state.date=date;
   state.stake=stake;
   state.gameType="money";
+  state.pointsCompetition=competition==="net" ? "net" : "stableford";
   state.roundOpen=true;
   state.players.forEach(p=>{
     p.paid=false; p.competition=null; p.stableford=null; p.netScore=null;
@@ -621,6 +632,11 @@ function waitingScreen(){
         <input id="firstRoundCourse" autocomplete="off" placeholder="e.g. Hazel Grove Golf Club">
         <label class="muted">Date</label>
         <input id="firstRoundDate" type="date">
+        <label class="muted">Competition</label>
+        <select id="firstRoundCompetition">
+          <option value="stableford">🏆 Stableford</option>
+          <option value="net">⛳ Net</option>
+        </select>
         <label class="muted">Stake per player (£) <span style="font-weight:400;">— optional</span></label>
         <input id="firstRoundStake" type="number" min="0" step="1" placeholder="Leave blank for no money game">
         <button class="primary full" style="margin-top:18px;" onclick="setupFirstRound()">⛳ Set Up Round</button>
@@ -948,7 +964,7 @@ $("screen").innerHTML=`
           <div class="big">£${pot()}</div>
           <div class="muted">Paid pot • £${potentialPot()} if everyone pays</div>
           <div class="muted" style="margin-top:6px;">
-            🏆 Stableford pot: £${stablefordPot()} • ⛳ Net pot: £${netPot()}
+            ${state.pointsCompetition==="net" ? "⛳ Net" : "🏆 Stableford"} pot: £${pot()}
           </div>
         </div>
 
@@ -960,7 +976,7 @@ $("screen").innerHTML=`
       <div class="notice">
         ${state.players.length>0 && paidCount()===state.players.length
           ? "🔒 Everyone is paid — ready to play."
-          : "Payments must be marked before tee-off."}
+          : "Players are marked paid automatically when they return from the payment link."}
       </div>
 
       <button class="primary full" onclick="show('pay')">${isAdmin ? "Manage payments" : "View payments"}</button>
@@ -1043,11 +1059,12 @@ function pay(){
 
  $("screen").innerHTML=`
  <div class="card">
-   <h2>💷 Pay Before Play</h2>
+   <h2>💷 Pay Your Group Admin</h2>
+   <div class="notice"><b>Your group's money stays with your group.</b><br>Payments go directly to your Group Admin using the payment link they provided. I'm In Golf does not receive or hold your money.</div>
    <div class="big">£${pot()}</div>
    <div class="muted">Paid pot • £${potentialPot()} if everyone pays • £${state.stake} each</div>
    <div class="muted" style="margin-top:6px;">
-     🏆 Stableford pot: £${stablefordPot()} • ⛳ Net pot: £${netPot()}
+     ${state.pointsCompetition==="net" ? "⛳ Net" : "🏆 Stableford"} pot: £${pot()}
    </div>
  </div>
 
@@ -1087,10 +1104,44 @@ function pay(){
      ? `<button class="secondary full" onclick="alert('👀 Demo Mode\n\nPayments are disabled in the demo.')">🔒 Demo — Payments Disabled</button>`
      : (me && me.paid
          ? `<button class="secondary full" disabled>✓ You are marked paid</button>`
-         : `<a href="https://monzo.me/gregoryaspinall?h=ImsHfW&account_type=personal" target="_blank"><button class="primary full">💳 Pay Entry Fee</button></a>`)
+         : (String(state.paymentLink||"").trim()
+             ? `<button class="primary full" onclick="beginPlayerPayment()">💳 Pay £${Number(state.stake||0)} to your Group Admin</button>`
+             : `<button class="secondary full" disabled>Payment link not set up — ask your Group Admin</button>`))
    }
  </div>`;
 }
+let paymentReturnBusy=false;
+function paymentReturnKey(){return "iigPaymentJourney_"+String(pin||"");}
+function beginPlayerPayment(){
+  if(!myPlayerId){alert("Please select who you are first.");return;}
+  const me=state.players.find(p=>p.id===myPlayerId);
+  if(!me)return;
+  if(me.paid){alert("You're already marked paid.");return;}
+  const link=String(state.paymentLink||"").trim();
+  if(!link){alert("Your Group Admin hasn't added a payment link yet.");return;}
+  sessionStorage.setItem(paymentReturnKey(),JSON.stringify({playerId:me.id,startedAt:Date.now()}));
+  window.open(link,"_blank");
+}
+async function recognisePaymentReturn(){
+  if(paymentReturnBusy || document.visibilityState==="hidden")return;
+  let journey=null;
+  try{journey=JSON.parse(sessionStorage.getItem(paymentReturnKey())||"null");}catch(e){}
+  if(!journey || !journey.playerId || Date.now()-Number(journey.startedAt||0)<1200)return;
+  const player=state.players.find(p=>p.id===journey.playerId);
+  sessionStorage.removeItem(paymentReturnKey());
+  if(!player || player.paid || roundLocked())return;
+  paymentReturnBusy=true;
+  player.paid=true;
+  player.paymentMarkedAt=new Date().toISOString();
+  player.paymentMarkMethod="payment-link-return";
+  await save();
+  paymentReturnBusy=false;
+  render();
+  alert("✅ Payment journey complete — you're marked paid.\n\nYour payment went directly to your Group Admin. I'm In Golf does not receive or hold the money.");
+}
+window.addEventListener("focus",()=>setTimeout(recognisePaymentReturn,250));
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")setTimeout(recognisePaymentReturn,250);});
+
 async function togglePaid(i){
 
   if(!demoCanEdit())return;
@@ -1133,13 +1184,10 @@ function scores(){
 
   const eligiblePlayers=isPointsGame
     ? [...state.players]
-    : state.players.filter(p=>
-        p.paid &&
-        (p.competition==="stableford" || p.competition==="net")
-      );
+    : (Number(state.stake||0)>0 ? state.players.filter(p=>p.paid) : [...state.players]);
 
   const stillToEnter=eligiblePlayers.filter(p=>{
-    const type=isPointsGame ? pointsComp : p.competition;
+    const type=pointsComp;
     return !submitted(p,type);
   });
 
@@ -1178,8 +1226,11 @@ function scores(){
           Everyone plays the same competition.
         </div>
       ` : `
-        <div class="muted">Choose Stableford or Net, then submit your score.</div>
-        <div class="notice">💷 Only paid players are eligible to win the pot.</div>
+        <div class="notice">
+          <b>${pointsComp==="stableford" ? "🏆 STABLEFORD" : "⛳ NET"}</b><br>
+          Your Group Admin chose the competition for everyone.
+        </div>
+        ${Number(state.stake||0)>0 ? `<div class="notice">💷 Only paid players are eligible to win the pot.</div>` : ""}
       `}
 
       ${roundLocked() ? `
@@ -1202,7 +1253,7 @@ function scores(){
       ${scorePlayers.map(p=>{
 
         const i=state.players.findIndex(x=>x.id===p.id);
-        const type=isPointsGame ? pointsComp : p.competition;
+        const type=pointsComp;
         const isSubmitted=type ? submitted(p,type) : false;
         const canControl=isAdmin || p.id===myPlayerId;
 
@@ -1212,49 +1263,15 @@ function scores(){
             <b>${esc(p.name)}</b>
             <div class="muted">HCP ${p.handicap}</div>
 
-            ${isPointsGame ? `
-              <div class="muted">
-                Competition: ${pointsComp==="stableford" ? "Stableford" : "Net"}
-              </div>
-            ` : `
-              <div class="muted">
-                Competition: ${
-                  p.competition==="net"
-                    ? "Net"
-                    : p.competition==="stableford"
-                    ? "Stableford"
-                    : "Choose competition"
-                }
-              </div>
-
-              ${canControl && p.paid && (!roundLocked() || (isAdmin && !isSubmitted)) ? `
-                <div class="grid2" style="margin-top:10px;">
-                  <button
-                    class="${p.competition==="stableford" ? "primary" : "ghost"} small"
-                    onclick="setCompetition(${i},'stableford')">
-                    Stableford
-                  </button>
-
-                  <button
-                    class="${p.competition==="net" ? "primary" : "ghost"} small"
-                    onclick="setCompetition(${i},'net')">
-                    Net
-                  </button>
-                </div>
-              ` : ""}
-            `}
+            <div class="muted">Competition: ${pointsComp==="stableford" ? "Stableford" : "Net"}</div>
           </div>
 
           ${canControl ? `
             <div style="margin-top:10px;">
 
-              ${!isPointsGame && !p.paid ? `
+              ${!isPointsGame && Number(state.stake||0)>0 && !p.paid ? `
                 <div class="notice warning">
                   💷 <b>Pay before entering the competition or a score.</b>
-                </div>
-              ` : !type ? `
-                <div class="notice">
-                  Choose Stableford or Net before entering a score.
                 </div>
               ` : isSubmitted ? `
                 <div class="notice">
@@ -1296,9 +1313,7 @@ function scores(){
             </div>
           ` : `
             <div class="muted" style="margin-top:6px;">
-              ${!type
-                ? "Competition not chosen"
-                : isSubmitted
+              ${isSubmitted
                 ? (p.noReturn===true
                     ? "NR — No Return"
                     : type==="stableford"
@@ -1313,7 +1328,7 @@ function scores(){
       }).join("")}
     </div>
 
-    ${(!isPointsGame || pointsComp==="stableford") ? `
+    ${pointsComp==="stableford" ? `
       <div class="card">
         <h2>🏆 Stableford Leaderboard</h2>
 
@@ -1337,7 +1352,7 @@ function scores(){
       </div>
     ` : ""}
 
-    ${(!isPointsGame || pointsComp==="net") ? `
+    ${pointsComp==="net" ? `
       <div class="card">
         <h2>⛳ Net Score Leaderboard</h2>
 
@@ -1359,10 +1374,10 @@ function scores(){
           : '<div class="muted">No Net scores yet.</div>'
         }
 
-        ${eligiblePlayers.some(p=>(isPointsGame ? pointsComp : p.competition)==="net" && p.noReturn===true) ? `
+        ${eligiblePlayers.some(p=>pointsComp==="net" && p.noReturn===true) ? `
           <div class="muted" style="margin-top:8px;">
             NR: ${eligiblePlayers
-              .filter(p=>(isPointsGame ? pointsComp : p.competition)==="net" && p.noReturn===true)
+              .filter(p=>pointsComp==="net" && p.noReturn===true)
               .map(p=>esc(p.name)).join(", ")}
           </div>
         ` : ""}
@@ -1414,6 +1429,7 @@ if(!demoCanEdit())return;
 }
 async function submitPlayerScore(i,type){
   if(!demoCanEdit())return;
+  type=state.pointsCompetition||type||"stableford";
 
   const p=state.players[i];
   if(!p)return;
@@ -1462,9 +1478,7 @@ async function submitNoReturn(i){
   if(!p)return;
   if(!isAdmin && p.id!==myPlayerId)return;
 
-  const type=state.gameType==="points"
-    ? (state.pointsCompetition||"stableford")
-    : p.competition;
+  const type=state.pointsCompetition||"stableford";
 
   if(type!=="net"){
     alert("No Return is available for Net competitions.");
@@ -1806,20 +1820,17 @@ if(isTrip){
   // 💷 MONEY GAME
   // =====================================
 
+  const moneyEligible=p=>Number(state.stake||0)>0 ? p.paid : true;
   const stablefordPlayers=state.players.filter(
-    p=>p.paid &&
-       p.competition==="stableford" &&
-       p.stableford!=null
+    p=>moneyEligible(p) && pointsComp==="stableford" && p.stableford!=null
   );
 
   const netPlayers=state.players.filter(
-    p=>p.paid &&
-       p.competition==="net" &&
-       p.netScore!=null
+    p=>moneyEligible(p) && pointsComp==="net" && p.netScore!=null
   );
 
   if(!stablefordPlayers.length && !netPlayers.length){
-    alert("Enter at least one Stableford or Net score first.");
+    alert(pointsComp==="stableford" ? "Enter at least one Stableford score first." : "Enter at least one Net score first.");
     return;
   }
 
@@ -4025,6 +4036,13 @@ function settingsPage(){
  <button class="secondary full" onclick="changeGroupName()">✏️ Change Group Name</button>
  <button class="primary full" onclick="openAdminHelp()">❓ Admin Help</button>
  </div>
+ <div class="card">
+   <h2>💷 Player payments</h2>
+   <div class="notice"><b>Payments go directly to you.</b><br>I'm In Golf does not receive, hold or manage your group's money.</div>
+   <div class="muted">PAYMENT LINK</div>
+   <b>${state.paymentLink ? esc(state.paymentLink) : "Not set up"}</b>
+   <button class="secondary full" onclick="changePaymentLink()">${state.paymentLink ? "✏️ Change Payment Link" : "➕ Add Payment Link"}</button>
+ </div>
  <div class="card"><h2>Round controls</h2>
  ${!state.trip?.active && !state.trip?.completed ? `
   <button class="secondary full" onclick="newRound()">
@@ -4927,6 +4945,53 @@ function organiserAdminPinSetup(groupName){
   });
 }
 
+function normalisePaymentLink(value){
+  const clean=String(value||"").trim();
+  if(!clean)return "";
+  try{const u=new URL(clean);return (u.protocol==="https:" || u.protocol==="http:") ? u.href : "";}catch(e){return "";}
+}
+function organiserPaymentSetup(groupName){
+  return new Promise(resolve=>{
+    const overlay=document.createElement("div");
+    overlay.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.42);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;";
+    overlay.innerHTML=`<div class="card" style="width:min(440px,100%);margin:0;padding:24px;border-radius:20px;box-shadow:0 18px 50px rgba(0,0,0,.18);">
+      <div style="font-size:38px;margin-bottom:8px;">💷</div>
+      <h2 style="margin:0 0 8px;">Set up player payments</h2>
+      <p class="muted">Add the payment link for the account where you want to receive <b>${esc(groupName)}</b>'s entry fees.</p>
+      <div class="notice"><b>Payments go directly to you.</b><br>I'm In Golf does not receive, hold or manage your group's money.</div>
+      <label><b>Your payment link</b></label>
+      <input id="setupPaymentLink" type="url" inputmode="url" autocomplete="url" placeholder="e.g. your Monzo, Revolut or PayPal payment link">
+      <div id="setupPaymentMsg" class="muted" style="min-height:18px;color:var(--red);"></div>
+      <button class="primary full" id="saveSetupPayment">Save Payment Link</button>
+      <button class="ghost full" id="skipSetupPayment">Skip for now</button>
+      <div class="muted" style="margin-top:10px;text-align:center;">You can add or change this later in Admin / Settings.</div>
+    </div>`;
+    document.body.appendChild(overlay);
+    const input=overlay.querySelector("#setupPaymentLink");
+    const msg=overlay.querySelector("#setupPaymentMsg");
+    overlay.querySelector("#saveSetupPayment").onclick=()=>{
+      const link=normalisePaymentLink(input.value);
+      if(!link){msg.textContent="Please paste a valid payment link beginning with https://";input.focus();return;}
+      overlay.remove();resolve(link);
+    };
+    overlay.querySelector("#skipSetupPayment").onclick=()=>{overlay.remove();resolve("");};
+    setTimeout(()=>input.focus(),50);
+  });
+}
+async function changePaymentLink(){
+  if(!isAdmin)return;
+  const current=String(state.paymentLink||"");
+  const answer=prompt("Paste the payment link where players should pay you.\n\nPayments go directly to you — I'm In Golf does not receive or hold the money.",current);
+  if(answer===null)return;
+  if(!String(answer).trim()){
+    if(current && confirm("Remove the current payment link?")){state.paymentLink="";await save();render();}
+    return;
+  }
+  const link=normalisePaymentLink(answer);
+  if(!link){alert("Please enter a valid payment link beginning with https://");return;}
+  state.paymentLink=link;await save();render();alert("✅ Payment link saved.");
+}
+
 function organiserAdminSetupComplete(groupName,groupPin){
   return new Promise(resolve=>{
     const overlay=document.createElement("div");
@@ -4938,7 +5003,8 @@ function organiserAdminSetupComplete(groupName,groupPin){
         <p class="muted" style="margin:0;">You're now the Admin for <b>${esc(groupName)}</b>.</p>
         <div class="notice" style="margin-top:18px;text-align:left;">
           <b>Group PIN: ${esc(groupPin)}</b><br>
-          Keep your Admin PIN private.
+          Keep your Admin PIN private.<br><br>
+          ${state.paymentLink ? "💷 Your player payment link is ready. Payments will go directly to you." : "💷 No payment link added yet. You can add one later in Admin / Settings."}
         </div>
         <button class="primary full" id="continueAfterAdminSetup">Continue</button>
       </div>`;
@@ -5348,6 +5414,17 @@ state.date=tripDate.trim();
   let selectedPointsValue=
     Number(state.pointsValue || 10);
 
+  if(selectedType==="money"){
+    const competition=prompt(
+      "Choose Competition for Everyone:\n\n" +
+      "1. 🏆 Stableford\n" +
+      "2. ⛳ Net\n\n" +
+      "Enter 1 or 2"
+    );
+    if(competition===null)return;
+    if(competition!=="1" && competition!=="2"){alert("Please enter 1 for Stableford or 2 for Net.");return;}
+    selectedCompetition=competition==="1" ? "stableford" : "net";
+  }
 
   if(selectedType==="points"){
 
@@ -5419,8 +5496,8 @@ state.date=tripDate.trim();
   state.date="";
   state.gameType=selectedType;
 
+  state.pointsCompetition=selectedCompetition;
   if(selectedType==="points"){
-    state.pointsCompetition=selectedCompetition;
     state.pointsValue=selectedPointsValue;
   }
 
