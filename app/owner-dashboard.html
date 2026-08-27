@@ -476,7 +476,7 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
     const name=prompt("New golf group name:");if(name===null)return;const clean=name.trim();if(!clean){alert("Please enter a group name.");return}
     const adminNameInput=prompt("Organiser / customer name:");if(adminNameInput===null)return;const adminName=adminNameInput.trim();if(!adminName){alert("Please enter the organiser's name.");return}
     const contactInput=prompt("Organiser contact (mobile or email):");if(contactInput===null)return;const adminContact=contactInput.trim();if(!adminContact){alert("Please enter a mobile number or email address.");return}
-    const newState={groupName:clean,course:"",date:"",stake:20,gameType:"money",pointsCompetition:"stableford",pointsValue:10,adminPin:"",adminSetupToken:"",players:[],history:[]};
+    const newState={groupName:clean,course:"",date:"",stake:0,gameType:"money",roundOpen:false,pointsCompetition:"stableford",pointsValue:10,adminPin:"",adminSetupToken:"",players:[],history:[]};
     const {data,error}=await db.rpc("create_golf_group",{p_group_name:clean,p_state:newState,p_creation_code:ownerCode});
     if(error){alert("Group could not be created.\n\n"+(error.message||"Please try again."));return}
     const newPin=String(data);const setupToken=(crypto.randomUUID?crypto.randomUUID():(Date.now().toString(36)+Math.random().toString(36).slice(2)));
