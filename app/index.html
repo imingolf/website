@@ -61,7 +61,6 @@ nav button{flex:1;background:transparent;color:#6d756f;padding:11px 2px;font-siz
       margin-left:6px;
     ">DEMO</span>
   </h1>
-  <div id="headerGroupName" style="font-size:18px;font-weight:800;margin-top:4px;line-height:1.2"></div>
   <p id="syncText">Shared golf group</p>
 </header>
 <main><div id="screen"></div></main>
@@ -337,6 +336,13 @@ localStorage.setItem("tensInPin",pin);
 loadMyPlayerForGroup();
 loadAdminForGroup();
 
+// Opening a live group counts as activity, so legacy groups gain a persistent
+// Last Activity value as soon as someone next uses them.
+if(!demoReadOnly()){
+  state.lastActivityAt=new Date().toISOString();
+  await db.rpc("save_group_state",{p_pin:pin,p_state:state});
+}
+
 // Clean up a stale blank round left behind by older Trip Mode versions.
 // This only closes an OPEN round when there is no course/date and nobody
 // has paid, chosen a competition, or entered a score.
@@ -435,6 +441,9 @@ async function save(){
 
   $("syncText").textContent="Saving…";
 
+  // Persist meaningful group activity for the Owner Dashboard.
+  state.lastActivityAt=new Date().toISOString();
+
   const {data,error}=await db.rpc(
     "save_group_state",
     {p_pin:pin,p_state:state}
@@ -463,14 +472,7 @@ async function refresh(){
 
  const {data,error}=await db.rpc("get_group_state",{p_pin:pin});
 if(!error && data){
-  // Some older saved group states do not contain groupName.
-  // Keep the live name already loaded from the group register so the
-  // 5-second refresh cannot make the header name disappear.
-  const currentGroupName=String(state?.groupName||"").trim();
   state=data;
-  if(!String(state?.groupName||"").trim() && currentGroupName){
-    state.groupName=currentGroupName;
-  }
 
   // Only redraw the app if this phone's saved player still exists
   // in the current group. This prevents "Find my name" from being
@@ -499,12 +501,6 @@ function show(p){
 }
 function render(){
   updateAdminUI();
-  const headerGroupName=$("headerGroupName");
-  if(headerGroupName){
-    const groupName=(state && typeof state.groupName==="string") ? state.groupName.trim() : "";
-    headerGroupName.textContent=groupName;
-    headerGroupName.style.display=groupName ? "block" : "none";
-  }
 
   if(page==="round")round();
   if(page==="pay")pay();
@@ -3848,97 +3844,6 @@ async function adminAddPlayer(){
 
 async function editPlayer(i){const p=state.players[i];const name=prompt("Player name",p.name);if(!name)return;const h=prompt("Handicap",p.handicap);p.name=name.trim();p.handicap=Number(h)||0;render();await save()}
 async function removePlayer(i){if(!confirm("Remove "+state.players[i].name+"? Their past round history will stay saved."))return;state.players.splice(i,1);render();await save()}
-async function resetDemoGroup(){
-  if(String(pin)!=="2894" || !isAdmin){
-    alert("Demo reset is only available to the Admin of Demo Group 2894.");
-    return;
-  }
-  if(!confirm("Reset Demo Group 2894 to its polished demonstration data?\n\nThis replaces the current Demo Group players, league/history and Trip history."))return;
-  if(!confirm("Press OK again to reset Demo Group 2894."))return;
-
-  const demoPlayers=[
-    {id:"demo_greg",name:"Greg Aspinall",handicap:11},
-    {id:"demo_simon",name:"Simon",handicap:14},
-    {id:"demo_tony",name:"Tony",handicap:16},
-    {id:"demo_dave",name:"Dave",handicap:18},
-    {id:"demo_mark",name:"Mark",handicap:12},
-    {id:"demo_chris",name:"Chris",handicap:20},
-    {id:"demo_steve",name:"Steve",handicap:9},
-    {id:"demo_andy",name:"Andy",handicap:22}
-  ];
-
-  const makeRound=(date,course,competition,scores,places)=>({
-    date,course,gameType:"points",pointsCompetition:competition,pointsValue:10,
-    pointsResults:places.map((name,i)=>({name,score:scores[name],position:i+1,points:[10,6,3][i]||0,countback:false})),
-    winners:places.length?[places[0]]:[],
-    stablefordWinnerNames:competition==="stableford"?[places[0]]:[],
-    netWinnerNames:competition==="net"?[places[0]]:[],
-    stablefordCountback:false,netCountback:false,
-    players:demoPlayers.map(p=>({name:p.name,handicap:p.handicap,competition,
-      stableford:competition==="stableford"?scores[p.name]:null,
-      netScore:competition==="net"?scores[p.name]:null,
-      noReturn:false,scoreSubmitted:true}))
-  });
-
-  const makeMoneyRound=(date,course,competition,scores,winner,stake=10)=>({
-    date,course,stake,gameType:"money",
-    stablefordPot:competition==="stableford" ? stake*demoPlayers.length : 0,
-    netPot:competition==="net" ? stake*demoPlayers.length : 0,
-    winners:[winner],
-    stablefordWinnerNames:competition==="stableford"?[winner]:[],
-    netWinnerNames:competition==="net"?[winner]:[],
-    stablefordCountback:false,stablefordSplit:false,netCountback:false,netSplit:false,
-    players:demoPlayers.map(p=>({name:p.name,handicap:p.handicap,competition,
-      stableford:competition==="stableford"?scores[p.name]:null,
-      netScore:competition==="net"?scores[p.name]:null,
-      noReturn:false,scoreSubmitted:true,paid:true}))
-  });
-
-  const normalRounds=[
-    makeRound("15 Aug 2026","Hazel Grove Golf Club","stableford",{"Greg Aspinall":38,"Simon":35,"Tony":33,"Dave":31,"Mark":34,"Chris":29,"Steve":36,"Andy":30},["Greg Aspinall","Steve","Simon"]),
-    makeMoneyRound("12 Aug 2026","Stockport Golf Club","stableford",{"Greg Aspinall":35,"Simon":34,"Tony":32,"Dave":30,"Mark":36,"Chris":31,"Steve":38,"Andy":29},"Steve",10),
-    makeRound("08 Aug 2026","Bramhall Golf Club","net",{"Greg Aspinall":70,"Simon":68,"Tony":72,"Dave":74,"Mark":69,"Chris":76,"Steve":71,"Andy":75},["Simon","Mark","Greg Aspinall"]),
-    makeMoneyRound("05 Aug 2026","Mellor & Townscliffe Golf Club","net",{"Greg Aspinall":71,"Simon":69,"Tony":73,"Dave":72,"Mark":68,"Chris":75,"Steve":70,"Andy":74},"Mark",20),
-    makeRound("01 Aug 2026","Davenport Golf Club","stableford",{"Greg Aspinall":34,"Simon":32,"Tony":37,"Dave":30,"Mark":35,"Chris":31,"Steve":36,"Andy":29},["Tony","Steve","Mark"])
-  ];
-
-  const trip=(name,courses,dates,winners)=>{
-    const rounds=[]; const standings={};
-    courses.forEach((course,i)=>{
-      const first=winners[i], order=[first,...demoPlayers.map(p=>p.name).filter(n=>n!==first)];
-      const scores={}; order.forEach((n,j)=>scores[n]=Math.max(27,38-j));
-      const places=order.slice(0,3);
-      const r=makeMoneyRound(dates[i],course,"stableford",scores,first,10);
-      rounds.push(r);
-      places.forEach((n,j)=>standings[n]=(standings[n]||0)+[10,6,3][j]);
-    });
-    const champion=Object.entries(standings).sort((a,b)=>b[1]-a[1])[0]?.[0]||null;
-    return {name,totalRounds:courses.length,currentRound:courses.length,competition:"stableford",tripPointsValue:10,rounds,standings,champion,completed:true,active:false};
-  };
-
-  const portugal=trip("Portugal – Vilamoura",["Old Course Vilamoura","Pinhal Golf Course","Millennium Golf Course","Laguna Golf Course"],["10 May 2026","11 May 2026","13 May 2026","14 May 2026"],["Greg Aspinall","Steve","Simon","Greg Aspinall"]);
-  const spain=trip("Spain – Costa del Sol",["La Cala Asia Course","Real Club Valderrama","Finca Cortesin","La Quinta Golf & Country Club"],["18 Oct 2025","19 Oct 2025","21 Oct 2025","22 Oct 2025"],["Tony","Mark","Greg Aspinall","Tony"]);
-  const usa=trip("USA – Florida",["TPC Sawgrass – THE PLAYERS Stadium Course","Arnold Palmer's Bay Hill Club & Lodge","Streamsong Red","Innisbrook – Copperhead Course"],["05 Mar 2025","06 Mar 2025","08 Mar 2025","09 Mar 2025"],["Steve","Simon","Dave","Steve"]);
-
-  const league={};
-  normalRounds.filter(r=>r.gameType==="points").forEach(r=>(r.pointsResults||[]).forEach(x=>league[x.name]=(league[x.name]||0)+Number(x.points||0)));
-  const wins={}; normalRounds.forEach(r=>{if(r.winners?.[0])wins[r.winners[0]]=(wins[r.winners[0]]||0)+1;});
-
-  const keepAdminPin=state.adminPin, keepSetupToken=state.adminSetupToken;
-  state={...state,
-    groupName:"Demo Group",course:"",date:"",stake:10,gameType:"points",pointsCompetition:"stableford",pointsValue:10,roundOpen:false,
-    adminPin:keepAdminPin,adminSetupToken:keepSetupToken,
-    players:demoPlayers.map(p=>({...p,paid:false,competition:null,stableford:null,netScore:null,noReturn:false,scoreSubmitted:false,wins:wins[p.name]||0,leaguePoints:league[p.name]||0,netWinnings:0})),
-    history:normalRounds,
-    trip:{active:false,name:"",totalRounds:0,currentRound:0,competition:null,tripPointsValue:10,rounds:[],standings:{},champion:null,completed:false,pastTrips:[portugal,spain,usa]}
-  };
-  myPlayerId="demo_greg"; saveMyPlayerForGroup();
-  const ok=await save();
-  if(!ok){alert("Demo data could not be saved. Nothing else was changed intentionally.");return;}
-  render();
-  alert("✅ Demo Group is ready.\n\n8 players, 5 normal previous rounds (including Money Games) and 3 completed Money Game trips have been loaded.");
-}
-
 
 
 let isAdmin=false;
@@ -4127,8 +4032,7 @@ ${state.trip?.pastTrips?.length ? `
  <button class="red full" onclick="resetPayments()">Reset payments</button>
 <button class="red full" onclick="resetScores()">Clear scores</button>
 <button class="red full" onclick="deleteLastRound()">↩️ Delete Last Round</button>
-<button class="red full" onclick="clearLeague()">🗑️ Clear League & History</button>
-${String(pin)==="2894" ? `<button class="primary full" onclick="resetDemoGroup()">🎬 Reset Demo Group</button>` : ""}</div>
+<button class="red full" onclick="clearLeague()">🗑️ Clear League & History</button></div>
  <div class="card"><h2>Players</h2><button class="primary full" onclick="show('players')">Manage players & handicaps</button></div>
 <div class="card">
   <h2>Group access</h2>
