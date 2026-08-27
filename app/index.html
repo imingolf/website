@@ -576,39 +576,71 @@ function waitingForNextCompetition(){
   return !state.trip?.active && !roundOpenNow();
 }
 
+function firstRoundNotYetCreated(){
+  return !state.trip?.active &&
+    (state.history||[]).length===0 &&
+    !String(state.course||"").trim() &&
+    !String(state.date||"").trim() &&
+    !roundOpenNow();
+}
+
+async function setupFirstRound(){
+  if(!isAdmin)return;
+  const course=String($("firstRoundCourse")?.value||"").trim();
+  const date=String($("firstRoundDate")?.value||"").trim();
+  const rawStake=String($("firstRoundStake")?.value||"").trim();
+  const stake=rawStake==="" ? 0 : Number(rawStake);
+
+  if(!course){ alert("Please enter the course."); $("firstRoundCourse")?.focus(); return; }
+  if(!date){ alert("Please choose the date."); $("firstRoundDate")?.focus(); return; }
+  if(!Number.isFinite(stake) || stake<0){ alert("Please enter a valid stake, or leave it blank for no money game."); return; }
+
+  state.course=course;
+  state.date=date;
+  state.stake=stake;
+  state.gameType="money";
+  state.roundOpen=true;
+  state.players.forEach(p=>{
+    p.paid=false; p.competition=null; p.stableford=null; p.netScore=null;
+    p.noReturn=false; p.scoreSubmitted=false;
+  });
+  await save();
+  render();
+}
+
 function waitingScreen(){
+  const first=firstRoundNotYetCreated();
+  if(first && isAdmin){
+    $("screen").innerHTML=`
+      ${myPlayerId && state.players.some(p=>p.id===myPlayerId) ? `<div class="notice" style="margin-top:0;">👤 You: <b>${esc(state.players.find(p=>p.id===myPlayerId)?.name||"")}</b></div>` : ""}
+      <div class="card">
+        <div style="font-size:38px;text-align:center;">⛳</div>
+        <h2 style="text-align:center;margin-bottom:6px;">Set up your first round</h2>
+        <div class="muted" style="text-align:center;margin-bottom:20px;">Add the details for your first game.</div>
+        <label class="muted">Course</label>
+        <input id="firstRoundCourse" autocomplete="off" placeholder="e.g. Hazel Grove Golf Club">
+        <label class="muted">Date</label>
+        <input id="firstRoundDate" type="date">
+        <label class="muted">Stake per player (£) <span style="font-weight:400;">— optional</span></label>
+        <input id="firstRoundStake" type="number" min="0" step="1" placeholder="Leave blank for no money game">
+        <button class="primary full" style="margin-top:18px;" onclick="setupFirstRound()">⛳ Set Up Round</button>
+      </div>`;
+    return;
+  }
+
   $("screen").innerHTML=`
+    ${myPlayerId && state.players.some(p=>p.id===myPlayerId) ? `<div class="notice" style="margin-top:0;">👤 You: <b>${esc(state.players.find(p=>p.id===myPlayerId)?.name||"")}</b></div>` : ""}
     <div class="card" style="text-align:center;padding:28px 18px;">
       <div style="font-size:46px;">⛳</div>
-      <div class="muted">NEXT COMPETITION</div>
-      <h2 style="font-size:28px;margin:8px 0;">
-        ${isAdmin ? "Ready for the next one?" : "Coming soon…"}
-      </h2>
-      <div class="muted">
-        ${isAdmin
-          ? "Set up your group's next competition."
-          : "Your Admin will set up the next competition."
-        }
-      </div>
-
-      ${isAdmin ? `
-        <button class="primary full" style="margin-top:18px;" onclick="newRound()">
-          ➕ Set Up Next Competition
-        </button>
-      ` : `
-        <button class="ghost full" style="margin-top:18px;" onclick="adminLoginFromWaiting()">
-          🔐 Admin — Set Up Next Competition
-        </button>
-      `}
+      <div class="muted">${first ? "NEXT ROUND" : "NEXT COMPETITION"}</div>
+      <h2 style="font-size:28px;margin:8px 0;">${isAdmin ? "Ready for the next one?" : (first ? "Your first round is coming soon" : "Coming soon…")}</h2>
+      <div class="muted">${isAdmin ? "Set up your group's next competition." : (first ? "Your Admin hasn't set up the first round yet." : "Your Admin will set up the next competition.")}</div>
+      ${isAdmin ? `<button class="primary full" style="margin-top:18px;" onclick="newRound()">➕ Set Up Next Competition</button>` : `<button class="ghost full" style="margin-top:18px;" onclick="adminLoginFromWaiting()">🔐 Admin — Set Up Next Competition</button>`}
     </div>
-
-    <div class="card">
-      <div class="notice">
-        ✅ The last result has been saved in <b>League → Previous rounds</b>.
-      </div>
-    </div>
+    ${first ? "" : `<div class="card"><div class="notice">✅ The last result has been saved in <b>League → Previous rounds</b>.</div></div>`}
   `;
 }
+
 function paidCount(){return state.players.filter(p=>p.paid).length}
 function potentialPot(){return Number(state.stake||0)*state.players.length}
 function pot(){return Number(state.stake||0)*paidCount()}
@@ -843,7 +875,7 @@ $("screen").innerHTML=`
 
         <div style="margin-top:8px;">
           <span class="pill paid">
-            ${state.gameType==="points" ? "🏆 POINTS GAME" : "💷 MONEY GAME"}
+            ${state.gameType==="points" ? "🏆 POINTS GAME" : (Number(state.stake||0)>0 ? "💷 MONEY GAME" : "⛳ NO STAKE")}
           </span>
         </div>
       </div>
@@ -867,7 +899,7 @@ $("screen").innerHTML=`
 
         ${state.gameType==="money" ? `
           <label class="muted">Stake per player (£)</label>
-          <input type="number" min="0" step="1" value="${state.stake}" onchange="state.stake=+this.value;save();render()">
+          <input type="number" min="0" step="1" value="${Number(state.stake||0)>0 ? state.stake : ""}" placeholder="No stake" onchange="state.stake=this.value==='' ? 0 : +this.value;save();render()">
         ` : `
           <div class="notice">
             <b>${state.pointsCompetition==="stableford" ? "🏆 Stableford" : "⛳ Net"}</b><br>
@@ -907,7 +939,7 @@ $("screen").innerHTML=`
     `}
   </div>
 
-  ${state.gameType==="money" ? `
+  ${state.gameType==="money" && Number(state.stake||0)>0 ? `
     <div class="card">
       <h2>💷 Pay Before Play</h2>
 
@@ -1360,7 +1392,7 @@ if(!demoCanEdit())return;
 
   if(!isAdmin && p.id!==myPlayerId)return;
 
-  if(state.gameType==="money" && !p.paid){
+  if(state.gameType==="money" && Number(state.stake||0)>0 && !p.paid){
     alert("Pay before choosing Stableford or Net.");
     return;
   }
@@ -1387,7 +1419,7 @@ async function submitPlayerScore(i,type){
   if(!p)return;
   if(!isAdmin && p.id!==myPlayerId)return;
 
-  if(state.gameType==="money" && !p.paid){
+  if(state.gameType==="money" && Number(state.stake||0)>0 && !p.paid){
     alert("Pay before entering a score.");
     return;
   }
@@ -1439,7 +1471,7 @@ async function submitNoReturn(i){
     return;
   }
 
-  if(state.gameType==="money" && !p.paid){
+  if(state.gameType==="money" && Number(state.stake||0)>0 && !p.paid){
     alert("Pay before submitting No Return.");
     return;
   }
@@ -4663,8 +4695,9 @@ async function createNewGolfGroup(){
     groupName:cleanGroupName,
     course:"",
     date:"",
-    stake:20,
+    stake:0,
     gameType:"money",
+    roundOpen:false,
     pointsCompetition:"stableford",
     pointsValue:10,
     adminPin:"",
