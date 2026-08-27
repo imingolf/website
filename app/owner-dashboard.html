@@ -78,6 +78,10 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
     <p>Enter your private Owner creation code. It is used only for this browser session.</p>
     <label><b>Owner creation code</b></label>
     <input id="ownerCodeInput" type="password" autocomplete="current-password" placeholder="Private owner code">
+    <label style="display:flex;align-items:center;gap:9px;margin:0 0 14px;font-weight:700;color:#44584a;">
+      <input id="rememberOwner" type="checkbox" style="width:auto;min-height:auto;margin:0;">
+      Remember this device
+    </label>
     <button id="loginBtn" class="primary" style="width:100%">Open Owner Dashboard</button>
     <div id="loginMsg" class="note"></div>
   </div>
@@ -172,6 +176,7 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
   const TEST_PINS=new Set(["2894"]);
   const OWNER_PROTECTED_PIN="1010";
   const PRICE_PER_YEAR=19.99;
+  const OWNER_REMEMBER_KEY="imingolfOwnerCode";
   let db=null, ownerCode="", groups=[], states=new Map(), selectedPin="", fingerprints=new Map(), observedActivity=new Map(), timer=null;
   const viewState={playersGroup:"all",playersSortKey:"name",playersSortDir:1,roundsGroup:"all"};
 
@@ -221,6 +226,8 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
       $("loginBtn").disabled=false;$("loginBtn").textContent="Open Owner Dashboard";return;
     }
     ownerCode=code; groups=Array.isArray(data)?data:[];
+    if($("rememberOwner")?.checked)localStorage.setItem(OWNER_REMEMBER_KEY,code);
+    else localStorage.removeItem(OWNER_REMEMBER_KEY);
     $("loginView").classList.add("hidden");$("dashView").classList.remove("hidden");
     await refreshAll(true);
     timer=setInterval(()=>refreshAll(false,false),10000);
@@ -632,7 +639,16 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
     }
     renderRounds();
   }
-  function logout(){clearInterval(timer);timer=null;ownerCode="";db=null;groups=[];states.clear();fingerprints.clear();observedActivity.clear();selectedPin="";viewState.playersGroup="all";viewState.playersSortKey="name";viewState.playersSortDir=1;viewState.roundsGroup="all";$("ownerCodeInput").value="";$("dashView").classList.add("hidden");$("loginView").classList.remove("hidden");$("loginBtn").disabled=false;$("loginBtn").textContent="Open Owner Dashboard";$("loginMsg").textContent=""}
+  function logout(){clearInterval(timer);timer=null;localStorage.removeItem(OWNER_REMEMBER_KEY);ownerCode="";db=null;groups=[];states.clear();fingerprints.clear();observedActivity.clear();selectedPin="";viewState.playersGroup="all";viewState.playersSortKey="name";viewState.playersSortDir=1;viewState.roundsGroup="all";$("ownerCodeInput").value="";if($("rememberOwner"))$("rememberOwner").checked=false;$("dashView").classList.add("hidden");$("loginView").classList.remove("hidden");$("loginBtn").disabled=false;$("loginBtn").textContent="Open Owner Dashboard";$("loginMsg").textContent=""}
+
+  window.addEventListener("load",async()=>{
+    const savedCode=localStorage.getItem(OWNER_REMEMBER_KEY);
+    if(savedCode){
+      $("ownerCodeInput").value=savedCode;
+      if($("rememberOwner"))$("rememberOwner").checked=true;
+      await login();
+    }
+  });
 
   $("loginBtn").addEventListener("click",login);
   $("dashboardNav").addEventListener("click",showDashboard);
