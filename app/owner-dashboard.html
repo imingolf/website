@@ -439,9 +439,9 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
       let msg="", inviteTitle="Player invite";
       if(!s?.adminPin&&s?.adminSetupToken){
         inviteTitle="Organiser invite";
-        msg=`⛳ I'm In Golf\n\nYou've been invited to manage: ${displayGroupName(g,s)}\n\nGroup PIN: ${pin}\n\nOpen this private Admin setup link:\nhttps://imingolf.co.uk/app/?pin=${encodeURIComponent(pin)}&adminsetup=${encodeURIComponent(s.adminSetupToken)}\n\nOn first opening, you'll be asked to choose your own 4-digit Admin PIN.\n\nKeep this setup link private.`;
+        msg=`⛳ I'm In Golf\n\nYou've been invited to manage ${displayGroupName(g,s)}.\nGroup PIN: ${pin}\n\nTap below to set up your 4-digit Admin PIN:\nhttps://imingolf.co.uk/app/?pin=${encodeURIComponent(pin)}&adminsetup=${encodeURIComponent(s.adminSetupToken)}\n\n🔒 Keep this link private.`;
       }else{
-        msg=`⛳ You're invited to I'm In Golf\n\nTap the link below to join our golf group:\nhttps://imingolf.co.uk/app/?pin=${encodeURIComponent(pin)}\n\nGroup PIN: ${pin}`;
+        msg=`⛳ I'm In Golf\n\nYou've been invited to join ${displayGroupName(g,s)}.\nGroup PIN: ${pin}\n\nTap below to join:\nhttps://imingolf.co.uk/app/?pin=${encodeURIComponent(pin)}`;
       }
       showModal(`<h2>📨 ${esc(inviteTitle)}</h2><p><b>${esc(displayGroupName(g,s))}</b><br>Group PIN: <b>${esc(pin)}</b></p><textarea id="inviteText" readonly>${esc(msg)}</textarea><div class="modal-actions"><button class="ghost" id="closeInvite">Close</button><button class="secondary" id="copyInvite">📋 Copy Invite</button><button class="primary" id="whatsAppInvite">🟢 Send via WhatsApp</button></div>`);
       $("closeInvite").onclick=closeModal;
@@ -505,7 +505,7 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
       }
     }
 
-    const invite=`⛳ I'm In Golf\n\nHi ${adminName},\n\nYou've been invited to manage: ${clean}\n\nGroup PIN: ${newPin}\n\nOpen this private Admin setup link:\nhttps://imingolf.co.uk/app/?pin=${encodeURIComponent(newPin)}&adminsetup=${encodeURIComponent(setupToken)}\n\nOn first opening, you'll be asked to choose your own 4-digit Admin PIN.\n\nKeep this setup link private.`;
+    const invite=`⛳ I'm In Golf\n\nHi ${adminName},\nYou've been invited to manage ${clean}.\nGroup PIN: ${newPin}\n\nTap below to set up your 4-digit Admin PIN:\nhttps://imingolf.co.uk/app/?pin=${encodeURIComponent(newPin)}&adminsetup=${encodeURIComponent(setupToken)}\n\n🔒 Keep this link private.`;
     showModal(`<h2>✅ New group created</h2><p><b>${esc(clean)}</b><br>Organiser: <b>${esc(adminName)}</b><br>Group PIN: <b>${esc(newPin)}</b></p><p class="note">Send this private organiser invite now, or resend it later from the group panel while Admin setup is still waiting.</p><textarea id="inviteText" readonly>${esc(invite)}</textarea><div class="modal-actions"><button class="ghost" id="closeInvite">Close</button><button class="secondary" id="copyInvite">📋 Copy Admin Invite</button><button class="primary" id="whatsAppInvite">🟢 Send via WhatsApp</button></div>`);
     $("closeInvite").onclick=async()=>{closeModal();await refreshAll()};
     $("copyInvite").onclick=async()=>{try{await navigator.clipboard.writeText(invite);toast("Admin invite copied")}catch(e){prompt("Copy this invite:",invite)}};
