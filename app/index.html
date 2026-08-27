@@ -94,6 +94,7 @@ function demoCanEdit(){
 let lastWinnerRecord=null;
 let statsPlayerId=null;
 let myPlayerId="";
+let pendingFirstWelcome="";
 
 function playerIdentityKey(groupPin){
   return "tensInPlayerId_" + String(groupPin||"").trim();
@@ -127,7 +128,7 @@ function chooseMyPlayer(){
       </div>
       ${state.players.length ? `
         <div class="notice" style="margin-bottom:12px;">
-          <b>Already been added by the organiser?</b><br>Tap your name below.
+          <b>Already in the group?</b><br>Tap your name below.
         </div>
         ${[...state.players].sort((a,b)=>a.name.localeCompare(b.name)).map(p=>`
           <button class="secondary full" onclick="selectMyPlayer('${p.id}')">
@@ -203,7 +204,7 @@ function showInstallHelp(playerName){
     <div class="card" style="text-align:center;">
       <div style="font-size:44px;">✅</div>
       <h2 style="font-size:24px;margin-top:8px;">You're in, ${esc(playerName)}!</h2>
-      <div class="muted">Your phone will remember who you are.</div>
+      <div class="muted">This device will remember who you are.</div>
 
       <h2 style="margin-top:24px;">📱 Put I'm In Golf on your Home Screen</h2>
       <div class="muted">It only takes a few seconds.</div>
@@ -220,9 +221,37 @@ function showInstallHelp(playerName){
 }
 
 function finishInstallHelp(){
-  page="round";
   if(db && !poller) startPolling();
+  if(pendingFirstWelcome){
+    showFirstWelcome(pendingFirstWelcome);
+    pendingFirstWelcome="";
+    return;
+  }
+  page="round";
   show("round");
+}
+function showFirstWelcome(role){
+  page="firstwelcome";
+  const me=state.players.find(p=>p.id===myPlayerId);
+  const name=me?.name || "there";
+  document.querySelector("nav").style.display="none";
+  if(role==="admin"){
+    $("screen").innerHTML=`<div class="card" style="text-align:center;padding:26px 18px;">
+      <div style="font-size:46px;">👋</div><h2 style="font-size:25px;margin:8px 0;">You're ready to go, ${esc(name)}!</h2>
+      <div class="muted">Your group is set up. Here are your next two steps.</div>
+      <div class="notice" style="text-align:left;margin-top:18px;"><b>1. 👥 Invite your players</b><br>Share your group invite so your mates can join themselves.</div>
+      <button class="primary full" onclick="document.querySelector('nav').style.display='';show('players')">👥 Invite Players</button>
+      <div class="notice" style="text-align:left;margin-top:18px;"><b>2. ⛳ Set up your first round</b><br>Add the course, date and entry fee when you're ready.</div>
+      <button class="secondary full" onclick="document.querySelector('nav').style.display='';show('round')">⛳ Set Up First Round</button>
+    </div>`;
+  }else{
+    $("screen").innerHTML=`<div class="card" style="text-align:center;padding:26px 18px;">
+      <div style="font-size:46px;">👋</div><h2 style="font-size:25px;margin:8px 0;">Welcome to I'm In Golf, ${esc(name)}!</h2>
+      <div class="muted">You're now part of <b>${esc(state.groupName||"your golf group")}</b>.</div>
+      <div class="notice" style="text-align:left;margin-top:18px;">Your Admin will set up the rounds.<br><br><b>💷 Pay → ⛳ Play → ✍️ Enter your score</b><br><br>Everyone in the group sees the same game.</div>
+      <button class="primary full" onclick="document.querySelector('nav').style.display='';show('round')">Got it — take me to the group</button>
+    </div>`;
+  }
 }
 
 function selectMyPlayer(id){
@@ -558,7 +587,7 @@ function waitingScreen(){
       <div class="muted">
         ${isAdmin
           ? "Set up your group's next competition."
-          : "Your organiser will set up the next competition."
+          : "Your Admin will set up the next competition."
         }
       </div>
 
@@ -568,7 +597,7 @@ function waitingScreen(){
         </button>
       ` : `
         <button class="ghost full" style="margin-top:18px;" onclick="adminLoginFromWaiting()">
-          🏌️ Organiser — Set Up Next Competition
+          🔐 Admin — Set Up Next Competition
         </button>
       `}
     </div>
@@ -787,6 +816,8 @@ function round(){
   const pointsThird=Math.round(pointsFirst*0.3);
 $("screen").innerHTML=`
 
+  ${myPlayerId && state.players.some(p=>p.id===myPlayerId) ? `<div class="notice" style="margin-top:0;">👤 You: <b>${esc(state.players.find(p=>p.id===myPlayerId)?.name||"")}</b></div>` : ""}
+
   ${state.trip?.active ? `
     <div class="card" style="text-align:center;">
       <div style="font-size:28px;">✈️</div>
@@ -895,12 +926,12 @@ $("screen").innerHTML=`
       </div>
 
       <div class="notice">
-        ${paidCount()===state.players.length
+        ${state.players.length>0 && paidCount()===state.players.length
           ? "🔒 Everyone is paid — ready to play."
           : "Payments must be marked before tee-off."}
       </div>
 
-      <button class="primary full" onclick="show('pay')">Manage payments</button>
+      <button class="primary full" onclick="show('pay')">${isAdmin ? "Manage payments" : "View payments"}</button>
     </div>
   ` : `
     <div class="card">
@@ -1001,7 +1032,7 @@ function pay(){
              <div class="muted">£${state.stake} stake</div>
            </div>
 
-           ${(isAdmin || p.id===myPlayerId)
+           ${isAdmin
              ? `<button class="${p.paid?'secondary':'primary'} small" onclick="togglePaid(${i})">${p.paid?'✓ Paid':'Mark paid'}</button>`
              : `<span class="pill ${p.paid?'paid':'pending'}">${p.paid?'✓ Paid':'Not paid'}</span>`
            }
@@ -1014,7 +1045,7 @@ function pay(){
      ? '<div class="notice"><b>👀 Demo Mode — no real payments are taken.</b></div>'
      : (paidCount()===state.players.length
          ? '<div class="notice"><b>🔒 All paid. Ready to play.</b></div>'
-         : '<button class="secondary full" onclick="reminder()">🔔 Copy payment reminder</button>')
+         : (isAdmin ? '<button class="secondary full" onclick="reminder()">🔔 Copy payment reminder</button>' : ''))
    }
  </div>
 
@@ -3614,7 +3645,7 @@ function playersPage(){
          <div class="muted">Tell us who you are to get started.</div>
        </div>
        ${sortedPlayers.length ? `
-         <div class="notice"><b>Already been added by the organiser?</b><br>Find and select your name.</div>
+         <div class="notice"><b>Already in the group?</b><br>Find and select your name.</div>
          <button class="secondary full" onclick="chooseMyPlayer()">👤 Find my name</button>
          <div class="notice" style="margin-top:18px;"><b>Not been added yet?</b><br>Add yourself with your name and handicap.</div>
        ` : `
@@ -3674,7 +3705,8 @@ function playersPage(){
    }).join("")}
 
    ${isAdmin ? `
-     <button class="primary full" onclick="adminAddPlayer()">➕ Add Player</button>
+     <button class="primary full" onclick="copyInvite()">👥 Invite Players</button>
+     <button class="secondary full" onclick="adminAddPlayer()">➕ Add Player Manually</button>
    ` : ""}
  </div>`;
 }
@@ -3717,75 +3749,43 @@ p.handicap=newHandicap;
  render();
  await save();
 }
+function playerJoinForm(){
+  return new Promise(resolve=>{
+    const overlay=document.createElement("div");
+    overlay.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.42);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;";
+    overlay.innerHTML=`<div class="card" style="width:min(440px,100%);margin:0;padding:24px;border-radius:20px;box-shadow:0 18px 50px rgba(0,0,0,.18);">
+      <div style="font-size:38px;">👋</div><h2 style="margin:6px 0 8px;">Add yourself to the group</h2>
+      <div class="muted" style="margin-bottom:16px;">Enter your name and golf handicap.</div>
+      <label><b>First name</b></label><input id="joinFirst" autocomplete="given-name">
+      <label><b>Surname</b></label><input id="joinSurname" autocomplete="family-name">
+      <label><b>Golf handicap</b></label><input id="joinHandicap" type="number" step="0.1" min="-10" max="60" value="18">
+      <div id="joinMsg" class="muted" style="min-height:18px;color:var(--red);"></div>
+      <button class="primary full" id="joinSubmit">Join Group</button><button class="ghost full" id="joinCancel">Cancel</button>
+    </div>`;
+    document.body.appendChild(overlay);
+    const msg=overlay.querySelector("#joinMsg");
+    overlay.querySelector("#joinCancel").onclick=()=>{overlay.remove();resolve(null)};
+    overlay.querySelector("#joinSubmit").onclick=()=>{
+      const first=overlay.querySelector("#joinFirst").value.trim();
+      const surname=overlay.querySelector("#joinSurname").value.trim();
+      const handicap=Number(overlay.querySelector("#joinHandicap").value);
+      if(!first||!surname){msg.textContent="Please enter your first name and surname.";return}
+      if(!Number.isFinite(handicap)||handicap < -10||handicap > 60){msg.textContent="Please enter a valid handicap between -10 and 60.";return}
+      overlay.remove();resolve({first,surname,handicap});
+    };
+    setTimeout(()=>overlay.querySelector("#joinFirst").focus(),50);
+  });
+}
 async function addPlayer(){
-const currentMember=state.players.find(p=>p.id===myPlayerId);
-if(currentMember){
-  alert("✅ You're already a member of this group as " + currentMember.name + ".");
-  return;
-}
-
-const firstName=prompt("First name:");
-if(firstName===null)return;
-
-const cleanFirstName=firstName.trim();
-
-if(!cleanFirstName){
-  alert("Please enter your first name.");
-  return;
-}
-
-const surname=prompt("Surname:");
-if(surname===null)return;
-
-const cleanSurname=surname.trim();
-
-if(!cleanSurname){
-  alert("Please enter your surname.");
-  return;
-}
-
-const cleanName=cleanFirstName + " " + cleanSurname;
-
-const duplicate=state.players.some(
-  p=>p.name.trim().toLowerCase()===cleanName.toLowerCase()
-);
-    if(duplicate){
-    alert("That name is already in the group. Please choose your existing name.");
-    return;
-  }
-
-  const h=prompt("Handicap","18");
-  if(h===null)return;
-
-  const handicap=Number(h);
-
-  if(!Number.isFinite(handicap) || handicap < -10 || handicap > 60){
-  alert("Please enter a valid handicap between -10 and 60.");
-  return;
-}
-  const newPlayer={
-    id:Date.now().toString(36),
-    name:cleanName,
-    handicap:handicap,
-    competition:null,
-    paid:false,
-    stableford:null,
-    netScore:null,
-    wins:0,
-    leaguePoints:0,
-    netWinnings:0
-  };
-
-  state.players.push(newPlayer);
-
-  myPlayerId=newPlayer.id;
-  saveMyPlayerForGroup();
-
-  render();
-  await save();
-
-  document.querySelector("nav").style.display="";
-  showInstallHelp(newPlayer.name);
+  const currentMember=state.players.find(p=>p.id===myPlayerId);
+  if(currentMember){alert("✅ You're already a member of this group as " + currentMember.name + ".");return;}
+  const details=await playerJoinForm(); if(!details)return;
+  const cleanName=details.first+" "+details.surname;
+  if(state.players.some(p=>p.name.trim().toLowerCase()===cleanName.toLowerCase())){alert("That name is already in the group. Please choose your existing name.");return;}
+  const newPlayer={id:Date.now().toString(36),name:cleanName,handicap:details.handicap,competition:null,paid:false,stableford:null,netScore:null,noReturn:false,scoreSubmitted:false,wins:0,leaguePoints:0,netWinnings:0};
+  state.players.push(newPlayer); myPlayerId=newPlayer.id; saveMyPlayerForGroup();
+  pendingFirstWelcome=isAdmin?"admin":"player";
+  render(); await save(); document.querySelector("nav").style.display=""; showInstallHelp(newPlayer.name);
 }
 
 async function adminAddPlayer(){
@@ -3992,8 +3992,6 @@ function settingsPage(){
  </div>
  <button class="secondary full" onclick="changeGroupName()">✏️ Change Group Name</button>
  <button class="primary full" onclick="openAdminHelp()">❓ Admin Help</button>
- <label class="muted">Course</label><input value="${escAttr(state.course)}" onchange="state.course=this.value;save()">
- <label class="muted">Default/current stake (£)</label><input type="number" min="0" value="${state.stake}" onchange="state.stake=+this.value;save()">
  </div>
  <div class="card"><h2>Round controls</h2>
  ${!state.trip?.active && !state.trip?.completed ? `
@@ -4066,13 +4064,7 @@ ${isOwner ? `
     Leave Owner Mode
   </button>
 </div>
-` : `
-<div class="card">
-  <button class="ghost full" onclick="ownerLogin()">
-    🔐 Owner Access
-  </button>
-</div>
-`}
+` : ``}
 
 <div class="card">
   <button class="red full" onclick="adminLogout()">
@@ -4104,12 +4096,12 @@ function adminHelpBack(){
 function adminHelpTopicContent(topic){
   const topics={
     setup:`<h2>⛳ Set up the next competition</h2><div class="notice"><b>1.</b> Go to <b>Round</b>.<br><br><b>2.</b> Tap <b>Set Up Next Competition</b>.<br><br><b>3.</b> Choose Money Game, Points Game or Trip Mode.<br><br><b>4.</b> Enter the course, date and competition details.<br><br><b>5.</b> In a Money Game, make sure players pay and choose Stableford or Net before the first score is submitted.</div><div class="notice warning">Once the first score is submitted, entries close automatically.</div>`,
-    players:`<h2>👥 Add or edit players</h2><div class="notice">Go to <b>Players</b>.<br><br>Players can join themselves, or the organiser can manage names and handicaps while Admin is unlocked.<br><br>A player can use <b>Change who I am</b> if the wrong name is selected on their phone.</div>`,
+    players:`<h2>👥 Add or edit players</h2><div class="notice">Go to <b>Players</b>.<br><br>Players can join themselves, or the Admin can manage names and handicaps while Admin is unlocked.<br><br>A player can use <b>Change who I am</b> if the wrong name is selected on their phone.</div>`,
     payments:`<h2>💷 Payments</h2><div class="notice">In a Money Game, go to <b>Pay</b> and mark players as paid before scoring starts.<br><br>Only paid players can enter a competition or submit a score.<br><br>Once scoring starts, payment status is locked so nobody can join late.</div><div class="muted">Automatic in-app pot collection is a future feature.</div>`,
     scoring:`<h2>🏌️ Scores</h2><div class="notice">Players enter their own score and tap <b>Submit score</b>.<br><br>The app asks <b>Are you sure?</b> before saving.<br><br>Once submitted, the player's score is locked.</div><div class="notice">Admin can use <b>Correct score</b> if a genuine mistake needs fixing.</div>`,
     nr:`<h2>NR — No Return</h2><div class="notice">In a <b>Net</b> competition, a player who does not return a score should tap <b>NR — No Return</b>.<br><br>NR counts as submitted, removes the player from <b>Still to enter</b>, and the player cannot win the Net competition.</div>`,
     waiting:`<h2>⏳ Still to enter</h2><div class="notice">The Scores screen shows exactly who still needs to submit.<br><br>For a Money Game, only players who are paid and have chosen a competition are included.<br><br>The list updates automatically as scores or NR results are submitted.</div>`,
-    finish:`<h2>🏁 Finish a round</h2><div class="notice">When every entered player has submitted a score or valid NR, Admin will see <b>Finish Round & Save Result</b> at the bottom of Scores.<br><br>Check the leaderboard, tap the button and confirm the result.<br><br>The completed round is saved in <b>League → Previous rounds</b>.</div><div class="notice">After a normal round finishes, players see <b>Next Competition — Coming soon…</b> until the organiser sets up the next one.</div>`,
+    finish:`<h2>🏁 Finish a round</h2><div class="notice">When every entered player has submitted a score or valid NR, Admin will see <b>Finish Round & Save Result</b> at the bottom of Scores.<br><br>Check the leaderboard, tap the button and confirm the result.<br><br>The completed round is saved in <b>League → Previous rounds</b>.</div><div class="notice">After a normal round finishes, players see <b>Next Competition — Coming soon…</b> until the Admin sets up the next one.</div>`,
     points:`<h2>🏆 Points Games</h2><div class="notice">Everyone plays the same competition — Stableford or Net.<br><br>There is no payment step.<br><br>The top three receive league points based on the value chosen when the round is set up.</div>`,
     trip:`<h2>✈️ Trip Mode</h2><div class="notice">Choose <b>Trip Mode</b> when setting up a competition, then enter the trip name and number of rounds.<br><br>Each round is saved inside the trip and Trip Championship points build across the trip.<br><br>After the final round, the app shows a Trip Summary with daily winners, final standings and the Trip winner.</div><div class="notice">The organiser then taps <b>Save Trip & Return to Normal Golf</b>.</div>`,
     pin:`<h2>🔐 Admin PIN</h2><div class="notice">Admin can change the PIN in <b>Settings → Change Admin PIN</b>.<br><br>If the Admin PIN is forgotten, the I'm In Golf owner can reset it securely from Owner Controls.</div>`,
@@ -4129,7 +4121,7 @@ function adminHelpPage(){
       <div class="card">
         <div class="muted">I'M IN GOLF</div>
         <h2 style="font-size:24px;margin:4px 0 8px;">❓ Admin Help</h2>
-        <div class="muted">Simple help for organisers.</div>
+        <div class="muted">Simple help for Admins.</div>
       </div>
       <div class="card">${topicHtml}</div>
       <div class="card">
@@ -4910,7 +4902,7 @@ function organiserAdminSetupComplete(groupName,groupPin){
       <div class="card" style="width:min(440px,100%);margin:0;padding:26px;border-radius:20px;box-shadow:0 18px 50px rgba(0,0,0,.18);text-align:center;">
         <div style="font-size:46px;margin-bottom:8px;">✅</div>
         <h2 style="font-size:24px;margin:0 0 8px;">Admin PIN created</h2>
-        <p class="muted" style="margin:0;">You're now the organiser for <b>${esc(groupName)}</b>.</p>
+        <p class="muted" style="margin:0;">You're now the Admin for <b>${esc(groupName)}</b>.</p>
         <div class="notice" style="margin-top:18px;text-align:left;">
           <b>Group PIN: ${esc(groupPin)}</b><br>
           Keep your Admin PIN private.
@@ -5864,11 +5856,10 @@ function copyInvite(){
   const groupName=String(state.groupName||"our golf group").trim();
   const message=`⛳ I'm In Golf
 
-Join ${groupName}.
-
+You've been invited to join ${groupName}.
 Group PIN: ${pin}
 
-Open I'm In Golf here:
+Tap below to join:
 ${url}`;
 
   navigator.clipboard?.writeText(message);
