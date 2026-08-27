@@ -150,11 +150,11 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
           </div>
           <div class="table-wrap">
             <table>
-              <thead><tr><th>Group</th><th>PIN</th><th>Players</th><th>Rounds</th><th>Plan</th><th>Trial / Renewal</th><th>Live activity</th><th>Status</th></tr></thead>
+              <thead><tr><th>Group</th><th>PIN</th><th>Players</th><th>Rounds</th><th>Plan</th><th>Trial / Renewal</th><th>Last activity</th><th>Status</th></tr></thead>
               <tbody id="groupsBody"></tbody>
             </table>
           </div>
-          <div class="note">Live player/round changes refresh automatically every 10 seconds. “Live activity” records changes observed while this dashboard is open; the current database does not yet store a permanent last-active timestamp.</div>
+          <div class="note">Live player/round changes refresh automatically every 10 seconds. “Last activity” is stored with the group and updates when the app is opened or a player/admin makes a change.</div>
         </div>
 
         <aside class="panel" id="detailPanel"><div class="empty">Select a group to see its details and members.</div></aside>
@@ -287,10 +287,20 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
     return "—";
   }
   function activityText(pin){
-    const d=observedActivity.get(pin); if(!d)return "No change seen";
-    const sec=Math.floor((Date.now()-d.getTime())/1000);
-    if(sec<60)return "Changed just now";
-    const min=Math.floor(sec/60);return `Changed ${min}m ago`;
+    const s=states.get(String(pin));
+    const raw=s?.lastActivityAt || s?.last_activity_at || null;
+    let d=raw?new Date(raw):null;
+    if(!d || Number.isNaN(d.getTime()))d=observedActivity.get(String(pin))||null;
+    if(!d)return "No activity recorded yet";
+
+    const now=new Date();
+    const sameDay=d.getFullYear()===now.getFullYear() && d.getMonth()===now.getMonth() && d.getDate()===now.getDate();
+    const yesterday=new Date(now.getFullYear(),now.getMonth(),now.getDate()-1);
+    const wasYesterday=d.getFullYear()===yesterday.getFullYear() && d.getMonth()===yesterday.getMonth() && d.getDate()===yesterday.getDate();
+    const time=d.toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"});
+    if(sameDay)return `Today ${time}`;
+    if(wasYesterday)return `Yesterday ${time}`;
+    return `${d.toLocaleDateString("en-GB",{day:"2-digit",month:"2-digit",year:"numeric"})} ${time}`;
   }
   function renderGroups(){
     const body=$("groupsBody");
@@ -348,7 +358,7 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
         <div class="detail-row"><span>Rounds completed</span><b>${(s?.history||[]).length}</b></div>
         <div class="detail-row"><span>Plan</span><b>${String(g.plan_type||"trial")==="trial"?"Free Trial":String(g.plan_type||"").replace(/^./,c=>c.toUpperCase())}</b></div>
         <div class="detail-row"><span>Trial / renewal</span><b>${esc(trialText(g))}</b></div>
-        <div class="detail-row"><span>Live activity</span><b>${esc(activityText(pin))}</b></div>
+        <div class="detail-row"><span>Last activity</span><b>${esc(activityText(pin))}</b></div>
       </div>
       <div class="members"><h3>📝 Live Score Entry</h3>
         ${s?.roundOpen===false ? `<div class="empty">No competition is currently open.</div>` : players.length ? players.slice().sort((a,b)=>String(a.name).localeCompare(String(b.name))).map(p=>{
