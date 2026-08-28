@@ -82,6 +82,7 @@ nav button{flex:1;background:transparent;color:#6d756f;padding:11px 2px;font-siz
 let db=null, pin="", page="round", poller=null;
 let leagueView="points";
 let selectedPastTripIndex=0;
+let roundEditOpen=false;
 
 function demoReadOnly(){
   return pin==="2026" && !isAdmin;
@@ -887,6 +888,35 @@ function showTripSummary(){
   window.scrollTo(0,0);
 }
 
+function beginRoundEdit(){
+  if(roundLocked())return;
+  roundEditOpen=true;
+  render();
+}
+function cancelRoundEdit(){
+  roundEditOpen=false;
+  render();
+}
+function saveRoundEdit(){
+  if(roundLocked()){roundEditOpen=false;render();return;}
+  const course=(document.getElementById("roundEditCourse")?.value||"").trim();
+  const date=document.getElementById("roundEditDate")?.value||"";
+  if(!course){appAlert("Please enter the course name.");return;}
+  if(!date){appAlert("Please choose the round date.");return;}
+  let stake=Number(state.stake||0);
+  if(state.gameType==="money"){
+    const raw=document.getElementById("roundEditStake")?.value||"";
+    stake=raw===""?0:Number(raw);
+    if(!Number.isFinite(stake)||stake<0){appAlert("Please enter a valid stake, or leave it blank for no stake.");return;}
+  }
+  state.course=course;
+  state.date=date;
+  if(state.gameType==="money")state.stake=stake;
+  roundEditOpen=false;
+  save();
+  render();
+}
+
 function round(){
 
   if(state.trip?.completed){
@@ -951,83 +981,33 @@ $("screen").innerHTML=`
   ` : ""}
 
   <div class="card">
-
-      <div class="row">
-      <div>
+    <div class="row" style="align-items:flex-start;">
+      <div style="min-width:0;flex:1;">
         <div class="muted">CURRENT ROUND</div>
-        <h2>${esc(state.course)}</h2>
-        <div class="muted">${esc(formatDate(state.date))} • ${state.players.length} players</div>
-
-        <div style="margin-top:8px;">
-          <span class="pill paid">
-            ${state.trip?.active ? "✈️ TRIP ROUND" : (state.gameType==="points" ? "🏆 POINTS GAME" : (Number(state.stake||0)>0 ? "💷 MONEY GAME" : "⛳ NO STAKE"))}
-          </span>
+        <h2 style="font-size:24px;margin:3px 0;">${esc(state.course || "Course not set")}</h2>
+        <div class="muted">${esc(formatDate(state.date))} • ${state.players.length} player${state.players.length===1?"":"s"}</div>
+        <div style="margin-top:9px;display:flex;gap:7px;flex-wrap:wrap;">
+          <span class="pill paid">${state.trip?.active ? "✈️ TRIP ROUND" : (state.gameType==="points" ? "🏆 POINTS GAME" : (Number(state.stake||0)>0 ? "💷 MONEY GAME" : "⛳ NO STAKE"))}</span>
+          <span class="pill paid">${state.pointsCompetition==="stableford" ? "🏆 STABLEFORD" : "⛳ NET"}</span>
         </div>
+        ${state.gameType==="money" && Number(state.stake||0)>0 ? `<div class="muted" style="margin-top:9px;"><b>£${Number(state.stake||0)} entry</b> • £${potentialPot()} expected pot${paidCount()>0 ? ` • £${pot()} paid in` : ``}</div>` : ``}
       </div>
-
-      <span class="pill ${roundLocked()?'pending':'paid'}">
-        ${roundLocked()?'🔒 ENTRIES CLOSED':'OPEN'}
-      </span>
+      <span class="pill ${roundLocked()?'pending':'paid'}">${roundLocked()?'🔒 ENTRIES CLOSED':'OPEN'}</span>
     </div>
-  </div>
 
-  <div class="card">
-    <h2>Round details</h2>
-
-    ${isAdmin ? `
-      ${roundLocked() ? `<div class="notice">🔒 <b>Round details locked</b><br>Course, date and stake can’t be changed after scoring has started.</div>` : ``}
-      <label class="muted">Course</label>
-      <input value="${escAttr(state.course)}" ${roundLocked()?"disabled":""} onchange="if(roundLocked()){render();return;}state.course=this.value;save()">
-
-      <div>
-        <label class="muted">Date</label>
-        <input type="date" value="${escAttr(state.date)}" ${roundLocked()?"disabled":""} onchange="if(roundLocked()){render();return;}state.date=this.value;save();render()">
-
-        <div class="notice"><b>Competition: ${state.pointsCompetition==="stableford" ? "🏆 Stableford" : "⛳ Net"}</b></div>
-
-        ${state.gameType==="money" ? `
-          <label class="muted">Stake per player (£)</label>
-          <input type="number" min="0" step="1" value="${Number(state.stake||0)>0 ? state.stake : ""}" placeholder="No stake" ${roundLocked()?"disabled":""} onchange="if(roundLocked()){render();return;}state.stake=this.value==='' ? 0 : +this.value;save();render()">
-        ` : `
-          <div class="notice">
-            <b>${state.pointsCompetition==="stableford" ? "🏆 Stableford" : "⛳ Net"}</b><br>
-            Points Game • Top 3 score league points
-          </div>
+    ${isAdmin && !roundLocked() ? `
+      <div style="margin-top:14px;">
+        ${!roundEditOpen ? `<button class="secondary full" onclick="beginRoundEdit()">✏️ Edit round details</button>` : `
+          <div class="notice"><b>Edit round details</b><br>Make any correction before scoring starts.</div>
+          <label class="muted">Course</label>
+          <input id="roundEditCourse" value="${escAttr(state.course)}" placeholder="Course">
+          <label class="muted">Date</label>
+          <input id="roundEditDate" type="date" value="${escAttr(state.date)}">
+          ${state.gameType==="money" ? `<label class="muted">Stake per player (£)</label><input id="roundEditStake" type="number" min="0" step="1" value="${Number(state.stake||0)>0 ? state.stake : ""}" placeholder="No stake">` : ``}
+          <div class="grid2"><button class="primary" onclick="saveRoundEdit()">Save changes</button><button class="secondary" onclick="cancelRoundEdit()">Cancel</button></div>
         `}
       </div>
-    ` : `
-      <div class="muted">Course</div>
-      <b>${esc(state.course)}</b>
-
-      <div style="height:10px"></div>
-
-      ${state.gameType==="money" ? `
-        <div class="grid2">
-          <div>
-            <div class="muted">Date</div>
-            <b>${esc(formatDate(state.date))}</b>
-          </div>
-          <div>
-            <div class="muted">Stake per player</div>
-            <b>£${state.stake}</b>
-          </div>
-        </div>
-        <div style="height:10px"></div>
-        <div class="muted">Competition</div>
-        <b>${state.pointsCompetition==="stableford" ? "🏆 Stableford" : "⛳ Net"}</b>
-      ` : `
-        <div class="grid2">
-          <div>
-            <div class="muted">Date</div>
-            <b>${esc(formatDate(state.date))}</b>
-          </div>
-          <div>
-            <div class="muted">Competition</div>
-            <b>${state.pointsCompetition==="stableford" ? "Stableford" : "Net"}</b>
-          </div>
-        </div>
-      `}
-    `}
+    ` : isAdmin && roundLocked() ? `<div class="notice" style="margin-top:14px;">🔒 <b>Round details locked</b><br>Course, date and stake can’t be changed after scoring has started.</div>` : ``}
   </div>
 
   ${state.gameType==="money" && Number(state.stake||0)>0 ? `
