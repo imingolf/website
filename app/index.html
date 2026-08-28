@@ -672,11 +672,15 @@ function paidCount(){return state.players.filter(p=>p.paid).length}
 function potentialPot(){return Number(state.stake||0)*state.players.length}
 function pot(){return Number(state.stake||0)*paidCount()}
 function stablefordPaidCount(){
-  return state.players.filter(p=>p.paid && p.competition==="stableford").length;
+  return (state.pointsCompetition || "stableford")==="stableford"
+    ? state.players.filter(p=>p.paid).length
+    : 0;
 }
 
 function netPaidCount(){
-  return state.players.filter(p=>p.paid && p.competition==="net").length;
+  return (state.pointsCompetition || "stableford")==="net"
+    ? state.players.filter(p=>p.paid).length
+    : 0;
 }
 
 function stablefordPot(){
@@ -1228,6 +1232,13 @@ function scores(){
     )
     .sort((a,b)=>Number(a.netScore)-Number(b.netScore));
 
+  const rankLabel=(list,index,scoreOf)=>{
+    const score=Number(scoreOf(list[index]));
+    const firstIndex=list.findIndex(x=>Number(scoreOf(x))===score);
+    const tied=list.filter(x=>Number(scoreOf(x))===score).length>1;
+    return tied ? `T${firstIndex+1}` : String(index+1);
+  };
+
   $("screen").innerHTML=`
     <div class="card">
       <h2>🏌️ Scores</h2>
@@ -1347,7 +1358,7 @@ function scores(){
         ${stablefordRanked.length
           ? stablefordRanked.map((p,i)=>`
             <div class="player row">
-              <span class="pos">${i+1}</span>
+              <span class="pos">${rankLabel(stablefordRanked,i,x=>x.stableford)}</span>
               <div style="flex:1">
                 <b>${esc(p.name)}</b>
                 ${!isPointsGame ? `
@@ -1371,7 +1382,7 @@ function scores(){
         ${netRanked.length
           ? netRanked.map((p,i)=>`
             <div class="player row">
-              <span class="pos">${i+1}</span>
+              <span class="pos">${rankLabel(netRanked,i,x=>x.netScore)}</span>
               <div style="flex:1">
                 <b>${esc(p.name)}</b>
                 ${!isPointsGame ? `
@@ -1605,34 +1616,83 @@ async function finishRound(){
     return players[selected];
   }
 
+  function chooseMoneyCountbackWinner(players,competition,score){
+    return new Promise(resolve=>{
+      const overlay=document.createElement("div");
+      overlay.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.42);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;";
+      overlay.innerHTML=`
+        <div class="card" style="width:min(440px,100%);margin:0;padding:24px;border-radius:20px;box-shadow:0 18px 50px rgba(0,0,0,.18);">
+          <div style="font-size:38px;text-align:center;">🏆</div>
+          <h2 style="text-align:center;margin:8px 0;">Choose countback winner</h2>
+          <div class="notice" style="margin-top:14px;">
+            <b>${esc(competition)} tie — ${esc(String(score))}</b><br>
+            Use your normal scorecard countback. No hole-by-hole entry is needed in I'm In Golf.
+          </div>
+          <div style="margin-top:14px;">
+            ${players.map((p,i)=>`
+              <button class="primary full" data-winner="${i}" style="margin-top:${i?8:0}px;">
+                🏆 ${esc(p.name)}
+              </button>
+            `).join("")}
+          </div>
+          <button class="secondary full" id="cancelCountbackWinner" style="margin-top:12px;">Cancel</button>
+        </div>`;
+      document.body.appendChild(overlay);
+      overlay.querySelectorAll("[data-winner]").forEach(btn=>{
+        btn.onclick=()=>{
+          const winner=players[Number(btn.dataset.winner)];
+          overlay.remove();
+          resolve(winner || null);
+        };
+      });
+      overlay.querySelector("#cancelCountbackWinner").onclick=()=>{
+        overlay.remove();
+        resolve(null);
+      };
+    });
+  }
+
   function resolveMoneyTie(players,competition,score,pot){
-    const each=players.length ? Number(pot||0)/players.length : 0;
-    const answer=prompt(
-      `${competition} tie on ${score}.\n\n` +
-      `1. Split the pot equally — £${each.toFixed(2).replace(/\\.00$/,"")} each\n` +
-      `2. Admin declares the countback winner\n\n` +
-      `Enter 1 or 2`
-    );
+    return new Promise(resolve=>{
+      const each=players.length ? Number(pot||0)/players.length : 0;
+      const money=n=>Number(n||0).toFixed(2).replace(/\.00$/,"" );
+      const overlay=document.createElement("div");
+      overlay.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.42);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;";
+      overlay.innerHTML=`
+        <div class="card" style="width:min(440px,100%);margin:0;padding:24px;border-radius:20px;box-shadow:0 18px 50px rgba(0,0,0,.18);">
+          <div style="font-size:40px;text-align:center;">🤝</div>
+          <h2 style="text-align:center;margin:8px 0;">Tied winning score</h2>
+          <div class="notice" style="margin-top:14px;">
+            <b>${esc(competition)} — ${esc(String(score))}</b><br>
+            ${players.map(p=>esc(p.name)).join(" & ")} are tied for 1st.
+          </div>
+          <p style="font-weight:800;margin:18px 0 8px;">How would you like to settle it?</p>
+          <button class="primary full" id="splitTiePot">
+            💷 Split the pot — £${money(each)} each
+          </button>
+          <button class="secondary full" id="countbackTieWinner" style="margin-top:10px;">
+            🏆 Choose winner — countback
+          </button>
+          <button class="ghost full" id="cancelMoneyTie" style="margin-top:10px;">Cancel</button>
+        </div>`;
+      document.body.appendChild(overlay);
 
-    if(answer===null)return null;
+      overlay.querySelector("#splitTiePot").onclick=()=>{
+        overlay.remove();
+        resolve({winners:[...players],countback:false,split:true});
+      };
 
-    if(String(answer).trim()==="1"){
-      return {winners:[...players],countback:false,split:true};
-    }
+      overlay.querySelector("#countbackTieWinner").onclick=async()=>{
+        overlay.remove();
+        const winner=await chooseMoneyCountbackWinner(players,competition,score);
+        resolve(winner ? {winners:[winner],countback:true,split:false} : null);
+      };
 
-    if(String(answer).trim()==="2"){
-      const winner=chooseCountbackWinner(
-        players,
-        competition,
-        score,
-        "1st"
-      );
-      if(!winner)return null;
-      return {winners:[winner],countback:true,split:false};
-    }
-
-    alert("Please enter 1 to split the pot or 2 for countback.");
-    return resolveMoneyTie(players,competition,score,pot);
+      overlay.querySelector("#cancelMoneyTie").onclick=()=>{
+        overlay.remove();
+        resolve(null);
+      };
+    });
   }
 
 
@@ -1884,7 +1944,7 @@ if(isTrip){
   let stablefordSplit=false;
 
   if(stablefordWinners.length>1){
-    const resolution=resolveMoneyTie(
+    const resolution=await resolveMoneyTie(
       stablefordWinners,
       "Stableford",
       stablefordBest + " points",
@@ -1902,7 +1962,7 @@ if(isTrip){
   let netSplit=false;
 
   if(netWinners.length>1){
-    const resolution=resolveMoneyTie(
+    const resolution=await resolveMoneyTie(
       netWinners,
       "Net",
       netBest,
