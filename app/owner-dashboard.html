@@ -133,6 +133,8 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
         <div class="stat"><div class="k">Total Groups</div><div class="v" id="statGroups">—</div><div class="s" id="statGroupsSub">Loading…</div></div>
         <div class="stat"><div class="k">Total Players</div><div class="v" id="statPlayers">—</div><div class="s">Across real groups</div></div>
         <div class="stat"><div class="k">Rounds Played</div><div class="v" id="statRounds">—</div><div class="s">Saved round history</div></div>
+        <div class="stat"><div class="k">Live Pots</div><div class="v" id="statLivePots">—</div><div class="s" id="statLivePotsSub">Current money rounds</div></div>
+        <div class="stat"><div class="k">Pots Played For</div><div class="v" id="statPotsPlayed">—</div><div class="s" id="statMoneyRounds">Completed money rounds</div></div>
         <div class="stat"><div class="k">Trial Groups</div><div class="v" id="statTrials">—</div><div class="s">Currently on trial</div></div>
         <div class="stat"><div class="k">Paid Groups</div><div class="v" id="statPaid">—</div><div class="s" id="statRevenue">Annual value —</div></div>
       </section>
@@ -268,16 +270,61 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
     }
   }
   function realGroups(){return groups.filter(g=>!TEST_PINS.has(String(g.group_pin)))}
+  function roundPotValue(r){
+    if(!r)return 0;
+    const sf=Number(r.stablefordPot||0), net=Number(r.netPot||0);
+    if(sf>0||net>0)return sf+net;
+    const stake=Number(r.stake||0);
+    if(stake<=0)return 0;
+    const ps=Array.isArray(r.players)?r.players:[];
+    const entered=ps.filter(p=>p.scoreSubmitted===true||p.stableford!=null||p.netScore!=null||p.noReturn===true).length;
+    return stake*(entered||ps.length||0);
+  }
+  function completedMoneyRounds(s){
+    if(!s)return [];
+    const rows=[];
+    (s.history||[]).forEach(r=>{if(Number(r?.stake||0)>0||String(r?.gameType||"")==="money"&&roundPotValue(r)>0)rows.push({...r,_tripName:""})});
+    const past=s.trip?.pastTrips||[];
+    past.forEach(t=>(t.rounds||[]).forEach(r=>{if(Number(r?.stake||0)>0||roundPotValue(r)>0)rows.push({...r,_tripName:t.name||"Trip"})}));
+    if(s.trip && (s.trip.active||s.trip.completed) && Array.isArray(s.trip.rounds)){
+      s.trip.rounds.forEach(r=>{if(Number(r?.stake||0)>0||roundPotValue(r)>0)rows.push({...r,_tripName:s.trip.name||"Trip"})});
+    }
+    return rows;
+  }
+  function liveMoneyInfo(s){
+    const stake=Number(s?.stake||0), open=s?.roundOpen!==false;
+    if(!s||!open||stake<=0)return null;
+    const ps=s.players||[], paid=ps.filter(p=>p.paid===true).length;
+    return {stake,paid,players:ps.length,current:stake*paid,expected:stake*ps.length};
+  }
+  function moneyWinnerText(r){
+    const names=Array.isArray(r?.winners)?r.winners:(r?.winnerName?[r.winnerName]:[]);
+    return names.filter(Boolean).join(", ")||getRoundWinner(r)||"—";
+  }
+
   function renderStats(){
     const real=realGroups();
-    let players=0,rounds=0;
-    real.forEach(g=>{const s=states.get(String(g.group_pin));players+=(s?.players||[]).length;rounds+=(s?.history||[]).length});
+    let players=0,rounds=0,livePots=0,livePotGroups=0,potsPlayed=0,moneyRounds=0;
+    real.forEach(g=>{
+      const s=states.get(String(g.group_pin));
+      players+=(s?.players||[]).length;
+      rounds+=(s?.history||[]).length;
+      const live=liveMoneyInfo(s);
+      if(live){livePots+=live.current;livePotGroups++;}
+      const completed=completedMoneyRounds(s);
+      moneyRounds+=completed.length;
+      potsPlayed+=completed.reduce((sum,r)=>sum+roundPotValue(r),0);
+    });
     const trials=real.filter(g=>String(g.plan_type||"trial")==="trial"&&String(g.status||"active")==="active").length;
     const paid=real.filter(g=>String(g.plan_type)==="paid"&&String(g.paid_status)==="paid"&&String(g.status||"active")==="active").length;
     $("statGroups").textContent=real.length;
     $("statGroupsSub").textContent=`${real.length} real • ${groups.length-real.length} test`;
     $("statPlayers").textContent=players;
     $("statRounds").textContent=rounds;
+    $("statLivePots").textContent=`£${livePots.toFixed(2).replace(/\.00$/,'')}`;
+    $("statLivePotsSub").textContent=`${livePotGroups} current money round${livePotGroups===1?"":"s"}`;
+    $("statPotsPlayed").textContent=`£${potsPlayed.toFixed(2).replace(/\.00$/,'')}`;
+    $("statMoneyRounds").textContent=`${moneyRounds} completed money round${moneyRounds===1?"":"s"}`;
     $("statTrials").textContent=trials;
     $("statPaid").textContent=paid;
     $("statRevenue").textContent=`Annual value £${(paid*PRICE_PER_YEAR).toFixed(2)}`;
@@ -354,6 +401,9 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
     if(!g){$("detailPanel").innerHTML=`<div class="empty">Select a group.</div>`;return}
     const players=s?.players||[], [done,total]=submittedCount(s), pct=total?Math.round(done/total*100):0;
     const adminSetup=s?.adminPin?"Complete":"Waiting";
+    const liveMoney=liveMoneyInfo(s);
+    const moneyRounds=completedMoneyRounds(s);
+    const moneyTotal=moneyRounds.reduce((sum,r)=>sum+roundPotValue(r),0);
     $("detailPanel").innerHTML=`
       <div class="detail-top"><div><div class="label">GROUP</div><h2>${esc(displayGroupName(g,s))}</h2><div class="sub">PIN ${esc(pin)}</div></div>${statusBadge(g)}</div>
       <div class="detail-grid">
@@ -361,6 +411,14 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
         <div class="detail-row"><span>Admin setup</span><b>${adminSetup}</b></div>
         <div class="detail-row"><span>Players</span><b>${players.length}</b></div>
         <div class="detail-row"><span>Current round</span><b>${esc(currentRoundText(s))}</b></div>
+        ${liveMoney ? `
+          <div class="detail-row"><span>Entry fee</span><b>£${liveMoney.stake}</b></div>
+          <div class="detail-row"><span>Current pot</span><b>£${liveMoney.current} paid in</b></div>
+          <div class="detail-row"><span>Paid</span><b>${liveMoney.paid} / ${liveMoney.players}</b></div>
+          <div class="detail-row"><span>Expected pot</span><b>£${liveMoney.expected}</b></div>
+        ` : ``}
+        <div class="detail-row"><span>Money rounds played</span><b>${moneyRounds.length}</b></div>
+        <div class="detail-row"><span>Total pots played for</span><b>£${moneyTotal.toFixed(2).replace(/\.00$/,'')}</b></div>
         ${s?.roundOpen===false ? `` : `
           <div class="detail-row"><span>Scores submitted</span><b>${done} / ${total}</b></div>
           <div class="progress"><span style="width:${pct}%"></span></div>
@@ -385,6 +443,10 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
           return `<div class="member"><div><b>${esc(p.name||"Player")}</b><div class="role">${compLabel}</div></div><div><b>${result}</b></div></div>`;
         }).join("") : `<div class="empty">No players have joined yet.</div>`}
       </div>
+      ${moneyRounds.length||liveMoney ? `<div class="members"><h3>💷 Money Activity</h3>
+        ${liveMoney ? `<div class="member"><div><b>Current round</b><div class="role">£${liveMoney.stake} entry • ${liveMoney.paid}/${liveMoney.players} paid</div></div><div><b>£${liveMoney.current}</b><div class="sub">£${liveMoney.expected} expected</div></div></div>` : ``}
+        ${moneyRounds.slice().sort((a,b)=>String(b.date||"").localeCompare(String(a.date||""))).slice(0,5).map(r=>`<div class="member"><div><b>${esc(r.course||"Completed round")}</b><div class="role">${esc(fmtDate(r.date||""))}${r._tripName?` • ${esc(r._tripName)}`:""}</div></div><div style="text-align:right"><b>£${roundPotValue(r).toFixed(2).replace(/\.00$/,'')}</b><div class="sub">${esc(moneyWinnerText(r))}</div></div></div>`).join("")}
+      </div>` : ``}
       <div class="members"><h3>👥 Group Members</h3>
         ${players.length?players.slice().sort((a,b)=>String(a.name).localeCompare(String(b.name))).map(p=>`<div class="member"><div><b>${esc(p.name||"Player")}</b><div class="role">${p.id===s?.adminPlayerId?"Admin":"Member"}</div></div><div>HCP ${esc(p.handicap??"—")}</div></div>`).join(""):`<div class="empty">No players have joined yet.</div>`}
       </div>
@@ -624,7 +686,7 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
         const pin=String(g.group_pin),s=states.get(pin);
         (s?.history||[]).forEach((r,i)=>rows.push({
           group:displayGroupName(g,s),pin,date:r.date||"",course:r.course||"",
-          type:niceGameName(r.gameType||r.type||""),winner:getRoundWinner(r),raw:r,idx:i
+          type:niceGameName(r.gameType||r.type||""),winner:getRoundWinner(r),pot:roundPotValue(r),raw:r,idx:i
         }));
       });
       rows.sort((a,b)=>String(b.date).localeCompare(String(a.date)));
@@ -635,7 +697,7 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
       $("altView").classList.remove("hidden");
       $("altView").innerHTML=`<div class="panel-head"><div><h2>🏆 Saved Rounds</h2><div class="sub">Round history across your real groups.</div></div><span class="badge active">${rows.length} round${rows.length===1?"":"s"}</span></div>
         <div class="filterbar"><label for="roundGroupFilter">Group</label><select id="roundGroupFilter">${realGroupOptions()}</select></div>
-        <div class="view-table"><table><thead><tr><th>Date</th><th>Group</th><th>PIN</th><th>Course</th><th>Game</th><th>Winner</th></tr></thead><tbody>${rows.length?rows.map(r=>`<tr><td>${esc(fmtDate(r.date))}</td><td><b>${esc(r.group)}</b></td><td>${esc(r.pin)}</td><td>${esc(r.course||"—")}</td><td>${esc(r.type)}</td><td>${esc(r.winner||"—")}</td></tr>`).join(""):'<tr><td colspan="6"><div class="empty">No saved rounds found.</div></td></tr>'}</tbody></table></div>`;
+        <div class="view-table"><table><thead><tr><th>Date</th><th>Group</th><th>PIN</th><th>Course</th><th>Game</th><th>Pot</th><th>Winner</th></tr></thead><tbody>${rows.length?rows.map(r=>`<tr><td>${esc(fmtDate(r.date))}</td><td><b>${esc(r.group)}</b></td><td>${esc(r.pin)}</td><td>${esc(r.course||"—")}</td><td>${esc(r.type)}</td><td>${r.pot>0?`<b>£${r.pot.toFixed(2).replace(/\.00$/,'')}</b>`:"—"}</td><td>${esc(r.winner||"—")}</td></tr>`).join(""):'<tr><td colspan="7"><div class="empty">No saved rounds found.</div></td></tr>'}</tbody></table></div>`;
       $("roundGroupFilter").value=viewState.roundsGroup;
       $("roundGroupFilter").addEventListener("change",e=>{viewState.roundsGroup=e.target.value;renderRounds()});
     }
