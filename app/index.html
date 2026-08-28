@@ -5199,7 +5199,7 @@ function chooseNewRoundGameType(){
 
         <button id="newRoundMoney" class="primary" style="width:100%;padding:15px 16px;margin:0 0 10px;text-align:left;">
           <span style="display:block;font-size:17px;font-weight:800;">💷 Money Game</span>
-          <span style="display:block;font-size:13px;font-weight:500;margin-top:3px;">Players pay an entry fee. Winner takes the pot.</span>
+          <span style="display:block;font-size:13px;font-weight:500;margin-top:3px;">Players pay an entry fee and play for the pot.</span>
         </button>
 
         <button id="newRoundPoints" class="primary" style="width:100%;padding:15px 16px;margin:0 0 10px;text-align:left;">
@@ -5221,6 +5221,34 @@ function chooseNewRoundGameType(){
     overlay.querySelector("#newRoundPoints").onclick=()=>finish("2");
     overlay.querySelector("#newRoundTrip").onclick=()=>finish("3");
     overlay.querySelector("#newRoundCancel").onclick=()=>finish(null);
+    overlay.addEventListener("click",e=>{ if(e.target===overlay) finish(null); });
+  });
+}
+
+function chooseRoundCompetition(title="Choose competition"){
+  return new Promise(resolve=>{
+    const overlay=document.createElement("div");
+    overlay.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.42);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;";
+    overlay.innerHTML=`
+      <div class="card" style="width:min(460px,100%);margin:0;padding:24px;border-radius:20px;box-shadow:0 18px 50px rgba(0,0,0,.18);">
+        <div style="font-size:34px;text-align:center;margin-bottom:6px;">🏆</div>
+        <h2 style="margin:0 0 6px;text-align:center;">${title}</h2>
+        <p class="muted" style="margin:0 0 20px;text-align:center;">How are you scoring this round?</p>
+        <button id="roundCompStableford" class="primary" style="width:100%;padding:15px 16px;margin:0 0 10px;text-align:left;">
+          <span style="display:block;font-size:17px;font-weight:800;">🏆 Stableford</span>
+          <span style="display:block;font-size:13px;font-weight:500;margin-top:3px;">Enter your Stableford points.</span>
+        </button>
+        <button id="roundCompNet" class="primary" style="width:100%;padding:15px 16px;margin:0 0 12px;text-align:left;">
+          <span style="display:block;font-size:17px;font-weight:800;">⛳ Net</span>
+          <span style="display:block;font-size:13px;font-weight:500;margin-top:3px;">Enter your net score.</span>
+        </button>
+        <button id="roundCompCancel" class="secondary" style="width:100%;">Cancel</button>
+      </div>`;
+    document.body.appendChild(overlay);
+    const finish=value=>{ overlay.remove(); resolve(value); };
+    overlay.querySelector("#roundCompStableford").onclick=()=>finish("stableford");
+    overlay.querySelector("#roundCompNet").onclick=()=>finish("net");
+    overlay.querySelector("#roundCompCancel").onclick=()=>finish(null);
     overlay.addEventListener("click",e=>{ if(e.target===overlay) finish(null); });
   });
 }
@@ -5492,35 +5520,16 @@ state.date=tripDate.trim();
     Number(state.pointsValue || 10);
 
   if(selectedType==="money"){
-    const competition=prompt(
-      "Choose Competition for Everyone:\n\n" +
-      "1. 🏆 Stableford\n" +
-      "2. ⛳ Net\n\n" +
-      "Enter 1 or 2"
-    );
+    const competition=await chooseRoundCompetition("Choose competition");
     if(competition===null)return;
-    if(competition!=="1" && competition!=="2"){alert("Please enter 1 for Stableford or 2 for Net.");return;}
-    selectedCompetition=competition==="1" ? "stableford" : "net";
+    selectedCompetition=competition;
   }
 
   if(selectedType==="points"){
 
-    const competition=prompt(
-      "Choose Points Competition:\n\n" +
-      "1. 🏆 Stableford\n" +
-      "2. ⛳ Net\n\n" +
-      "Enter 1 or 2"
-    );
-
+    const competition=await chooseRoundCompetition("Choose competition");
     if(competition===null)return;
-
-    if(competition!=="1" && competition!=="2"){
-      alert("Please enter 1 for Stableford or 2 for Net.");
-      return;
-    }
-
-    selectedCompetition=
-      competition==="1" ? "stableford" : "net";
+    selectedCompetition=competition;
 
     const points=prompt(
       "How many points is this game worth to the winner?",
