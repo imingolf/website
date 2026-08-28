@@ -5253,351 +5253,266 @@ function chooseRoundCompetition(title="Choose competition"){
   });
 }
 
-async function newRound(){
 
-  // Security/permissions guard: only the group Admin can create a competition.
-  // This protects the action itself, even if a non-admin somehow calls it.
+function normalRoundSetup(selectedType, selectedCompetition){
+  return new Promise(resolve=>{
+    const overlay=document.createElement("div");
+    overlay.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.42);z-index:10000;display:flex;align-items:center;justify-content:center;padding:18px;overflow:auto;";
+    const isPoints=selectedType==="points";
+    const compLabel=selectedCompetition==="net" ? "⛳ Net" : "🏆 Stableford";
+    overlay.innerHTML=`
+      <div class="card" style="width:min(500px,100%);margin:auto;padding:24px;border-radius:20px;box-shadow:0 18px 50px rgba(0,0,0,.18);">
+        <div style="font-size:34px;text-align:center;margin-bottom:6px;">${isPoints ? "🏆" : "💷"}</div>
+        <h2 style="margin:0 0 6px;text-align:center;">Set up ${isPoints ? "Points Game" : "Money Game"}</h2>
+        <p class="muted" style="margin:0 0 18px;text-align:center;">Add the round details, then start the game.</p>
+
+        <label style="display:block;margin:0 0 6px;">Course</label>
+        <input id="normalSetupCourse" type="text" placeholder="e.g. Hazel Grove Golf Club" style="width:100%;margin-bottom:14px;">
+
+        <label style="display:block;margin:0 0 6px;">Date</label>
+        <input id="normalSetupDate" type="date" style="width:100%;margin-bottom:14px;">
+
+        <div class="notice" style="margin-bottom:14px;"><b>Competition:</b> ${compLabel}</div>
+
+        ${isPoints ? `
+          <div class="notice" style="margin-bottom:16px;">
+            <b>🏆 League points</b><br>
+            This round uses your group's standard points.<br><br>
+            🥇 1st — 10 pts&nbsp;&nbsp; 🥈 2nd — 6 pts&nbsp;&nbsp; 🥉 3rd — 3 pts
+          </div>
+        ` : `
+          <label style="display:block;margin:0 0 6px;">Stake per player (£)</label>
+          <input id="normalSetupStake" type="number" min="0" step="1" value="${Number(state.stake||10)}" placeholder="e.g. 10" style="width:100%;margin-bottom:16px;">
+        `}
+
+        <div id="normalSetupError" class="notice warning" style="display:none;margin-bottom:12px;"></div>
+        <button id="normalSetupStart" class="primary" style="width:100%;padding:14px 16px;margin-bottom:10px;">⛳ Set Up Round</button>
+        <button id="normalSetupCancel" class="secondary" style="width:100%;">Cancel</button>
+      </div>`;
+    document.body.appendChild(overlay);
+    const course=overlay.querySelector('#normalSetupCourse');
+    const date=overlay.querySelector('#normalSetupDate');
+    const stake=overlay.querySelector('#normalSetupStake');
+    const err=overlay.querySelector('#normalSetupError');
+    const finish=value=>{ overlay.remove(); resolve(value); };
+    overlay.querySelector('#normalSetupCancel').onclick=()=>finish(null);
+    overlay.querySelector('#normalSetupStart').onclick=()=>{
+      const c=course.value.trim();
+      const d=date.value;
+      const st=isPoints ? Number(state.stake||0) : Number(stake?.value||0);
+      let msg="";
+      if(!c) msg="Please enter the course.";
+      else if(!d) msg="Please choose the date.";
+      else if(!isPoints && (!Number.isFinite(st) || st<0)) msg="Please enter a valid stake.";
+      if(msg){ err.textContent=msg; err.style.display='block'; return; }
+      finish({course:c,date:d,stake:st});
+    };
+    overlay.addEventListener('click',e=>{ if(e.target===overlay) finish(null); });
+    setTimeout(()=>course.focus(),50);
+  });
+}
+
+function tripSetupScreen(){
+  return new Promise(resolve=>{
+    const overlay=document.createElement("div");
+    overlay.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.42);z-index:10000;padding:16px;overflow:auto;";
+    overlay.innerHTML=`
+      <div class="card" style="width:min(720px,100%);margin:18px auto;padding:24px;border-radius:20px;box-shadow:0 18px 50px rgba(0,0,0,.18);">
+        <div style="font-size:34px;text-align:center;margin-bottom:6px;">✈️</div>
+        <h2 style="margin:0 0 6px;text-align:center;">Set Up Golf Trip</h2>
+        <p class="muted" style="margin:0 0 20px;text-align:center;">Set up the trip once. Each round will be ready when you get to it.</p>
+
+        <label style="display:block;margin:0 0 6px;">Trip name</label>
+        <input id="tripSetupName" type="text" value="${String(state.trip?.name||'Golf Trip').replace(/"/g,'&quot;')}" style="width:100%;margin-bottom:14px;">
+
+        <label style="display:block;margin:0 0 6px;">Number of rounds</label>
+        <input id="tripSetupRounds" type="number" min="1" max="12" step="1" value="${Number(state.trip?.totalRounds||3)}" style="width:100%;margin-bottom:16px;">
+
+        <div style="margin-bottom:8px;font-weight:800;">Trip Championship</div>
+        <div class="muted" style="margin-bottom:10px;">Choose the scoring used for the overall trip standings. The same scoring is used for each trip round so players only enter one score.</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
+          <button id="tripCompStableford" class="primary">🏆 Stableford</button>
+          <button id="tripCompNet" class="secondary">⛳ Net</button>
+        </div>
+        <div class="notice" style="margin-bottom:18px;"><b>🏆 Trip Championship points</b><br>🥇 1st — 10 pts&nbsp;&nbsp; 🥈 2nd — 6 pts&nbsp;&nbsp; 🥉 3rd — 3 pts</div>
+
+        <div id="tripRoundsWrap"></div>
+        <div id="tripSetupError" class="notice warning" style="display:none;margin:10px 0 12px;"></div>
+        <button id="tripSetupStart" class="primary" style="width:100%;padding:14px 16px;margin-bottom:10px;">✈️ Start Golf Trip</button>
+        <button id="tripSetupCancel" class="secondary" style="width:100%;">Cancel</button>
+      </div>`;
+    document.body.appendChild(overlay);
+
+    let tripCompetition='stableford';
+    let drafts=[];
+    const roundsInput=overlay.querySelector('#tripSetupRounds');
+    const wrap=overlay.querySelector('#tripRoundsWrap');
+    const err=overlay.querySelector('#tripSetupError');
+    const setTripComp=(comp)=>{
+      tripCompetition=comp;
+      overlay.querySelector('#tripCompStableford').className=comp==='stableford'?'primary':'secondary';
+      overlay.querySelector('#tripCompNet').className=comp==='net'?'primary':'secondary';
+      renderRounds();
+    };
+    const readExisting=()=>{
+      [...wrap.querySelectorAll('[data-trip-round]')].forEach(card=>{
+        const i=Number(card.dataset.tripRound);
+        drafts[i]=drafts[i]||{};
+        drafts[i].course=card.querySelector('[data-course]')?.value||'';
+        drafts[i].date=card.querySelector('[data-date]')?.value||'';
+        drafts[i].stake=Number(card.querySelector('[data-stake]')?.value||0);
+        drafts[i].gameType=card.dataset.gameType||'money';
+      });
+    };
+    function renderRounds(){
+      readExisting();
+      const count=Math.max(1,Math.min(12,Number(roundsInput.value||1)));
+      wrap.innerHTML='';
+      for(let i=0;i<count;i++){
+        const d=drafts[i]||{course:'',date:'',stake:Number(state.stake||10),gameType:i===0?'money':'money'};
+        drafts[i]=d;
+        const card=document.createElement('div');
+        card.dataset.tripRound=i;
+        card.dataset.gameType=d.gameType||'money';
+        card.className='notice';
+        card.style.cssText='margin:0 0 14px;padding:16px;';
+        card.innerHTML=`
+          <div style="font-weight:900;font-size:17px;margin-bottom:12px;">Round ${i+1}</div>
+          <label style="display:block;margin:0 0 5px;">Course</label>
+          <input data-course type="text" value="${String(d.course||'').replace(/"/g,'&quot;')}" placeholder="Course" style="width:100%;margin-bottom:10px;">
+          <label style="display:block;margin:0 0 5px;">Date</label>
+          <input data-date type="date" value="${d.date||''}" style="width:100%;margin-bottom:10px;">
+          <div style="font-weight:700;margin-bottom:6px;">Game</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+            <button type="button" data-money class="${card.dataset.gameType==='money'?'primary':'secondary'}">💷 Money Game</button>
+            <button type="button" data-points class="${card.dataset.gameType==='points'?'primary':'secondary'}">🏆 Points Game</button>
+          </div>
+          <div style="margin-bottom:10px;"><b>Competition:</b> ${tripCompetition==='net'?'⛳ Net':'🏆 Stableford'}</div>
+          <div data-stake-wrap style="${card.dataset.gameType==='money'?'':'display:none;'}">
+            <label style="display:block;margin:0 0 5px;">Stake per player (£)</label>
+            <input data-stake type="number" min="0" step="1" value="${Number.isFinite(Number(d.stake))?Number(d.stake):10}" style="width:100%;">
+          </div>`;
+        wrap.appendChild(card);
+        const money=card.querySelector('[data-money]');
+        const points=card.querySelector('[data-points]');
+        const stakeWrap=card.querySelector('[data-stake-wrap]');
+        const setGame=g=>{
+          card.dataset.gameType=g; drafts[i].gameType=g;
+          money.className=g==='money'?'primary':'secondary';
+          points.className=g==='points'?'primary':'secondary';
+          stakeWrap.style.display=g==='money'?'':'none';
+        };
+        money.onclick=()=>setGame('money');
+        points.onclick=()=>setGame('points');
+      }
+    }
+    roundsInput.addEventListener('change',renderRounds);
+    overlay.querySelector('#tripCompStableford').onclick=()=>setTripComp('stableford');
+    overlay.querySelector('#tripCompNet').onclick=()=>setTripComp('net');
+    const finish=value=>{ overlay.remove(); resolve(value); };
+    overlay.querySelector('#tripSetupCancel').onclick=()=>finish(null);
+    overlay.querySelector('#tripSetupStart').onclick=()=>{
+      readExisting();
+      const name=overlay.querySelector('#tripSetupName').value.trim();
+      const totalRounds=Number(roundsInput.value);
+      let msg='';
+      if(!name) msg='Please enter a trip name.';
+      else if(!Number.isInteger(totalRounds)||totalRounds<1||totalRounds>12) msg='Please enter a valid number of rounds.';
+      const rounds=[];
+      if(!msg){
+        for(let i=0;i<totalRounds;i++){
+          const card=wrap.querySelector(`[data-trip-round="${i}"]`);
+          const course=card?.querySelector('[data-course]')?.value.trim()||'';
+          const date=card?.querySelector('[data-date]')?.value||'';
+          const gameType=card?.dataset.gameType||'money';
+          const stake=gameType==='money'?Number(card?.querySelector('[data-stake]')?.value||0):0;
+          if(!course){ msg=`Please enter the course for Round ${i+1}.`; break; }
+          if(!date){ msg=`Please choose the date for Round ${i+1}.`; break; }
+          if(gameType==='money' && (!Number.isFinite(stake)||stake<0)){ msg=`Please enter a valid stake for Round ${i+1}.`; break; }
+          rounds.push({course,date,gameType,competition:tripCompetition,stake});
+        }
+      }
+      if(msg){ err.textContent=msg; err.style.display='block'; return; }
+      finish({name,totalRounds,competition:tripCompetition,tripPointsValue:10,rounds});
+    };
+    overlay.addEventListener('click',e=>{ if(e.target===overlay) finish(null); });
+    renderRounds();
+  });
+}
+
+async function newRound(){
   if(!isAdmin){
     alert("🔒 Only the group Admin can set up the next competition.");
     return;
   }
 
   const choice=await chooseNewRoundGameType();
-
   if(choice===null)return;
 
-
-  // =====================================
-  // ✈️ TRIP MODE SETUP
-  // =====================================
-
   if(choice==="3"){
-
-    const tripName=prompt(
-      "Trip name",
-      state.trip?.name || "Golf Trip"
-    );
-
-    if(tripName===null)return;
-    if(!tripName.trim()){
-      alert("Please enter a trip name.");
-      return;
-    }
-
-const roundsAnswer=prompt(
-  "How many rounds on the trip?",
-  state.trip?.totalRounds || 3
-);
-
-if(roundsAnswer===null)return;
-
-const totalRounds=Number(roundsAnswer);
-
-if(!Number.isInteger(totalRounds) || totalRounds<1){
-  alert("Please enter a valid number of rounds (1 or more).");
-  return;
-}
-    
-    const firstGame=prompt(
-      "Choose Round 1 Game:\n\n" +
-      "1. 💷 Money Game\n" +
-      "2. 🏆 Points Game\n\n" +
-      "Enter 1 or 2"
-    );
-
-    if(firstGame===null)return;
-
-    if(firstGame!=="1" && firstGame!=="2"){
-      alert("Please enter 1 for Money Game or 2 for Points Game.");
-      return;
-    }
-
-    const selectedType=
-      firstGame==="2" ? "points" : "money";
-let tripCompetition="stableford";
-let tripPointsValue=10;
-
-if(selectedType==="money"){
-
-  const tripComp=prompt(
-    "Choose Trip Championship Competition:\n\n" +
-    "1. 🏆 Stableford\n" +
-    "2. ⛳ Net\n\n" +
-    "This decides the Trip 1st, 2nd and 3rd.\n\n" +
-    "Enter 1 or 2"
-  );
-
-  if(tripComp===null)return;
-
-  if(tripComp!=="1" && tripComp!=="2"){
-    alert("Please enter 1 for Stableford or 2 for Net.");
-    return;
-  }
-tripCompetition=
-  tripComp==="1" ? "stableford" : "net";
-}
-
-const tripPoints=prompt(
-  "How many Trip Championship points is Round 1 worth to the winner?",
-  tripPointsValue
-);
-
-if(tripPoints===null)return;
-
-const tripValue=Number(tripPoints);
-
-if(!Number.isFinite(tripValue) || tripValue<=0){
-  alert("Please enter a valid Trip points value.");
-  return;
-}
-
-tripPointsValue=tripValue;
-
-let selectedCompetition=
-  state.pointsCompetition || "stableford";
-     let selectedPointsValue=
-      Number(state.pointsValue || 10);
-
-
-    // Points setup for Round 1
-    if(selectedType==="points"){
-
-      const competition=prompt(
-        "Choose Points Competition:\n\n" +
-        "1. 🏆 Stableford\n" +
-        "2. ⛳ Net\n\n" +
-        "Enter 1 or 2"
-      );
-
-      if(competition===null)return;
-
-      if(competition!=="1" && competition!=="2"){
-        alert("Please enter 1 for Stableford or 2 for Net.");
-        return;
-      }
-
-      selectedCompetition=
-        competition==="1" ? "stableford" : "net";
-tripCompetition=selectedCompetition;
-selectedPointsValue=tripPointsValue;
-
-          }
-
-
-    const second=Math.round(selectedPointsValue*0.6);
-    const third=Math.round(selectedPointsValue*0.3);
-
-    let tripMessage=
-      "✈️ Start Trip Mode?\n\n" +
-      tripName.trim() +
-      "\n" +
-      totalRounds + " rounds\n\n" +
-      "Round 1: " +
-      (selectedType==="points"
-        ? "🏆 Points Game"
-        : "💷 Money Game");
-
-    if(selectedType==="points"){
-      tripMessage+=
-        "\n" +
-        (selectedCompetition==="stableford"
-          ? "Stableford"
-          : "Net") +
-        "\n\n🥇 " + selectedPointsValue + " pts" +
-        "\n🥈 " + second + " pts" +
-        "\n🥉 " + third + " pts";
-    }
-
-    tripMessage+=
-      "\n\nThis starts a new trip and clears the current round entries.";
-
-    if(!confirm(tripMessage))return;
-
-
-// Trip Round 1 course
-const tripCourse=prompt(
-  "Round 1 course",
-  ""
-);
-
-if(tripCourse===null)return;
-
-if(!tripCourse.trim()){
-  alert("Please enter the Round 1 course.");
-  return;
-}
-
-// Trip Round 1 date
-const tripDate=await pickTripDate(
-  "Round 1 date"
-);
-
-if(tripDate===null)return;
-
-state.trip={
-
-  active:true,
-  name:tripName.trim(),
-  totalRounds:totalRounds,
-  currentRound:1,
-  competition:tripCompetition,
-  tripPointsValue:tripPointsValue,
-
-  // Backup of the normal weekly round
-  normalRoundBackup:{
-    course:state.course,
-    date:state.date,
-    stake:state.stake,
-    gameType:state.gameType,
-    pointsCompetition:state.pointsCompetition,
-    pointsValue:state.pointsValue,
-    roundOpen:roundOpenNow(),
-
-    players:state.players.map(p=>({
-      id:p.id,
-      name:p.name,
-      handicap:p.handicap,
-      paid:p.paid,
-      competition:p.competition || null,
-      stableford:p.stableford,
-      netScore:p.netScore,
-      noReturn:Boolean(p.noReturn),
-      scoreSubmitted:Boolean(p.scoreSubmitted),
-      wins:p.wins || 0,
-      leaguePoints:p.leaguePoints || 0,
-      netWinnings:p.netWinnings || 0
-    }))
-  },
-
-  // Completed rounds for this trip
-  rounds:[],
-
-  // Running Trip Championship points
-  standings:{},
-
-  // Filled when the trip is finished
-  champion:null,
-  completed:false,
-
-  // Keeps old completed trips separate
-  pastTrips:state.trip?.pastTrips || []
-};
-state.roundOpen=true;
-state.course=tripCourse.trim();
-state.date=tripDate.trim();
-   
-    state.gameType=selectedType;
-
-    if(selectedType==="points"){
-      state.pointsCompetition=selectedCompetition;
-      state.pointsValue=selectedPointsValue;
-    }
-
+    const setup=await tripSetupScreen();
+    if(!setup)return;
+    const first=setup.rounds[0];
+    state.trip={
+      active:true,
+      name:setup.name,
+      totalRounds:setup.totalRounds,
+      currentRound:1,
+      competition:setup.competition,
+      tripPointsValue:10,
+      plan:setup.rounds,
+      normalRoundBackup:{
+        course:state.course,
+        date:state.date,
+        stake:state.stake,
+        gameType:state.gameType,
+        pointsCompetition:state.pointsCompetition,
+        pointsValue:state.pointsValue,
+        roundOpen:roundOpenNow(),
+        players:state.players.map(p=>({
+          id:p.id,name:p.name,handicap:p.handicap,paid:p.paid,
+          competition:p.competition||null,stableford:p.stableford,netScore:p.netScore,
+          noReturn:Boolean(p.noReturn),scoreSubmitted:Boolean(p.scoreSubmitted),
+          wins:p.wins||0,leaguePoints:p.leaguePoints||0,netWinnings:p.netWinnings||0
+        }))
+      },
+      rounds:[],standings:{},champion:null,completed:false,
+      pastTrips:state.trip?.pastTrips||[]
+    };
+    state.roundOpen=true;
+    state.course=first.course;
+    state.date=first.date;
+    state.gameType=first.gameType;
+    state.stake=first.gameType==='money'?Number(first.stake||0):0;
+    state.pointsCompetition=setup.competition;
+    state.pointsValue=10;
     state.players.forEach(p=>{
-      p.paid=false;
-      p.stableford=null;
-      p.netScore=null;
-      p.competition=null;
+      p.paid=false;p.stableford=null;p.netScore=null;p.noReturn=false;p.scoreSubmitted=false;p.competition=null;
     });
-
     await save();
-    show("round");
+    show('round');
     return;
   }
 
+  const selectedType=choice==="2" ? "points" : "money";
+  const selectedCompetition=await chooseRoundCompetition("Choose competition");
+  if(selectedCompetition===null)return;
+  const setup=await normalRoundSetup(selectedType,selectedCompetition);
+  if(!setup)return;
 
-  // =====================================
-  // NORMAL MONEY / POINTS ROUND
-  // =====================================
-
-  const selectedType=
-    choice==="2" ? "points" : "money";
-
-  let selectedCompetition=
-    state.pointsCompetition || "stableford";
-
-  let selectedPointsValue=
-    Number(state.pointsValue || 10);
-
-  if(selectedType==="money"){
-    const competition=await chooseRoundCompetition("Choose competition");
-    if(competition===null)return;
-    selectedCompetition=competition;
-  }
-
-  if(selectedType==="points"){
-
-    const competition=await chooseRoundCompetition("Choose competition");
-    if(competition===null)return;
-    selectedCompetition=competition;
-
-    const points=prompt(
-      "How many points is this game worth to the winner?",
-      selectedPointsValue
-    );
-
-    if(points===null)return;
-
-    const value=Number(points);
-
-    if(!Number.isFinite(value) || value<=0){
-      alert("Please enter a valid points value.");
-      return;
-    }
-
-    selectedPointsValue=value;
-
-    const second=Math.round(value*0.6);
-    const third=Math.round(value*0.3);
-
-    if(!confirm(
-      "Points Game Setup\n\n" +
-      (selectedCompetition==="stableford"
-        ? "🏆 Stableford"
-        : "⛳ Net") +
-      "\n\n🥇 1st — " + value + " pts" +
-      "\n🥈 2nd — " + second + " pts" +
-      "\n🥉 3rd — " + third + " pts" +
-      "\n\nContinue?"
-    ))return;
-  }
-
-
-  if(!confirm(
-    "Start a new " +
-    (selectedType==="points"
-      ? "Points Game"
-      : "Money Game") +
-    "?\n\nThis clears current payments, scores and competition choices."
-  ))return;
-
-
-  // Normal round means we're outside Trip Mode
-  if(state.trip){
-    state.trip.active=false;
-  }
-
+  if(state.trip) state.trip.active=false;
   state.roundOpen=true;
-  state.course="";
-  state.date="";
+  state.course=setup.course;
+  state.date=setup.date;
   state.gameType=selectedType;
-
   state.pointsCompetition=selectedCompetition;
-  if(selectedType==="points"){
-    state.pointsValue=selectedPointsValue;
-  }
-
+  state.pointsValue=10;
+  state.stake=selectedType==='money'?Number(setup.stake||0):0;
   state.players.forEach(p=>{
-    p.paid=false;
-    p.stableford=null;
-    p.netScore=null;
-    p.noReturn=false;
-    p.scoreSubmitted=false;
-    p.competition=null;
+    p.paid=false;p.stableford=null;p.netScore=null;p.noReturn=false;p.scoreSubmitted=false;p.competition=null;
   });
-
   await save();
-  show("round");
+  show('round');
 }
 async function nextTripRound(){
 
@@ -5607,6 +5522,29 @@ async function nextTripRound(){
   }
 
   const roundNumber=Number(state.trip.currentRound||1);
+
+  // New Trip setup stores every round up front, so later rounds can start with one tap.
+  const plannedRound=Array.isArray(state.trip.plan) ? state.trip.plan[roundNumber-1] : null;
+  if(plannedRound){
+    state.roundOpen=true;
+    state.course=plannedRound.course || "";
+    state.date=plannedRound.date || "";
+    state.gameType=plannedRound.gameType || "money";
+    state.stake=state.gameType==="money" ? Number(plannedRound.stake||0) : 0;
+    state.pointsCompetition=state.trip.competition || plannedRound.competition || "stableford";
+    state.pointsValue=10;
+    state.players.forEach(p=>{
+      p.paid=false;
+      p.stableford=null;
+      p.netScore=null;
+      p.noReturn=false;
+      p.scoreSubmitted=false;
+      p.competition=null;
+    });
+    await save();
+    show("round");
+    return;
+  }
 
   // Trip Round course
   const tripCourse=prompt(
