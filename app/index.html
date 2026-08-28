@@ -690,11 +690,78 @@ function stablefordPot(){
 function netPot(){
   return Number(state.stake||0)*netPaidCount();
 }
+function tripRoundRanking(record, competition){
+  const comp=competition || state.trip?.competition || "stableford";
+  const rows=(record?.players||[]).map(p=>({
+    name:p.name,
+    score:comp==="net" ? (p.netScore==null?null:Number(p.netScore)) : (p.stableford==null?null:Number(p.stableford)),
+    noReturn:Boolean(p.noReturn)
+  })).filter(x=>x.score!=null || x.noReturn);
+
+  rows.sort((a,b)=>{
+    if(a.noReturn!==b.noReturn)return a.noReturn?1:-1;
+    if(a.score==null && b.score==null)return a.name.localeCompare(b.name);
+    if(a.score==null)return 1;
+    if(b.score==null)return -1;
+    const d=comp==="net" ? a.score-b.score : b.score-a.score;
+    return d || a.name.localeCompare(b.name);
+  });
+
+  let lastScore=null, lastRank=0;
+  return rows.map((r,i)=>{
+    let rank=null;
+    if(!r.noReturn && r.score!=null){
+      if(lastScore===null || r.score!==lastScore){ lastRank=i+1; lastScore=r.score; }
+      rank=lastRank;
+    }
+    const tied=rank!=null && rows.filter(x=>!x.noReturn && x.score===r.score).length>1;
+    return {...r,rank,rankLabel:rank==null?"NR":(tied?"T"+rank:String(rank))};
+  });
+}
+
+function tripAggregate(trip){
+  trip=trip||state.trip||{};
+  const rounds=trip.rounds||[];
+  const comp=trip.competition||"stableford";
+  const liveNames=(trip===state.trip) ? state.players.map(p=>p.name) : [];
+  const names=[...new Set([
+    ...liveNames,
+    ...rounds.flatMap(r=>(r.players||[]).map(p=>p.name))
+  ])];
+  const rows=names.map(name=>{
+    let total=0, played=0, hasNR=false;
+    const roundScores=[];
+    rounds.forEach(r=>{
+      const p=(r.players||[]).find(x=>x.name===name);
+      if(!p){ roundScores.push(null); return; }
+      if(p.noReturn===true){ hasNR=true; roundScores.push("NR"); return; }
+      const score=comp==="net" ? p.netScore : p.stableford;
+      if(score==null){ roundScores.push(null); return; }
+      const n=Number(score); total+=n; played+=1; roundScores.push(n);
+    });
+    return {name,total,played,hasNR,roundScores};
+  });
+  rows.sort((a,b)=>{
+    const aComplete=a.played===rounds.length && !a.hasNR;
+    const bComplete=b.played===rounds.length && !b.hasNR;
+    if(aComplete!==bComplete)return aComplete?-1:1;
+    if(a.hasNR!==b.hasNR)return a.hasNR?1:-1;
+    if(a.played!==b.played)return b.played-a.played;
+    const d=comp==="net" ? a.total-b.total : b.total-a.total;
+    return d || a.name.localeCompare(b.name);
+  });
+  return rows;
+}
+
+function rebuildTripStandings(trip){
+  if(!trip)return;
+  const rows=tripAggregate(trip);
+  trip.standings={};
+  rows.forEach(r=>{ trip.standings[r.name]=r.hasNR ? null : r.total; });
+}
+
 function tripStandingsSorted(){
-  const standings=state.trip?.standings || {};
-  return Object.entries(standings)
-    .map(([name,points])=>({name,points:Number(points||0)}))
-    .sort((a,b)=>b.points-a.points || a.name.localeCompare(b.name));
+  return tripAggregate(state.trip).map(r=>({name:r.name,points:r.total,played:r.played,hasNR:r.hasNR,roundScores:r.roundScores}));
 }
 
 function tripRoundWinner(record){
@@ -737,128 +804,86 @@ function tripRoundWinner(record){
 
 function setTripChampion(){
   if(!state.trip)return;
-  const sorted=tripStandingsSorted();
+  const sorted=tripAggregate(state.trip);
   state.trip.champion=sorted.length ? sorted[0].name : null;
+  rebuildTripStandings(state.trip);
 }
 
 function showTripSummary(){
   const trip=state.trip || {};
   const rounds=trip.rounds || [];
-  const standings=tripStandingsSorted();
-  const champion=trip.champion || standings[0]?.name || null;
+  const comp=trip.competition || "stableford";
+  const standings=tripAggregate(trip);
+  const champion=standings[0] || null;
 
   const tripMoney={};
   rounds.forEach(r=>{
-    if(r.gameType!=="money")return;
-
     const stableNames=Array.isArray(r.stablefordWinnerNames) ? r.stablefordWinnerNames : [];
     const netNames=Array.isArray(r.netWinnerNames) ? r.netWinnerNames : [];
     const stableShare=stableNames.length ? Number(r.stablefordPot||0)/stableNames.length : 0;
     const netShare=netNames.length ? Number(r.netPot||0)/netNames.length : 0;
-
-    stableNames.forEach(name=>{
-      tripMoney[name]=(tripMoney[name]||0)+stableShare;
-    });
-    netNames.forEach(name=>{
-      tripMoney[name]=(tripMoney[name]||0)+netShare;
-    });
+    stableNames.forEach(name=>tripMoney[name]=(tripMoney[name]||0)+stableShare);
+    netNames.forEach(name=>tripMoney[name]=(tripMoney[name]||0)+netShare);
   });
-
-  const tripMoneyRows=state.players
-    .map(p=>({name:p.name,won:Number(tripMoney[p.name]||0)}))
-    .sort((a,b)=>b.won-a.won || a.name.localeCompare(b.name));
+  const tripMoneyRows=standings.map(x=>({name:x.name,won:Number(tripMoney[x.name]||0)}));
+  const showMoney=rounds.some(r=>Number(r.stake||0)>0) || tripMoneyRows.some(x=>x.won>0);
+  const scoreLabel=v=>comp==="net" ? (v+" net") : (v+" pts");
 
   page="tripsummary";
-  clearInterval(poller);
-  poller=null;
+  clearInterval(poller); poller=null;
 
   $("screen").innerHTML=`
     <div class="card" style="text-align:center;">
       <div style="font-size:50px;">🏆</div>
       <div class="muted">TRIP COMPLETE</div>
       <h2 style="font-size:28px;margin:6px 0;">${esc(trip.name || "Golf Trip")}</h2>
-      <div class="muted">${rounds.length} round${rounds.length===1?"":"s"} completed</div>
+      <div class="muted">${rounds.length} round${rounds.length===1?"":"s"} completed • ${comp==="net"?"Net":"Stableford"}</div>
     </div>
 
-    ${champion ? `
-      <div class="card" style="text-align:center;">
-        <div style="font-size:38px;">👑</div>
-        <div class="muted">TRIP WINNER</div>
-        <h2 style="font-size:28px;margin:6px 0;">${esc(champion)}</h2>
-        <div class="big">${Number((trip.standings||{})[champion]||0)} pts</div>
-      </div>
-    ` : ""}
+    ${champion ? `<div class="card" style="text-align:center;">
+      <div style="font-size:38px;">👑</div>
+      <div class="muted">TRIP WINNER</div>
+      <h2 style="font-size:28px;margin:6px 0;">${esc(champion.name)}</h2>
+      <div class="big">${champion.hasNR?"NR":scoreLabel(champion.total)}</div>
+      <div class="muted">Overall ${comp==="net"?"net total":"Stableford total"}</div>
+    </div>` : ""}
 
     <div class="card">
       <h2>📅 Daily results</h2>
       ${rounds.length ? rounds.map((r,i)=>{
-        const w=tripRoundWinner(r);
-        const gameLabel=r.gameType==="points" ? "🏆 Points Game" : "💷 Money Game";
-        const compLabel=r.gameType==="points"
-          ? (r.pointsCompetition==="net" ? "Net" : "Stableford")
-          : (trip.competition==="net" ? "Net" : "Stableford");
-        return `
-          <div class="player">
-            <div class="row">
-              <div>
-                <b>Round ${i+1}${r.course ? " — "+esc(r.course) : ""}</b>
-                <div class="muted">
-                  ${r.date ? esc(formatDate(r.date))+" • " : ""}${gameLabel} • ${compLabel}
-                </div>
-              </div>
-            </div>
-            ${w ? `
-              <div style="margin-top:7px;">
-                🏆 <b>${esc(w.name)}</b>${w.score ? " • "+esc(String(w.score)) : ""}
-              </div>
-            ` : `<div class="muted" style="margin-top:7px;">No winner recorded</div>`}
+        const ranking=tripRoundRanking(r,comp);
+        return `<div class="player" style="padding:14px 0;">
+          <div style="margin-bottom:10px;"><b>Round ${i+1}${r.course?" — "+esc(r.course):""}</b>
+            <div class="muted">${r.date?esc(formatDate(r.date))+" • ":""}${comp==="net"?"⛳ Net":"🏆 Stableford"}${Number(r.stake||0)>0?" • £"+Number(r.stake||0)+" stake":""}</div>
           </div>
-        `;
+          ${ranking.length ? ranking.map(x=>`<div class="row" style="padding:7px 0;border-top:1px solid #e6ece8;">
+            <div><b>${x.rankLabel}. ${esc(x.name)}</b></div>
+            <div style="font-weight:800;">${x.noReturn?"NR":(comp==="net"?"Net "+x.score:x.score+" pts")}</div>
+          </div>`).join("") : `<div class="muted">No scores recorded.</div>`}
+        </div>`;
       }).join("") : `<div class="muted">No completed trip rounds saved.</div>`}
     </div>
 
     <div class="card">
-      <h2>🏆 Final Trip standings</h2>
+      <h2>🏆 Overall Trip Standings</h2>
+      <div class="muted" style="margin-bottom:10px;">${comp==="net"?"Lowest total net score wins.":"Highest total Stableford points wins."}</div>
       ${standings.length ? standings.map((s,i)=>`
-        <div class="player row">
-          <div>
-            <b>${i===0?"👑 ":i===1?"🥈 ":i===2?"🥉 ":""}${i+1}. ${esc(s.name)}</b>
+        <div class="player">
+          <div class="row">
+            <div><b>${i===0?"👑 ":i===1?"🥈 ":i===2?"🥉 ":""}${i+1}. ${esc(s.name)}</b>
+              <div class="muted">${s.roundScores.map((v,j)=>`R${j+1}: ${v==null?"—":v}`).join(" • ")}</div>
+            </div>
+            <div style="text-align:right;"><div class="money">${s.hasNR?"NR":scoreLabel(s.total)}</div><div class="muted">Played ${s.played}/${rounds.length}</div></div>
           </div>
-          <div class="money">${s.points} pts</div>
-        </div>
-      `).join("") : `<div class="muted">No Trip standings recorded.</div>`}
+        </div>`).join("") : `<div class="muted">No Trip standings recorded.</div>`}
     </div>
+
+    ${showMoney ? `<div class="card"><h2>💷 Trip Money Summary</h2>${tripMoneyRows.map(m=>`<div class="player row"><div><b>${m.won>0?"💰 ":""}${esc(m.name)}</b></div><div class="money">£${m.won.toFixed(2).replace(/\\.00$/,'')}</div></div>`).join("")}</div>` : ""}
 
     <div class="card">
-      <h2>💷 Trip Money Summary</h2>
-      ${tripMoneyRows.length ? tripMoneyRows.map((m,i)=>`
-        <div class="player row">
-          <div>
-            <b>${i===0 && m.won>0 ? "💰 " : ""}${esc(m.name)}</b>
-          </div>
-          <div class="money">£${Number(m.won).toFixed(2).replace(/\.00$/,"")}</div>
-        </div>
-      `).join("") : `<div class="muted">No money results recorded for this trip.</div>`}
-    </div>
-
-    ${isAdmin ? `
-      <div class="card">
-        <button class="primary full" onclick="finishTrip()">
-          ✅ Save Trip & Return to Normal Golf
-        </button>
-      </div>
-    ` : `
-      <div class="card">
-        <div class="notice">
-          The organiser will close and archive the completed trip.
-        </div>
-        <button class="ghost full" onclick="adminLogin()">
-          🔐 Organiser / Admin
-        </button>
-      </div>
-    `}
-  `;
-
+      <button class="primary full" onclick="shareTripSummary()">📤 Share Final Trip Results</button>
+      ${isAdmin ? `<button class="secondary full" onclick="finishTrip()">✅ Save Trip & Return to Normal Golf</button>` : `<div class="notice" style="margin-top:10px;">Waiting for the Group Admin to save and close the completed trip.</div>`}
+    </div>`;
   window.scrollTo(0,0);
 }
 
@@ -887,8 +912,8 @@ function round(){
           <div class="muted">NEXT ROUND</div>
           <h2>${esc(planned.course||"Round "+nextNo)}</h2>
           <div class="muted">${planned.date ? esc(formatDate(planned.date)) : ""}</div>
-          <div style="margin-top:10px;"><span class="pill paid">${planned.gameType==="points" ? "🏆 POINTS GAME" : "💷 MONEY GAME"}</span></div>
-          <div class="notice" style="margin-top:12px;"><b>Competition: ${state.trip.competition==="net" ? "⛳ Net" : "🏆 Stableford"}</b>${planned.gameType==="money" ? `<br>Stake: £${Number(planned.stake||0)}` : `<br>Trip points: 10 / 6 / 3`}</div>
+          <div style="margin-top:10px;"><span class="pill paid">${state.trip.competition==="net" ? "⛳ NET TRIP" : "🏆 STABLEFORD TRIP"}</span></div>
+          <div class="notice" style="margin-top:12px;"><b>Competition: ${state.trip.competition==="net" ? "⛳ Net" : "🏆 Stableford"}</b>${Number(planned.stake||0)>0 ? `<br>Daily stake: £${Number(planned.stake||0)}` : `<br>No daily stake`}</div>
         </div>` : ""}
       <div class="card" style="text-align:center;">
         <div style="font-weight:800;margin-bottom:10px;">Round ${nextNo-1} is complete.</div>
@@ -935,7 +960,7 @@ $("screen").innerHTML=`
 
         <div style="margin-top:8px;">
           <span class="pill paid">
-            ${state.gameType==="points" ? "🏆 POINTS GAME" : (Number(state.stake||0)>0 ? "💷 MONEY GAME" : "⛳ NO STAKE")}
+            ${state.trip?.active ? "✈️ TRIP ROUND" : (state.gameType==="points" ? "🏆 POINTS GAME" : (Number(state.stake||0)>0 ? "💷 MONEY GAME" : "⛳ NO STAKE"))}
           </span>
         </div>
       </div>
@@ -2013,83 +2038,9 @@ const winners=[
 
 
 // =====================================
-// ✈️ TRIP MONEY GAME POINTS
+// ✈️ TRIP TOTALS
+// Raw Stableford/Net totals are rebuilt from saved trip rounds.
 // =====================================
-
-let tripPlaces=[];
-
-if(isTrip){
-
-  const tripComp=state.trip.competition || "stableford";
-
-  let tripPlayers=state.players.filter(p=>
-    tripComp==="stableford"
-      ? p.stableford!=null
-      : p.netScore!=null
-  );
-
-  tripPlayers.sort((a,b)=>
-    tripComp==="stableford"
-      ? Number(b.stableford)-Number(a.stableford)
-      : Number(a.netScore)-Number(b.netScore)
-  );
-
-  let remainingTrip=[...tripPlayers];
-tripPlaces=[];
-
-const tripPlaceNames=["1st","2nd","3rd"];
-
-for(let place=0; place<3 && remainingTrip.length; place++){
-
-  const bestScore=
-    tripComp==="stableford"
-      ? Math.max(...remainingTrip.map(p=>Number(p.stableford)))
-      : Math.min(...remainingTrip.map(p=>Number(p.netScore)));
-
-  const tied=remainingTrip.filter(p=>
-    tripComp==="stableford"
-      ? Number(p.stableford)===bestScore
-      : Number(p.netScore)===bestScore
-  );
-
-  let selectedPlayer=tied[0];
-
-  if(state.gameType==="points" && (tied.length>1)){
-
-    selectedPlayer=chooseCountbackWinner(
-      tied,
-      tripComp==="stableford" ? "Stableford" : "Net",
-      tripComp==="stableford"
-        ? bestScore + " points"
-        : bestScore,
-      tripPlaceNames[place]
-    );
-
-    if(!selectedPlayer)return;
-  }
-
-  tripPlaces.push(selectedPlayer);
-
-  remainingTrip=
-    remainingTrip.filter(p=>p!==selectedPlayer);
-}
-
-  const tripFirst=Number(state.trip.tripPointsValue||10);
-
-  const tripAwards=[
-  tripFirst,
-  Math.round(tripFirst*0.6),
-  Math.round(tripFirst*0.3)
-];
-  state.trip.standings=state.trip.standings || {};
-
-  tripPlaces.forEach((p,i)=>{
-    const points=tripAwards[i];
-
-    state.trip.standings[p.name]=
-      Number(state.trip.standings[p.name]||0)+points;
-  });
-}
 
 
 const record={
@@ -2136,6 +2087,7 @@ const record={
 if(isTrip){
   state.trip.rounds=state.trip.rounds || [];
   state.trip.rounds.push(record);
+  rebuildTripStandings(state.trip);
 }else{
   state.history=state.history || [];
   state.history.unshift(record);
@@ -2283,10 +2235,26 @@ function showRoundHistory(historyIndex){
   window.scrollTo(0,0);
 }
 
+function showTripRoundResult(record){
+  const trip=state.trip||{};
+  const comp=trip.competition||"stableford";
+  const roundNo=Math.max(1,Number(trip.currentRound||1)-1);
+  const ranking=tripRoundRanking(record,comp);
+  const potValue=comp==="net"?Number(record.netPot||0):Number(record.stablefordPot||0);
+  const winnerNames=comp==="net"?(record.netWinnerNames||[]):(record.stablefordWinnerNames||[]);
+  $("screen").innerHTML=`
+    <div class="card" style="text-align:center;"><div style="font-size:52px;">🏆</div><div class="muted">ROUND ${roundNo} RESULT</div><h2 style="font-size:26px;margin:6px 0;">${esc(record.course||"Golf Trip")}</h2><div class="muted">${record.date?esc(formatDate(record.date))+" • ":""}${comp==="net"?"⛳ Net":"🏆 Stableford"}</div></div>
+    <div class="card"><h2>📋 Full leaderboard</h2>${ranking.map(x=>`<div class="player row"><div><b>${x.rankLabel}. ${esc(x.name)}</b></div><div style="font-size:18px;font-weight:800;">${x.noReturn?"NR":(comp==="net"?"Net "+x.score:x.score+" pts")}</div></div>`).join("")}</div>
+    ${Number(record.stake||0)>0?`<div class="card"><div class="notice"><b>💷 Daily pot £${potValue}</b><br>${winnerNames.length?"Winner"+(winnerNames.length>1?"s":"")+": "+winnerNames.map(esc).join(" & "):"Result saved"}</div></div>`:""}
+    <div class="card" style="text-align:center;"><div style="font-size:28px;">🎉 ⛳ 🎉</div><div style="font-weight:800;margin-top:8px;">Round ${roundNo} complete!</div><div class="notice" style="margin-top:12px;">Share today's full result with the group, then move on to Round ${trip.currentRound} of ${trip.totalRounds}.</div><button class="primary full" onclick="shareWinnerImage()">📤 Share Round ${roundNo} Result</button>${isAdmin?`<button class="secondary full" onclick="nextTripRound()">✈️ Move on to Round ${trip.currentRound}</button>`:`<div class="notice" style="margin-top:10px;">Waiting for the Group Admin to start Round ${trip.currentRound}.</div>`}</div>`;
+  window.scrollTo(0,0);
+}
+
 function showWinnerScreen(record){
 
   page="winner";
   lastWinnerRecord=record;
+  if(state.trip?.active && state.roundOpen===false){ showTripRoundResult(record); return; }
 
   const isPointsGame=record.gameType==="points";
 
@@ -3105,103 +3073,22 @@ async function shareWinnerImage(){
 async function shareTripSummary(){
   const past=state.trip?.pastTrips||[];
   const live=Boolean(state.trip&&(state.trip.active||state.trip.completed||(state.trip.rounds||[]).length));
-  const safeIndex=(selectedPastTripIndex>=0 && selectedPastTripIndex<past.length)
-    ? selectedPastTripIndex : 0;
+  const safeIndex=(selectedPastTripIndex>=0&&selectedPastTripIndex<past.length)?selectedPastTripIndex:0;
   const trip=live?state.trip:(past[safeIndex]||null);
   if(!trip){alert("No Trip is available to share.");return;}
-
-  const rounds=trip.rounds||[];
-  const names=[...new Set([...state.players.map(p=>p.name),...Object.keys(trip.standings||{})])];
-  const standings=names.map(name=>({name,points:Number(trip.standings?.[name]||0)}))
-    .sort((a,b)=>b.points-a.points||a.name.localeCompare(b.name));
-
-  const played=name=>rounds.filter(r=>(r.players||[]).some(p=>p.name===name&&(p.stableford!=null||p.netScore!=null))).length;
-  const money={}; names.forEach(n=>money[n]=0);
-  rounds.forEach(r=>{
-    if(r.gameType!=="money")return;
-    const sf=r.stablefordWinnerNames||[], net=r.netWinnerNames||[];
-    const sfShare=sf.length?Number(r.stablefordPot||0)/sf.length:0;
-    const netShare=net.length?Number(r.netPot||0)/net.length:0;
-    sf.forEach(n=>money[n]=(money[n]||0)+sfShare);
-    net.forEach(n=>money[n]=(money[n]||0)+netShare);
-  });
-
-  const roundWinner=r=>{
-    if(r.gameType==="points"&&r.pointsResults?.length){
-      return {name:r.pointsResults[0].name||"",score:r.pointsResults[0].score??""};
-    }
-    const ws=[...(r.stablefordWinnerNames||[]),...(r.netWinnerNames||[])];
-    const p=(r.players||[]).find(x=>x.name===ws[0]);
-    return {name:ws.join(" & ")||"Result saved",score:p?.stableford??p?.netScore??""};
-  };
-
-  const W=1080, rowH=92, roundsH=Math.max(1,rounds.length)*76;
-  const H=720 + standings.length*rowH + roundsH + 260;
-  const canvas=document.createElement("canvas");
-  canvas.width=W; canvas.height=H;
-  const c=canvas.getContext("2d");
-
-  const green="#006b3c", dark="#004f2d", pale="#f2f7f4", gold="#d5a928", ink="#17211b", grey="#68756d";
-  c.fillStyle=pale;c.fillRect(0,0,W,H);
-  c.fillStyle=green;c.fillRect(0,0,W,250);
-  c.fillStyle="#fff";c.textAlign="center";c.font="800 54px Arial";c.fillText("I'M IN GOLF",W/2,76);
-  c.font="700 27px Arial";c.fillText((trip.name||"GOLF TRIP").toUpperCase(),W/2,125);
-  c.font="700 22px Arial";c.fillText("FINAL TOURNAMENT RESULTS",W/2,165);
-  c.fillStyle=gold;c.fillRect(390,190,300,5);
-
-  const champ=standings[0];
-  let y=285;
-  c.fillStyle="#fff";c.fillRect(55,y,970,190);
-  c.strokeStyle=gold;c.lineWidth=4;c.strokeRect(55,y,970,190);
-  c.fillStyle=green;c.font="800 25px Arial";c.fillText("TRIP CHAMPION",W/2,y+48);
-  c.fillStyle=ink;c.font="800 48px Arial";c.fillText((champ?.name||"").toUpperCase(),W/2,y+108);
-  c.fillStyle=green;c.font="800 34px Arial";c.fillText(`${champ?.points||0} POINTS`,W/2,y+158);
-
-  y+=235;
-  c.textAlign="left";c.fillStyle=dark;c.font="800 31px Arial";c.fillText("FINAL STANDINGS",60,y);
-  y+=35;
-  c.fillStyle=dark;c.fillRect(55,y,970,58);
-  c.fillStyle="#fff";c.font="700 20px Arial";
-  c.fillText("POS",80,y+37);c.fillText("PLAYER",180,y+37);c.fillText("PTS",650,y+37);c.fillText("RDS",760,y+37);c.fillText("WON",880,y+37);
-  y+=58;
-  standings.forEach((p,i)=>{
-    c.fillStyle=i%2?"#fff":"#f8fbf9";c.fillRect(55,y,970,rowH);
-    c.fillStyle=i===0?gold:ink;c.font="800 27px Arial";c.fillText(String(i+1),85,y+55);
-    c.fillStyle=ink;c.font="700 27px Arial";c.fillText(p.name,180,y+55);
-    c.fillStyle=green;c.font="800 27px Arial";c.fillText(String(p.points),650,y+55);
-    c.fillStyle=ink;c.font="700 25px Arial";c.fillText(String(played(p.name)),770,y+55);
-    c.fillStyle=green;c.font="800 27px Arial";c.fillText("£"+Number(money[p.name]||0).toFixed(2).replace(/\.00$/,""),880,y+55);
-    y+=rowH;
-  });
-
-  y+=45;c.fillStyle=dark;c.font="800 31px Arial";c.fillText("ROUND WINNERS",60,y);y+=25;
-  rounds.forEach((r,i)=>{
-    const w=roundWinner(r);
-    y+=65;c.fillStyle=ink;c.font="700 25px Arial";c.fillText(`ROUND ${i+1}${r.course?" — "+r.course:""}`,70,y);
-    c.textAlign="right";c.fillStyle=green;c.font="800 25px Arial";c.fillText(`${w.name}${w.score!==""?"  "+w.score:""}`,1000,y);c.textAlign="left";
-    c.strokeStyle="#d9e2dc";c.lineWidth=2;c.beginPath();c.moveTo(65,y+20);c.lineTo(1015,y+20);c.stroke();
-  });
-
-  y+=75;c.fillStyle=green;c.fillRect(55,y,970,115);
-  const total=Object.values(money).reduce((a,b)=>a+Number(b||0),0);
-  c.fillStyle="#fff";c.textAlign="center";c.font="700 23px Arial";c.fillText("TOTAL TRIP PRIZE MONEY",W/2,y+40);
-  c.font="800 42px Arial";c.fillText("£"+total.toFixed(2).replace(/\.00$/,""),W/2,y+88);
-  y+=160;c.fillStyle=grey;c.font="700 20px Arial";c.fillText("Thanks for playing — I'm In Golf",W/2,y);
-
-  canvas.toBlob(async blob=>{
-    if(!blob){alert("Couldn't create the Trip Summary image.");return;}
-    const file=new File([blob],"im-in-golf-trip-summary.png",{type:"image/png"});
-    try{
-      if(navigator.canShare&&navigator.canShare({files:[file]})){
-        await navigator.share({title:`I'm In Golf — ${trip.name||"Trip Summary"}`,files:[file]});
-      }else{
-        const url=URL.createObjectURL(blob);
-        const a=document.createElement("a");a.href=url;a.download="im-in-golf-trip-summary.png";a.click();
-        setTimeout(()=>URL.revokeObjectURL(url),1000);
-        alert("Trip Summary image created. You can now share the saved image.");
-      }
-    }catch(err){if(err?.name!=="AbortError")alert("Couldn't share the Trip Summary image. Please try again.");}
-  },"image/png");
+  const rounds=trip.rounds||[], comp=trip.competition||"stableford", standings=tripAggregate(trip);
+  const rowH=72, W=1080, H=Math.min(30000,650+standings.length*rowH+rounds.length*70);
+  const canvas=document.createElement("canvas"); canvas.width=W; canvas.height=H; const c=canvas.getContext("2d");
+  const green="#126b3a", dark="#143322", pale="#f4f7f5", gold="#d4a62a", ink="#18231d", grey="#64736a";
+  c.fillStyle=pale;c.fillRect(0,0,W,H); c.fillStyle=green;c.fillRect(0,0,W,235);
+  c.textAlign="center";c.fillStyle="#fff";c.font="800 50px Arial";c.fillText("I'M IN GOLF",W/2,65);c.font="800 31px Arial";c.fillText((trip.name||"GOLF TRIP").toUpperCase(),W/2,118);c.font="700 23px Arial";c.fillText("FINAL TOURNAMENT RESULTS • "+(comp==="net"?"NET":"STABLEFORD"),W/2,158);c.fillStyle=gold;c.fillRect(390,185,300,5);
+  let y=275; const champ=standings[0];
+  if(champ){c.fillStyle="#fff";c.fillRect(55,y,970,150);c.strokeStyle=gold;c.lineWidth=4;c.strokeRect(55,y,970,150);c.fillStyle=green;c.font="800 22px Arial";c.fillText("TRIP CHAMPION",W/2,y+38);c.fillStyle=ink;c.font="800 43px Arial";c.fillText(champ.name.toUpperCase(),W/2,y+90);c.fillStyle=green;c.font="800 29px Arial";c.fillText(champ.hasNR?"NR":(comp==="net"?champ.total+" NET":champ.total+" PTS"),W/2,y+128);y+=195;}
+  c.textAlign="left";c.fillStyle=dark;c.font="800 29px Arial";c.fillText("FINAL STANDINGS",60,y);y+=25;c.fillStyle=dark;c.fillRect(55,y,970,52);c.fillStyle="#fff";c.font="700 18px Arial";c.fillText("POS",75,y+33);c.fillText("PLAYER",155,y+33);c.fillText("ROUND SCORES",480,y+33);c.textAlign="right";c.fillText("TOTAL",995,y+33);c.textAlign="left";y+=52;
+  standings.forEach((p,i)=>{c.fillStyle=i%2?"#fff":"#f9fbfa";c.fillRect(55,y,970,rowH);c.fillStyle=i===0?gold:ink;c.font="800 23px Arial";c.fillText(String(i+1),80,y+44);c.fillStyle=ink;c.font="700 23px Arial";c.fillText(p.name,155,y+44);c.fillStyle=grey;c.font="600 17px Arial";let roundsText=p.roundScores.map((v,j)=>`R${j+1} ${v==null?'—':v}`).join('  '); while(c.measureText(roundsText).width>360&&roundsText.length>12)roundsText=roundsText.slice(0,-4)+'…';c.fillText(roundsText,480,y+44);c.textAlign="right";c.fillStyle=green;c.font="800 24px Arial";c.fillText(p.hasNR?"NR":String(p.total)+(comp==="net"?"":" pts"),995,y+44);c.textAlign="left";y+=rowH;});
+  y+=40;c.fillStyle=dark;c.font="800 27px Arial";c.fillText("ROUND WINNERS",60,y);y+=18; rounds.forEach((r,i)=>{const rank=tripRoundRanking(r,comp), first=rank.find(x=>x.rank===1); y+=58;c.fillStyle=ink;c.font="700 21px Arial";c.fillText(`ROUND ${i+1}${r.course?' — '+r.course:''}`,70,y);c.textAlign="right";c.fillStyle=green;c.font="800 21px Arial";c.fillText(first?`${first.name}  ${first.noReturn?'NR':first.score+(comp==='net'?'':' pts')}`:'No result',1000,y);c.textAlign="left";c.strokeStyle="#d9e2dc";c.beginPath();c.moveTo(65,y+17);c.lineTo(1015,y+17);c.stroke();});
+  y+=70;c.fillStyle=grey;c.textAlign="center";c.font="700 19px Arial";c.fillText("I'm In Golf • Trip results",W/2,y);
+  canvas.toBlob(async blob=>{if(!blob){alert("Couldn't create the Trip Summary image.");return;} const file=new File([blob],"im-in-golf-trip-results.png",{type:"image/png"}); try{if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({title:`I'm In Golf — ${trip.name||"Trip Results"}`,files:[file]});}else{const url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="im-in-golf-trip-results.png";a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);alert("Trip results image created. You can now share the saved image.");}}catch(err){if(err?.name!=="AbortError")alert("Couldn't share the Trip results image. Please try again.");}},"image/png");
 }
 
 function league(){
@@ -3322,19 +3209,7 @@ const tripPlayed=(playerName)=>{
   }).length;
 };
 
-const tripSorted=[...state.players].sort((a,b)=>{
-  const aPoints=
-    Number(leagueTrip?.standings?.[a.name]||0);
-
-  const bPoints=
-    Number(leagueTrip?.standings?.[b.name]||0);
-
-  if(bPoints!==aPoints){
-    return bPoints-aPoints;
-  }
-
-  return tripPlayed(b.name)-tripPlayed(a.name);
-});
+const tripSorted=leagueTrip ? tripAggregate(leagueTrip) : [];
   $("screen").innerHTML=`
 
    <div class="card">
@@ -3461,26 +3336,8 @@ ${leagueTrip ? `
 
 ${tripSorted.map((p,i)=>`
   <div class="player row">
-    <div>
-      <b>
-        ${i===0 && Number(leagueTrip?.standings?.[p.name]||0)>0 ? "👑 " : ""}
-        ${i+1}. ${esc(p.name)}
-      </b>
-
-      <div class="muted">
-        Handicap ${p.handicap}
-      </div>
-    </div>
-
-    <div style="text-align:right;">
-      <div class="money">
-        ${Number(leagueTrip?.standings?.[p.name]||0)} pts
-      </div>
-
-      <div style="font-weight:800;">
-        Played ${tripPlayed(p.name)}
-      </div>
-    </div>
+    <div><b>${i===0 ? "👑 " : ""}${i+1}. ${esc(p.name)}</b><div class="muted">${p.roundScores.map((v,j)=>`R${j+1}: ${v==null?"—":v}`).join(" • ")}</div></div>
+    <div style="text-align:right;"><div class="money">${p.hasNR?"NR":(leagueTrip.competition==="net"?p.total+" net":p.total+" pts")}</div><div style="font-weight:800;">Played ${p.played}/${(leagueTrip.rounds||[]).length}</div></div>
   </div>
 `).join("")}
 
@@ -4021,7 +3878,7 @@ function updateAdminUI(){
   }
 
   if(payButton){
-    if(state.gameType==="points"){
+    if(state.gameType==="points" || Number(state.stake||0)<=0 || state.trip?.completed){
       payButton.classList.add("hidden");
 
       if(page==="pay"){
@@ -4286,7 +4143,7 @@ function adminHelpTopicContent(topic){
     waiting:`<h2>⏳ Still to enter</h2><div class="notice">The Scores screen shows exactly who still needs to submit.<br><br>For a Money Game, only players who are paid and have chosen a competition are included.<br><br>The list updates automatically as scores or NR results are submitted.</div>`,
     finish:`<h2>🏁 Finish a round</h2><div class="notice">When every entered player has submitted a score or valid NR, Admin will see <b>Finish Round & Save Result</b> at the bottom of Scores.<br><br>Check the leaderboard, tap the button and confirm the result.<br><br>The completed round is saved in <b>League → Previous rounds</b>.</div><div class="notice">After a normal round finishes, players see <b>Next Competition — Coming soon…</b> until the Admin sets up the next one.</div>`,
     points:`<h2>🏆 Points Games</h2><div class="notice">Everyone plays the same competition — Stableford or Net.<br><br>There is no payment step.<br><br>The top three receive league points based on the value chosen when the round is set up.</div>`,
-    trip:`<h2>✈️ Trip Mode</h2><div class="notice">Choose <b>Trip Mode</b> when setting up a competition, then enter the trip name and number of rounds.<br><br>Each round is saved inside the trip and Trip Championship points build across the trip.<br><br>After the final round, the app shows a Trip Summary with daily winners, final standings and the Trip winner.</div><div class="notice">The organiser then taps <b>Save Trip & Return to Normal Golf</b>.</div>`,
+    trip:`<h2>✈️ Trip Mode</h2><div class="notice">Choose <b>Trip Mode</b> when setting up a competition, then enter the trip name and number of rounds.<br><br>Choose <b>Stableford</b> or <b>Net</b> once for the whole trip. Each round is saved and every golfer's actual scores are added together across the trip.<br><br>After the final round, the app shows every day's full leaderboard, overall totals and the Trip winner.</div><div class="notice">The organiser then taps <b>Save Trip & Return to Normal Golf</b>.</div>`,
     pin:`<h2>🔐 Admin PIN</h2><div class="notice">Admin can change the PIN in <b>Settings → Change Admin PIN</b>.<br><br>If the Admin PIN is forgotten, the I'm In Golf owner can reset it securely from Owner Controls.</div>`,
     install:`<h2>📱 Install on a phone</h2><div class="notice"><b>iPhone:</b> Safari → <b>•••</b> bottom-right → <b>Share</b> → <b>Add to Home Screen</b>.<br><br><b>Android:</b> Chrome → <b>⋮</b> → <b>Add to Home screen</b> or <b>Install app</b>.</div>`,
     problems:`<h2>🛠️ Something isn't working</h2><div class="notice"><b>1.</b> Check the Group PIN.<br><br><b>2.</b> Refresh or fully close and reopen the app.<br><br><b>3.</b> On a laptop, use <b>Ctrl + F5</b>.<br><br><b>4.</b> Wrong player? Go to <b>Players → Change who I am</b>.<br><br><b>5.</b> Forgotten Admin PIN? Contact the I'm In Golf owner for a reset.</div><div class="muted">The app will not redraw while someone is typing a score.</div>`
@@ -5404,21 +5261,20 @@ function tripSetupScreen(){
       <div class="card" style="width:min(720px,100%);margin:18px auto;padding:24px;border-radius:20px;box-shadow:0 18px 50px rgba(0,0,0,.18);">
         <div style="font-size:34px;text-align:center;margin-bottom:6px;">✈️</div>
         <h2 style="margin:0 0 6px;text-align:center;">Set Up Golf Trip</h2>
-        <p class="muted" style="margin:0 0 20px;text-align:center;">Set up the trip once. Each round will be ready when you get to it.</p>
+        <p class="muted" style="margin:0 0 20px;text-align:center;">Set the trip up once. Everyone enters one golf score each day and I'm In Golf adds the trip totals for you.</p>
 
         <label style="display:block;margin:0 0 6px;">Trip name</label>
-        <input id="tripSetupName" type="text" value="${String(state.trip?.name||'Golf Trip').replace(/"/g,'&quot;')}" style="width:100%;margin-bottom:14px;">
-
+        <input id="tripSetupName" type="text" value="Golf Trip" style="width:100%;margin-bottom:14px;">
         <label style="display:block;margin:0 0 6px;">Number of rounds</label>
-        <input id="tripSetupRounds" type="number" min="1" max="12" step="1" value="${Number(state.trip?.totalRounds||3)}" style="width:100%;margin-bottom:16px;">
+        <input id="tripSetupRounds" type="number" min="1" max="12" step="1" value="3" style="width:100%;margin-bottom:16px;">
 
-        <div style="margin-bottom:8px;font-weight:800;">Trip Championship</div>
-        <div class="muted" style="margin-bottom:10px;">Choose the scoring used for the overall trip standings. The same scoring is used for each trip round so players only enter one score.</div>
+        <div style="margin-bottom:8px;font-weight:800;">Trip scoring</div>
+        <div class="muted" style="margin-bottom:10px;">Choose once for the whole trip.</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
           <button id="tripCompStableford" class="primary">🏆 Stableford</button>
           <button id="tripCompNet" class="secondary">⛳ Net</button>
         </div>
-        <div class="notice" style="margin-bottom:18px;"><b>🏆 Trip Championship points</b><br>🥇 1st — 10 pts&nbsp;&nbsp; 🥈 2nd — 6 pts&nbsp;&nbsp; 🥉 3rd — 3 pts</div>
+        <div id="tripScoringHelp" class="notice" style="margin-bottom:18px;"><b>🏆 Stableford Trip</b><br>Each day's Stableford points are added together. Highest total wins the trip.</div>
 
         <div id="tripRoundsWrap"></div>
         <div id="tripSetupError" class="notice warning" style="display:none;margin:10px 0 12px;"></div>
@@ -5426,101 +5282,47 @@ function tripSetupScreen(){
         <button id="tripSetupCancel" class="secondary" style="width:100%;">Cancel</button>
       </div>`;
     document.body.appendChild(overlay);
-
-    let tripCompetition='stableford';
-    let drafts=[];
-    const roundsInput=overlay.querySelector('#tripSetupRounds');
-    const wrap=overlay.querySelector('#tripRoundsWrap');
-    const err=overlay.querySelector('#tripSetupError');
-    const setTripComp=(comp)=>{
+    let tripCompetition="stableford", drafts=[];
+    const roundsInput=overlay.querySelector('#tripSetupRounds'), wrap=overlay.querySelector('#tripRoundsWrap'), err=overlay.querySelector('#tripSetupError');
+    const readExisting=()=>{ [...wrap.querySelectorAll('[data-trip-round]')].forEach(card=>{ const i=+card.dataset.tripRound; drafts[i]={course:card.querySelector('[data-course]')?.value||'',date:card.querySelector('[data-date]')?.value||'',stake:Number(card.querySelector('[data-stake]')?.value||0)}; }); };
+    const setTripComp=comp=>{
       tripCompetition=comp;
       overlay.querySelector('#tripCompStableford').className=comp==='stableford'?'primary':'secondary';
       overlay.querySelector('#tripCompNet').className=comp==='net'?'primary':'secondary';
+      overlay.querySelector('#tripScoringHelp').innerHTML=comp==='net'?'<b>⛳ Net Trip</b><br>Each day\'s net score is added together. Lowest total wins the trip.':'<b>🏆 Stableford Trip</b><br>Each day\'s Stableford points are added together. Highest total wins the trip.';
       renderRounds();
     };
-    const readExisting=()=>{
-      [...wrap.querySelectorAll('[data-trip-round]')].forEach(card=>{
-        const i=Number(card.dataset.tripRound);
-        drafts[i]=drafts[i]||{};
-        drafts[i].course=card.querySelector('[data-course]')?.value||'';
-        drafts[i].date=card.querySelector('[data-date]')?.value||'';
-        drafts[i].stake=Number(card.querySelector('[data-stake]')?.value||0);
-        drafts[i].gameType=card.dataset.gameType||'money';
-      });
-    };
     function renderRounds(){
-      readExisting();
-      const count=Math.max(1,Math.min(12,Number(roundsInput.value||1)));
-      wrap.innerHTML='';
+      readExisting(); const count=Math.max(1,Math.min(12,Number(roundsInput.value||1))); wrap.innerHTML='';
       for(let i=0;i<count;i++){
-        const d=drafts[i]||{course:'',date:'',stake:Number(state.stake||10),gameType:i===0?'money':'money'};
-        drafts[i]=d;
-        const card=document.createElement('div');
-        card.dataset.tripRound=i;
-        card.dataset.gameType=d.gameType||'money';
-        card.className='notice';
-        card.style.cssText='margin:0 0 14px;padding:16px;';
-        card.innerHTML=`
-          <div style="font-weight:900;font-size:17px;margin-bottom:12px;">Round ${i+1}</div>
-          <label style="display:block;margin:0 0 5px;">Course</label>
-          <input data-course type="text" value="${String(d.course||'').replace(/"/g,'&quot;')}" placeholder="Course" style="width:100%;margin-bottom:10px;">
-          <label style="display:block;margin:0 0 5px;">Date</label>
-          <input data-date type="date" value="${d.date||''}" style="width:100%;margin-bottom:10px;">
-          <div style="font-weight:700;margin-bottom:6px;">Game</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
-            <button type="button" data-money class="${card.dataset.gameType==='money'?'primary':'secondary'}">💷 Money Game</button>
-            <button type="button" data-points class="${card.dataset.gameType==='points'?'primary':'secondary'}">🏆 Points Game</button>
-          </div>
-          <div style="margin-bottom:10px;"><b>Competition:</b> ${tripCompetition==='net'?'⛳ Net':'🏆 Stableford'}</div>
-          <div data-stake-wrap style="${card.dataset.gameType==='money'?'':'display:none;'}">
-            <label style="display:block;margin:0 0 5px;">Stake per player (£)</label>
-            <input data-stake type="number" min="0" step="1" value="${Number.isFinite(Number(d.stake))?Number(d.stake):10}" style="width:100%;">
-          </div>`;
+        const d=drafts[i]||{course:'',date:'',stake:0}; drafts[i]=d;
+        const card=document.createElement('div'); card.dataset.tripRound=i; card.className='notice'; card.style.cssText='margin:0 0 14px;padding:16px;';
+        card.innerHTML=`<div style="font-weight:900;font-size:17px;margin-bottom:12px;">Round ${i+1}</div>
+          <label style="display:block;margin:0 0 5px;">Course</label><input data-course type="text" value="${String(d.course||'').replace(/"/g,'&quot;')}" placeholder="Course" style="width:100%;margin-bottom:10px;">
+          <label style="display:block;margin:0 0 5px;">Date</label><input data-date type="date" value="${d.date||''}" style="width:100%;margin-bottom:10px;">
+          <div style="margin-bottom:10px;"><b>Scoring:</b> ${tripCompetition==='net'?'⛳ Net':'🏆 Stableford'}</div>
+          <label style="display:block;margin:0 0 5px;">Daily stake per player (£) <span class="muted">— optional</span></label>
+          <input data-stake type="number" min="0" step="1" value="${Number(d.stake||0)||''}" placeholder="No stake" style="width:100%;">`;
         wrap.appendChild(card);
-        const money=card.querySelector('[data-money]');
-        const points=card.querySelector('[data-points]');
-        const stakeWrap=card.querySelector('[data-stake-wrap]');
-        const setGame=g=>{
-          card.dataset.gameType=g; drafts[i].gameType=g;
-          money.className=g==='money'?'primary':'secondary';
-          points.className=g==='points'?'primary':'secondary';
-          stakeWrap.style.display=g==='money'?'':'none';
-        };
-        money.onclick=()=>setGame('money');
-        points.onclick=()=>setGame('points');
       }
     }
     roundsInput.addEventListener('change',renderRounds);
     overlay.querySelector('#tripCompStableford').onclick=()=>setTripComp('stableford');
     overlay.querySelector('#tripCompNet').onclick=()=>setTripComp('net');
-    const finish=value=>{ overlay.remove(); resolve(value); };
+    const finish=value=>{overlay.remove();resolve(value)};
     overlay.querySelector('#tripSetupCancel').onclick=()=>finish(null);
     overlay.querySelector('#tripSetupStart').onclick=()=>{
-      readExisting();
-      const name=overlay.querySelector('#tripSetupName').value.trim();
-      const totalRounds=Number(roundsInput.value);
-      let msg='';
-      if(!name) msg='Please enter a trip name.';
-      else if(!Number.isInteger(totalRounds)||totalRounds<1||totalRounds>12) msg='Please enter a valid number of rounds.';
-      const rounds=[];
-      if(!msg){
-        for(let i=0;i<totalRounds;i++){
-          const card=wrap.querySelector(`[data-trip-round="${i}"]`);
-          const course=card?.querySelector('[data-course]')?.value.trim()||'';
-          const date=card?.querySelector('[data-date]')?.value||'';
-          const gameType=card?.dataset.gameType||'money';
-          const stake=gameType==='money'?Number(card?.querySelector('[data-stake]')?.value||0):0;
-          if(!course){ msg=`Please enter the course for Round ${i+1}.`; break; }
-          if(!date){ msg=`Please choose the date for Round ${i+1}.`; break; }
-          if(gameType==='money' && (!Number.isFinite(stake)||stake<0)){ msg=`Please enter a valid stake for Round ${i+1}.`; break; }
-          rounds.push({course,date,gameType,competition:tripCompetition,stake});
-        }
+      readExisting(); const name=overlay.querySelector('#tripSetupName').value.trim(), totalRounds=Number(roundsInput.value); let msg=''; const rounds=[];
+      if(!name)msg='Please enter a trip name.'; else if(!Number.isInteger(totalRounds)||totalRounds<1||totalRounds>12)msg='Please enter a valid number of rounds.';
+      if(!msg)for(let i=0;i<totalRounds;i++){
+        const card=wrap.querySelector(`[data-trip-round="${i}"]`), course=card?.querySelector('[data-course]')?.value.trim()||'', date=card?.querySelector('[data-date]')?.value||'', stake=Number(card?.querySelector('[data-stake]')?.value||0);
+        if(!course){msg=`Please enter the course for Round ${i+1}.`;break} if(!date){msg=`Please choose the date for Round ${i+1}.`;break} if(!Number.isFinite(stake)||stake<0){msg=`Please enter a valid stake for Round ${i+1}.`;break}
+        rounds.push({course,date,gameType:'money',competition:tripCompetition,stake});
       }
-      if(msg){ err.textContent=msg; err.style.display='block'; return; }
-      finish({name,totalRounds,competition:tripCompetition,tripPointsValue:10,rounds});
+      if(msg){err.textContent=msg;err.style.display='block';return}
+      finish({name,totalRounds,competition:tripCompetition,rounds});
     };
-    overlay.addEventListener('click',e=>{ if(e.target===overlay) finish(null); });
-    renderRounds();
+    overlay.addEventListener('click',e=>{if(e.target===overlay)finish(null)}); renderRounds();
   });
 }
 
@@ -5543,7 +5345,6 @@ async function newRound(){
       totalRounds:setup.totalRounds,
       currentRound:1,
       competition:setup.competition,
-      tripPointsValue:10,
       plan:setup.rounds,
       normalRoundBackup:{
         course:state.course,
@@ -5566,8 +5367,8 @@ async function newRound(){
     state.roundOpen=true;
     state.course=first.course;
     state.date=first.date;
-    state.gameType=first.gameType;
-    state.stake=first.gameType==='money'?Number(first.stake||0):0;
+    state.gameType="money";
+    state.stake=Number(first.stake||0);
     state.pointsCompetition=setup.competition;
     state.pointsValue=10;
     state.players.forEach(p=>{
@@ -5613,8 +5414,8 @@ async function nextTripRound(){
     state.roundOpen=true;
     state.course=plannedRound.course || "";
     state.date=plannedRound.date || "";
-    state.gameType=plannedRound.gameType || "money";
-    state.stake=state.gameType==="money" ? Number(plannedRound.stake||0) : 0;
+    state.gameType="money";
+    state.stake=Number(plannedRound.stake||0);
     state.pointsCompetition=state.trip.competition || plannedRound.competition || "stableford";
     state.pointsValue=10;
     state.players.forEach(p=>{
@@ -5649,98 +5450,25 @@ const tripDate=await pickTripDate(
 
 if(tripDate===null)return;
 
-    const game=prompt(
-    "✈️ " + state.trip.name +
-    "\nRound " + roundNumber + " of " + state.trip.totalRounds +
-    "\n\nChoose Game Type:\n\n" +
-    "1. 💷 Money Game\n" +
-    "2. 🏆 Points Game\n\n" +
-    "Enter 1 or 2"
-  );
+    const stakeAnswer=prompt(
+      "Daily stake per player (£) — optional",
+      "0"
+    );
+    if(stakeAnswer===null)return;
+    const tripStake=Number(stakeAnswer||0);
+    if(!Number.isFinite(tripStake) || tripStake<0){
+      alert("Please enter a valid stake, or 0 for no stake.");
+      return;
+    }
 
-  if(game===null)return;
-
-  if(game!=="1" && game!=="2"){
-    alert("Please enter 1 for Money Game or 2 for Points Game.");
-    return;
-  }
-
-  const selectedType=
-    game==="2" ? "points" : "money";
-
-  const competition=prompt(
-    "Choose Trip Championship Competition:\n\n" +
-    "1. 🏆 Stableford\n" +
-    "2. ⛳ Net\n\n" +
-    "Enter 1 or 2"
-  );
-
-  if(competition===null)return;
-
-  if(competition!=="1" && competition!=="2"){
-    alert("Please enter 1 for Stableford or 2 for Net.");
-    return;
-  }
-
-  const selectedCompetition=
-    competition==="1" ? "stableford" : "net";
-
-  const points=prompt(
-    "How many Trip Championship points is Round " +
-    roundNumber +
-    " worth to the winner?",
-    Number(state.trip.tripPointsValue||10)
-  );
-
-  if(points===null)return;
-
-  const tripPointsValue=Number(points);
-
-  if(!Number.isFinite(tripPointsValue) || tripPointsValue<=0){
-    alert("Please enter a valid Trip points value.");
-    return;
-  }
-
-  const second=Math.round(tripPointsValue*0.6);
-  const third=Math.round(tripPointsValue*0.3);
-
-  const message=
-    "✈️ " + state.trip.name +
-    "\n\nRound " + roundNumber +
-    " of " + state.trip.totalRounds +
-    "\n" + tripCourse.trim() +
-    "\n" + tripDate.trim() +
-    "\n\n" +
-    (selectedType==="points"
-      ? "🏆 Points Game"
-      : "💷 Money Game") +
-    "\n" +
-    (selectedCompetition==="stableford"
-      ? "🏆 Stableford"
-      : "⛳ Net") +
-    "\n\nTrip Championship Points:" +
-    "\n🥇 " + tripPointsValue + " pts" +
-    "\n🥈 " + second + " pts" +
-    "\n🥉 " + third + " pts" +
-    "\n\nStart this round?";
-
-  if(!confirm(message))return;
-
-  state.trip.active=true;
-  state.trip.completed=false;
-  state.roundOpen=true;
-  state.course=tripCourse.trim();
-  state.date=tripDate.trim();
-
-  state.gameType=selectedType;
-
-  state.trip.competition=selectedCompetition;
-  state.trip.tripPointsValue=tripPointsValue;
-
-  if(selectedType==="points"){
-    state.pointsCompetition=selectedCompetition;
-    state.pointsValue=tripPointsValue;
-  }
+    state.trip.active=true;
+    state.trip.completed=false;
+    state.roundOpen=true;
+    state.course=tripCourse.trim();
+    state.date=tripDate.trim();
+    state.gameType="money";
+    state.stake=tripStake;
+    state.pointsCompetition=state.trip.competition || "stableford";
 
   state.players.forEach(p=>{
     p.paid=false;
