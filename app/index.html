@@ -4025,6 +4025,33 @@ async function changeGroupName(){
   alert("✅ Group name changed to " + clean);
 }
 
+async function changeCurrentRoundCompetition(){
+  if(!isAdmin)return;
+  if(!roundOpenNow()){
+    alert("There is no open round to change.");
+    return;
+  }
+  if(roundLocked()){
+    alert("Competition cannot be changed after scoring has started.");
+    return;
+  }
+  const current=(state.pointsCompetition||"stableford")==="net" ? "net" : "stableford";
+  const next=current==="stableford" ? "net" : "stableford";
+  const currentLabel=current==="stableford" ? "Stableford" : "Net";
+  const nextLabel=next==="stableford" ? "Stableford" : "Net";
+  if(!confirm(`Change this round from ${currentLabel} to ${nextLabel}?\n\nPlayers, payments, course, date and stake will stay unchanged.`))return;
+  state.pointsCompetition=next;
+  // Keep legacy per-player competition data aligned where no score has been submitted.
+  state.players.forEach(p=>{
+    if(p.stableford==null && p.netScore==null && p.noReturn!==true){
+      p.competition=next;
+    }
+  });
+  await save();
+  alert(`✅ Competition changed to ${nextLabel}.`);
+  settingsPage();
+}
+
 function settingsPage(){
  if(!isAdmin){adminLogin();return}
  $("screen").innerHTML=`<div class="card"><h2>⚙️ Admin / Settings</h2>
@@ -4048,6 +4075,15 @@ function settingsPage(){
   <button class="secondary full" onclick="newRound()">
     Start new round
   </button>
+  ${roundOpenNow() && !roundLocked() ? `
+    <div class="notice" style="margin-top:12px;">
+      <div class="muted">CURRENT COMPETITION</div>
+      <b>${state.pointsCompetition==="net" ? "⛳ Net" : "🏆 Stableford"}</b>
+    </div>
+    <button class="secondary full" onclick="changeCurrentRoundCompetition()">
+      🔄 Change to ${state.pointsCompetition==="net" ? "Stableford" : "Net"}
+    </button>
+  ` : ""}
   <button class="red full" onclick="cancelCurrentRound()">
     🗑️ Cancel Current Round
   </button>
