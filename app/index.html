@@ -28,6 +28,7 @@ nav{position:fixed;left:50%;transform:translateX(-50%);bottom:0;width:min(520px,
 nav button{flex:1;background:transparent;color:#6d756f;padding:11px 2px;font-size:13px;line-height:1.35}nav button.active{color:var(--green);font-weight:800}
 .pay-sticky{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(72px + env(safe-area-inset-bottom));width:min(488px,calc(100% - 32px));background:white;border:1px solid var(--line);border-radius:16px;padding:10px;box-shadow:0 6px 22px rgba(0,0,0,.14);z-index:19}
 .pay-sticky .full{margin-top:0}.pay-screen-spacer{height:82px}
+.finish-sticky{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(72px + env(safe-area-inset-bottom));width:min(488px,calc(100% - 32px));background:white;border:1px solid var(--line);border-radius:16px;padding:10px;box-shadow:0 6px 22px rgba(0,0,0,.14);z-index:19}.finish-sticky .full{margin-top:0}.finish-screen-spacer{height:82px}
 .score{width:78px;margin:0}.pos{font-weight:800;font-size:18px;min-width:24px}.money{font-weight:800}
 #setupOverlay{position:fixed;inset:0;background:#f4f6f3;z-index:50;display:flex;align-items:flex-start;justify-content:center;padding:45px 16px;overflow:auto}
 .setup{width:min(480px,100%)}.hidden{display:none!important}
@@ -1032,7 +1033,7 @@ $("screen").innerHTML=`
 
   <div class="card">
     <button class="secondary full" onclick="shareApp()">📤 Share I'm In Golf</button>
-    <button class="ghost full" onclick="adminLogin()">🔐 Admin</button>
+    <button class="ghost full" onclick="adminLogin()">🔐 Admin Login</button>
   </div>`;
 }
 function shareApp(){
@@ -1256,7 +1257,7 @@ function scores(){
             ? (isAdmin
                 ? `<b>⏳ Still to enter (${stillToEnter.length})</b><br>${stillToEnter.map(p=>esc(p.name)).join(", ")}`
                 : `<b>⏳ ${stillToEnter.length} score${stillToEnter.length===1?"":"s"} still to enter</b>`)
-            : `<b>✅ All entered players have submitted.</b>`
+            : `<b>✅ All entered players have submitted.</b>${!isAdmin ? `<br><span class="muted">⏳ Waiting for the Group Admin to finish the round.</span>` : ``}`
           }
         </div>
       ` : ""}
@@ -1396,17 +1397,18 @@ function scores(){
     ` : ""}
 
     ${isAdmin ? `
-      <div class="card">
-        ${eligiblePlayers.length && stillToEnter.length===0 ? `
-          <button class="primary full" onclick="finishRound()">
-            🏁 Finish Round & Save Result
-          </button>
-        ` : `
+      ${eligiblePlayers.length && stillToEnter.length===0 ? `
+        <div class="finish-screen-spacer"></div>
+        <div class="finish-sticky">
+          <button class="primary full" onclick="finishRound()">🏁 Finish Round</button>
+        </div>
+      ` : `
+        <div class="card">
           <div class="notice warning">
             ⏳ Finish Round will be available when every entered player has submitted a score${pointsComp==="net" || !isPointsGame ? " or NR" : ""}.
           </div>
-        `}
-      </div>
+        </div>
+      `}
     ` : ""}
   `;
 }
