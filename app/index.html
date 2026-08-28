@@ -5187,6 +5187,44 @@ async function cancelCurrentRound(){
   show("round");
 }
 
+function chooseNewRoundGameType(){
+  return new Promise(resolve=>{
+    const overlay=document.createElement("div");
+    overlay.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.42);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;";
+    overlay.innerHTML=`
+      <div class="card" style="width:min(460px,100%);margin:0;padding:24px;border-radius:20px;box-shadow:0 18px 50px rgba(0,0,0,.18);">
+        <div style="font-size:34px;text-align:center;margin-bottom:6px;">⛳</div>
+        <h2 style="margin:0 0 6px;text-align:center;">Start a new round</h2>
+        <p class="muted" style="margin:0 0 20px;text-align:center;">What type of game are you playing?</p>
+
+        <button id="newRoundMoney" class="primary" style="width:100%;padding:15px 16px;margin:0 0 10px;text-align:left;">
+          <span style="display:block;font-size:17px;font-weight:800;">💷 Money Game</span>
+          <span style="display:block;font-size:13px;font-weight:500;margin-top:3px;">Players pay an entry fee. Winner takes the pot.</span>
+        </button>
+
+        <button id="newRoundPoints" class="primary" style="width:100%;padding:15px 16px;margin:0 0 10px;text-align:left;">
+          <span style="display:block;font-size:17px;font-weight:800;">🏆 Points Game</span>
+          <span style="display:block;font-size:13px;font-weight:500;margin-top:3px;">Players compete for league points.</span>
+        </button>
+
+        <button id="newRoundTrip" class="primary" style="width:100%;padding:15px 16px;margin:0 0 12px;text-align:left;">
+          <span style="display:block;font-size:17px;font-weight:800;">✈️ Trip Mode</span>
+          <span style="display:block;font-size:13px;font-weight:500;margin-top:3px;">Multiple rounds across a golf trip.</span>
+        </button>
+
+        <button id="newRoundCancel" class="secondary" style="width:100%;">Cancel</button>
+      </div>`;
+    document.body.appendChild(overlay);
+
+    const finish=value=>{ overlay.remove(); resolve(value); };
+    overlay.querySelector("#newRoundMoney").onclick=()=>finish("1");
+    overlay.querySelector("#newRoundPoints").onclick=()=>finish("2");
+    overlay.querySelector("#newRoundTrip").onclick=()=>finish("3");
+    overlay.querySelector("#newRoundCancel").onclick=()=>finish(null);
+    overlay.addEventListener("click",e=>{ if(e.target===overlay) finish(null); });
+  });
+}
+
 async function newRound(){
 
   // Security/permissions guard: only the group Admin can create a competition.
@@ -5196,20 +5234,9 @@ async function newRound(){
     return;
   }
 
-  const choice=prompt(
-    "Choose Game Type:\n\n" +
-    "1. 💷 Money Game\n" +
-    "2. 🏆 Points Game\n" +
-    "3. ✈️ Trip Mode\n\n" +
-    "Enter 1, 2 or 3"
-  );
+  const choice=await chooseNewRoundGameType();
 
   if(choice===null)return;
-
-  if(choice!=="1" && choice!=="2" && choice!=="3"){
-    alert("Please enter 1 for Money Game, 2 for Points Game or 3 for Trip Mode.");
-    return;
-  }
 
 
   // =====================================
