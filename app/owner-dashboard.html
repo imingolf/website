@@ -361,8 +361,10 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
         <div class="detail-row"><span>Admin setup</span><b>${adminSetup}</b></div>
         <div class="detail-row"><span>Players</span><b>${players.length}</b></div>
         <div class="detail-row"><span>Current round</span><b>${esc(currentRoundText(s))}</b></div>
-        <div class="detail-row"><span>Scores submitted</span><b>${done} / ${total}</b></div>
-        <div class="progress"><span style="width:${pct}%"></span></div>
+        ${s?.roundOpen===false ? `` : `
+          <div class="detail-row"><span>Scores submitted</span><b>${done} / ${total}</b></div>
+          <div class="progress"><span style="width:${pct}%"></span></div>
+        `}
         <div class="detail-row"><span>Rounds completed</span><b>${(s?.history||[]).length}</b></div>
         <div class="detail-row"><span>Plan</span><b>${String(g.plan_type||"trial")==="trial"?"Free Trial":String(g.plan_type||"").replace(/^./,c=>c.toUpperCase())}</b></div>
         <div class="detail-row"><span>Trial / renewal</span><b>${esc(trialText(g))}</b></div>
