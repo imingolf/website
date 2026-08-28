@@ -869,6 +869,35 @@ function round(){
     return;
   }
 
+  // Between Trip rounds, do not show the previous round as if it were the new one.
+  // The next round was planned up front, so the Admin can start it with one tap.
+  if(state.trip?.active && state.roundOpen===false){
+    const nextNo=Number(state.trip.currentRound||1);
+    const planned=Array.isArray(state.trip.plan) ? state.trip.plan[nextNo-1] : null;
+    $("screen").innerHTML=`
+      ${myPlayerId && state.players.some(p=>p.id===myPlayerId) ? `<div class="notice" style="margin-top:0;">👤 You: <b>${esc(state.players.find(p=>p.id===myPlayerId)?.name||"")}</b></div>` : ""}
+      <div class="card" style="text-align:center;">
+        <div style="font-size:36px;">✈️</div>
+        <div class="muted">TRIP MODE</div>
+        <h2 style="margin:4px 0;">${esc(state.trip.name||"Golf Trip")}</h2>
+        <div style="font-weight:800;">Ready for Round ${nextNo} of ${state.trip.totalRounds}</div>
+      </div>
+      ${planned ? `
+        <div class="card">
+          <div class="muted">NEXT ROUND</div>
+          <h2>${esc(planned.course||"Round "+nextNo)}</h2>
+          <div class="muted">${planned.date ? esc(formatDate(planned.date)) : ""}</div>
+          <div style="margin-top:10px;"><span class="pill paid">${planned.gameType==="points" ? "🏆 POINTS GAME" : "💷 MONEY GAME"}</span></div>
+          <div class="notice" style="margin-top:12px;"><b>Competition: ${state.trip.competition==="net" ? "⛳ Net" : "🏆 Stableford"}</b>${planned.gameType==="money" ? `<br>Stake: £${Number(planned.stake||0)}` : `<br>Trip points: 10 / 6 / 3`}</div>
+        </div>` : ""}
+      <div class="card" style="text-align:center;">
+        <div style="font-weight:800;margin-bottom:10px;">Round ${nextNo-1} is complete.</div>
+        ${isAdmin ? `<button class="primary full" onclick="nextTripRound()">✈️ Start Round ${nextNo}</button>` : `<div class="notice">Waiting for the Group Admin to start Round ${nextNo}.</div>`}
+      </div>`;
+    window.scrollTo(0,0);
+    return;
+  }
+
   if(waitingForNextCompetition()){
     waitingScreen();
     return;
@@ -1873,6 +1902,7 @@ if(!isTrip){
 if(isTrip){
   if(state.trip.currentRound < state.trip.totalRounds){
     state.trip.currentRound += 1;
+    state.roundOpen=false;
   }else{
     state.trip.completed=true;
     state.trip.active=false;
@@ -2139,6 +2169,7 @@ if(!isTrip){
 if(isTrip){
   if(state.trip.currentRound < state.trip.totalRounds){
     state.trip.currentRound += 1;
+    state.roundOpen=false;
   }else{
     state.trip.completed=true;
     state.trip.active=false;
@@ -2335,21 +2366,18 @@ function showWinnerScreen(record){
 
       <div class="card" style="text-align:center;">
         <div style="font-size:28px;">🎉 ⛳ 🎉</div>
-        <div style="font-weight:800;margin-top:8px;">
-          Well played!
-        </div>
-
-        <button
-          class="primary full"
-          onclick="shareWinnerImage()">
-          📤 Share Result
-        </button>
-
-        <button
-          class="secondary full"
-          onclick="show('league')">
-          View League
-        </button>
+        <div style="font-weight:800;margin-top:8px;">Well played!</div>
+        ${state.trip?.active && state.roundOpen===false ? `
+          <div class="notice" style="margin-top:12px;">
+            <b>Round ${Number(state.trip.currentRound)-1} complete!</b><br>
+            Share today's result with the group, then move on to Round ${state.trip.currentRound} of ${state.trip.totalRounds}.
+          </div>
+          <button class="primary full" onclick="shareWinnerImage()">📤 Share Round ${Number(state.trip.currentRound)-1} Result</button>
+          ${isAdmin ? `<button class="secondary full" onclick="nextTripRound()">✈️ Move on to Round ${state.trip.currentRound}</button>` : `<div class="notice" style="margin-top:10px;">Waiting for the Group Admin to start Round ${state.trip.currentRound}.</div>`}
+        ` : `
+          <button class="primary full" onclick="shareWinnerImage()">📤 Share Result</button>
+          <button class="secondary full" onclick="show('league')">View League</button>
+        `}
       </div>
     `;
 
@@ -2465,22 +2493,18 @@ function showWinnerScreen(record){
 
     <div class="card" style="text-align:center;">
       <div style="font-size:28px;">🎉 ⛳ 🎉</div>
-
-      <div style="font-weight:800;margin-top:8px;">
-        Congratulations!
-      </div>
-
-      <button
-        class="primary full"
-        onclick="shareWinnerImage()">
-        📤 Share Result
-      </button>
-
-      <button
-        class="secondary full"
-        onclick="show('league')">
-        View League
-      </button>
+      <div style="font-weight:800;margin-top:8px;">Congratulations!</div>
+      ${state.trip?.active && state.roundOpen===false ? `
+        <div class="notice" style="margin-top:12px;">
+          <b>Round ${Number(state.trip.currentRound)-1} complete!</b><br>
+          Share today's result with the group, then move on to Round ${state.trip.currentRound} of ${state.trip.totalRounds}.
+        </div>
+        <button class="primary full" onclick="shareWinnerImage()">📤 Share Round ${Number(state.trip.currentRound)-1} Result</button>
+        ${isAdmin ? `<button class="secondary full" onclick="nextTripRound()">✈️ Move on to Round ${state.trip.currentRound}</button>` : `<div class="notice" style="margin-top:10px;">Waiting for the Group Admin to start Round ${state.trip.currentRound}.</div>`}
+      ` : `
+        <button class="primary full" onclick="shareWinnerImage()">📤 Share Result</button>
+        <button class="secondary full" onclick="show('league')">View League</button>
+      `}
     </div>
   `;
 }
