@@ -23,6 +23,7 @@ button{border:0;border-radius:12px;padding:11px 13px;font-weight:750;font-size:1
 .full{width:100%;margin-top:10px}.small{padding:8px 10px;font-size:12px}
 input{width:100%;padding:11px;border:1px solid var(--line);border-radius:10px;font-size:16px;background:white;margin:5px 0 11px}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}.notice{background:#edf5ef;padding:11px;border-radius:12px;font-size:13px;margin:10px 0}.warning{background:#fff5dc}
+.comp-choice{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:6px 0 14px}.comp-choice button{border:2px solid var(--line);background:#f3f4f3;color:#536058;padding:14px 8px;font-size:15px}.comp-choice button.selected{background:var(--green);border-color:var(--green);color:white}
 nav{position:fixed;left:50%;transform:translateX(-50%);bottom:0;width:min(520px,100%);padding:8px 8px calc(8px + env(safe-area-inset-bottom));background:white;border-top:1px solid var(--line);display:flex;z-index:20}
 nav button{flex:1;background:transparent;color:#6d756f;padding:11px 2px;font-size:13px;line-height:1.35}nav button.active{color:var(--green);font-weight:800}
 .pay-sticky{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(72px + env(safe-area-inset-bottom));width:min(488px,calc(100% - 32px));background:white;border:1px solid var(--line);border-radius:16px;padding:10px;box-shadow:0 6px 22px rgba(0,0,0,.14);z-index:19}
@@ -619,6 +620,14 @@ async function setupFirstRound(){
   render();
 }
 
+function setFirstRoundCompetition(type){
+  const value=type==="net" ? "net" : "stableford";
+  const input=$("firstRoundCompetition");
+  if(input)input.value=value;
+  $("firstCompStableford")?.classList.toggle("selected",value==="stableford");
+  $("firstCompNet")?.classList.toggle("selected",value==="net");
+}
+
 function waitingScreen(){
   const first=firstRoundNotYetCreated();
   if(first && isAdmin){
@@ -632,11 +641,12 @@ function waitingScreen(){
         <input id="firstRoundCourse" autocomplete="off" placeholder="e.g. Hazel Grove Golf Club">
         <label class="muted">Date</label>
         <input id="firstRoundDate" type="date">
-        <label class="muted">Competition</label>
-        <select id="firstRoundCompetition">
-          <option value="stableford">🏆 Stableford</option>
-          <option value="net">⛳ Net</option>
-        </select>
+        <label class="muted"><b>Competition</b></label>
+        <input id="firstRoundCompetition" type="hidden" value="stableford">
+        <div class="comp-choice">
+          <button id="firstCompStableford" type="button" class="selected" onclick="setFirstRoundCompetition('stableford')">🏆 Stableford</button>
+          <button id="firstCompNet" type="button" onclick="setFirstRoundCompetition('net')">⛳ Net</button>
+        </div>
         <label class="muted">Stake per player (£) <span style="font-weight:400;">— optional</span></label>
         <input id="firstRoundStake" type="number" min="0" step="1" placeholder="Leave blank for no money game">
         <button class="primary full" style="margin-top:18px;" onclick="setupFirstRound()">⛳ Set Up Round</button>
@@ -651,7 +661,7 @@ function waitingScreen(){
       <div class="muted">${first ? "NEXT ROUND" : "NEXT COMPETITION"}</div>
       <h2 style="font-size:28px;margin:8px 0;">${isAdmin ? "Ready for the next one?" : (first ? "Your first round is coming soon" : "Coming soon…")}</h2>
       <div class="muted">${isAdmin ? "Set up your group's next competition." : (first ? "Your Admin hasn't set up the first round yet." : "Your Admin will set up the next competition.")}</div>
-      ${isAdmin ? `<button class="primary full" style="margin-top:18px;" onclick="newRound()">➕ Set Up Next Competition</button>` : `<button class="ghost full" style="margin-top:18px;" onclick="adminLoginFromWaiting()">🔐 Admin — Set Up Next Competition</button>`}
+      ${isAdmin ? `<button class="primary full" style="margin-top:18px;" onclick="newRound()">➕ Set Up Next Competition</button>` : ``}
     </div>
     ${first ? "" : `<div class="card"><div class="notice">✅ The last result has been saved in <b>League → Previous rounds</b>.</div></div>`}
   `;
@@ -913,6 +923,8 @@ $("screen").innerHTML=`
         <label class="muted">Date</label>
         <input type="date" value="${escAttr(state.date)}" onchange="state.date=this.value;save();render()">
 
+        <div class="notice"><b>Competition: ${state.pointsCompetition==="stableford" ? "🏆 Stableford" : "⛳ Net"}</b></div>
+
         ${state.gameType==="money" ? `
           <label class="muted">Stake per player (£)</label>
           <input type="number" min="0" step="1" value="${Number(state.stake||0)>0 ? state.stake : ""}" placeholder="No stake" onchange="state.stake=this.value==='' ? 0 : +this.value;save();render()">
@@ -940,6 +952,9 @@ $("screen").innerHTML=`
             <b>£${state.stake}</b>
           </div>
         </div>
+        <div style="height:10px"></div>
+        <div class="muted">Competition</div>
+        <b>${state.pointsCompetition==="stableford" ? "🏆 Stableford" : "⛳ Net"}</b>
       ` : `
         <div class="grid2">
           <div>
@@ -962,10 +977,8 @@ $("screen").innerHTML=`
       <div class="row">
         <div>
           <div class="big">£${pot()}</div>
-          <div class="muted">Paid pot • £${potentialPot()} if everyone pays</div>
-          <div class="muted" style="margin-top:6px;">
-            ${state.pointsCompetition==="net" ? "⛳ Net" : "🏆 Stableford"} pot: £${pot()}
-          </div>
+          <div class="muted"><b>Paid so far</b></div>
+          <div class="muted" style="margin-top:6px;">Expected pot: £${potentialPot()} • Entry fee: £${state.stake} per player</div>
         </div>
 
         <span class="pill ${paidCount()===state.players.length?'paid':'pending'}">
@@ -1062,10 +1075,8 @@ function pay(){
    <h2>💷 Pay Your Group Admin</h2>
    <div class="notice"><b>Your group's money stays with your group.</b><br>Payments go directly to your Group Admin using the payment link they provided. I'm In Golf does not receive or hold your money.</div>
    <div class="big">£${pot()}</div>
-   <div class="muted">Paid pot • £${potentialPot()} if everyone pays • £${state.stake} each</div>
-   <div class="muted" style="margin-top:6px;">
-     ${state.pointsCompetition==="net" ? "⛳ Net" : "🏆 Stableford"} pot: £${pot()}
-   </div>
+   <div class="muted"><b>Paid so far</b></div>
+   <div class="muted" style="margin-top:6px;">Expected pot: £${potentialPot()} • Entry fee: £${state.stake} per player</div>
  </div>
 
  <div class="card">
@@ -1077,7 +1088,7 @@ function pay(){
        <div class="player">
          <div class="row">
            <div>
-             <b>${esc(p.name)}</b>
+             <b>${esc(p.name)}${p.id===myPlayerId ? ` <span class="pill paid" style="margin-left:6px;">👤 You</span>` : ""}</b>
              <div class="muted">£${state.stake} stake</div>
            </div>
 
@@ -4992,14 +5003,15 @@ function organiserPaymentSetup(groupName){
     overlay.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.42);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;";
     overlay.innerHTML=`<div class="card" style="width:min(440px,100%);margin:0;padding:24px;border-radius:20px;box-shadow:0 18px 50px rgba(0,0,0,.18);">
       <div style="font-size:38px;margin-bottom:8px;">💷</div>
-      <h2 style="margin:0 0 8px;">Set up player payments</h2>
-      <p class="muted">Add the payment link for the account where you want to receive <b>${esc(groupName)}</b>'s entry fees.</p>
-      <div class="notice"><b>Payments go directly to you.</b><br>I'm In Golf does not receive, hold or manage your group's money.</div>
-      <label><b>Your payment link</b></label>
-      <input id="setupPaymentLink" type="url" inputmode="url" autocomplete="url" placeholder="e.g. your Monzo, Revolut or PayPal payment link">
+      <h2 style="margin:0 0 8px;">Set up where your players pay</h2>
+      <p>Add the payment link for the account where you want <b>${esc(groupName)}</b>'s entry fees sent.</p>
+      <div class="notice" style="padding:14px;"><b style="font-size:15px;">💷 YOUR GROUP'S MONEY GOES DIRECTLY TO YOU</b><br><br>Every player payment goes directly to the payment account you choose.<br><b>I'm In Golf never receives or holds your group's money.</b></div>
+      <div class="notice"><b>What you need to do:</b><br>1. Open the banking or payment app you want to receive money into.<br>2. Find its <b>payment link / request money / get paid</b> option.<br>3. Copy your payment link.<br>4. Come back here and paste it below.<br><br><span class="muted">For example: Monzo, Revolut or PayPal.</span></div>
+      <label><b>Paste your payment link here</b></label>
+      <input id="setupPaymentLink" type="url" inputmode="url" autocomplete="url" placeholder="https://…">
       <div id="setupPaymentMsg" class="muted" style="min-height:18px;color:var(--red);"></div>
       <button class="primary full" id="saveSetupPayment">Save Payment Link</button>
-      <button class="ghost full" id="skipSetupPayment">Skip for now</button>
+      <button class="ghost full" id="skipSetupPayment">Don't play for money? Skip for now</button>
       <div class="muted" style="margin-top:10px;text-align:center;">You can add or change this later in Admin / Settings.</div>
     </div>`;
     document.body.appendChild(overlay);
