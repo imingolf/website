@@ -3077,7 +3077,10 @@ async function shareTripSummary(){
   const trip=live?state.trip:(past[safeIndex]||null);
   if(!trip){alert("No Trip is available to share.");return;}
   const rounds=trip.rounds||[], comp=trip.competition||"stableford", standings=tripAggregate(trip);
-  const rowH=72, W=1080, H=Math.min(30000,650+standings.length*rowH+rounds.length*70);
+  const rowH=72, roundRowH=48;
+  const roundRanks=rounds.map(r=>tripRoundRanking(r,comp));
+  const totalRoundRows=roundRanks.reduce((n,rows)=>n+rows.length,0);
+  const W=1080, H=Math.min(30000,720+standings.length*rowH+rounds.length*78+totalRoundRows*roundRowH);
   const canvas=document.createElement("canvas"); canvas.width=W; canvas.height=H; const c=canvas.getContext("2d");
   const green="#126b3a", dark="#143322", pale="#f4f7f5", gold="#d4a62a", ink="#18231d", grey="#64736a";
   c.fillStyle=pale;c.fillRect(0,0,W,H); c.fillStyle=green;c.fillRect(0,0,W,235);
@@ -3086,8 +3089,22 @@ async function shareTripSummary(){
   if(champ){c.fillStyle="#fff";c.fillRect(55,y,970,150);c.strokeStyle=gold;c.lineWidth=4;c.strokeRect(55,y,970,150);c.fillStyle=green;c.font="800 22px Arial";c.fillText("TRIP CHAMPION",W/2,y+38);c.fillStyle=ink;c.font="800 43px Arial";c.fillText(champ.name.toUpperCase(),W/2,y+90);c.fillStyle=green;c.font="800 29px Arial";c.fillText(champ.hasNR?"NR":(comp==="net"?champ.total+" NET":champ.total+" PTS"),W/2,y+128);y+=195;}
   c.textAlign="left";c.fillStyle=dark;c.font="800 29px Arial";c.fillText("FINAL STANDINGS",60,y);y+=25;c.fillStyle=dark;c.fillRect(55,y,970,52);c.fillStyle="#fff";c.font="700 18px Arial";c.fillText("POS",75,y+33);c.fillText("PLAYER",155,y+33);c.fillText("ROUND SCORES",480,y+33);c.textAlign="right";c.fillText("TOTAL",995,y+33);c.textAlign="left";y+=52;
   standings.forEach((p,i)=>{c.fillStyle=i%2?"#fff":"#f9fbfa";c.fillRect(55,y,970,rowH);c.fillStyle=i===0?gold:ink;c.font="800 23px Arial";c.fillText(String(i+1),80,y+44);c.fillStyle=ink;c.font="700 23px Arial";c.fillText(p.name,155,y+44);c.fillStyle=grey;c.font="600 17px Arial";let roundsText=p.roundScores.map((v,j)=>`R${j+1} ${v==null?'—':v}`).join('  '); while(c.measureText(roundsText).width>360&&roundsText.length>12)roundsText=roundsText.slice(0,-4)+'…';c.fillText(roundsText,480,y+44);c.textAlign="right";c.fillStyle=green;c.font="800 24px Arial";c.fillText(p.hasNR?"NR":String(p.total)+(comp==="net"?"":" pts"),995,y+44);c.textAlign="left";y+=rowH;});
-  y+=40;c.fillStyle=dark;c.font="800 27px Arial";c.fillText("ROUND WINNERS",60,y);y+=18; rounds.forEach((r,i)=>{const rank=tripRoundRanking(r,comp), first=rank.find(x=>x.rank===1); y+=58;c.fillStyle=ink;c.font="700 21px Arial";c.fillText(`ROUND ${i+1}${r.course?' — '+r.course:''}`,70,y);c.textAlign="right";c.fillStyle=green;c.font="800 21px Arial";c.fillText(first?`${first.name}  ${first.noReturn?'NR':first.score+(comp==='net'?'':' pts')}`:'No result',1000,y);c.textAlign="left";c.strokeStyle="#d9e2dc";c.beginPath();c.moveTo(65,y+17);c.lineTo(1015,y+17);c.stroke();});
-  y+=70;c.fillStyle=grey;c.textAlign="center";c.font="700 19px Arial";c.fillText("I'm In Golf • Trip results",W/2,y);
+  y+=40;c.fillStyle=dark;c.font="800 27px Arial";c.fillText("FULL ROUND RESULTS",60,y);y+=22;
+  rounds.forEach((r,i)=>{
+    const rank=roundRanks[i]||[];
+    y+=50;c.fillStyle=dark;c.font="800 22px Arial";c.fillText(`ROUND ${i+1}${r.course?' — '+r.course:''}`,70,y);
+    c.textAlign="right";c.fillStyle=grey;c.font="600 17px Arial";c.fillText(r.date||"",1000,y);c.textAlign="left";
+    c.strokeStyle="#d9e2dc";c.beginPath();c.moveTo(65,y+15);c.lineTo(1015,y+15);c.stroke();
+    if(!rank.length){y+=roundRowH;c.fillStyle=grey;c.font="600 19px Arial";c.fillText("No results recorded",85,y);return;}
+    rank.forEach((player,j)=>{
+      y+=roundRowH;
+      c.fillStyle=j%2?"#ffffff":"#f9fbfa";c.fillRect(65,y-34,950,roundRowH);
+      c.fillStyle=player.rank===1?gold:ink;c.font="800 20px Arial";c.fillText(player.rankLabel,85,y);
+      c.fillStyle=ink;c.font="700 20px Arial";c.fillText(player.name,155,y);
+      c.textAlign="right";c.fillStyle=green;c.font="800 20px Arial";c.fillText(player.noReturn?"NR":String(player.score)+(comp==="net"?"":" pts"),995,y);c.textAlign="left";
+    });
+  });
+  y+=60;c.fillStyle=grey;c.textAlign="center";c.font="700 19px Arial";c.fillText("I'm In Golf • Trip results",W/2,y);
   canvas.toBlob(async blob=>{if(!blob){alert("Couldn't create the Trip Summary image.");return;} const file=new File([blob],"im-in-golf-trip-results.png",{type:"image/png"}); try{if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({title:`I'm In Golf — ${trip.name||"Trip Results"}`,files:[file]});}else{const url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="im-in-golf-trip-results.png";a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);alert("Trip results image created. You can now share the saved image.");}}catch(err){if(err?.name!=="AbortError")alert("Couldn't share the Trip results image. Please try again.");}},"image/png");
 }
 
