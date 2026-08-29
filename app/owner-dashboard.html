@@ -389,10 +389,19 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
     if(s.roundOpen===false)return "Waiting for next competition";
     return `${s.gameType==="points"?"Points Game":"Money Game"}${s.gameType==="points"?" • "+(s.pointsCompetition==="net"?"Net":"Stableford"):""}`;
   }
+  function currentCompetition(s){
+    return String(s?.pointsCompetition||s?.trip?.competition||"stableford")==="net" ? "net" : "stableford";
+  }
+  function playerEnteredCurrentRound(s,p){
+    if(!s||!p)return false;
+    if(s.gameType==="points")return true;
+    // Money Games only require payment when the organiser has set a stake above £0.
+    return Number(s.stake||0)>0 ? p.paid===true : true;
+  }
   function submittedCount(s){
     if(!s)return [0,0];
     const ps=s.players||[];
-    const eligible=s.gameType==="points"?ps:ps.filter(p=>p.paid&&(p.competition==="stableford"||p.competition==="net"));
+    const eligible=ps.filter(p=>playerEnteredCurrentRound(s,p));
     const n=eligible.filter(p=>p.scoreSubmitted===true||p.stableford!=null||p.netScore!=null||p.noReturn===true).length;
     return [n,eligible.length];
   }
@@ -430,16 +439,16 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
       </div>
       <div class="members"><h3>📝 Live Score Entry</h3>
         ${s?.roundOpen===false ? `<div class="empty">No competition is currently open.</div>` : players.length ? players.slice().sort((a,b)=>String(a.name).localeCompare(String(b.name))).map(p=>{
-          const eligible=s?.gameType==="points" ? true : (p.paid===true && (p.competition==="stableford"||p.competition==="net"));
+          const entered=playerEnteredCurrentRound(s,p);
           const submitted=p.scoreSubmitted===true||p.stableford!=null||p.netScore!=null||p.noReturn===true;
+          const comp=currentCompetition(s);
+          const compLabel=comp==="net" ? "Net" : "Stableford";
           let result="⏳ Waiting";
-          if(!eligible) result=s?.gameType==="money" ? (p.paid===true?"Waiting for game choice":"Not entered") : "⏳ Waiting";
+          if(!entered) result="Not entered";
           else if(p.noReturn===true) result="✅ NR";
           else if(submitted){
-            const comp=s?.gameType==="points" ? String(s.pointsCompetition||"stableford") : String(p.competition||"stableford");
             result=comp==="net" ? `✅ Net ${esc(p.netScore??"—")}` : `✅ ${esc(p.stableford??"—")} pts`;
           }
-          const compLabel=s?.gameType==="money"&&p.competition ? (p.competition==="net"?"Net":"Stableford") : "";
           return `<div class="member"><div><b>${esc(p.name||"Player")}</b><div class="role">${compLabel}</div></div><div><b>${result}</b></div></div>`;
         }).join("") : `<div class="empty">No players have joined yet.</div>`}
       </div>
