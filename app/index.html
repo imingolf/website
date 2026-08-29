@@ -218,7 +218,7 @@ function demoReadOnly(){
 }
 function demoCanEdit(){
   if(demoReadOnly()){
-    alert("👀 Demo Mode\n\nThis demo is read-only.\nYou can explore the app without changing anything.");
+    alert("👀 Demo Mode\n\nHave a look around. Changes are disabled in the demo.");
     return false;
   }
   return true;
@@ -1286,6 +1286,7 @@ function paymentLinkForStake(rawLink,stake){
   return link;
 }
 function beginPlayerPayment(){
+  if(!demoCanEdit())return;
   if(!myPlayerId){alert("Please select who you are first.");return;}
   const me=state.players.find(p=>p.id===myPlayerId);
   if(!me)return;
@@ -1311,6 +1312,7 @@ function showAppToast(title,subtitle="",duration=2800){
   },duration);
 }
 async function recognisePaymentReturn(){
+  if(demoReadOnly())return;
   if(paymentReturnBusy || document.visibilityState==="hidden")return;
   let journey=null;
   try{journey=JSON.parse(sessionStorage.getItem(paymentReturnKey())||"null");}catch(e){}
@@ -4015,6 +4017,7 @@ function switchGolfGroup(){
   $("pinInput").focus();
 }
 async function changeMyHandicap(i){
+ if(!demoCanEdit())return;
  const p=state.players[i];
 
  if(p.id!==myPlayerId && !isAdmin)return;
@@ -4060,6 +4063,7 @@ function playerJoinForm(){
   });
 }
 async function addPlayer(){
+  if(!demoCanEdit())return;
   const currentMember=state.players.find(p=>p.id===myPlayerId);
   if(currentMember){alert("✅ You're already a member of this group as " + currentMember.name + ".");return;}
   const details=await playerJoinForm(); if(!details)return;
