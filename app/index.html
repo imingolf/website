@@ -33,9 +33,106 @@ nav button{flex:1;background:transparent;color:#6d756f;padding:11px 2px;font-siz
 .score{width:78px;margin:0}.pos{font-weight:800;font-size:18px;min-width:24px}.money{font-weight:800}
 #setupOverlay{position:fixed;inset:0;background:#f4f6f3;z-index:50;display:flex;align-items:flex-start;justify-content:center;padding:45px 16px;overflow:auto}
 .setup{width:min(480px,100%)}.hidden{display:none!important}
+
+
+/* Opening animation: self-contained and isolated from the app */
+#openingSplash{position:fixed;inset:0;z-index:20000;background:#bfe4ff;display:flex;align-items:stretch;justify-content:stretch;opacity:1;transition:opacity .28s ease;pointer-events:none;overflow:hidden}
+#openingSplash.hide{opacity:0}
+#openingSplash .opening-stage{position:relative;width:100%;height:100%;background:linear-gradient(#bfe4ff 0 58%,#76b96a 58% 100%);overflow:hidden}
+#openingSplash svg{width:100%;height:100%;display:block}
+#openingSplash .opening-brand{font-weight:900;fill:#0f5a37;font-size:46px;opacity:0}
+#openingSplash .opening-tag{font-weight:700;fill:#355b45;font-size:20px;opacity:0}
+@media (prefers-reduced-motion:reduce){#openingSplash{transition:none}}
+
 </style>
 </head>
 <body>
+
+<div id="openingSplash" aria-hidden="true">
+  <div class="opening-stage">
+    <svg viewBox="0 0 1000 700" preserveAspectRatio="xMidYMid slice" aria-label="Golf ball flying into the hole">
+      <defs>
+        <linearGradient id="iigOpeningGreenShade" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#6fba68"/>
+          <stop offset="100%" stop-color="#58a155"/>
+        </linearGradient>
+        <filter id="iigOpeningBallShadow" x="-50%" y="-50%" width="200%" height="200%">
+          <feDropShadow dx="0" dy="3" stdDeviation="3" flood-opacity=".25"/>
+        </filter>
+      </defs>
+      <ellipse cx="500" cy="690" rx="620" ry="255" fill="url(#iigOpeningGreenShade)"/>
+      <path id="iigOpeningFlightPath" d="M 135 525 C 290 265, 500 225, 675 335 C 770 395, 815 475, 825 570" fill="none" stroke="none"/>
+      <ellipse cx="825" cy="570" rx="22" ry="8" fill="#23372c"/>
+      <line x1="825" y1="570" x2="825" y2="405" stroke="#f7f7f7" stroke-width="5" stroke-linecap="round"/>
+      <path d="M 825 405 L 900 430 L 825 455 Z" fill="#0f5a37"/>
+      <g id="iigOpeningBall" filter="url(#iigOpeningBallShadow)">
+        <circle cx="135" cy="525" r="15" fill="#fff"/>
+        <circle cx="130" cy="520" r="2" fill="#d7ddd8"/>
+        <circle cx="141" cy="519" r="2" fill="#d7ddd8"/>
+        <circle cx="136" cy="530" r="2" fill="#d7ddd8"/>
+      </g>
+      <text id="iigOpeningBrand" class="opening-brand" x="500" y="105" text-anchor="middle">I’m In Golf ⛳</text>
+      <text id="iigOpeningTag" class="opening-tag" x="500" y="140" text-anchor="middle">Pay. Play. Score. Brag.</text>
+    </svg>
+  </div>
+</div>
+<script>
+(function(){
+  const splash=document.getElementById('openingSplash');
+  const path=document.getElementById('iigOpeningFlightPath');
+  const ball=document.getElementById('iigOpeningBall');
+  const brand=document.getElementById('iigOpeningBrand');
+  const tag=document.getElementById('iigOpeningTag');
+  if(!splash || !path || !ball)return;
+
+  const reduced=window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function closeSplash(delay){
+    setTimeout(()=>{
+      splash.classList.add('hide');
+      setTimeout(()=>splash.remove(),300);
+    },delay);
+  }
+  if(reduced){
+    if(brand)brand.style.opacity='1';
+    if(tag)tag.style.opacity='1';
+    closeSplash(450);
+    return;
+  }
+
+  const length=path.getTotalLength();
+  const start=path.getPointAtLength(0);
+  const flightMs=1200;
+  const sinkMs=300;
+  let t0=null;
+  function easeOutCubic(t){return 1-Math.pow(1-t,3);}
+  function frame(ts){
+    if(!t0)t0=ts;
+    const raw=Math.min(1,(ts-t0)/flightMs);
+    const eased=easeOutCubic(raw);
+    const p=path.getPointAtLength(length*eased);
+    ball.setAttribute('transform',`translate(${p.x-start.x} ${p.y-start.y})`);
+    if(raw<1){requestAnimationFrame(frame);return;}
+
+    const sinkStart=performance.now();
+    function sink(now){
+      const s=Math.min(1,(now-sinkStart)/sinkMs);
+      const y=12*s;
+      const opacity=1-Math.min(1,s*1.7);
+      ball.setAttribute('transform',`translate(${825-start.x} ${570-start.y+y})`);
+      ball.style.opacity=opacity;
+      if(s<1){requestAnimationFrame(sink);return;}
+      ball.style.opacity='0';
+      if(brand)brand.animate([{opacity:0},{opacity:1}],{duration:350,fill:'forwards'});
+      if(tag)setTimeout(()=>tag.animate([{opacity:0},{opacity:1}],{duration:350,fill:'forwards'}),90);
+      closeSplash(620);
+    }
+    requestAnimationFrame(sink);
+  }
+  requestAnimationFrame(frame);
+})();
+</script>
+
+
 <div id="setupOverlay">
  <div class="setup">
   <div class="card">
