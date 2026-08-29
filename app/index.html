@@ -32,112 +32,9 @@ nav button{flex:1;background:transparent;color:#6d756f;padding:11px 2px;font-siz
 .score{width:78px;margin:0}.pos{font-weight:800;font-size:18px;min-width:24px}.money{font-weight:800}
 #setupOverlay{position:fixed;inset:0;background:#f4f6f3;z-index:50;display:flex;align-items:flex-start;justify-content:center;padding:45px 16px;overflow:auto}
 .setup{width:min(480px,100%)}.hidden{display:none!important}
-
-/* ===== I'm In Golf ball-to-hole opening animation ===== */
-#iigOpenSplash{
-  position:fixed;inset:0;z-index:200000;overflow:hidden;
-  background:#f7f3e9;
-  animation:iigSplashAway 1.84s ease forwards;
-}
-.iig-open-brand{
-  position:absolute;top:13%;left:0;right:0;text-align:center;
-  font-size:clamp(30px,8vw,42px);font-weight:900;letter-spacing:-1px;color:#174d30;
-}
-.iig-open-brand span{color:#6e9f35}
-.iig-open-green{
-  position:absolute;right:-12%;bottom:-4%;width:74%;height:28%;
-  border-radius:55% 45% 0 0;background:#79aa56;transform:rotate(-3deg);
-}
-.iig-open-green:before{
-  content:"";position:absolute;left:-48%;bottom:-12%;width:130%;height:78%;
-  border-radius:50% 50% 0 0;background:#abc97d;z-index:-1;
-}
-.iig-open-flagpole{
-  position:absolute;right:19%;bottom:13%;width:4px;height:128px;background:#174d30;z-index:5;
-}
-.iig-open-flagpole:before{
-  content:"";position:absolute;left:4px;top:1px;width:52px;height:31px;background:#174d30;
-  clip-path:polygon(0 0,100% 45%,0 100%);
-}
-.iig-open-hole{
-  position:absolute;right:calc(19% - 15px);bottom:12.2%;
-  width:34px;height:10px;border-radius:50%;background:#153c27;z-index:6;
-}
-.iig-open-ball{
-  position:absolute;left:5%;top:54%;width:58px;height:58px;border-radius:50%;
-  z-index:20;border:3px solid #174d30;
-  background:
-    radial-gradient(circle at 30% 28%,#d2cec5 0 2px,transparent 2.5px),
-    radial-gradient(circle at 62% 34%,#d2cec5 0 2px,transparent 2.5px),
-    radial-gradient(circle at 45% 61%,#d2cec5 0 2px,transparent 2.5px),
-    radial-gradient(circle at 70% 70%,#d2cec5 0 2px,transparent 2.5px),
-    #fff;
-  box-shadow:0 4px 10px rgba(0,0,0,.25);
-  will-change:transform,opacity;
-  backface-visibility:hidden;
-  transform:translate3d(0,0,0);
-  animation:iigBallToCup 1.62s linear .05s both;
-}
-.iig-open-arc{
-  position:absolute;left:3%;top:35%;width:71%;height:36%;z-index:7;
-  border-top:4px solid rgba(104,153,55,.65);
-  border-radius:55% 45% 0 0;transform:rotate(-5deg) scaleX(.08);
-  transform-origin:left center;opacity:0;
-  animation:iigArc .82s ease .11s both;
-}
-.iig-open-cupflash{
-  position:absolute;right:calc(19% - 23px);bottom:10.8%;
-  width:50px;height:18px;border:3px solid rgba(255,255,255,.85);
-  border-radius:50%;opacity:0;z-index:8;
-  animation:iigCupFlash .23s ease 1.52s both;
-}
-@keyframes iigBallToCup{
-  0%{transform:translate3d(0,0,0) scale(1) rotate(0deg);opacity:1}
-  10%{transform:translate3d(10vw,-11vh,0) scale(.95) rotate(60deg);opacity:1}
-  20%{transform:translate3d(20vw,-20vh,0) scale(.90) rotate(120deg);opacity:1}
-  30%{transform:translate3d(30vw,-27vh,0) scale(.85) rotate(180deg);opacity:1}
-  40%{transform:translate3d(40vw,-31vh,0) scale(.79) rotate(240deg);opacity:1}
-  50%{transform:translate3d(50vw,-30vh,0) scale(.73) rotate(300deg);opacity:1}
-  60%{transform:translate3d(59vw,-25vh,0) scale(.66) rotate(360deg);opacity:1}
-  70%{transform:translate3d(66vw,-16vh,0) scale(.59) rotate(420deg);opacity:1}
-  80%{transform:translate3d(71vw,-4vh,0) scale(.52) rotate(470deg);opacity:1}
-  90%{transform:translate3d(74.5vw,14vh,0) scale(.43) rotate(515deg);opacity:1}
-  96%{transform:translate3d(75.5vw,25vh,0) scale(.34) rotate(540deg);opacity:1}
-  100%{transform:translate3d(76vw,33vh,0) scale(.18) rotate(550deg);opacity:0}
-}
-@keyframes iigArc{
-  0%{opacity:0;transform:rotate(-5deg) scaleX(.08)}
-  18%{opacity:.8}
-  80%{opacity:.48}
-  100%{opacity:0;transform:rotate(-5deg) scaleX(1)}
-}
-@keyframes iigCupFlash{
-  0%{opacity:0;transform:scale(.35)}
-  45%{opacity:.9}
-  100%{opacity:0;transform:scale(1.22)}
-}
-@keyframes iigSplashAway{
-  0%,88%{opacity:1;visibility:visible;pointer-events:auto}
-  100%{opacity:0;visibility:hidden;pointer-events:none}
-}
-@media (prefers-reduced-motion:reduce){
-  #iigOpenSplash{animation-duration:.2s}
-  .iig-open-ball,.iig-open-arc,.iig-open-cupflash{animation:none!important}
-}
 </style>
 </head>
 <body>
-
-<div id="iigOpenSplash" aria-hidden="true">
-  <div class="iig-open-brand">I'M IN <span>GOLF</span></div>
-  <div class="iig-open-green"></div>
-  <div class="iig-open-arc"></div>
-  <div class="iig-open-ball"></div>
-  <div class="iig-open-flagpole"></div>
-  <div class="iig-open-hole"></div>
-  <div class="iig-open-cupflash"></div>
-</div>
-
 <div id="setupOverlay">
  <div class="setup">
   <div class="card">
@@ -185,14 +82,13 @@ nav button{flex:1;background:transparent;color:#6d756f;padding:11px 2px;font-siz
 let db=null, pin="", page="round", poller=null;
 let leagueView="points";
 let selectedPastTripIndex=0;
-let roundEditOpen=false;
 
 function demoReadOnly(){
   return pin==="2026" && !isAdmin;
 }
 function demoCanEdit(){
   if(demoReadOnly()){
-    appAlert("👀 Demo Mode\n\nThis demo is read-only.\nYou can explore the app without changing anything.");
+    alert("👀 Demo Mode\n\nThis demo is read-only.\nYou can explore the app without changing anything.");
     return false;
   }
   return true;
@@ -373,7 +269,7 @@ function selectMyPlayer(id){
 let state={
  course:"Hazel Grove Golf Club",
  date:"Saturday",
- stake:20,
+ stake:0,
  gameType:"money",
  pointsCompetition:"stableford",
  pointsValue:10,
@@ -388,7 +284,6 @@ let state={
 
 const $=id=>document.getElementById(id);
 function configured(){return window.TENS_IN_CONFIG && TENS_IN_CONFIG.supabaseUrl && !TENS_IN_CONFIG.supabaseUrl.includes("PASTE_")}
-
 window.addEventListener("load",()=>{
   if(!configured()) $("configMissing").classList.remove("hidden");
 
@@ -515,7 +410,7 @@ const setupTokenFromUrl=
 
 if(!state.adminPin && setupTokenFromUrl){
   if(String(state.adminSetupToken||"")!==String(setupTokenFromUrl)){
-    appAlert("This Admin setup link is no longer valid.");
+    alert("This Admin setup link is no longer valid.");
     return;
   }
 
@@ -527,7 +422,7 @@ if(!state.adminPin && setupTokenFromUrl){
   // appears everywhere without changing the permanent Group PIN.
   const nameSaved=await save();
   if(!nameSaved){
-    appAlert("The group name could not be saved. Please reopen the private setup link and try again.");
+    alert("The group name could not be saved. Please reopen the private setup link and try again.");
     return;
   }
 
@@ -541,7 +436,7 @@ if(!state.adminPin && setupTokenFromUrl){
 
   if(!saved){
     state.adminPin="";
-    appAlert("Admin PIN could not be saved. Please reopen the setup link and try again.");
+    alert("Admin PIN could not be saved. Please reopen the setup link and try again.");
     return;
   }
 
@@ -704,11 +599,11 @@ async function setupFirstRound(){
   const rawStake=String($("firstRoundStake")?.value||"").trim();
   const stake=rawStake==="" ? 0 : Number(rawStake);
 
-  if(!course){ appAlert("Please enter the course."); $("firstRoundCourse")?.focus(); return; }
-  if(!date){ appAlert("Please choose the date."); $("firstRoundDate")?.focus(); return; }
-  if(!Number.isFinite(stake) || stake<0){ appAlert("Please enter a valid stake, or leave it blank for no money game."); return; }
+  if(!course){ alert("Please enter the course."); $("firstRoundCourse")?.focus(); return; }
+  if(!date){ alert("Please choose the date."); $("firstRoundDate")?.focus(); return; }
+  if(!Number.isFinite(stake) || stake<0){ alert("Please enter a valid stake, or leave it blank for no money game."); return; }
   if(stake>0 && !String(state.paymentLink||"").trim()){
-    appAlert("Please add your payment link in Admin / Settings before starting a money round.");
+    alert("Please add your payment link in Admin / Settings before starting a money round.");
     return;
   }
 
@@ -754,7 +649,7 @@ function waitingScreen(){
           <button id="firstCompNet" type="button" onclick="setFirstRoundCompetition('net')">⛳ Net</button>
         </div>
         <label class="muted">Stake per player (£) <span style="font-weight:400;">— optional</span></label>
-        <input id="firstRoundStake" type="number" min="0" step="1" placeholder="Leave blank for no money game">
+        <input id="firstRoundStake" type="number" min="0" step="0.01" placeholder="Enter stake">
         <button class="primary full" style="margin-top:18px;" onclick="setupFirstRound()">⛳ Set Up Round</button>
       </div>`;
     return;
@@ -795,78 +690,11 @@ function stablefordPot(){
 function netPot(){
   return Number(state.stake||0)*netPaidCount();
 }
-function tripRoundRanking(record, competition){
-  const comp=competition || state.trip?.competition || "stableford";
-  const rows=(record?.players||[]).map(p=>({
-    name:p.name,
-    score:comp==="net" ? (p.netScore==null?null:Number(p.netScore)) : (p.stableford==null?null:Number(p.stableford)),
-    noReturn:Boolean(p.noReturn)
-  })).filter(x=>x.score!=null || x.noReturn);
-
-  rows.sort((a,b)=>{
-    if(a.noReturn!==b.noReturn)return a.noReturn?1:-1;
-    if(a.score==null && b.score==null)return a.name.localeCompare(b.name);
-    if(a.score==null)return 1;
-    if(b.score==null)return -1;
-    const d=comp==="net" ? a.score-b.score : b.score-a.score;
-    return d || a.name.localeCompare(b.name);
-  });
-
-  let lastScore=null, lastRank=0;
-  return rows.map((r,i)=>{
-    let rank=null;
-    if(!r.noReturn && r.score!=null){
-      if(lastScore===null || r.score!==lastScore){ lastRank=i+1; lastScore=r.score; }
-      rank=lastRank;
-    }
-    const tied=rank!=null && rows.filter(x=>!x.noReturn && x.score===r.score).length>1;
-    return {...r,rank,rankLabel:rank==null?"NR":(tied?"T"+rank:String(rank))};
-  });
-}
-
-function tripAggregate(trip){
-  trip=trip||state.trip||{};
-  const rounds=trip.rounds||[];
-  const comp=trip.competition||"stableford";
-  const liveNames=(trip===state.trip) ? state.players.map(p=>p.name) : [];
-  const names=[...new Set([
-    ...liveNames,
-    ...rounds.flatMap(r=>(r.players||[]).map(p=>p.name))
-  ])];
-  const rows=names.map(name=>{
-    let total=0, played=0, hasNR=false;
-    const roundScores=[];
-    rounds.forEach(r=>{
-      const p=(r.players||[]).find(x=>x.name===name);
-      if(!p){ roundScores.push(null); return; }
-      if(p.noReturn===true){ hasNR=true; roundScores.push("NR"); return; }
-      const score=comp==="net" ? p.netScore : p.stableford;
-      if(score==null){ roundScores.push(null); return; }
-      const n=Number(score); total+=n; played+=1; roundScores.push(n);
-    });
-    return {name,total,played,hasNR,roundScores};
-  });
-  rows.sort((a,b)=>{
-    const aComplete=a.played===rounds.length && !a.hasNR;
-    const bComplete=b.played===rounds.length && !b.hasNR;
-    if(aComplete!==bComplete)return aComplete?-1:1;
-    if(a.hasNR!==b.hasNR)return a.hasNR?1:-1;
-    if(a.played!==b.played)return b.played-a.played;
-    const d=comp==="net" ? a.total-b.total : b.total-a.total;
-    return d || a.name.localeCompare(b.name);
-  });
-  return rows;
-}
-
-function rebuildTripStandings(trip){
-  if(!trip)return;
-  const rows=tripAggregate(trip);
-  trip.standings={};
-  rows.forEach(r=>{ trip.standings[r.name]=r.hasNR ? null : r.total; });
-}
-
 function tripStandingsSorted(){
-  return tripAggregate(state.trip).map(r=>({name:r.name,points:r.total,played:r.played,hasNR:r.hasNR,roundScores:r.roundScores}));
+  const standings=state.trip?.standings || {};
+  return Object.entries(standings)
+    .map(([name,points])=>({name,points:Number(points||0)}))
+    .sort((a,b)=>b.points-a.points || a.name.localeCompare(b.name));
 }
 
 function tripRoundWinner(record){
@@ -909,116 +737,129 @@ function tripRoundWinner(record){
 
 function setTripChampion(){
   if(!state.trip)return;
-  const sorted=tripAggregate(state.trip);
+  const sorted=tripStandingsSorted();
   state.trip.champion=sorted.length ? sorted[0].name : null;
-  rebuildTripStandings(state.trip);
 }
 
 function showTripSummary(){
   const trip=state.trip || {};
   const rounds=trip.rounds || [];
-  const comp=trip.competition || "stableford";
-  const standings=tripAggregate(trip);
-  const champion=standings[0] || null;
+  const standings=tripStandingsSorted();
+  const champion=trip.champion || standings[0]?.name || null;
 
   const tripMoney={};
   rounds.forEach(r=>{
+    if(r.gameType!=="money")return;
+
     const stableNames=Array.isArray(r.stablefordWinnerNames) ? r.stablefordWinnerNames : [];
     const netNames=Array.isArray(r.netWinnerNames) ? r.netWinnerNames : [];
     const stableShare=stableNames.length ? Number(r.stablefordPot||0)/stableNames.length : 0;
     const netShare=netNames.length ? Number(r.netPot||0)/netNames.length : 0;
-    stableNames.forEach(name=>tripMoney[name]=(tripMoney[name]||0)+stableShare);
-    netNames.forEach(name=>tripMoney[name]=(tripMoney[name]||0)+netShare);
+
+    stableNames.forEach(name=>{
+      tripMoney[name]=(tripMoney[name]||0)+stableShare;
+    });
+    netNames.forEach(name=>{
+      tripMoney[name]=(tripMoney[name]||0)+netShare;
+    });
   });
-  const tripMoneyRows=standings.map(x=>({name:x.name,won:Number(tripMoney[x.name]||0)}));
-  const showMoney=rounds.some(r=>Number(r.stake||0)>0) || tripMoneyRows.some(x=>x.won>0);
-  const scoreLabel=v=>comp==="net" ? (v+" net") : (v+" pts");
+
+  const tripMoneyRows=state.players
+    .map(p=>({name:p.name,won:Number(tripMoney[p.name]||0)}))
+    .sort((a,b)=>b.won-a.won || a.name.localeCompare(b.name));
 
   page="tripsummary";
-  clearInterval(poller); poller=null;
+  clearInterval(poller);
+  poller=null;
 
   $("screen").innerHTML=`
     <div class="card" style="text-align:center;">
       <div style="font-size:50px;">🏆</div>
       <div class="muted">TRIP COMPLETE</div>
       <h2 style="font-size:28px;margin:6px 0;">${esc(trip.name || "Golf Trip")}</h2>
-      <div class="muted">${rounds.length} round${rounds.length===1?"":"s"} completed • ${comp==="net"?"Net":"Stableford"}</div>
+      <div class="muted">${rounds.length} round${rounds.length===1?"":"s"} completed</div>
     </div>
 
-    ${champion ? `<div class="card" style="text-align:center;">
-      <div style="font-size:38px;">👑</div>
-      <div class="muted">TRIP WINNER</div>
-      <h2 style="font-size:28px;margin:6px 0;">${esc(champion.name)}</h2>
-      <div class="big">${champion.hasNR?"NR":scoreLabel(champion.total)}</div>
-      <div class="muted">Overall ${comp==="net"?"net total":"Stableford total"}</div>
-    </div>` : ""}
+    ${champion ? `
+      <div class="card" style="text-align:center;">
+        <div style="font-size:38px;">👑</div>
+        <div class="muted">TRIP WINNER</div>
+        <h2 style="font-size:28px;margin:6px 0;">${esc(champion)}</h2>
+        <div class="big">${Number((trip.standings||{})[champion]||0)} pts</div>
+      </div>
+    ` : ""}
 
     <div class="card">
       <h2>📅 Daily results</h2>
       ${rounds.length ? rounds.map((r,i)=>{
-        const ranking=tripRoundRanking(r,comp);
-        return `<div class="player" style="padding:14px 0;">
-          <div style="margin-bottom:10px;"><b>Round ${i+1}${r.course?" — "+esc(r.course):""}</b>
-            <div class="muted">${r.date?esc(formatDate(r.date))+" • ":""}${comp==="net"?"⛳ Net":"🏆 Stableford"}${Number(r.stake||0)>0?" • £"+Number(r.stake||0)+" stake":""}</div>
+        const w=tripRoundWinner(r);
+        const gameLabel=r.gameType==="points" ? "🏆 Points Game" : "💷 Money Game";
+        const compLabel=r.gameType==="points"
+          ? (r.pointsCompetition==="net" ? "Net" : "Stableford")
+          : (trip.competition==="net" ? "Net" : "Stableford");
+        return `
+          <div class="player">
+            <div class="row">
+              <div>
+                <b>Round ${i+1}${r.course ? " — "+esc(r.course) : ""}</b>
+                <div class="muted">
+                  ${r.date ? esc(formatDate(r.date))+" • " : ""}${gameLabel} • ${compLabel}
+                </div>
+              </div>
+            </div>
+            ${w ? `
+              <div style="margin-top:7px;">
+                🏆 <b>${esc(w.name)}</b>${w.score ? " • "+esc(String(w.score)) : ""}
+              </div>
+            ` : `<div class="muted" style="margin-top:7px;">No winner recorded</div>`}
           </div>
-          ${ranking.length ? ranking.map(x=>`<div class="row" style="padding:7px 0;border-top:1px solid #e6ece8;">
-            <div><b>${x.rankLabel}. ${esc(x.name)}</b></div>
-            <div style="font-weight:800;">${x.noReturn?"NR":(comp==="net"?"Net "+x.score:x.score+" pts")}</div>
-          </div>`).join("") : `<div class="muted">No scores recorded.</div>`}
-        </div>`;
+        `;
       }).join("") : `<div class="muted">No completed trip rounds saved.</div>`}
     </div>
 
     <div class="card">
-      <h2>🏆 Overall Trip Standings</h2>
-      <div class="muted" style="margin-bottom:10px;">${comp==="net"?"Lowest total net score wins.":"Highest total Stableford points wins."}</div>
+      <h2>🏆 Final Trip standings</h2>
       ${standings.length ? standings.map((s,i)=>`
-        <div class="player">
-          <div class="row">
-            <div><b>${i===0?"👑 ":i===1?"🥈 ":i===2?"🥉 ":""}${i+1}. ${esc(s.name)}</b>
-              <div class="muted">${s.roundScores.map((v,j)=>`R${j+1}: ${v==null?"—":v}`).join(" • ")}</div>
-            </div>
-            <div style="text-align:right;"><div class="money">${s.hasNR?"NR":scoreLabel(s.total)}</div><div class="muted">Played ${s.played}/${rounds.length}</div></div>
+        <div class="player row">
+          <div>
+            <b>${i===0?"👑 ":i===1?"🥈 ":i===2?"🥉 ":""}${i+1}. ${esc(s.name)}</b>
           </div>
-        </div>`).join("") : `<div class="muted">No Trip standings recorded.</div>`}
+          <div class="money">${s.points} pts</div>
+        </div>
+      `).join("") : `<div class="muted">No Trip standings recorded.</div>`}
     </div>
 
-    ${showMoney ? `<div class="card"><h2>💷 Trip Money Summary</h2>${tripMoneyRows.map(m=>`<div class="player row"><div><b>${m.won>0?"💰 ":""}${esc(m.name)}</b></div><div class="money">£${m.won.toFixed(2).replace(/\\.00$/,'')}</div></div>`).join("")}</div>` : ""}
-
     <div class="card">
-      <button class="primary full" onclick="shareTripSummary()">📤 Share Final Trip Results</button>
-      ${isAdmin ? `<button class="secondary full" onclick="finishTrip()">✅ Save Trip & Return to Normal Golf</button>` : `<div class="notice" style="margin-top:10px;">Waiting for the Group Admin to save and close the completed trip.</div>`}
-    </div>`;
-  window.scrollTo(0,0);
-}
+      <h2>💷 Trip Money Summary</h2>
+      ${tripMoneyRows.length ? tripMoneyRows.map((m,i)=>`
+        <div class="player row">
+          <div>
+            <b>${i===0 && m.won>0 ? "💰 " : ""}${esc(m.name)}</b>
+          </div>
+          <div class="money">£${Number(m.won).toFixed(2).replace(/\.00$/,"")}</div>
+        </div>
+      `).join("") : `<div class="muted">No money results recorded for this trip.</div>`}
+    </div>
 
-function beginRoundEdit(){
-  if(roundLocked())return;
-  roundEditOpen=true;
-  render();
-}
-function cancelRoundEdit(){
-  roundEditOpen=false;
-  render();
-}
-function saveRoundEdit(){
-  if(roundLocked()){roundEditOpen=false;render();return;}
-  const course=(document.getElementById("roundEditCourse")?.value||"").trim();
-  const date=document.getElementById("roundEditDate")?.value||"";
-  if(!course){appAlert("Please enter the course name.");return;}
-  if(!date){appAlert("Please choose the round date.");return;}
-  let stake=Number(state.stake||0);
-  if(state.gameType==="money"){
-    const raw=document.getElementById("roundEditStake")?.value||"";
-    stake=raw===""?0:Number(raw);
-    if(!Number.isFinite(stake)||stake<0){appAlert("Please enter a valid stake, or leave it blank for no stake.");return;}
-  }
-  state.course=course;
-  state.date=date;
-  if(state.gameType==="money")state.stake=stake;
-  roundEditOpen=false;
-  save();
-  render();
+    ${isAdmin ? `
+      <div class="card">
+        <button class="primary full" onclick="finishTrip()">
+          ✅ Save Trip & Return to Normal Golf
+        </button>
+      </div>
+    ` : `
+      <div class="card">
+        <div class="notice">
+          The organiser will close and archive the completed trip.
+        </div>
+        <button class="ghost full" onclick="adminLogin()">
+          🔐 Organiser / Admin
+        </button>
+      </div>
+    `}
+  `;
+
+  window.scrollTo(0,0);
 }
 
 function round(){
@@ -1046,8 +887,8 @@ function round(){
           <div class="muted">NEXT ROUND</div>
           <h2>${esc(planned.course||"Round "+nextNo)}</h2>
           <div class="muted">${planned.date ? esc(formatDate(planned.date)) : ""}</div>
-          <div style="margin-top:10px;"><span class="pill paid">${state.trip.competition==="net" ? "⛳ NET TRIP" : "🏆 STABLEFORD TRIP"}</span></div>
-          <div class="notice" style="margin-top:12px;"><b>Competition: ${state.trip.competition==="net" ? "⛳ Net" : "🏆 Stableford"}</b>${Number(planned.stake||0)>0 ? `<br>Daily stake: £${Number(planned.stake||0)}` : `<br>No daily stake`}</div>
+          <div style="margin-top:10px;"><span class="pill paid">${planned.gameType==="points" ? "🏆 POINTS GAME" : "💷 MONEY GAME"}</span></div>
+          <div class="notice" style="margin-top:12px;"><b>Competition: ${state.trip.competition==="net" ? "⛳ Net" : "🏆 Stableford"}</b>${planned.gameType==="money" ? `<br>Stake: £${Number(planned.stake||0)}` : `<br>Trip points: 10 / 6 / 3`}</div>
         </div>` : ""}
       <div class="card" style="text-align:center;">
         <div style="font-weight:800;margin-bottom:10px;">Round ${nextNo-1} is complete.</div>
@@ -1085,33 +926,82 @@ $("screen").innerHTML=`
   ` : ""}
 
   <div class="card">
-    <div class="row" style="align-items:flex-start;">
-      <div style="min-width:0;flex:1;">
-        <div class="muted">CURRENT ROUND</div>
-        <h2 style="font-size:24px;margin:3px 0;">${esc(state.course || "Course not set")}</h2>
-        <div class="muted">${esc(formatDate(state.date))} • ${state.players.length} player${state.players.length===1?"":"s"}</div>
-        <div style="margin-top:9px;display:flex;gap:7px;flex-wrap:wrap;">
-          <span class="pill paid">${state.trip?.active ? "✈️ TRIP ROUND" : (state.gameType==="points" ? "🏆 POINTS GAME" : (Number(state.stake||0)>0 ? "💷 MONEY GAME" : "⛳ NO STAKE"))}</span>
-          <span class="pill paid">${state.pointsCompetition==="stableford" ? "🏆 STABLEFORD" : "⛳ NET"}</span>
-        </div>
-        ${state.gameType==="money" && Number(state.stake||0)>0 ? `<div class="muted" style="margin-top:9px;"><b>£${Number(state.stake||0)} entry</b> • £${potentialPot()} expected pot${paidCount()>0 ? ` • £${pot()} paid in` : ``}</div>` : ``}
-      </div>
-      <span class="pill ${roundLocked()?'pending':'paid'}">${roundLocked()?'🔒 ENTRIES CLOSED':'OPEN'}</span>
-    </div>
 
-    ${isAdmin && !roundLocked() ? `
-      <div style="margin-top:14px;">
-        ${!roundEditOpen ? `<button class="secondary full" onclick="beginRoundEdit()">✏️ Edit round details</button>` : `
-          <div class="notice"><b>Edit round details</b><br>Make any correction before scoring starts.</div>
-          <label class="muted">Course</label>
-          <input id="roundEditCourse" value="${escAttr(state.course)}" placeholder="Course">
-          <label class="muted">Date</label>
-          <input id="roundEditDate" type="date" value="${escAttr(state.date)}">
-          ${state.gameType==="money" ? `<label class="muted">Stake per player (£)</label><input id="roundEditStake" type="number" min="0" step="1" value="${Number(state.stake||0)>0 ? state.stake : ""}" placeholder="No stake">` : ``}
-          <div class="grid2"><button class="primary" onclick="saveRoundEdit()">Save changes</button><button class="secondary" onclick="cancelRoundEdit()">Cancel</button></div>
+      <div class="row">
+      <div>
+        <div class="muted">CURRENT ROUND</div>
+        <h2>${esc(state.course)}</h2>
+        <div class="muted">${esc(formatDate(state.date))} • ${state.players.length} players</div>
+
+        <div style="margin-top:8px;">
+          <span class="pill paid">
+            ${state.gameType==="points" ? "🏆 POINTS GAME" : (Number(state.stake||0)>0 ? "💷 MONEY GAME" : "⛳ NO STAKE")}
+          </span>
+        </div>
+      </div>
+
+      <span class="pill ${roundLocked()?'pending':'paid'}">
+        ${roundLocked()?'🔒 ENTRIES CLOSED':'OPEN'}
+      </span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Round details</h2>
+
+    ${isAdmin ? `
+      <label class="muted">Course</label>
+      <input value="${escAttr(state.course)}" onchange="state.course=this.value;save()">
+
+      <div>
+        <label class="muted">Date</label>
+        <input type="date" value="${escAttr(state.date)}" onchange="state.date=this.value;save();render()">
+
+        <div class="notice"><b>Competition: ${state.pointsCompetition==="stableford" ? "🏆 Stableford" : "⛳ Net"}</b></div>
+
+        ${state.gameType==="money" ? `
+          <label class="muted">Stake per player (£)</label>
+          <input type="number" min="0" step="1" value="${Number(state.stake||0)>0 ? state.stake : ""}" placeholder="No stake" onchange="state.stake=this.value==='' ? 0 : +this.value;save();render()">
+        ` : `
+          <div class="notice">
+            <b>${state.pointsCompetition==="stableford" ? "🏆 Stableford" : "⛳ Net"}</b><br>
+            Points Game • Top 3 score league points
+          </div>
         `}
       </div>
-    ` : isAdmin && roundLocked() ? `<div class="notice" style="margin-top:14px;">🔒 <b>Round details locked</b><br>Course, date and stake can’t be changed after scoring has started.</div>` : ``}
+    ` : `
+      <div class="muted">Course</div>
+      <b>${esc(state.course)}</b>
+
+      <div style="height:10px"></div>
+
+      ${state.gameType==="money" ? `
+        <div class="grid2">
+          <div>
+            <div class="muted">Date</div>
+            <b>${esc(formatDate(state.date))}</b>
+          </div>
+          <div>
+            <div class="muted">Stake per player</div>
+            <b>£${state.stake}</b>
+          </div>
+        </div>
+        <div style="height:10px"></div>
+        <div class="muted">Competition</div>
+        <b>${state.pointsCompetition==="stableford" ? "🏆 Stableford" : "⛳ Net"}</b>
+      ` : `
+        <div class="grid2">
+          <div>
+            <div class="muted">Date</div>
+            <b>${esc(formatDate(state.date))}</b>
+          </div>
+          <div>
+            <div class="muted">Competition</div>
+            <b>${state.pointsCompetition==="stableford" ? "Stableford" : "Net"}</b>
+          </div>
+        </div>
+      `}
+    `}
   </div>
 
   ${state.gameType==="money" && Number(state.stake||0)>0 ? `
@@ -1199,7 +1089,7 @@ Group PIN: ${pin}`;
     });
   }else{
     navigator.clipboard?.writeText(message);
-    appAlert("Invite copied. Paste it into WhatsApp.");
+    alert("Invite copied. Paste it into WhatsApp.");
   }
 
 }
@@ -1256,7 +1146,7 @@ function pay(){
  <div class="pay-screen-spacer"></div>
  <div class="pay-sticky">
    ${pin==="2026"
-     ? `<button class="secondary full" onclick="appAlert('👀 Demo Mode\n\nPayments are disabled in the demo.')">🔒 Demo — Payments Disabled</button>`
+     ? `<button class="secondary full" onclick="alert('👀 Demo Mode\n\nPayments are disabled in the demo.')">🔒 Demo — Payments Disabled</button>`
      : (me && me.paid
          ? `<button class="secondary full" disabled>✓ You are marked paid</button>`
          : (String(state.paymentLink||"").trim()
@@ -1267,13 +1157,38 @@ function pay(){
 }
 let paymentReturnBusy=false;
 function paymentReturnKey(){return "iigPaymentJourney_"+String(pin||"");}
+function paymentLinkForStake(rawLink,stake){
+  const link=String(rawLink||"").trim();
+  const amount=Number(stake||0);
+  if(!link || !Number.isFinite(amount) || amount<=0)return link;
+
+  // Monzo.me supports the requested amount as /username/amount.
+  // Keep the Admin's saved link unchanged; build the round-specific link only when a player taps Pay.
+  try{
+    const candidate=/^https?:\/\//i.test(link) ? link : `https://${link}`;
+    const url=new URL(candidate);
+    const host=url.hostname.toLowerCase().replace(/^www\./,"");
+    if(host==="monzo.me"){
+      const parts=url.pathname.split("/").filter(Boolean);
+      if(parts.length){
+        const username=parts[0];
+        url.pathname=`/${username}/${amount.toFixed(2)}`;
+        return url.toString();
+      }
+    }
+  }catch(e){}
+
+  // Other payment providers keep using the Admin's saved link as entered.
+  return link;
+}
 function beginPlayerPayment(){
-  if(!myPlayerId){appAlert("Please select who you are first.");return;}
+  if(!myPlayerId){alert("Please select who you are first.");return;}
   const me=state.players.find(p=>p.id===myPlayerId);
   if(!me)return;
-  if(me.paid){appAlert("You're already marked paid.");return;}
-  const link=String(state.paymentLink||"").trim();
-  if(!link){appAlert("Your Group Admin hasn't added a payment link yet.");return;}
+  if(me.paid){alert("You're already marked paid.");return;}
+  const savedLink=String(state.paymentLink||"").trim();
+  if(!savedLink){alert("Your Group Admin hasn't added a payment link yet.");return;}
+  const link=paymentLinkForStake(savedLink,state.stake);
   sessionStorage.setItem(paymentReturnKey(),JSON.stringify({playerId:me.id,startedAt:Date.now()}));
   window.open(link,"_blank");
 }
@@ -1292,7 +1207,7 @@ async function recognisePaymentReturn(){
   await save();
   paymentReturnBusy=false;
   render();
-  appAlert("✅ Payment journey complete — you're marked paid.\n\nYour payment went directly to your Group Admin. I'm In Golf does not receive or hold the money.");
+  alert("✅ Payment journey complete — you're marked paid.\n\nYour payment went directly to your Group Admin. I'm In Golf does not receive or hold the money.");
 }
 window.addEventListener("focus",()=>setTimeout(recognisePaymentReturn,250));
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")setTimeout(recognisePaymentReturn,250);});
@@ -1304,12 +1219,12 @@ async function togglePaid(i){
   const p=state.players[i];
 
  if(!isAdmin && p.id!==myPlayerId){
-   appAlert("You can only change your own payment.");
+   alert("You can only change your own payment.");
    return;
  }
 
  if(roundLocked()){
-   appAlert("🔒 Entries are closed — scoring has started.");
+   alert("🔒 Entries are closed — scoring has started.");
    return;
  }
 
@@ -1318,7 +1233,7 @@ async function togglePaid(i){
  await save();
 }
 
-function reminder(){const names=state.players.filter(p=>!p.paid).map(p=>p.name).join(", ");const txt=`I'm In Golf: ${names} — your £${state.stake} golf stake is still due for ${state.course}. Please pay before tee-off.`;navigator.clipboard?.writeText(txt);appAlert("Reminder copied. Paste it into WhatsApp.");}
+function reminder(){const names=state.players.filter(p=>!p.paid).map(p=>p.name).join(", ");const txt=`I'm In Golf: ${names} — your £${state.stake} golf stake is still due for ${state.course}. Please pay before tee-off.`;navigator.clipboard?.writeText(txt);alert("Reminder copied. Paste it into WhatsApp.");}
 function scores(){
 
   if(waitingForNextCompetition()){
@@ -1571,17 +1486,17 @@ if(!demoCanEdit())return;
   if(!isAdmin && p.id!==myPlayerId)return;
 
   if(state.gameType==="money" && Number(state.stake||0)>0 && !p.paid){
-    appAlert("Pay before choosing Stableford or Net.");
+    alert("Pay before choosing Stableford or Net.");
     return;
   }
 
   if(roundLocked() && !isAdmin){
-    appAlert("🔒 Entries are closed — scoring has started.");
+    alert("🔒 Entries are closed — scoring has started.");
     return;
   }
 
   if(roundLocked() && isAdmin && (p.scoreSubmitted===true || p.stableford!=null || p.netScore!=null || p.noReturn===true)){
-    appAlert("This player has already submitted. Use Correct score if a change is needed.");
+    alert("This player has already submitted. Use Correct score if a change is needed.");
     return;
   }
 
@@ -1599,7 +1514,7 @@ async function submitPlayerScore(i,type){
   if(!isAdmin && p.id!==myPlayerId)return;
 
   if(state.gameType==="money" && Number(state.stake||0)>0 && !p.paid){
-    appAlert("Pay before entering a score.");
+    alert("Pay before entering a score.");
     return;
   }
 
@@ -1608,7 +1523,7 @@ async function submitPlayerScore(i,type){
   const value=Number(raw);
 
   if(!raw || !Number.isFinite(value) || value<0){
-    appAlert("Please enter a valid score.");
+    alert("Please enter a valid score.");
     return;
   }
 
@@ -1616,7 +1531,7 @@ async function submitPlayerScore(i,type){
     ? "Stableford score " + value + " points"
     : "Net score " + value;
 
-  if(!await appConfirm("Submit " + label + "?\n\nAre you sure?"))return;
+  if(!confirm("Submit " + label + "?\n\nAre you sure?"))return;
 
   if(type==="stableford"){
     p.stableford=value;
@@ -1644,16 +1559,16 @@ async function submitNoReturn(i){
   const type=state.pointsCompetition||"stableford";
 
   if(type!=="net"){
-    appAlert("No Return is available for Net competitions.");
+    alert("No Return is available for Net competitions.");
     return;
   }
 
   if(state.gameType==="money" && Number(state.stake||0)>0 && !p.paid){
-    appAlert("Pay before submitting No Return.");
+    alert("Pay before submitting No Return.");
     return;
   }
 
-  if(!await appConfirm("Submit NR — No Return?\n\nThis player will count as submitted but cannot win the Net competition."))return;
+  if(!confirm("Submit NR — No Return?\n\nThis player will count as submitted but cannot win the Net competition."))return;
 
   p.netScore=null;
   p.stableford=null;
@@ -1677,7 +1592,7 @@ async function adminEditSubmittedScore(i,type){
     ? String(p.stableford??"")
     : String(p.netScore??"");
 
-  const answer=await appPrompt(
+  const answer=prompt(
     "Correct " + p.name + "'s submitted " +
     (type==="stableford" ? "Stableford score" : "Net score") +
     (type==="net" ? ".\n\nEnter a number or NR." : "."),
@@ -1689,7 +1604,7 @@ async function adminEditSubmittedScore(i,type){
   const clean=String(answer).trim().toUpperCase();
 
   if(type==="net" && clean==="NR"){
-    if(!await appConfirm("Change " + p.name + "'s result to NR — No Return?"))return;
+    if(!confirm("Change " + p.name + "'s result to NR — No Return?"))return;
     p.netScore=null;
     p.stableford=null;
     p.noReturn=true;
@@ -1701,11 +1616,11 @@ async function adminEditSubmittedScore(i,type){
 
   const value=Number(clean);
   if(clean==="" || !Number.isFinite(value) || value<0){
-    appAlert("Please enter a valid score" + (type==="net" ? " or NR." : "."));
+    alert("Please enter a valid score" + (type==="net" ? " or NR." : "."));
     return;
   }
 
-  if(!await appConfirm("Change " + p.name + "'s submitted score to " + value + "?"))return;
+  if(!confirm("Change " + p.name + "'s submitted score to " + value + "?"))return;
 
   if(type==="stableford"){
     p.stableford=value;
@@ -1728,10 +1643,10 @@ async function finishRound(){
   const pointsComp=state.pointsCompetition || "stableford";
   const isTrip=Boolean(state.trip?.active);
 
-  async function chooseCountbackWinner(players,competition,score,position){
+  function chooseCountbackWinner(players,competition,score,position){
     const names=players.map((p,i)=>`${i+1}. ${p.name}`).join("\n");
 
-    const answer=await appPrompt(
+    const answer=prompt(
       `${competition} tie for ${position} on ${score}.\n\n` +
       `Use your normal scorecard countback and choose the winner.\nNo hole-by-hole entry is needed in the app.\n\n` +
       names +
@@ -1743,8 +1658,8 @@ async function finishRound(){
     const selected=Number(answer)-1;
 
     if(selected<0 || selected>=players.length){
-      appAlert("Please choose one of the listed players.");
-      return await chooseCountbackWinner(
+      alert("Please choose one of the listed players.");
+      return chooseCountbackWinner(
         players,
         competition,
         score,
@@ -1848,7 +1763,7 @@ async function finishRound(){
     );
 
     if(!scoredPlayers.length){
-      appAlert(
+      alert(
         pointsComp==="stableford"
           ? "Enter at least one Stableford score first."
           : "Enter at least one Net score first."
@@ -1879,7 +1794,7 @@ async function finishRound(){
 
       if(state.gameType==="points" && (tied.length>1)){
 
-        selectedPlayer=await chooseCountbackWinner(
+        selectedPlayer=chooseCountbackWinner(
           tied,
           pointsComp==="stableford" ? "Stableford" : "Net",
           pointsComp==="stableford"
@@ -2043,7 +1958,7 @@ if(isTrip){
   );
 
   if(!stablefordPlayers.length && !netPlayers.length){
-    appAlert(pointsComp==="stableford" ? "Enter at least one Stableford score first." : "Enter at least one Net score first.");
+    alert(pointsComp==="stableford" ? "Enter at least one Stableford score first." : "Enter at least one Net score first.");
     return;
   }
 
@@ -2123,9 +2038,83 @@ const winners=[
 
 
 // =====================================
-// ✈️ TRIP TOTALS
-// Raw Stableford/Net totals are rebuilt from saved trip rounds.
+// ✈️ TRIP MONEY GAME POINTS
 // =====================================
+
+let tripPlaces=[];
+
+if(isTrip){
+
+  const tripComp=state.trip.competition || "stableford";
+
+  let tripPlayers=state.players.filter(p=>
+    tripComp==="stableford"
+      ? p.stableford!=null
+      : p.netScore!=null
+  );
+
+  tripPlayers.sort((a,b)=>
+    tripComp==="stableford"
+      ? Number(b.stableford)-Number(a.stableford)
+      : Number(a.netScore)-Number(b.netScore)
+  );
+
+  let remainingTrip=[...tripPlayers];
+tripPlaces=[];
+
+const tripPlaceNames=["1st","2nd","3rd"];
+
+for(let place=0; place<3 && remainingTrip.length; place++){
+
+  const bestScore=
+    tripComp==="stableford"
+      ? Math.max(...remainingTrip.map(p=>Number(p.stableford)))
+      : Math.min(...remainingTrip.map(p=>Number(p.netScore)));
+
+  const tied=remainingTrip.filter(p=>
+    tripComp==="stableford"
+      ? Number(p.stableford)===bestScore
+      : Number(p.netScore)===bestScore
+  );
+
+  let selectedPlayer=tied[0];
+
+  if(state.gameType==="points" && (tied.length>1)){
+
+    selectedPlayer=chooseCountbackWinner(
+      tied,
+      tripComp==="stableford" ? "Stableford" : "Net",
+      tripComp==="stableford"
+        ? bestScore + " points"
+        : bestScore,
+      tripPlaceNames[place]
+    );
+
+    if(!selectedPlayer)return;
+  }
+
+  tripPlaces.push(selectedPlayer);
+
+  remainingTrip=
+    remainingTrip.filter(p=>p!==selectedPlayer);
+}
+
+  const tripFirst=Number(state.trip.tripPointsValue||10);
+
+  const tripAwards=[
+  tripFirst,
+  Math.round(tripFirst*0.6),
+  Math.round(tripFirst*0.3)
+];
+  state.trip.standings=state.trip.standings || {};
+
+  tripPlaces.forEach((p,i)=>{
+    const points=tripAwards[i];
+
+    state.trip.standings[p.name]=
+      Number(state.trip.standings[p.name]||0)+points;
+  });
+}
 
 
 const record={
@@ -2172,7 +2161,6 @@ const record={
 if(isTrip){
   state.trip.rounds=state.trip.rounds || [];
   state.trip.rounds.push(record);
-  rebuildTripStandings(state.trip);
 }else{
   state.history=state.history || [];
   state.history.unshift(record);
@@ -2223,7 +2211,7 @@ if(isTrip){
 function showRoundHistory(historyIndex){
   const h=(state.history||[])[Number(historyIndex)];
   if(!h){
-    appAlert("Round details could not be found.");
+    alert("Round details could not be found.");
     return;
   }
 
@@ -2320,26 +2308,10 @@ function showRoundHistory(historyIndex){
   window.scrollTo(0,0);
 }
 
-function showTripRoundResult(record){
-  const trip=state.trip||{};
-  const comp=trip.competition||"stableford";
-  const roundNo=Math.max(1,Number(trip.currentRound||1)-1);
-  const ranking=tripRoundRanking(record,comp);
-  const potValue=comp==="net"?Number(record.netPot||0):Number(record.stablefordPot||0);
-  const winnerNames=comp==="net"?(record.netWinnerNames||[]):(record.stablefordWinnerNames||[]);
-  $("screen").innerHTML=`
-    <div class="card" style="text-align:center;"><div style="font-size:52px;">🏆</div><div class="muted">ROUND ${roundNo} RESULT</div><h2 style="font-size:26px;margin:6px 0;">${esc(record.course||"Golf Trip")}</h2><div class="muted">${record.date?esc(formatDate(record.date))+" • ":""}${comp==="net"?"⛳ Net":"🏆 Stableford"}</div></div>
-    <div class="card"><h2>📋 Full leaderboard</h2>${ranking.map(x=>`<div class="player row"><div><b>${x.rankLabel}. ${esc(x.name)}</b></div><div style="font-size:18px;font-weight:800;">${x.noReturn?"NR":(comp==="net"?"Net "+x.score:x.score+" pts")}</div></div>`).join("")}</div>
-    ${Number(record.stake||0)>0?`<div class="card"><div class="notice"><b>💷 Daily pot £${potValue}</b><br>${winnerNames.length?"Winner"+(winnerNames.length>1?"s":"")+": "+winnerNames.map(esc).join(" & "):"Result saved"}</div></div>`:""}
-    <div class="card" style="text-align:center;"><div style="font-size:28px;">🎉 ⛳ 🎉</div><div style="font-weight:800;margin-top:8px;">Round ${roundNo} complete!</div><div class="notice" style="margin-top:12px;">Share today's full result with the group, then move on to Round ${trip.currentRound} of ${trip.totalRounds}.</div><button class="primary full" onclick="shareWinnerImage()">📤 Share Round ${roundNo} Result</button>${isAdmin?`<button class="secondary full" onclick="nextTripRound()">✈️ Move on to Round ${trip.currentRound}</button>`:`<div class="notice" style="margin-top:10px;">Waiting for the Group Admin to start Round ${trip.currentRound}.</div>`}</div>`;
-  window.scrollTo(0,0);
-}
-
 function showWinnerScreen(record){
 
   page="winner";
   lastWinnerRecord=record;
-  if(state.trip?.active && state.roundOpen===false){ showTripRoundResult(record); return; }
 
   const isPointsGame=record.gameType==="points";
 
@@ -2566,7 +2538,7 @@ async function shareWinnerImage(){
   const record=lastWinnerRecord;
 
   if(!record){
-    appAlert("No result available to share.");
+    alert("No result available to share.");
     return;
   }
 
@@ -3105,7 +3077,7 @@ async function shareWinnerImage(){
   canvas.toBlob(async blob=>{
 
     if(!blob){
-      appAlert("Couldn't create the result image.");
+      alert("Couldn't create the result image.");
       return;
     }
 
@@ -3139,7 +3111,7 @@ async function shareWinnerImage(){
           "_blank"
         );
 
-        appAlert(
+        alert(
           "Result image created. Use your phone's Share button to send it to WhatsApp."
         );
       }
@@ -3147,7 +3119,7 @@ async function shareWinnerImage(){
     }catch(err){
 
       if(err.name!=="AbortError"){
-        appAlert(
+        alert(
           "Couldn't share the image. Please try again."
         );
       }
@@ -3158,39 +3130,103 @@ async function shareWinnerImage(){
 async function shareTripSummary(){
   const past=state.trip?.pastTrips||[];
   const live=Boolean(state.trip&&(state.trip.active||state.trip.completed||(state.trip.rounds||[]).length));
-  const safeIndex=(selectedPastTripIndex>=0&&selectedPastTripIndex<past.length)?selectedPastTripIndex:0;
+  const safeIndex=(selectedPastTripIndex>=0 && selectedPastTripIndex<past.length)
+    ? selectedPastTripIndex : 0;
   const trip=live?state.trip:(past[safeIndex]||null);
-  if(!trip){appAlert("No Trip is available to share.");return;}
-  const rounds=trip.rounds||[], comp=trip.competition||"stableford", standings=tripAggregate(trip);
-  const rowH=72, roundRowH=48;
-  const roundRanks=rounds.map(r=>tripRoundRanking(r,comp));
-  const totalRoundRows=roundRanks.reduce((n,rows)=>n+rows.length,0);
-  const W=1080, H=Math.min(30000,720+standings.length*rowH+rounds.length*78+totalRoundRows*roundRowH);
-  const canvas=document.createElement("canvas"); canvas.width=W; canvas.height=H; const c=canvas.getContext("2d");
-  const green="#126b3a", dark="#143322", pale="#f4f7f5", gold="#d4a62a", ink="#18231d", grey="#64736a";
-  c.fillStyle=pale;c.fillRect(0,0,W,H); c.fillStyle=green;c.fillRect(0,0,W,235);
-  c.textAlign="center";c.fillStyle="#fff";c.font="800 50px Arial";c.fillText("I'M IN GOLF",W/2,65);c.font="800 31px Arial";c.fillText((trip.name||"GOLF TRIP").toUpperCase(),W/2,118);c.font="700 23px Arial";c.fillText("FINAL TOURNAMENT RESULTS • "+(comp==="net"?"NET":"STABLEFORD"),W/2,158);c.fillStyle=gold;c.fillRect(390,185,300,5);
-  let y=275; const champ=standings[0];
-  if(champ){c.fillStyle="#fff";c.fillRect(55,y,970,150);c.strokeStyle=gold;c.lineWidth=4;c.strokeRect(55,y,970,150);c.fillStyle=green;c.font="800 22px Arial";c.fillText("TRIP CHAMPION",W/2,y+38);c.fillStyle=ink;c.font="800 43px Arial";c.fillText(champ.name.toUpperCase(),W/2,y+90);c.fillStyle=green;c.font="800 29px Arial";c.fillText(champ.hasNR?"NR":(comp==="net"?champ.total+" NET":champ.total+" PTS"),W/2,y+128);y+=195;}
-  c.textAlign="left";c.fillStyle=dark;c.font="800 29px Arial";c.fillText("FINAL STANDINGS",60,y);y+=25;c.fillStyle=dark;c.fillRect(55,y,970,52);c.fillStyle="#fff";c.font="700 18px Arial";c.fillText("POS",75,y+33);c.fillText("PLAYER",155,y+33);c.fillText("ROUND SCORES",480,y+33);c.textAlign="right";c.fillText("TOTAL",995,y+33);c.textAlign="left";y+=52;
-  standings.forEach((p,i)=>{c.fillStyle=i%2?"#fff":"#f9fbfa";c.fillRect(55,y,970,rowH);c.fillStyle=i===0?gold:ink;c.font="800 23px Arial";c.fillText(positionLabel(i+1),80,y+44);c.fillStyle=ink;c.font="700 23px Arial";c.fillText(p.name,155,y+44);c.fillStyle=grey;c.font="600 17px Arial";let roundsText=p.roundScores.map((v,j)=>`R${j+1} ${v==null?'—':v}`).join('  '); while(c.measureText(roundsText).width>360&&roundsText.length>12)roundsText=roundsText.slice(0,-4)+'…';c.fillText(roundsText,480,y+44);c.textAlign="right";c.fillStyle=green;c.font="800 24px Arial";c.fillText(p.hasNR?"NR":String(p.total)+(comp==="net"?"":" pts"),995,y+44);c.textAlign="left";y+=rowH;});
-  y+=40;c.fillStyle=dark;c.font="800 27px Arial";c.fillText("FULL ROUND RESULTS",60,y);y+=22;
-  rounds.forEach((r,i)=>{
-    const rank=roundRanks[i]||[];
-    y+=50;c.fillStyle=dark;c.font="800 22px Arial";c.fillText(`ROUND ${i+1}${r.course?' — '+r.course:''}`,70,y);
-    c.textAlign="right";c.fillStyle=grey;c.font="600 17px Arial";c.fillText(formatShareDate(r.date)||"",1000,y);c.textAlign="left";
-    c.strokeStyle="#d9e2dc";c.beginPath();c.moveTo(65,y+15);c.lineTo(1015,y+15);c.stroke();
-    if(!rank.length){y+=roundRowH;c.fillStyle=grey;c.font="600 19px Arial";c.fillText("No results recorded",85,y);return;}
-    rank.forEach((player,j)=>{
-      y+=roundRowH;
-      c.fillStyle=j%2?"#ffffff":"#f9fbfa";c.fillRect(65,y-34,950,roundRowH);
-      c.fillStyle=player.rank===1?gold:ink;c.font="800 20px Arial";c.fillText(player.rank==null?"NR":(String(player.rankLabel).startsWith("T")?player.rankLabel:positionLabel(player.rank)),85,y);
-      c.fillStyle=ink;c.font="700 20px Arial";c.fillText(player.name,155,y);
-      c.textAlign="right";c.fillStyle=green;c.font="800 20px Arial";c.fillText(player.noReturn?"NR":String(player.score)+(comp==="net"?"":" pts"),995,y);c.textAlign="left";
-    });
+  if(!trip){alert("No Trip is available to share.");return;}
+
+  const rounds=trip.rounds||[];
+  const names=[...new Set([...state.players.map(p=>p.name),...Object.keys(trip.standings||{})])];
+  const standings=names.map(name=>({name,points:Number(trip.standings?.[name]||0)}))
+    .sort((a,b)=>b.points-a.points||a.name.localeCompare(b.name));
+
+  const played=name=>rounds.filter(r=>(r.players||[]).some(p=>p.name===name&&(p.stableford!=null||p.netScore!=null))).length;
+  const money={}; names.forEach(n=>money[n]=0);
+  rounds.forEach(r=>{
+    if(r.gameType!=="money")return;
+    const sf=r.stablefordWinnerNames||[], net=r.netWinnerNames||[];
+    const sfShare=sf.length?Number(r.stablefordPot||0)/sf.length:0;
+    const netShare=net.length?Number(r.netPot||0)/net.length:0;
+    sf.forEach(n=>money[n]=(money[n]||0)+sfShare);
+    net.forEach(n=>money[n]=(money[n]||0)+netShare);
   });
-  y+=60;c.fillStyle=grey;c.textAlign="center";c.font="700 19px Arial";c.fillText("I'm In Golf • Trip results",W/2,y);
-  canvas.toBlob(async blob=>{if(!blob){appAlert("Couldn't create the Trip Summary image.");return;} const file=new File([blob],"im-in-golf-trip-results.png",{type:"image/png"}); try{if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({title:`I'm In Golf — ${trip.name||"Trip Results"}`,files:[file]});}else{const url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="im-in-golf-trip-results.png";a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);appAlert("Trip results image created. You can now share the saved image.");}}catch(err){if(err?.name!=="AbortError")appAlert("Couldn't share the Trip results image. Please try again.");}},"image/png");
+
+  const roundWinner=r=>{
+    if(r.gameType==="points"&&r.pointsResults?.length){
+      return {name:r.pointsResults[0].name||"",score:r.pointsResults[0].score??""};
+    }
+    const ws=[...(r.stablefordWinnerNames||[]),...(r.netWinnerNames||[])];
+    const p=(r.players||[]).find(x=>x.name===ws[0]);
+    return {name:ws.join(" & ")||"Result saved",score:p?.stableford??p?.netScore??""};
+  };
+
+  const W=1080, rowH=92, roundsH=Math.max(1,rounds.length)*76;
+  const H=720 + standings.length*rowH + roundsH + 260;
+  const canvas=document.createElement("canvas");
+  canvas.width=W; canvas.height=H;
+  const c=canvas.getContext("2d");
+
+  const green="#006b3c", dark="#004f2d", pale="#f2f7f4", gold="#d5a928", ink="#17211b", grey="#68756d";
+  c.fillStyle=pale;c.fillRect(0,0,W,H);
+  c.fillStyle=green;c.fillRect(0,0,W,250);
+  c.fillStyle="#fff";c.textAlign="center";c.font="800 54px Arial";c.fillText("I'M IN GOLF",W/2,76);
+  c.font="700 27px Arial";c.fillText((trip.name||"GOLF TRIP").toUpperCase(),W/2,125);
+  c.font="700 22px Arial";c.fillText("FINAL TOURNAMENT RESULTS",W/2,165);
+  c.fillStyle=gold;c.fillRect(390,190,300,5);
+
+  const champ=standings[0];
+  let y=285;
+  c.fillStyle="#fff";c.fillRect(55,y,970,190);
+  c.strokeStyle=gold;c.lineWidth=4;c.strokeRect(55,y,970,190);
+  c.fillStyle=green;c.font="800 25px Arial";c.fillText("TRIP CHAMPION",W/2,y+48);
+  c.fillStyle=ink;c.font="800 48px Arial";c.fillText((champ?.name||"").toUpperCase(),W/2,y+108);
+  c.fillStyle=green;c.font="800 34px Arial";c.fillText(`${champ?.points||0} POINTS`,W/2,y+158);
+
+  y+=235;
+  c.textAlign="left";c.fillStyle=dark;c.font="800 31px Arial";c.fillText("FINAL STANDINGS",60,y);
+  y+=35;
+  c.fillStyle=dark;c.fillRect(55,y,970,58);
+  c.fillStyle="#fff";c.font="700 20px Arial";
+  c.fillText("POS",80,y+37);c.fillText("PLAYER",180,y+37);c.fillText("PTS",650,y+37);c.fillText("RDS",760,y+37);c.fillText("WON",880,y+37);
+  y+=58;
+  standings.forEach((p,i)=>{
+    c.fillStyle=i%2?"#fff":"#f8fbf9";c.fillRect(55,y,970,rowH);
+    c.fillStyle=i===0?gold:ink;c.font="800 27px Arial";c.fillText(String(i+1),85,y+55);
+    c.fillStyle=ink;c.font="700 27px Arial";c.fillText(p.name,180,y+55);
+    c.fillStyle=green;c.font="800 27px Arial";c.fillText(String(p.points),650,y+55);
+    c.fillStyle=ink;c.font="700 25px Arial";c.fillText(String(played(p.name)),770,y+55);
+    c.fillStyle=green;c.font="800 27px Arial";c.fillText("£"+Number(money[p.name]||0).toFixed(2).replace(/\.00$/,""),880,y+55);
+    y+=rowH;
+  });
+
+  y+=45;c.fillStyle=dark;c.font="800 31px Arial";c.fillText("ROUND WINNERS",60,y);y+=25;
+  rounds.forEach((r,i)=>{
+    const w=roundWinner(r);
+    y+=65;c.fillStyle=ink;c.font="700 25px Arial";c.fillText(`ROUND ${i+1}${r.course?" — "+r.course:""}`,70,y);
+    c.textAlign="right";c.fillStyle=green;c.font="800 25px Arial";c.fillText(`${w.name}${w.score!==""?"  "+w.score:""}`,1000,y);c.textAlign="left";
+    c.strokeStyle="#d9e2dc";c.lineWidth=2;c.beginPath();c.moveTo(65,y+20);c.lineTo(1015,y+20);c.stroke();
+  });
+
+  y+=75;c.fillStyle=green;c.fillRect(55,y,970,115);
+  const total=Object.values(money).reduce((a,b)=>a+Number(b||0),0);
+  c.fillStyle="#fff";c.textAlign="center";c.font="700 23px Arial";c.fillText("TOTAL TRIP PRIZE MONEY",W/2,y+40);
+  c.font="800 42px Arial";c.fillText("£"+total.toFixed(2).replace(/\.00$/,""),W/2,y+88);
+  y+=160;c.fillStyle=grey;c.font="700 20px Arial";c.fillText("Thanks for playing — I'm In Golf",W/2,y);
+
+  canvas.toBlob(async blob=>{
+    if(!blob){alert("Couldn't create the Trip Summary image.");return;}
+    const file=new File([blob],"im-in-golf-trip-summary.png",{type:"image/png"});
+    try{
+      if(navigator.canShare&&navigator.canShare({files:[file]})){
+        await navigator.share({title:`I'm In Golf — ${trip.name||"Trip Summary"}`,files:[file]});
+      }else{
+        const url=URL.createObjectURL(blob);
+        const a=document.createElement("a");a.href=url;a.download="im-in-golf-trip-summary.png";a.click();
+        setTimeout(()=>URL.revokeObjectURL(url),1000);
+        alert("Trip Summary image created. You can now share the saved image.");
+      }
+    }catch(err){if(err?.name!=="AbortError")alert("Couldn't share the Trip Summary image. Please try again.");}
+  },"image/png");
 }
 
 function league(){
@@ -3311,7 +3347,19 @@ const tripPlayed=(playerName)=>{
   }).length;
 };
 
-const tripSorted=leagueTrip ? tripAggregate(leagueTrip) : [];
+const tripSorted=[...state.players].sort((a,b)=>{
+  const aPoints=
+    Number(leagueTrip?.standings?.[a.name]||0);
+
+  const bPoints=
+    Number(leagueTrip?.standings?.[b.name]||0);
+
+  if(bPoints!==aPoints){
+    return bPoints-aPoints;
+  }
+
+  return tripPlayed(b.name)-tripPlayed(a.name);
+});
   $("screen").innerHTML=`
 
    <div class="card">
@@ -3438,8 +3486,26 @@ ${leagueTrip ? `
 
 ${tripSorted.map((p,i)=>`
   <div class="player row">
-    <div><b>${i===0 ? "👑 " : ""}${i+1}. ${esc(p.name)}</b><div class="muted">${p.roundScores.map((v,j)=>`R${j+1}: ${v==null?"—":v}`).join(" • ")}</div></div>
-    <div style="text-align:right;"><div class="money">${p.hasNR?"NR":(leagueTrip.competition==="net"?p.total+" net":p.total+" pts")}</div><div style="font-weight:800;">Played ${p.played}/${(leagueTrip.rounds||[]).length}</div></div>
+    <div>
+      <b>
+        ${i===0 && Number(leagueTrip?.standings?.[p.name]||0)>0 ? "👑 " : ""}
+        ${i+1}. ${esc(p.name)}
+      </b>
+
+      <div class="muted">
+        Handicap ${p.handicap}
+      </div>
+    </div>
+
+    <div style="text-align:right;">
+      <div class="money">
+        ${Number(leagueTrip?.standings?.[p.name]||0)} pts
+      </div>
+
+      <div style="font-weight:800;">
+        Played ${tripPlayed(p.name)}
+      </div>
+    </div>
   </div>
 `).join("")}
 
@@ -3550,7 +3616,7 @@ function showPlayerStats(id){
   const p=state.players.find(x=>x.id===id);
 
   if(!p){
-    appAlert("Player not found.");
+    alert("Player not found.");
     return;
   }
 
@@ -3835,12 +3901,12 @@ async function changeMyHandicap(i){
 
  if(p.id!==myPlayerId && !isAdmin)return;
 
- const h=await appPrompt("Enter your new handicap",p.handicap);
+ const h=prompt("Enter your new handicap",p.handicap);
  if(h===null)return;
 
  const newHandicap=Number(h);
 if(!Number.isFinite(newHandicap) || newHandicap < -10 || newHandicap > 60){
-  appAlert("Please enter a valid handicap between -10 and 60.");
+  alert("Please enter a valid handicap between -10 and 60.");
   return;
 }
 p.handicap=newHandicap;
@@ -3877,10 +3943,10 @@ function playerJoinForm(){
 }
 async function addPlayer(){
   const currentMember=state.players.find(p=>p.id===myPlayerId);
-  if(currentMember){appAlert("✅ You're already a member of this group as " + currentMember.name + ".");return;}
+  if(currentMember){alert("✅ You're already a member of this group as " + currentMember.name + ".");return;}
   const details=await playerJoinForm(); if(!details)return;
   const cleanName=details.first+" "+details.surname;
-  if(state.players.some(p=>p.name.trim().toLowerCase()===cleanName.toLowerCase())){appAlert("That name is already in the group. Please choose your existing name.");return;}
+  if(state.players.some(p=>p.name.trim().toLowerCase()===cleanName.toLowerCase())){alert("That name is already in the group. Please choose your existing name.");return;}
   const newPlayer={id:Date.now().toString(36),name:cleanName,handicap:details.handicap,competition:null,paid:false,stableford:null,netScore:null,noReturn:false,scoreSubmitted:false,wins:0,leaguePoints:0,netWinnings:0};
   state.players.push(newPlayer); myPlayerId=newPlayer.id; saveMyPlayerForGroup();
   pendingFirstWelcome=isAdmin?"admin":"player";
@@ -3890,30 +3956,30 @@ async function addPlayer(){
 async function adminAddPlayer(){
   if(!isAdmin || !demoCanEdit())return;
 
-  const firstName=await appPrompt("Player first name:");
+  const firstName=prompt("Player first name:");
   if(firstName===null)return;
 
-  const surname=await appPrompt("Player surname:");
+  const surname=prompt("Player surname:");
   if(surname===null)return;
 
   const cleanName=(firstName.trim()+" "+surname.trim()).trim();
 
   if(!firstName.trim() || !surname.trim()){
-    appAlert("Please enter the player's first name and surname.");
+    alert("Please enter the player's first name and surname.");
     return;
   }
 
   if(state.players.some(p=>p.name.trim().toLowerCase()===cleanName.toLowerCase())){
-    appAlert("That player is already in this group.");
+    alert("That player is already in this group.");
     return;
   }
 
-  const h=await appPrompt("Handicap","18");
+  const h=prompt("Handicap","18");
   if(h===null)return;
 
   const handicap=Number(h);
   if(!Number.isFinite(handicap) || handicap < -10 || handicap > 60){
-    appAlert("Please enter a valid handicap between -10 and 60.");
+    alert("Please enter a valid handicap between -10 and 60.");
     return;
   }
 
@@ -3934,11 +4000,11 @@ async function adminAddPlayer(){
 
   await save();
   render();
-  appAlert("✅ " + cleanName + " added to the group.");
+  alert("✅ " + cleanName + " added to the group.");
 }
 
-async function editPlayer(i){const p=state.players[i];const name=await appPrompt("Player name",p.name);if(!name)return;const h=await appPrompt("Handicap",p.handicap);p.name=name.trim();p.handicap=Number(h)||0;render();await save()}
-async function removePlayer(i){if(!await appConfirm("Remove "+state.players[i].name+"? Their past round history will stay saved."))return;state.players.splice(i,1);render();await save()}
+async function editPlayer(i){const p=state.players[i];const name=prompt("Player name",p.name);if(!name)return;const h=prompt("Handicap",p.handicap);p.name=name.trim();p.handicap=Number(h)||0;render();await save()}
+async function removePlayer(i){if(!confirm("Remove "+state.players[i].name+"? Their past round history will stay saved."))return;state.players.splice(i,1);render();await save()}
 
 
 let isAdmin=false;
@@ -3980,7 +4046,7 @@ function updateAdminUI(){
   }
 
   if(payButton){
-    if(state.gameType==="points" || Number(state.stake||0)<=0 || state.trip?.completed){
+    if(state.gameType==="points"){
       payButton.classList.add("hidden");
 
       if(page==="pay"){
@@ -4000,8 +4066,8 @@ function adminPinForGroup(){
 function validAdminPin(value){
   return /^\d{4}$/.test(String(value||""));
 }
-async function adminLoginFromWaiting(){
- const entered=await appPrompt("Enter Admin PIN");
+function adminLoginFromWaiting(){
+ const entered=prompt("Enter Admin PIN");
  if(entered===null)return;
  if(String(entered).trim()===adminPinForGroup()){
    isAdmin=true;
@@ -4009,12 +4075,12 @@ async function adminLoginFromWaiting(){
    updateAdminUI();
    newRound();
  }else{
-   appAlert("Incorrect Admin PIN");
+   alert("Incorrect Admin PIN");
  }
 }
 
-async function adminLogin(){
- const entered=await appPrompt("Enter Admin PIN");
+function adminLogin(){
+ const entered=prompt("Enter Admin PIN");
  if(entered===null)return;
  if(String(entered).trim()===adminPinForGroup()){
    isAdmin=true;
@@ -4022,33 +4088,33 @@ async function adminLogin(){
    updateAdminUI();
    show("settings");
  }else{
-   appAlert("Incorrect Admin PIN");
+   alert("Incorrect Admin PIN");
  }
 }
 async function changeAdminPin(){
   if(!isAdmin)return;
-  const current=await appPrompt("Enter current Admin PIN");
+  const current=prompt("Enter current Admin PIN");
   if(current===null)return;
   if(String(current).trim()!==adminPinForGroup()){
-    appAlert("Current Admin PIN is incorrect.");
+    alert("Current Admin PIN is incorrect.");
     return;
   }
-  const first=await appPrompt("Choose a new 4-digit Admin PIN");
+  const first=prompt("Choose a new 4-digit Admin PIN");
   if(first===null)return;
   const clean=String(first).trim();
   if(!validAdminPin(clean)){
-    appAlert("Please choose exactly 4 numbers.");
+    alert("Please choose exactly 4 numbers.");
     return;
   }
-  const second=await appPrompt("Enter the new 4-digit PIN again");
+  const second=prompt("Enter the new 4-digit PIN again");
   if(second===null)return;
   if(String(second).trim()!==clean){
-    appAlert("The two PINs did not match.");
+    alert("The two PINs did not match.");
     return;
   }
   state.adminPin=clean;
   const ok=await save();
-  appAlert(ok ? "✅ Admin PIN changed for this golf group." : "The new Admin PIN could not be saved. Please try again.");
+  alert(ok ? "✅ Admin PIN changed for this golf group." : "The new Admin PIN could not be saved. Please try again.");
 }
 function adminLogout(){
  isAdmin=false;
@@ -4062,11 +4128,11 @@ function adminLogout(){
 async function changeGroupName(){
   if(!isAdmin)return;
   const current=String(state.groupName||"").trim();
-  const entered=await appPrompt("Group name", current || "My Golf Group");
+  const entered=prompt("Group name", current || "My Golf Group");
   if(entered===null)return;
   const clean=String(entered).trim();
   if(!clean){
-    appAlert("Please enter a group name.");
+    alert("Please enter a group name.");
     return;
   }
   const previousName=state.groupName;
@@ -4074,28 +4140,28 @@ async function changeGroupName(){
   const ok=await save();
   if(!ok){
     state.groupName=previousName;
-    appAlert("The group name could not be saved. Please try again.");
+    alert("The group name could not be saved. Please try again.");
     return;
   }
   render();
-  appAlert("✅ Group name changed to " + clean);
+  alert("✅ Group name changed to " + clean);
 }
 
 async function changeCurrentRoundCompetition(){
   if(!isAdmin)return;
   if(!roundOpenNow()){
-    appAlert("There is no open round to change.");
+    alert("There is no open round to change.");
     return;
   }
   if(roundLocked()){
-    appAlert("Competition cannot be changed after scoring has started.");
+    alert("Competition cannot be changed after scoring has started.");
     return;
   }
   const current=(state.pointsCompetition||"stableford")==="net" ? "net" : "stableford";
   const next=current==="stableford" ? "net" : "stableford";
   const currentLabel=current==="stableford" ? "Stableford" : "Net";
   const nextLabel=next==="stableford" ? "Stableford" : "Net";
-  if(!await appConfirm(`Change this round from ${currentLabel} to ${nextLabel}?\n\nPlayers, payments, course, date and stake will stay unchanged.`))return;
+  if(!confirm(`Change this round from ${currentLabel} to ${nextLabel}?\n\nPlayers, payments, course, date and stake will stay unchanged.`))return;
   state.pointsCompetition=next;
   // Keep legacy per-player competition data aligned where no score has been submitted.
   state.players.forEach(p=>{
@@ -4104,7 +4170,7 @@ async function changeCurrentRoundCompetition(){
     }
   });
   await save();
-  appAlert(`✅ Competition changed to ${nextLabel}.`);
+  alert(`✅ Competition changed to ${nextLabel}.`);
   settingsPage();
 }
 
@@ -4237,7 +4303,7 @@ function adminHelpBack(){
 
 function adminHelpTopicContent(topic){
   const topics={
-    setup:`<h2>⛳ Set up the next competition</h2><div class="notice"><b>1.</b> Go to <b>Round</b>.<br><br><b>2.</b> Tap <b>Set Up Next Competition</b>.<br><br><b>3.</b> Choose Money Game, Points Game or Trip Mode.<br><br><b>4.</b> Enter the course, date and competition details.<br><br><b>5.</b> In a Money Game, make sure players have paid before scoring starts. The Admin chooses Stableford or Net when setting up the round.</div><div class="notice warning">Once the first score is submitted, entries close automatically.</div>`,
+    setup:`<h2>⛳ Set up the next competition</h2><div class="notice"><b>1.</b> Go to <b>Round</b>.<br><br><b>2.</b> Tap <b>Set Up Next Competition</b>.<br><br><b>3.</b> Choose Money Game, Points Game or Trip Mode.<br><br><b>4.</b> Enter the course, date and competition details.<br><br><b>5.</b> In a Money Game, make sure players pay and choose Stableford or Net before the first score is submitted.</div><div class="notice warning">Once the first score is submitted, entries close automatically.</div>`,
     players:`<h2>👥 Add or edit players</h2><div class="notice">Go to <b>Players</b>.<br><br>Players can join themselves, or the Admin can manage names and handicaps while Admin is unlocked.<br><br>A player can use <b>Change who I am</b> if the wrong name is selected on their phone.</div>`,
     payments:`<h2>💷 Payments</h2><div class="notice">In a Money Game, go to <b>Pay</b> and mark players as paid before scoring starts.<br><br>Only paid players can enter a competition or submit a score.<br><br>Once scoring starts, payment status is locked so nobody can join late.</div><div class="muted">Automatic in-app pot collection is a future feature.</div>`,
     scoring:`<h2>🏌️ Scores</h2><div class="notice">Players enter their own score and tap <b>Submit score</b>.<br><br>The app asks <b>Are you sure?</b> before saving.<br><br>Once submitted, the player's score is locked.</div><div class="notice">Admin can use <b>Correct score</b> if a genuine mistake needs fixing.</div>`,
@@ -4245,7 +4311,7 @@ function adminHelpTopicContent(topic){
     waiting:`<h2>⏳ Still to enter</h2><div class="notice">The Scores screen shows exactly who still needs to submit.<br><br>For a Money Game, only players who are paid and have chosen a competition are included.<br><br>The list updates automatically as scores or NR results are submitted.</div>`,
     finish:`<h2>🏁 Finish a round</h2><div class="notice">When every entered player has submitted a score or valid NR, Admin will see <b>Finish Round & Save Result</b> at the bottom of Scores.<br><br>Check the leaderboard, tap the button and confirm the result.<br><br>The completed round is saved in <b>League → Previous rounds</b>.</div><div class="notice">After a normal round finishes, players see <b>Next Competition — Coming soon…</b> until the Admin sets up the next one.</div>`,
     points:`<h2>🏆 Points Games</h2><div class="notice">Everyone plays the same competition — Stableford or Net.<br><br>There is no payment step.<br><br>The top three receive league points based on the value chosen when the round is set up.</div>`,
-    trip:`<h2>✈️ Trip Mode</h2><div class="notice">Choose <b>Trip Mode</b> when setting up a competition, then enter the trip name and number of rounds.<br><br>Choose <b>Stableford</b> or <b>Net</b> once for the whole trip. Each round is saved and every golfer's actual scores are added together across the trip.<br><br>After the final round, the app shows every day's full leaderboard, overall totals and the Trip winner.</div><div class="notice">The organiser then taps <b>Save Trip & Return to Normal Golf</b>.</div>`,
+    trip:`<h2>✈️ Trip Mode</h2><div class="notice">Choose <b>Trip Mode</b> when setting up a competition, then enter the trip name and number of rounds.<br><br>Each round is saved inside the trip and Trip Championship points build across the trip.<br><br>After the final round, the app shows a Trip Summary with daily winners, final standings and the Trip winner.</div><div class="notice">The organiser then taps <b>Save Trip & Return to Normal Golf</b>.</div>`,
     pin:`<h2>🔐 Admin PIN</h2><div class="notice">Admin can change the PIN in <b>Settings → Change Admin PIN</b>.<br><br>If the Admin PIN is forgotten, the I'm In Golf owner can reset it securely from Owner Controls.</div>`,
     install:`<h2>📱 Install on a phone</h2><div class="notice"><b>iPhone:</b> Safari → <b>•••</b> bottom-right → <b>Share</b> → <b>Add to Home Screen</b>.<br><br><b>Android:</b> Chrome → <b>⋮</b> → <b>Add to Home screen</b> or <b>Install app</b>.</div>`,
     problems:`<h2>🛠️ Something isn't working</h2><div class="notice"><b>1.</b> Check the Group PIN.<br><br><b>2.</b> Refresh or fully close and reopen the app.<br><br><b>3.</b> On a laptop, use <b>Ctrl + F5</b>.<br><br><b>4.</b> Wrong player? Go to <b>Players → Change who I am</b>.<br><br><b>5.</b> Forgotten Admin PIN? Contact the I'm In Golf owner for a reset.</div><div class="muted">The app will not redraw while someone is typing a score.</div>`
@@ -4325,12 +4391,12 @@ function backToManageGroups(){
 
 async function manageGroupsPage(){
   if(!isAdmin || !isOwner || !ownerCreationCode){
-    appAlert("I'm In Golf Owner access required.");
+    alert("I'm In Golf Owner access required.");
     show("settings");
     return;
   }
   if(!db){
-    appAlert("Database connection is not available.");
+    alert("Database connection is not available.");
     return;
   }
 
@@ -4353,7 +4419,7 @@ async function manageGroupsPage(){
     page="settings";
     if(db && !poller) startPolling();
     render();
-    appAlert("Manage Groups is ready in the app, but the Owner database function still needs to be added in Supabase.");
+    alert("Manage Groups is ready in the app, but the Owner database function still needs to be added in Supabase.");
     return;
   }
 
@@ -4441,14 +4507,14 @@ async function manageGroupsPage(){
 async function deleteOwnerGroup(groupPin){
 
   if(!db || !isAdmin || !isOwner || !ownerCreationCode){
-    appAlert("I'm In Golf Owner access required.");
+    alert("I'm In Golf Owner access required.");
     return;
   }
 
   const cleanPin=String(groupPin||"");
 
   if(cleanPin==="1010"){
-    appAlert("🔐 The Owner group cannot be deleted.");
+    alert("🔐 The Owner group cannot be deleted.");
     return;
   }
 
@@ -4457,13 +4523,13 @@ async function deleteOwnerGroup(groupPin){
   );
 
   if(!g){
-    appAlert("Group could not be found.");
+    alert("Group could not be found.");
     return;
   }
 
   const groupName=String(g.group_name||"Unnamed Group");
 
-  const firstConfirm=await appConfirm(
+  const firstConfirm=confirm(
     "🗑️ Delete " + groupName + "?\n\n" +
     "Group PIN: " + cleanPin + "\n\n" +
     "This permanently removes this group and its saved group data.\n\n" +
@@ -4472,7 +4538,7 @@ async function deleteOwnerGroup(groupPin){
 
   if(!firstConfirm)return;
 
-  const typed=await appPrompt(
+  const typed=prompt(
     "Final confirmation\n\n" +
     "Type the Group PIN " + cleanPin + " to permanently delete " + groupName + "."
   );
@@ -4480,7 +4546,7 @@ async function deleteOwnerGroup(groupPin){
   if(typed===null)return;
 
   if(String(typed).trim()!==cleanPin){
-    appAlert("Group PIN did not match. Nothing was deleted.");
+    alert("Group PIN did not match. Nothing was deleted.");
     return;
   }
 
@@ -4493,14 +4559,14 @@ async function deleteOwnerGroup(groupPin){
   );
 
   if(error){
-    appAlert(
+    alert(
       "Group could not be deleted.\n\n" +
       (error.message||"Please try again.")
     );
     return;
   }
 
-  appAlert("✅ " + groupName + " deleted.");
+  alert("✅ " + groupName + " deleted.");
   await manageGroupsPage();
 }
 
@@ -4520,7 +4586,7 @@ function ownerDateInput(value){
 
 function editGroupPage(){
   if(!isAdmin || !isOwner || !ownerCreationCode){
-    appAlert("I'm In Golf Owner access required.");
+    alert("I'm In Golf Owner access required.");
     leaveManageGroups();
     return;
   }
@@ -4528,7 +4594,7 @@ function editGroupPage(){
   const g=ownerGroups.find(x=>String(x.group_pin)===String(ownerEditGroupPin));
 
   if(!g){
-    appAlert("Group details could not be found.");
+    alert("Group details could not be found.");
     manageGroupsPage();
     return;
   }
@@ -4587,34 +4653,34 @@ function editGroupPage(){
 
 async function ownerResetAdminPin(){
   if(!db || !isAdmin || !isOwner || !ownerCreationCode){
-    appAlert("I'm In Golf Owner access required.");
+    alert("I'm In Golf Owner access required.");
     return;
   }
 
   const groupPin=String(ownerEditGroupPin||"");
   if(!groupPin){
-    appAlert("Group could not be identified.");
+    alert("Group could not be identified.");
     return;
   }
 
-  const first=await appPrompt("Choose a new 4-digit Admin PIN for group " + groupPin);
+  const first=prompt("Choose a new 4-digit Admin PIN for group " + groupPin);
   if(first===null)return;
 
   const clean=String(first).trim();
   if(!validAdminPin(clean)){
-    appAlert("Please choose exactly 4 numbers.");
+    alert("Please choose exactly 4 numbers.");
     return;
   }
 
-  const second=await appPrompt("Enter the new 4-digit Admin PIN again");
+  const second=prompt("Enter the new 4-digit Admin PIN again");
   if(second===null)return;
 
   if(String(second).trim()!==clean){
-    appAlert("The two PINs did not match.");
+    alert("The two PINs did not match.");
     return;
   }
 
-  const ok=await appConfirm("Reset the Admin PIN for group " + groupPin + "?");
+  const ok=confirm("Reset the Admin PIN for group " + groupPin + "?");
   if(!ok)return;
 
   const {data,error}=await db.rpc(
@@ -4627,7 +4693,7 @@ async function ownerResetAdminPin(){
   );
 
   if(error || data!==true){
-    appAlert(
+    alert(
       "Admin PIN could not be reset.\n\n" +
       (error?.message || "Please try again.")
     );
@@ -4639,7 +4705,7 @@ async function ownerResetAdminPin(){
     state.adminSetupToken="";
   }
 
-  appAlert("✅ Admin PIN reset for group " + groupPin + ".");
+  alert("✅ Admin PIN reset for group " + groupPin + ".");
 }
 
 async function saveOwnerGroupEdit(){
@@ -4676,11 +4742,11 @@ async function saveOwnerGroupEdit(){
       saveButton.disabled=false;
       saveButton.textContent="💾 Save Changes";
     }
-    appAlert("Group changes could not be saved.\n\n" + (error.message||"Please try again."));
+    alert("Group changes could not be saved.\n\n" + (error.message||"Please try again."));
     return;
   }
 
-  appAlert("✅ Group details updated.");
+  alert("✅ Group details updated.");
   ownerEditGroupPin="";
   await manageGroupsPage();
 }
@@ -4692,19 +4758,19 @@ function formatOwnerDate(value){
   return d.toLocaleDateString("en-GB",{day:"2-digit",month:"2-digit",year:"numeric"});
 }
 
-async function ownerLogin(){
+function ownerLogin(){
   if(!isAdmin){
-    appAlert("Admin access required first.");
+    alert("Admin access required first.");
     return;
   }
 
-  const entered=await appPrompt("Enter your private I'm In Golf owner creation code");
+  const entered=prompt("Enter your private I'm In Golf owner creation code");
   if(entered===null)return;
 
   const clean=entered.trim();
 
   if(!clean){
-    appAlert("Owner creation code is required.");
+    alert("Owner creation code is required.");
     return;
   }
 
@@ -4758,16 +4824,16 @@ function adminInvitePage(){
 }
 
 async function copyAdminInvite(){
-  if(!lastAdminInvite){ appAlert("Create a new group first."); return; }
+  if(!lastAdminInvite){ alert("Create a new group first."); return; }
   try{
     await navigator.clipboard.writeText(lastAdminInvite);
-    appAlert("✅ Admin invite copied.");
+    alert("✅ Admin invite copied.");
   }catch(e){
-    await appPrompt("Copy this Admin invite:",lastAdminInvite);
+    prompt("Copy this Admin invite:",lastAdminInvite);
   }
 }
 async function shareAdminInvite(){
-  if(!lastAdminInvite){ appAlert("Create a new group first."); return; }
+  if(!lastAdminInvite){ alert("Create a new group first."); return; }
   if(navigator.share){
     try{
       await navigator.share({title:"I'm In Golf – Admin Invite",text:lastAdminInvite});
@@ -4782,22 +4848,22 @@ async function shareAdminInvite(){
 async function createNewGolfGroup(){
 
   if(!isAdmin || !isOwner || !ownerCreationCode){
-    appAlert("I'm In Golf Owner access required.");
+    alert("I'm In Golf Owner access required.");
     return;
   }
 
   if(!db){
-    appAlert("Database connection is not available.");
+    alert("Database connection is not available.");
     return;
   }
 
-  const groupName=await appPrompt("New golf group name:");
+  const groupName=prompt("New golf group name:");
   if(groupName===null)return;
 
   const cleanGroupName=groupName.trim();
 
   if(!cleanGroupName){
-    appAlert("Please enter a group name.");
+    alert("Please enter a group name.");
     return;
   }
 
@@ -4829,7 +4895,7 @@ async function createNewGolfGroup(){
     isOwner=false;
     ownerCreationCode="";
     render();
-    appAlert("Owner access was not accepted.\n\nCheck your private owner creation code and try again.");
+    alert("Owner access was not accepted.\n\nCheck your private owner creation code and try again.");
     return;
   }
 
@@ -4845,7 +4911,7 @@ async function createNewGolfGroup(){
   );
 
   if(setupError){
-    appAlert("The group was created, but Admin setup could not be prepared. Please try again before sending the invite.");
+    alert("The group was created, but Admin setup could not be prepared. Please try again before sending the invite.");
     return;
   }
 
@@ -4869,7 +4935,7 @@ https://imingolf.co.uk/app/?pin=${encodeURIComponent(newPin)}&adminsetup=${encod
 
 function competitionReminder(){
 if(roundLocked()){
-    appAlert("🔒 Entries are closed — scoring has started.");
+    alert("🔒 Entries are closed — scoring has started.");
     return;
   }
 
@@ -4877,29 +4943,46 @@ if(roundLocked()){
     .filter(p=>!p.paid)
     .map(p=>p.name);
 
-  if(!notPaid.length){
-    appAlert("Everyone is paid and ready to play.");
+  const noCompetition=state.players
+    .filter(p=>p.paid && !p.competition)
+    .map(p=>p.name);
+
+  if(!notPaid.length && !noCompetition.length){
+    alert("Everyone is paid and entered into a competition.");
     return;
   }
 
-  let message=`⛳ I'm In Golf — Payment Reminder
+  let message=`⛳ I'm In Golf — Competition Reminder
 
 ${state.course}
 ${formatDate(state.date)}
 
-💷 Still to pay:
+`;
+
+  if(notPaid.length){
+    message+=`💷 Still to pay:
 ${notPaid.join(", ")}
 
-Please pay your entry before scoring starts.`;
+`;
+  }
+
+  if(noCompetition.length){
+    message+=`🏆 Still to choose Stableford or Net:
+${noCompetition.join(", ")}
+
+`;
+  }
+
+  message+="Please pay your entry and choose Stableford or Net before scoring starts.";
 
   if(navigator.share){
     navigator.share({
-      title:"I'm In Golf — Payment Reminder",
+      title:"I'm In Golf — Competition Reminder",
       text:message
     });
   }else{
     navigator.clipboard?.writeText(message);
-    appAlert("Payment reminder copied. Paste it into WhatsApp.");
+    alert("Competition reminder copied. Paste it into WhatsApp.");
   }
 }
 function organiserGroupNameSetup(currentName){
@@ -4942,7 +5025,7 @@ function organiserGroupNameSetup(currentName){
     };
     const saveName=()=>{
       const clean=String(input.value||"").trim();
-      if(!clean){appAlert("Please enter a group name.");return;}
+      if(!clean){alert("Please enter a group name.");return;}
       overlay.remove();resolve(clean);
     };
     overlay.querySelector("#setupRenameSave").onclick=saveName;
@@ -5057,15 +5140,15 @@ function organiserPaymentSetup(groupName){
 async function changePaymentLink(){
   if(!isAdmin)return;
   const current=String(state.paymentLink||"");
-  const answer=await appPrompt("Paste the payment link where players should pay you.\n\nPayments go directly to you — I'm In Golf does not receive or hold the money.",current);
+  const answer=prompt("Paste the payment link where players should pay you.\n\nPayments go directly to you — I'm In Golf does not receive or hold the money.",current);
   if(answer===null)return;
   if(!String(answer).trim()){
-    if(current && await appConfirm("Remove the current payment link?")){state.paymentLink="";await save();render();}
+    if(current && confirm("Remove the current payment link?")){state.paymentLink="";await save();render();}
     return;
   }
   const link=normalisePaymentLink(answer);
-  if(!link){appAlert("Please enter a valid payment link beginning with https://");return;}
-  state.paymentLink=link;await save();render();appAlert("✅ Payment link saved.");
+  if(!link){alert("Please enter a valid payment link beginning with https://");return;}
+  state.paymentLink=link;await save();render();alert("✅ Payment link saved.");
 }
 
 function organiserAdminSetupComplete(groupName,groupPin){
@@ -5142,7 +5225,7 @@ function pickTripDate(title,initialValue=""){
       const value=input.value;
 
       if(!value){
-        appAlert("Please choose a date.");
+        alert("Please choose a date.");
         return;
       }
 
@@ -5153,12 +5236,12 @@ function pickTripDate(title,initialValue=""){
 }
 async function cancelCurrentRound(){
   if(!isAdmin){
-    appAlert("🔒 Only the group Admin can cancel the current round.");
+    alert("🔒 Only the group Admin can cancel the current round.");
     return;
   }
 
   if(state.trip?.active){
-    appAlert("Use Cancel Current Trip for an active trip.");
+    alert("Use Cancel Current Trip for an active trip.");
     return;
   }
 
@@ -5175,11 +5258,11 @@ async function cancelCurrentRound(){
     );
 
   if(!hasRoundSetup){
-    appAlert("There is no current round to cancel.");
+    alert("There is no current round to cancel.");
     return;
   }
 
-  if(!await appConfirm(
+  if(!confirm(
     "Cancel the current round?\n\n" +
     "This clears only the current round setup, payments, competition choices and scores.\n\n" +
     "Players, league standings and previous-round history will NOT be deleted."
@@ -5205,11 +5288,11 @@ async function cancelCurrentRound(){
 
   const ok=await save();
   if(!ok){
-    appAlert("The current round could not be cancelled. Please try again.");
+    alert("The current round could not be cancelled. Please try again.");
     return;
   }
 
-  appAlert("✅ Current round cancelled. League and history were kept.");
+  alert("✅ Current round cancelled. League and history were kept.");
   show("round");
 }
 
@@ -5308,7 +5391,7 @@ function normalRoundSetup(selectedType, selectedCompetition){
           </div>
         ` : `
           <label style="display:block;margin:0 0 6px;">Stake per player (£)</label>
-          <input id="normalSetupStake" type="number" min="0" step="1" value="${Number(state.stake||10)}" placeholder="e.g. 10" style="width:100%;margin-bottom:16px;">
+          <input id="normalSetupStake" type="number" min="0" step="0.01" value="" placeholder="Enter stake" style="width:100%;margin-bottom:16px;">
         `}
 
         <div id="normalSetupError" class="notice warning" style="display:none;margin-bottom:12px;"></div>
@@ -5346,20 +5429,21 @@ function tripSetupScreen(){
       <div class="card" style="width:min(720px,100%);margin:18px auto;padding:24px;border-radius:20px;box-shadow:0 18px 50px rgba(0,0,0,.18);">
         <div style="font-size:34px;text-align:center;margin-bottom:6px;">✈️</div>
         <h2 style="margin:0 0 6px;text-align:center;">Set Up Golf Trip</h2>
-        <p class="muted" style="margin:0 0 20px;text-align:center;">Set the trip up once. Everyone enters one golf score each day and I'm In Golf adds the trip totals for you.</p>
+        <p class="muted" style="margin:0 0 20px;text-align:center;">Set up the trip once. Each round will be ready when you get to it.</p>
 
         <label style="display:block;margin:0 0 6px;">Trip name</label>
-        <input id="tripSetupName" type="text" value="Golf Trip" style="width:100%;margin-bottom:14px;">
-        <label style="display:block;margin:0 0 6px;">Number of rounds</label>
-        <input id="tripSetupRounds" type="number" min="1" max="12" step="1" value="3" style="width:100%;margin-bottom:16px;">
+        <input id="tripSetupName" type="text" value="${String(state.trip?.name||'Golf Trip').replace(/"/g,'&quot;')}" style="width:100%;margin-bottom:14px;">
 
-        <div style="margin-bottom:8px;font-weight:800;">Trip scoring</div>
-        <div class="muted" style="margin-bottom:10px;">Choose once for the whole trip.</div>
+        <label style="display:block;margin:0 0 6px;">Number of rounds</label>
+        <input id="tripSetupRounds" type="number" min="1" max="12" step="1" value="${Number(state.trip?.totalRounds||3)}" style="width:100%;margin-bottom:16px;">
+
+        <div style="margin-bottom:8px;font-weight:800;">Trip Championship</div>
+        <div class="muted" style="margin-bottom:10px;">Choose the scoring used for the overall trip standings. The same scoring is used for each trip round so players only enter one score.</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
           <button id="tripCompStableford" class="primary">🏆 Stableford</button>
           <button id="tripCompNet" class="secondary">⛳ Net</button>
         </div>
-        <div id="tripScoringHelp" class="notice" style="margin-bottom:18px;"><b>🏆 Stableford Trip</b><br>Each day's Stableford points are added together. Highest total wins the trip.</div>
+        <div class="notice" style="margin-bottom:18px;"><b>🏆 Trip Championship points</b><br>🥇 1st — 10 pts&nbsp;&nbsp; 🥈 2nd — 6 pts&nbsp;&nbsp; 🥉 3rd — 3 pts</div>
 
         <div id="tripRoundsWrap"></div>
         <div id="tripSetupError" class="notice warning" style="display:none;margin:10px 0 12px;"></div>
@@ -5367,53 +5451,107 @@ function tripSetupScreen(){
         <button id="tripSetupCancel" class="secondary" style="width:100%;">Cancel</button>
       </div>`;
     document.body.appendChild(overlay);
-    let tripCompetition="stableford", drafts=[];
-    const roundsInput=overlay.querySelector('#tripSetupRounds'), wrap=overlay.querySelector('#tripRoundsWrap'), err=overlay.querySelector('#tripSetupError');
-    const readExisting=()=>{ [...wrap.querySelectorAll('[data-trip-round]')].forEach(card=>{ const i=+card.dataset.tripRound; drafts[i]={course:card.querySelector('[data-course]')?.value||'',date:card.querySelector('[data-date]')?.value||'',stake:Number(card.querySelector('[data-stake]')?.value||0)}; }); };
-    const setTripComp=comp=>{
+
+    let tripCompetition='stableford';
+    let drafts=[];
+    const roundsInput=overlay.querySelector('#tripSetupRounds');
+    const wrap=overlay.querySelector('#tripRoundsWrap');
+    const err=overlay.querySelector('#tripSetupError');
+    const setTripComp=(comp)=>{
       tripCompetition=comp;
       overlay.querySelector('#tripCompStableford').className=comp==='stableford'?'primary':'secondary';
       overlay.querySelector('#tripCompNet').className=comp==='net'?'primary':'secondary';
-      overlay.querySelector('#tripScoringHelp').innerHTML=comp==='net'?'<b>⛳ Net Trip</b><br>Each day\'s net score is added together. Lowest total wins the trip.':'<b>🏆 Stableford Trip</b><br>Each day\'s Stableford points are added together. Highest total wins the trip.';
       renderRounds();
     };
+    const readExisting=()=>{
+      [...wrap.querySelectorAll('[data-trip-round]')].forEach(card=>{
+        const i=Number(card.dataset.tripRound);
+        drafts[i]=drafts[i]||{};
+        drafts[i].course=card.querySelector('[data-course]')?.value||'';
+        drafts[i].date=card.querySelector('[data-date]')?.value||'';
+        drafts[i].stake=Number(card.querySelector('[data-stake]')?.value||0);
+        drafts[i].gameType=card.dataset.gameType||'money';
+      });
+    };
     function renderRounds(){
-      readExisting(); const count=Math.max(1,Math.min(12,Number(roundsInput.value||1))); wrap.innerHTML='';
+      readExisting();
+      const count=Math.max(1,Math.min(12,Number(roundsInput.value||1)));
+      wrap.innerHTML='';
       for(let i=0;i<count;i++){
-        const d=drafts[i]||{course:'',date:'',stake:0}; drafts[i]=d;
-        const card=document.createElement('div'); card.dataset.tripRound=i; card.className='notice'; card.style.cssText='margin:0 0 14px;padding:16px;';
-        card.innerHTML=`<div style="font-weight:900;font-size:17px;margin-bottom:12px;">Round ${i+1}</div>
-          <label style="display:block;margin:0 0 5px;">Course</label><input data-course type="text" value="${String(d.course||'').replace(/"/g,'&quot;')}" placeholder="Course" style="width:100%;margin-bottom:10px;">
-          <label style="display:block;margin:0 0 5px;">Date</label><input data-date type="date" value="${d.date||''}" style="width:100%;margin-bottom:10px;">
-          <div style="margin-bottom:10px;"><b>Scoring:</b> ${tripCompetition==='net'?'⛳ Net':'🏆 Stableford'}</div>
-          <label style="display:block;margin:0 0 5px;">Daily stake per player (£) <span class="muted">— optional</span></label>
-          <input data-stake type="number" min="0" step="1" value="${Number(d.stake||0)||''}" placeholder="No stake" style="width:100%;">`;
+        const d=drafts[i]||{course:'',date:'',stake:'',gameType:i===0?'money':'money'};
+        drafts[i]=d;
+        const card=document.createElement('div');
+        card.dataset.tripRound=i;
+        card.dataset.gameType=d.gameType||'money';
+        card.className='notice';
+        card.style.cssText='margin:0 0 14px;padding:16px;';
+        card.innerHTML=`
+          <div style="font-weight:900;font-size:17px;margin-bottom:12px;">Round ${i+1}</div>
+          <label style="display:block;margin:0 0 5px;">Course</label>
+          <input data-course type="text" value="${String(d.course||'').replace(/"/g,'&quot;')}" placeholder="Course" style="width:100%;margin-bottom:10px;">
+          <label style="display:block;margin:0 0 5px;">Date</label>
+          <input data-date type="date" value="${d.date||''}" style="width:100%;margin-bottom:10px;">
+          <div style="font-weight:700;margin-bottom:6px;">Game</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+            <button type="button" data-money class="${card.dataset.gameType==='money'?'primary':'secondary'}">💷 Money Game</button>
+            <button type="button" data-points class="${card.dataset.gameType==='points'?'primary':'secondary'}">🏆 Points Game</button>
+          </div>
+          <div style="margin-bottom:10px;"><b>Competition:</b> ${tripCompetition==='net'?'⛳ Net':'🏆 Stableford'}</div>
+          <div data-stake-wrap style="${card.dataset.gameType==='money'?'':'display:none;'}">
+            <label style="display:block;margin:0 0 5px;">Stake per player (£)</label>
+            <input data-stake type="number" min="0" step="0.01" value="${d.stake==='' ? '' : (Number.isFinite(Number(d.stake)) ? Number(d.stake) : '')}" placeholder="Enter stake" style="width:100%;">
+          </div>`;
         wrap.appendChild(card);
+        const money=card.querySelector('[data-money]');
+        const points=card.querySelector('[data-points]');
+        const stakeWrap=card.querySelector('[data-stake-wrap]');
+        const setGame=g=>{
+          card.dataset.gameType=g; drafts[i].gameType=g;
+          money.className=g==='money'?'primary':'secondary';
+          points.className=g==='points'?'primary':'secondary';
+          stakeWrap.style.display=g==='money'?'':'none';
+        };
+        money.onclick=()=>setGame('money');
+        points.onclick=()=>setGame('points');
       }
     }
     roundsInput.addEventListener('change',renderRounds);
     overlay.querySelector('#tripCompStableford').onclick=()=>setTripComp('stableford');
     overlay.querySelector('#tripCompNet').onclick=()=>setTripComp('net');
-    const finish=value=>{overlay.remove();resolve(value)};
+    const finish=value=>{ overlay.remove(); resolve(value); };
     overlay.querySelector('#tripSetupCancel').onclick=()=>finish(null);
     overlay.querySelector('#tripSetupStart').onclick=()=>{
-      readExisting(); const name=overlay.querySelector('#tripSetupName').value.trim(), totalRounds=Number(roundsInput.value); let msg=''; const rounds=[];
-      if(!name)msg='Please enter a trip name.'; else if(!Number.isInteger(totalRounds)||totalRounds<1||totalRounds>12)msg='Please enter a valid number of rounds.';
-      if(!msg)for(let i=0;i<totalRounds;i++){
-        const card=wrap.querySelector(`[data-trip-round="${i}"]`), course=card?.querySelector('[data-course]')?.value.trim()||'', date=card?.querySelector('[data-date]')?.value||'', stake=Number(card?.querySelector('[data-stake]')?.value||0);
-        if(!course){msg=`Please enter the course for Round ${i+1}.`;break} if(!date){msg=`Please choose the date for Round ${i+1}.`;break} if(!Number.isFinite(stake)||stake<0){msg=`Please enter a valid stake for Round ${i+1}.`;break}
-        rounds.push({course,date,gameType:'money',competition:tripCompetition,stake});
+      readExisting();
+      const name=overlay.querySelector('#tripSetupName').value.trim();
+      const totalRounds=Number(roundsInput.value);
+      let msg='';
+      if(!name) msg='Please enter a trip name.';
+      else if(!Number.isInteger(totalRounds)||totalRounds<1||totalRounds>12) msg='Please enter a valid number of rounds.';
+      const rounds=[];
+      if(!msg){
+        for(let i=0;i<totalRounds;i++){
+          const card=wrap.querySelector(`[data-trip-round="${i}"]`);
+          const course=card?.querySelector('[data-course]')?.value.trim()||'';
+          const date=card?.querySelector('[data-date]')?.value||'';
+          const gameType=card?.dataset.gameType||'money';
+          const stake=gameType==='money'?Number(card?.querySelector('[data-stake]')?.value||0):0;
+          if(!course){ msg=`Please enter the course for Round ${i+1}.`; break; }
+          if(!date){ msg=`Please choose the date for Round ${i+1}.`; break; }
+          if(gameType==='money' && (!Number.isFinite(stake)||stake<0)){ msg=`Please enter a valid stake for Round ${i+1}.`; break; }
+          rounds.push({course,date,gameType,competition:tripCompetition,stake});
+        }
       }
-      if(msg){err.textContent=msg;err.style.display='block';return}
-      finish({name,totalRounds,competition:tripCompetition,rounds});
+      if(msg){ err.textContent=msg; err.style.display='block'; return; }
+      finish({name,totalRounds,competition:tripCompetition,tripPointsValue:10,rounds});
     };
-    overlay.addEventListener('click',e=>{if(e.target===overlay)finish(null)}); renderRounds();
+    overlay.addEventListener('click',e=>{ if(e.target===overlay) finish(null); });
+    renderRounds();
   });
 }
 
 async function newRound(){
   if(!isAdmin){
-    appAlert("🔒 Only the group Admin can set up the next competition.");
+    alert("🔒 Only the group Admin can set up the next competition.");
     return;
   }
 
@@ -5430,6 +5568,7 @@ async function newRound(){
       totalRounds:setup.totalRounds,
       currentRound:1,
       competition:setup.competition,
+      tripPointsValue:10,
       plan:setup.rounds,
       normalRoundBackup:{
         course:state.course,
@@ -5452,8 +5591,8 @@ async function newRound(){
     state.roundOpen=true;
     state.course=first.course;
     state.date=first.date;
-    state.gameType="money";
-    state.stake=Number(first.stake||0);
+    state.gameType=first.gameType;
+    state.stake=first.gameType==='money'?Number(first.stake||0):0;
     state.pointsCompetition=setup.competition;
     state.pointsValue=10;
     state.players.forEach(p=>{
@@ -5487,7 +5626,7 @@ async function newRound(){
 async function nextTripRound(){
 
   if(!state.trip?.active){
-    appAlert("There is no active trip.");
+    alert("There is no active trip.");
     return;
   }
 
@@ -5499,8 +5638,8 @@ async function nextTripRound(){
     state.roundOpen=true;
     state.course=plannedRound.course || "";
     state.date=plannedRound.date || "";
-    state.gameType="money";
-    state.stake=Number(plannedRound.stake||0);
+    state.gameType=plannedRound.gameType || "money";
+    state.stake=state.gameType==="money" ? Number(plannedRound.stake||0) : 0;
     state.pointsCompetition=state.trip.competition || plannedRound.competition || "stableford";
     state.pointsValue=10;
     state.players.forEach(p=>{
@@ -5517,7 +5656,7 @@ async function nextTripRound(){
   }
 
   // Trip Round course
-  const tripCourse=await appPrompt(
+  const tripCourse=prompt(
     "Round " + roundNumber + " course",
     ""
   );
@@ -5525,7 +5664,7 @@ async function nextTripRound(){
   if(tripCourse===null)return;
 
   if(!tripCourse.trim()){
-    appAlert("Please enter the Round " + roundNumber + " course.");
+    alert("Please enter the Round " + roundNumber + " course.");
     return;
   }
 // Trip Round date
@@ -5535,25 +5674,98 @@ const tripDate=await pickTripDate(
 
 if(tripDate===null)return;
 
-    const stakeAnswer=await appPrompt(
-      "Daily stake per player (£) — optional",
-      "0"
-    );
-    if(stakeAnswer===null)return;
-    const tripStake=Number(stakeAnswer||0);
-    if(!Number.isFinite(tripStake) || tripStake<0){
-      appAlert("Please enter a valid stake, or 0 for no stake.");
-      return;
-    }
+    const game=prompt(
+    "✈️ " + state.trip.name +
+    "\nRound " + roundNumber + " of " + state.trip.totalRounds +
+    "\n\nChoose Game Type:\n\n" +
+    "1. 💷 Money Game\n" +
+    "2. 🏆 Points Game\n\n" +
+    "Enter 1 or 2"
+  );
 
-    state.trip.active=true;
-    state.trip.completed=false;
-    state.roundOpen=true;
-    state.course=tripCourse.trim();
-    state.date=tripDate.trim();
-    state.gameType="money";
-    state.stake=tripStake;
-    state.pointsCompetition=state.trip.competition || "stableford";
+  if(game===null)return;
+
+  if(game!=="1" && game!=="2"){
+    alert("Please enter 1 for Money Game or 2 for Points Game.");
+    return;
+  }
+
+  const selectedType=
+    game==="2" ? "points" : "money";
+
+  const competition=prompt(
+    "Choose Trip Championship Competition:\n\n" +
+    "1. 🏆 Stableford\n" +
+    "2. ⛳ Net\n\n" +
+    "Enter 1 or 2"
+  );
+
+  if(competition===null)return;
+
+  if(competition!=="1" && competition!=="2"){
+    alert("Please enter 1 for Stableford or 2 for Net.");
+    return;
+  }
+
+  const selectedCompetition=
+    competition==="1" ? "stableford" : "net";
+
+  const points=prompt(
+    "How many Trip Championship points is Round " +
+    roundNumber +
+    " worth to the winner?",
+    Number(state.trip.tripPointsValue||10)
+  );
+
+  if(points===null)return;
+
+  const tripPointsValue=Number(points);
+
+  if(!Number.isFinite(tripPointsValue) || tripPointsValue<=0){
+    alert("Please enter a valid Trip points value.");
+    return;
+  }
+
+  const second=Math.round(tripPointsValue*0.6);
+  const third=Math.round(tripPointsValue*0.3);
+
+  const message=
+    "✈️ " + state.trip.name +
+    "\n\nRound " + roundNumber +
+    " of " + state.trip.totalRounds +
+    "\n" + tripCourse.trim() +
+    "\n" + tripDate.trim() +
+    "\n\n" +
+    (selectedType==="points"
+      ? "🏆 Points Game"
+      : "💷 Money Game") +
+    "\n" +
+    (selectedCompetition==="stableford"
+      ? "🏆 Stableford"
+      : "⛳ Net") +
+    "\n\nTrip Championship Points:" +
+    "\n🥇 " + tripPointsValue + " pts" +
+    "\n🥈 " + second + " pts" +
+    "\n🥉 " + third + " pts" +
+    "\n\nStart this round?";
+
+  if(!confirm(message))return;
+
+  state.trip.active=true;
+  state.trip.completed=false;
+  state.roundOpen=true;
+  state.course=tripCourse.trim();
+  state.date=tripDate.trim();
+
+  state.gameType=selectedType;
+
+  state.trip.competition=selectedCompetition;
+  state.trip.tripPointsValue=tripPointsValue;
+
+  if(selectedType==="points"){
+    state.pointsCompetition=selectedCompetition;
+    state.pointsValue=tripPointsValue;
+  }
 
   state.players.forEach(p=>{
     p.paid=false;
@@ -5572,7 +5784,7 @@ async function deletePastTrip(){
   const pastTrips=state.trip?.pastTrips || [];
 
   if(!pastTrips.length){
-    appAlert("There are no past trips to delete.");
+    alert("There are no past trips to delete.");
     return;
   }
 
@@ -5580,7 +5792,7 @@ async function deletePastTrip(){
     (i+1) + ". " + (t.name || "Unnamed Trip")
   ).join("\n");
 
-  const answer=await appPrompt(
+  const answer=prompt(
     "Delete which past trip?\n\n" +
     names +
     "\n\nEnter the trip number."
@@ -5591,13 +5803,13 @@ async function deletePastTrip(){
   const index=Number(answer)-1;
 
   if(index<0 || index>=pastTrips.length){
-    appAlert("Please enter a valid trip number.");
+    alert("Please enter a valid trip number.");
     return;
   }
 
   const tripName=pastTrips[index].name || "Trip";
 
-  if(!await appConfirm(
+  if(!confirm(
     "Delete " + tripName + "?\n\n" +
     "This removes only this past Trip.\n\n" +
     "Normal leagues, players and current round will not be changed."
@@ -5610,18 +5822,18 @@ async function deletePastTrip(){
   await save();
   render();
 
-  appAlert(tripName + " deleted.");
+  alert(tripName + " deleted.");
 }
 async function finishTrip(){
 
   if(!state.trip?.completed){
-    appAlert("The Trip is not complete yet.");
+    alert("The Trip is not complete yet.");
     return;
   }
 
   const tripName=state.trip.name || "Trip";
 
-  if(!await appConfirm(
+  if(!confirm(
     "🏁 Finish " + tripName + "?\n\n" +
     "The completed Trip and final standings will be saved.\n\n" +
     "Your normal round will then be restored."
@@ -5633,7 +5845,7 @@ async function finishTrip(){
     state.trip?.pastTrips?.[0]?.normalRoundBackup;
 
   if(!backup){
-    appAlert(
+    alert(
       "Normal round backup could not be found.\n\n" +
       "The Trip has not been closed."
     );
@@ -5710,7 +5922,7 @@ async function finishTrip(){
   await save();
   show("round");
 
-  appAlert(
+  alert(
     "🏁 " + tripName + " saved.\n\n" +
     "You're ready to set up the next competition."
   );
@@ -5718,13 +5930,13 @@ async function finishTrip(){
 async function cancelTrip(){
 
   if(!state.trip?.active){
-    appAlert("There is no active trip to cancel.");
+    alert("There is no active trip to cancel.");
     return;
   }
 
   const tripName=state.trip.name || "Current Trip";
 
-  if(!await appConfirm(
+  if(!confirm(
     "Cancel " + tripName + "?\n\n" +
     "This will remove the current Trip setup and Trip standings.\n\n" +
     "Your normal Points League, Money League and previous rounds will not be changed."
@@ -5772,16 +5984,16 @@ state.trip={
 await save();
 show("round");
 
-appAlert("Trip cancelled. Your normal round has been restored.");
+alert("Trip cancelled. Your normal round has been restored.");
 }
   async function resetPayments(){
- if(!await appConfirm("Mark everyone unpaid?"))return;
+ if(!confirm("Mark everyone unpaid?"))return;
  state.players.forEach(p=>p.paid=false);
  render();
  await save();
 }
 async function resetScores(){
- if(!await appConfirm("Clear all scores?"))return;
+ if(!confirm("Clear all scores?"))return;
  state.players.forEach(p=>{
    p.stableford=null;
    p.netScore=null;
@@ -5793,7 +6005,7 @@ async function resetScores(){
 }
 async function deleteLastRound(){
   if(!state.history || !state.history.length){
-    appAlert("There are no completed rounds to delete.");
+    alert("There are no completed rounds to delete.");
     return;
   }
 
@@ -5819,7 +6031,7 @@ async function deleteLastRound(){
     "\n\nThis will remove the round and correct the league stats.\n\n" +
     "Are you sure?";
 
-  if(!await appConfirm(deleteMessage))return;
+  if(!confirm(deleteMessage))return;
 
   // Undo winner win
   (lastRound.winners||[]).forEach(name=>{
@@ -5850,10 +6062,10 @@ async function deleteLastRound(){
   render();
   await save();
 
-  appAlert("Last round deleted and league stats corrected.");
+  alert("Last round deleted and league stats corrected.");
 }
 async function clearLeague(){
- if(!await appConfirm(
+ if(!confirm(
   "⚠️ DANGER — PERMANENT DELETION ⚠️\n\n" +
   "Delete the Points League and all Money & Points round history?\n\n" +
   "Past Trips are SAFE.\n\n" +
@@ -5861,7 +6073,7 @@ async function clearLeague(){
   "Press OK for FINAL WARNING."
 ))return;
 
-if(!await appConfirm(
+if(!confirm(
   "🚨 FINAL WARNING 🚨\n\n" +
   "There is NO undo.\n\n" +
   "Past Trips will be kept.\n\n" +
@@ -5879,7 +6091,7 @@ if(!await appConfirm(
  render();
  await save();
 
- appAlert("League and previous round history cleared.");
+ alert("League and previous round history cleared.");
 }
 function copyInvite(){
   const url="https://imingolf.co.uk/app/?pin="+encodeURIComponent(pin);
@@ -5894,65 +6106,8 @@ Tap below to join:
 ${url}`;
 
   navigator.clipboard?.writeText(message);
-  appAlert("Invite copied. Paste it into WhatsApp.");
+  alert("Invite copied. Paste it into WhatsApp.");
 }
-function formatShareDate(d){
- if(!d || !String(d).includes("-"))return d||"";
- const [y,m,day]=String(d).split("-");
- return `${day}/${m}/${y}`;
-}
-function positionLabel(n){
- n=Number(n)||0;
- if(n===1)return "🥇 1";
- if(n===2)return "🥈 2";
- if(n===3)return "🥉 3";
- return String(n);
-}
-function ensureAppMessageLayer(){
- let el=document.getElementById("appMessageLayer");
- if(el)return el;
- el=document.createElement("div");
- el.id="appMessageLayer";
- el.style.cssText="position:fixed;inset:0;z-index:99999;display:none;align-items:center;justify-content:center;padding:22px;background:rgba(8,35,22,.48);backdrop-filter:blur(2px)";
- el.innerHTML=`<div style="width:min(430px,100%);background:#fff;border-radius:22px;box-shadow:0 20px 60px rgba(0,0,0,.25);overflow:hidden;border:1px solid #dfe9e3">
-   <div style="background:#126b3a;color:#fff;padding:18px 22px;text-align:center;font-weight:900;font-size:20px;">I'M IN GOLF</div>
-   <div id="appMessageText" style="padding:24px 22px 18px;white-space:pre-line;text-align:center;line-height:1.45;font-size:17px;color:#183326"></div>
-   <div style="padding:0 22px 22px"><button class="primary full" onclick="closeAppAlert()">OK</button></div>
- </div>`;
- document.body.appendChild(el);
- return el;
-}
-function appModalBase({title="I'm In Golf",message="",input=false,value="",placeholder="",confirmText="OK",cancelText="Cancel",showCancel=false,inputType="text"}={}){
- return new Promise(resolve=>{
-   const overlay=document.createElement("div");
-   overlay.style.cssText="position:fixed;inset:0;z-index:100000;display:flex;align-items:center;justify-content:center;padding:22px;background:rgba(8,35,22,.48);backdrop-filter:blur(2px)";
-   overlay.innerHTML=`<div style="width:min(430px,100%);background:#fff;border-radius:22px;box-shadow:0 20px 60px rgba(0,0,0,.25);overflow:hidden;border:1px solid #dfe9e3">
-     <div style="background:#126b3a;color:#fff;padding:18px 22px;text-align:center;font-weight:900;font-size:20px;">I'M IN GOLF</div>
-     <div style="padding:23px 22px 12px;text-align:center"><div style="font-size:21px;font-weight:900;color:#183326;margin-bottom:10px">${esc(title)}</div><div style="white-space:pre-line;line-height:1.45;font-size:16px;color:#42594d">${esc(message)}</div></div>
-     ${input?`<div style="padding:5px 22px 12px"><input id="appModalInput" type="${escAttr(inputType)}" value="${escAttr(value)}" placeholder="${escAttr(placeholder)}" style="width:100%;font-size:18px"></div>`:""}
-     <div style="padding:8px 22px 22px;display:grid;gap:9px"><button class="primary full" id="appModalConfirm">${esc(confirmText)}</button>${showCancel?`<button class="secondary full" id="appModalCancel">${esc(cancelText)}</button>`:""}</div>
-   </div>`;
-   document.body.appendChild(overlay);
-   const inp=overlay.querySelector("#appModalInput");
-   const done=v=>{overlay.remove();resolve(v)};
-   overlay.querySelector("#appModalConfirm").onclick=()=>done(input?(inp?.value??""):true);
-   overlay.querySelector("#appModalCancel")?.addEventListener("click",()=>done(input?null:false));
-   inp?.addEventListener("keydown",e=>{if(e.key==="Enter")done(inp.value);if(e.key==="Escape")done(null)});
-   setTimeout(()=>{if(inp){inp.focus();inp.select();}},20);
- });
-}
-function modalParts(text){
- const raw=String(text??""); const parts=raw.split(/\n\n/); const title=(parts.shift()||"I'm In Golf").trim(); return {title,message:parts.join("\n\n").trim()};
-}
-async function appConfirm(message){const p=modalParts(message);return appModalBase({title:p.title,message:p.message,confirmText:"Yes",cancelText:"Cancel",showCancel:true});}
-async function appPrompt(message,value=""){const p=modalParts(message);return appModalBase({title:p.title,message:p.message,input:true,value:value??"",confirmText:"Continue",cancelText:"Cancel",showCancel:true});}
-function appAlert(message){
- const el=ensureAppMessageLayer();
- const text=document.getElementById("appMessageText");
- if(text)text.textContent=String(message??"");
- el.style.display="flex";
-}
-function closeAppAlert(){const el=document.getElementById("appMessageLayer");if(el)el.style.display="none";}
 function formatDate(d){
  if(!d || !d.includes("-"))return d;
  const [y,m,day]=d.split("-");
