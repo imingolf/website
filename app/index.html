@@ -214,11 +214,11 @@ let leagueView="points";
 let selectedPastTripIndex=0;
 
 function demoReadOnly(){
-  return pin==="2026" && !isAdmin;
+  return pin==="2026";
 }
 function demoCanEdit(){
   if(demoReadOnly()){
-    alert("👀 Demo Mode\n\nHave a look around. Changes are disabled in the demo.");
+    showAppToast("👀 Demo Mode","Have a look around. Changes are disabled in the demo.",3200);
     return false;
   }
   return true;
@@ -982,9 +982,10 @@ function showTripSummary(){
         <div class="notice">
           The organiser will close and archive the completed trip.
         </div>
+        ${demoReadOnly() ? "" : `
         <button class="ghost full" onclick="adminLogin()">
           🔐 Organiser / Admin
-        </button>
+        </button>`}
       </div>
     `}
   `;
@@ -1170,7 +1171,7 @@ $("screen").innerHTML=`
 
   <div class="card">
     <button class="secondary full" onclick="shareApp()">📤 Share I'm In Golf</button>
-    <button class="ghost full" onclick="adminLogin()">🔐 Admin Login</button>
+    ${demoReadOnly() ? "" : `<button class="ghost full" onclick="adminLogin()">🔐 Admin Login</button>`}
   </div>`;
 }
 function shareApp(){
@@ -3955,9 +3956,10 @@ function playersPage(){
      🔄 Change who I am
    </button>
 
+   ${demoReadOnly() ? "" : `
    <button class="secondary full" onclick="switchGolfGroup()">
      🔁 Switch Golf Group
-   </button>
+   </button>`}
 
    ${sortedPlayers.map(p=>{
 
@@ -4001,6 +4003,10 @@ function changeMyPlayer(){
 }
 
 function switchGolfGroup(){
+  if(demoReadOnly()){
+    showAppToast("👀 Demo Mode","Switching groups is disabled in the demo.",3200);
+    return;
+  }
   clearInterval(poller);
   poller=null;
   isAdmin=false;
@@ -4136,7 +4142,7 @@ function adminSessionKey(groupPin){
 }
 
 function loadAdminForGroup(){
-  isAdmin=!!pin && sessionStorage.getItem(adminSessionKey(pin))==="yes";
+  isAdmin=pin!=="2026" && !!pin && sessionStorage.getItem(adminSessionKey(pin))==="yes";
   if(!isAdmin){
     isOwner=false;
     ownerCreationCode="";
@@ -4189,6 +4195,10 @@ function validAdminPin(value){
   return /^\d{4}$/.test(String(value||""));
 }
 function adminLoginFromWaiting(){
+ if(demoReadOnly()){
+   showAppToast("👀 Demo Mode","Admin access is disabled in the demo.",3200);
+   return;
+ }
  const entered=prompt("Enter Admin PIN");
  if(entered===null)return;
  if(String(entered).trim()===adminPinForGroup()){
@@ -4202,6 +4212,10 @@ function adminLoginFromWaiting(){
 }
 
 function adminLogin(){
+ if(demoReadOnly()){
+   showAppToast("👀 Demo Mode","Admin access is disabled in the demo.",3200);
+   return;
+ }
  const entered=prompt("Enter Admin PIN");
  if(entered===null)return;
  if(String(entered).trim()===adminPinForGroup()){
