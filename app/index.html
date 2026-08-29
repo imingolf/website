@@ -1389,7 +1389,10 @@ function scores(){
   // Admin still sees and can manage the full field.
   const scorePlayers=isAdmin
     ? sortedPlayers
-    : sortedPlayers.filter(p=>p.id===myPlayerId);
+    : sortedPlayers.filter(p=>
+        p.id===myPlayerId &&
+        (!roundLocked() || eligiblePlayers.some(ep=>ep.id===p.id))
+      );
 
   const stablefordRanked=[...state.players]
     .filter(p=>
@@ -1418,35 +1421,38 @@ function scores(){
     <div class="card">
       <h2>🏌️ Scores</h2>
 
-      ${isPointsGame ? `
-        <div class="notice">
-          <b>🏆 POINTS GAME — ${pointsComp==="stableford" ? "STABLEFORD" : "NET"}</b><br>
-          Everyone plays the same competition.
-        </div>
-      ` : `
-        <div class="notice">
-          <b>${pointsComp==="stableford" ? "🏆 STABLEFORD" : "⛳ NET"}</b><br>
-          Your Group Admin chose the competition for everyone.
-        </div>
-        ${Number(state.stake||0)>0 ? `<div class="notice">💷 Only paid players are eligible to win the pot.</div>` : ""}
-      `}
-
       ${roundLocked() ? `
-        <div class="notice warning">
-          🔒 <b>Scoring has started. Entries are closed.</b>
-        </div>
-      ` : ""}
+        ${eligiblePlayers.length ? `
+          <div class="notice ${stillToEnter.length ? "warning" : ""}">
+            ${stillToEnter.length
+              ? `<b>⏳ Still to enter — ${stillToEnter.length}</b><br>${stillToEnter.map(p=>esc(p.name)).join(" • ")}`
+              : `<b>✅ All scores are in</b>${!isAdmin ? `<br><span class="muted">Waiting for the Group Admin to finish the round.</span>` : ``}`
+            }
+          </div>
+        ` : ""}
+      ` : `
+        ${isPointsGame ? `
+          <div class="notice">
+            <b>🏆 POINTS GAME — ${pointsComp==="stableford" ? "STABLEFORD" : "NET"}</b><br>
+            Everyone plays the same competition.
+          </div>
+        ` : `
+          <div class="notice">
+            <b>${pointsComp==="stableford" ? "🏆 STABLEFORD" : "⛳ NET"}</b><br>
+            Your Group Admin chose the competition for everyone.
+          </div>
+          ${Number(state.stake||0)>0 ? `<div class="notice">💷 Only paid players are eligible to win the pot.</div>` : ""}
+        `}
 
-      ${eligiblePlayers.length ? `
-        <div class="notice ${stillToEnter.length ? "warning" : ""}">
-          ${stillToEnter.length
-            ? (isAdmin
-                ? `<b>⏳ Still to enter (${stillToEnter.length})</b><br>${stillToEnter.map(p=>esc(p.name)).join(", ")}`
-                : `<b>⏳ ${stillToEnter.length} score${stillToEnter.length===1?"":"s"} still to enter</b>`)
-            : `<b>✅ All entered players have submitted.</b>${!isAdmin ? `<br><span class="muted">⏳ Waiting for the Group Admin to finish the round.</span>` : ``}`
-          }
-        </div>
-      ` : ""}
+        ${eligiblePlayers.length ? `
+          <div class="notice ${stillToEnter.length ? "warning" : ""}">
+            ${stillToEnter.length
+              ? `<b>⏳ ${stillToEnter.length} score${stillToEnter.length===1?"":"s"} still to enter</b>`
+              : `<b>✅ All entered players have submitted.</b>`
+            }
+          </div>
+        ` : ""}
+      `}
 
       ${scorePlayers.map(p=>{
 
@@ -1468,9 +1474,11 @@ function scores(){
             <div style="margin-top:10px;">
 
               ${!isPointsGame && Number(state.stake||0)>0 && !p.paid ? `
-                <div class="notice warning">
-                  💷 <b>Pay before entering the competition or a score.</b>
-                </div>
+                ${roundLocked() ? `` : `
+                  <div class="notice warning">
+                    💷 <b>Pay before entering the competition or a score.</b>
+                  </div>
+                `}
               ` : isSubmitted ? `
                 <div class="notice">
                   ✅ <b>Score submitted</b><br>
