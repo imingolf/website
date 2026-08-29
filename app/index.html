@@ -44,6 +44,35 @@ nav button{flex:1;background:transparent;color:#6d756f;padding:11px 2px;font-siz
 @media (max-width:600px) and (orientation:portrait){#openingSplash .opening-brand{font-size:64px}}
 @media (prefers-reduced-motion:reduce){#openingSplash{transition:none}}
 
+
+/* Mobile polish pass — presentation only; app logic and opening animation remain unchanged */
+button{
+  min-height:44px;
+  touch-action:manipulation;
+  -webkit-tap-highlight-color:transparent;
+}
+.small{min-height:40px}
+@media (max-width:600px){
+  .muted{font-size:14px;line-height:1.4}
+  .notice{font-size:14px;line-height:1.4}
+  .pill{font-size:13px}
+  nav button{min-height:48px}
+  .pay-sticky,.finish-sticky{bottom:calc(76px + env(safe-area-inset-bottom))}
+  .pay-screen-spacer,.finish-screen-spacer{height:88px}
+  #setupOverlay{
+    padding-top:calc(22px + env(safe-area-inset-top));
+    padding-bottom:calc(22px + env(safe-area-inset-bottom));
+  }
+}
+@media (max-width:350px){
+  .grid2{grid-template-columns:1fr}
+  main{padding-left:10px;padding-right:10px}
+  .card{padding:14px}
+}
+@media (max-height:650px){
+  #setupOverlay{padding-top:12px;padding-bottom:12px}
+}
+
 </style>
 </head>
 <body>
