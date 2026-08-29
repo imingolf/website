@@ -33,83 +33,94 @@ nav button{flex:1;background:transparent;color:#6d756f;padding:11px 2px;font-siz
 #setupOverlay{position:fixed;inset:0;background:#f4f6f3;z-index:50;display:flex;align-items:flex-start;justify-content:center;padding:45px 16px;overflow:auto}
 .setup{width:min(480px,100%)}.hidden{display:none!important}
 
+
 /* ===== I'm In Golf opening animation ===== */
 #launchSplash{
   position:fixed;inset:0;z-index:200000;
   display:flex;align-items:center;justify-content:center;
-  background:#f7f5ed;
-  color:#0b3d24;padding:24px;
-  transition:opacity .14s ease,visibility .14s ease;
+  background:#f6f1e7;
+  color:#0f5a32;padding:24px;
+  transition:opacity .22s ease,visibility .22s ease;
 }
 #launchSplash.splash-hide{opacity:0;visibility:hidden;pointer-events:none}
 .launch-inner{width:min(390px,100%);text-align:center}
-.launch-title{font-size:34px;font-weight:900;letter-spacing:-.5px;color:#0b3d24}
-.launch-tag{display:none}
-.launch-scene{
-  position:relative;width:280px;height:116px;margin:24px auto 0;
+.launch-brand{
+  font-size:30px;font-weight:900;letter-spacing:.2px;
+  color:#0f5a32;margin-bottom:10px
 }
-.launch-ground{
-  position:absolute;left:18px;right:18px;bottom:20px;height:4px;
-  border-radius:999px;background:#9bbb72;
+.launch-scene{
+  position:relative;width:300px;height:150px;margin:0 auto;
+}
+.launch-hills,
+.launch-hills:before,
+.launch-hills:after{
+  position:absolute;content:"";border-radius:50% 50% 0 0;
+}
+.launch-hills{
+  left:0;right:0;bottom:14px;height:48px;background:#7fae58;
+}
+.launch-hills:before{
+  width:190px;height:52px;left:-12px;bottom:0;background:#9bc46d;
+}
+.launch-hills:after{
+  width:190px;height:44px;right:-10px;bottom:0;background:#5f9348;
 }
 .launch-tee{
-  position:absolute;left:58px;bottom:21px;width:3px;height:13px;
-  border-radius:2px;background:#f7d07a;
+  position:absolute;left:69px;bottom:38px;width:3px;height:18px;
+  border-radius:3px;background:#0f5a32;
 }
 .launch-ball{
-  position:absolute;left:52px;bottom:32px;width:14px;height:14px;
-  border-radius:50%;background:#fff;
-  box-shadow:0 2px 7px rgba(0,0,0,.25);
-  animation:iigBallFlight .50s cubic-bezier(.18,.8,.32,1) .18s both;
+  position:absolute;left:61px;bottom:52px;width:17px;height:17px;
+  border-radius:50%;background:#fff;border:1px solid #d7d2c8;
+  box-shadow:0 1px 3px rgba(0,0,0,.12);
+  animation:iigBallFlight .62s cubic-bezier(.2,.72,.28,1) .43s both;
 }
 .launch-club{
-  position:absolute;left:48px;bottom:31px;width:4px;height:62px;
-  border-radius:5px;background:#0b3d24;
+  position:absolute;left:58px;bottom:49px;width:5px;height:75px;
+  border-radius:5px;background:#0b3f29;
   transform-origin:50% 100%;
-  animation:iigSwing .28s ease-in-out .02s both;
+  animation:iigSwing .48s ease-in-out .08s both;
 }
 .launch-club:after{
-  content:"";position:absolute;left:-6px;top:-2px;width:15px;height:7px;
-  border-radius:5px;background:#0b3d24;
+  content:"";position:absolute;left:-16px;top:-4px;width:27px;height:12px;
+  border-radius:45% 55% 50% 50%;background:#0b3f29;
+}
+.launch-flight{
+  position:absolute;left:79px;bottom:70px;width:145px;height:66px;
+  border-top:3px solid #6ca326;border-radius:50%;
+  transform:rotate(-7deg);opacity:0;
+  animation:iigFlightLine .62s ease .43s both;
 }
 .launch-flag{
-  position:absolute;right:23px;bottom:22px;width:3px;height:65px;
-  background:#fff;border-radius:4px;
+  position:absolute;right:44px;bottom:39px;width:3px;height:71px;
+  background:#0f5a32;border-radius:4px;
 }
 .launch-flag:before{
-  content:"";position:absolute;left:3px;top:3px;
-  width:35px;height:22px;background:#18733f;
+  content:"";position:absolute;left:3px;top:2px;
+  width:36px;height:22px;background:#0f5a32;
   clip-path:polygon(0 0,100% 50%,0 100%);
 }
 .launch-hole{
-  position:absolute;right:17px;bottom:17px;width:18px;height:6px;
-  border-radius:50%;background:rgba(0,0,0,.45);
-}
-.launch-whoosh{
-  position:absolute;left:84px;bottom:57px;width:116px;height:36px;
-  border-top:3px solid rgba(24,115,63,.38);
-  border-radius:50%;
-  opacity:0;transform:rotate(-10deg);
-  animation:iigWhoosh .34s ease .20s both;
+  position:absolute;right:35px;bottom:33px;width:22px;height:7px;
+  border-radius:50%;background:#28492f;
 }
 @keyframes iigSwing{
-  0%{transform:rotate(-58deg)}
-  55%{transform:rotate(16deg)}
-  100%{transform:rotate(35deg)}
+  0%{transform:rotate(-64deg)}
+  55%{transform:rotate(10deg)}
+  100%{transform:rotate(34deg)}
 }
 @keyframes iigBallFlight{
   0%{transform:translate(0,0) scale(1)}
-  38%{transform:translate(78px,-55px) scale(.9)}
-  72%{transform:translate(152px,-42px) scale(.78)}
-  100%{transform:translate(191px,9px) scale(.68)}
+  45%{transform:translate(92px,-63px) scale(.9)}
+  100%{transform:translate(164px,6px) scale(.68)}
 }
-@keyframes iigWhoosh{
-  0%{opacity:0;transform:rotate(-10deg) scaleX(.35)}
-  35%{opacity:.75}
-  100%{opacity:0;transform:rotate(-10deg) scaleX(1)}
+@keyframes iigFlightLine{
+  0%{opacity:0;transform:rotate(-7deg) scaleX(.2)}
+  35%{opacity:.7}
+  100%{opacity:0;transform:rotate(-7deg) scaleX(1)}
 }
 @media (prefers-reduced-motion:reduce){
-  .launch-ball,.launch-club,.launch-whoosh{animation:none!important}
+  .launch-ball,.launch-club,.launch-flight{animation:none!important}
 }
 
 </style>
@@ -118,17 +129,18 @@ nav button{flex:1;background:transparent;color:#6d756f;padding:11px 2px;font-siz
 
 <div id="launchSplash" aria-hidden="true">
   <div class="launch-inner">
-    <div class="launch-title">I'm In Golf ⛳</div>
-    <div class="launch-tag">Golf. Mates. You're In.</div>
+    <div class="launch-brand">I'M IN GOLF</div>
     <div class="launch-scene">
-      <div class="launch-ground"></div>
+      <div class="launch-hills"></div>
       <div class="launch-tee"></div>
       <div class="launch-club"></div>
       <div class="launch-ball"></div>
-      <div class="launch-whoosh"></div>
+      <div class="launch-flight"></div>
       <div class="launch-flag"></div>
       <div class="launch-hole"></div>
     </div>
+  </div>
+</div>
   </div>
 </div>
 
