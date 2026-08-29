@@ -1063,10 +1063,16 @@ $("screen").innerHTML=`
         <h2>${esc(state.course)}</h2>
         <div class="muted">${esc(formatDate(state.date))} • ${state.players.length} players</div>
 
-        <div style="margin-top:8px;">
+        <div style="margin-top:8px;display:flex;gap:7px;flex-wrap:wrap;">
           <span class="pill paid">
             ${state.gameType==="points" ? "🏆 POINTS GAME" : (Number(state.stake||0)>0 ? "💷 MONEY GAME" : "⛳ NO STAKE")}
           </span>
+          <span class="pill" style="background:#edf5ef;color:var(--green);">
+            ${(state.pointsCompetition||state.trip?.competition||"stableford")==="net" ? "⛳ Net" : "🏆 Stableford"}
+          </span>
+          ${state.gameType==="money" && Number(state.stake||0)>0 ? `
+            <span class="pill" style="background:#edf5ef;color:var(--green);">£${state.stake} entry</span>
+          ` : ``}
         </div>
       </div>
 
@@ -1076,10 +1082,10 @@ $("screen").innerHTML=`
     </div>
   </div>
 
+  ${isAdmin ? `
   <div class="card">
-    <h2>Round details</h2>
+    <h2>Edit round details</h2>
 
-    ${isAdmin ? `
       <label class="muted">Course</label>
       <input value="${escAttr(state.course)}" onchange="state.course=this.value;save()">
 
@@ -1099,40 +1105,8 @@ $("screen").innerHTML=`
           </div>
         `}
       </div>
-    ` : `
-      <div class="muted">Course</div>
-      <b>${esc(state.course)}</b>
-
-      <div style="height:10px"></div>
-
-      ${state.gameType==="money" ? `
-        <div class="grid2">
-          <div>
-            <div class="muted">Date</div>
-            <b>${esc(formatDate(state.date))}</b>
-          </div>
-          <div>
-            <div class="muted">Stake per player</div>
-            <b>£${state.stake}</b>
-          </div>
-        </div>
-        <div style="height:10px"></div>
-        <div class="muted">Competition</div>
-        <b>${state.pointsCompetition==="stableford" ? "🏆 Stableford" : "⛳ Net"}</b>
-      ` : `
-        <div class="grid2">
-          <div>
-            <div class="muted">Date</div>
-            <b>${esc(formatDate(state.date))}</b>
-          </div>
-          <div>
-            <div class="muted">Competition</div>
-            <b>${state.pointsCompetition==="stableford" ? "Stableford" : "Net"}</b>
-          </div>
-        </div>
-      `}
-    `}
   </div>
+  ` : ``}
 
   ${state.gameType==="money" && Number(state.stake||0)>0 ? `
     <div class="card">
