@@ -32,9 +32,106 @@ nav button{flex:1;background:transparent;color:#6d756f;padding:11px 2px;font-siz
 .score{width:78px;margin:0}.pos{font-weight:800;font-size:18px;min-width:24px}.money{font-weight:800}
 #setupOverlay{position:fixed;inset:0;background:#f4f6f3;z-index:50;display:flex;align-items:flex-start;justify-content:center;padding:45px 16px;overflow:auto}
 .setup{width:min(480px,100%)}.hidden{display:none!important}
+
+/* ===== I'm In Golf opening animation ===== */
+#launchSplash{
+  position:fixed;inset:0;z-index:200000;
+  display:flex;align-items:center;justify-content:center;
+  background:#f7f5ed;
+  color:#0b3d24;padding:24px;
+  transition:opacity .14s ease,visibility .14s ease;
+}
+#launchSplash.splash-hide{opacity:0;visibility:hidden;pointer-events:none}
+.launch-inner{width:min(390px,100%);text-align:center}
+.launch-title{font-size:34px;font-weight:900;letter-spacing:-.5px;color:#0b3d24}
+.launch-tag{display:none}
+.launch-scene{
+  position:relative;width:280px;height:116px;margin:24px auto 0;
+}
+.launch-ground{
+  position:absolute;left:18px;right:18px;bottom:20px;height:4px;
+  border-radius:999px;background:#9bbb72;
+}
+.launch-tee{
+  position:absolute;left:58px;bottom:21px;width:3px;height:13px;
+  border-radius:2px;background:#f7d07a;
+}
+.launch-ball{
+  position:absolute;left:52px;bottom:32px;width:14px;height:14px;
+  border-radius:50%;background:#fff;
+  box-shadow:0 2px 7px rgba(0,0,0,.25);
+  animation:iigBallFlight .50s cubic-bezier(.18,.8,.32,1) .18s both;
+}
+.launch-club{
+  position:absolute;left:48px;bottom:31px;width:4px;height:62px;
+  border-radius:5px;background:#0b3d24;
+  transform-origin:50% 100%;
+  animation:iigSwing .28s ease-in-out .02s both;
+}
+.launch-club:after{
+  content:"";position:absolute;left:-6px;top:-2px;width:15px;height:7px;
+  border-radius:5px;background:#0b3d24;
+}
+.launch-flag{
+  position:absolute;right:23px;bottom:22px;width:3px;height:65px;
+  background:#fff;border-radius:4px;
+}
+.launch-flag:before{
+  content:"";position:absolute;left:3px;top:3px;
+  width:35px;height:22px;background:#18733f;
+  clip-path:polygon(0 0,100% 50%,0 100%);
+}
+.launch-hole{
+  position:absolute;right:17px;bottom:17px;width:18px;height:6px;
+  border-radius:50%;background:rgba(0,0,0,.45);
+}
+.launch-whoosh{
+  position:absolute;left:84px;bottom:57px;width:116px;height:36px;
+  border-top:3px solid rgba(24,115,63,.38);
+  border-radius:50%;
+  opacity:0;transform:rotate(-10deg);
+  animation:iigWhoosh .34s ease .20s both;
+}
+@keyframes iigSwing{
+  0%{transform:rotate(-58deg)}
+  55%{transform:rotate(16deg)}
+  100%{transform:rotate(35deg)}
+}
+@keyframes iigBallFlight{
+  0%{transform:translate(0,0) scale(1)}
+  38%{transform:translate(78px,-55px) scale(.9)}
+  72%{transform:translate(152px,-42px) scale(.78)}
+  100%{transform:translate(191px,9px) scale(.68)}
+}
+@keyframes iigWhoosh{
+  0%{opacity:0;transform:rotate(-10deg) scaleX(.35)}
+  35%{opacity:.75}
+  100%{opacity:0;transform:rotate(-10deg) scaleX(1)}
+}
+@media (prefers-reduced-motion:reduce){
+  .launch-ball,.launch-club,.launch-whoosh{animation:none!important}
+}
+
 </style>
 </head>
 <body>
+
+<div id="launchSplash" aria-hidden="true">
+  <div class="launch-inner">
+    <div class="launch-title">I'm In Golf ⛳</div>
+    <div class="launch-tag">Golf. Mates. You're In.</div>
+    <div class="launch-scene">
+      <div class="launch-ground"></div>
+      <div class="launch-tee"></div>
+      <div class="launch-club"></div>
+      <div class="launch-ball"></div>
+      <div class="launch-whoosh"></div>
+      <div class="launch-flag"></div>
+      <div class="launch-hole"></div>
+    </div>
+  </div>
+</div>
+
 <div id="setupOverlay">
  <div class="setup">
   <div class="card">
@@ -285,6 +382,26 @@ let state={
 
 const $=id=>document.getElementById(id);
 function configured(){return window.TENS_IN_CONFIG && TENS_IN_CONFIG.supabaseUrl && !TENS_IN_CONFIG.supabaseUrl.includes("PASTE_")}
+
+function finishLaunchSplash(){
+  const splash=document.getElementById("launchSplash");
+  if(!splash)return;
+  splash.classList.add("splash-hide");
+  setTimeout(()=>splash.remove(),170);
+}
+(function setupLaunchSplash(){
+  const splash=document.getElementById("launchSplash");
+  if(!splash)return;
+  const alreadyShown=sessionStorage.getItem("iigLaunchShown")==="1";
+  if(alreadyShown){
+    splash.remove();
+    return;
+  }
+  sessionStorage.setItem("iigLaunchShown","1");
+  const reduced=window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  setTimeout(finishLaunchSplash,reduced?100:850);
+})();
+
 window.addEventListener("load",()=>{
   if(!configured()) $("configMissing").classList.remove("hidden");
 
