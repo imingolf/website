@@ -40,8 +40,8 @@ nav button{flex:1;background:transparent;color:#6d756f;padding:11px 2px;font-siz
 #openingSplash.hide{opacity:0}
 #openingSplash .opening-stage{position:relative;width:100%;height:100%;background:linear-gradient(#bfe4ff 0 58%,#76b96a 58% 100%);overflow:hidden}
 #openingSplash svg{width:100%;height:100%;display:block}
-#openingSplash .opening-brand{font-weight:900;fill:#0f5a37;font-size:46px;opacity:0}
-#openingSplash .opening-tag{font-weight:700;fill:#355b45;font-size:20px;opacity:0}
+#openingSplash .opening-brand{font-weight:900;fill:#0f5a37;font-size:54px;opacity:0}
+@media (max-width:600px) and (orientation:portrait){#openingSplash .opening-brand{font-size:64px}}
 @media (prefers-reduced-motion:reduce){#openingSplash{transition:none}}
 
 </style>
@@ -72,7 +72,6 @@ nav button{flex:1;background:transparent;color:#6d756f;padding:11px 2px;font-siz
         <circle cx="136" cy="530" r="2" fill="#d7ddd8"/>
       </g>
       <text id="iigOpeningBrand" class="opening-brand" x="500" y="105" text-anchor="middle">I’m In Golf ⛳</text>
-      <text id="iigOpeningTag" class="opening-tag" x="500" y="140" text-anchor="middle">Pay. Play. Score. Brag.</text>
     </svg>
   </div>
 </div>
@@ -82,7 +81,6 @@ nav button{flex:1;background:transparent;color:#6d756f;padding:11px 2px;font-siz
   const path=document.getElementById('iigOpeningFlightPath');
   const ball=document.getElementById('iigOpeningBall');
   const brand=document.getElementById('iigOpeningBrand');
-  const tag=document.getElementById('iigOpeningTag');
   if(!splash || !path || !ball)return;
 
   const openingSvg=document.getElementById('iigOpeningSvg');
@@ -101,7 +99,6 @@ nav button{flex:1;background:transparent;color:#6d756f;padding:11px 2px;font-siz
   }
   if(reduced){
     if(brand)brand.style.opacity='1';
-    if(tag)tag.style.opacity='1';
     closeSplash(450);
     return;
   }
@@ -130,7 +127,6 @@ nav button{flex:1;background:transparent;color:#6d756f;padding:11px 2px;font-siz
       if(s<1){requestAnimationFrame(sink);return;}
       ball.style.opacity='0';
       if(brand)brand.animate([{opacity:0},{opacity:1}],{duration:350,fill:'forwards'});
-      if(tag)setTimeout(()=>tag.animate([{opacity:0},{opacity:1}],{duration:350,fill:'forwards'}),90);
       closeSplash(620);
     }
     requestAnimationFrame(sink);
