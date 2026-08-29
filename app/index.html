@@ -38,89 +38,118 @@ nav button{flex:1;background:transparent;color:#6d756f;padding:11px 2px;font-siz
 #launchSplash{
   position:fixed;inset:0;z-index:200000;
   display:flex;align-items:center;justify-content:center;
-  background:#f6f1e7;
-  color:#0f5a32;padding:24px;
-  transition:opacity .22s ease,visibility .22s ease;
+  overflow:hidden;background:#f7f1e5;color:#0b4a2b;
+  transition:opacity .16s ease,visibility .16s ease;
 }
 #launchSplash.splash-hide{opacity:0;visibility:hidden;pointer-events:none}
-.launch-inner{width:min(390px,100%);text-align:center}
+.launch-inner{position:relative;width:100%;height:100%;min-height:520px;overflow:hidden}
 .launch-brand{
-  font-size:30px;font-weight:900;letter-spacing:.2px;
-  color:#0f5a32;margin-bottom:10px
+  position:absolute;top:16%;left:0;right:0;text-align:center;
+  font-size:clamp(28px,8vw,40px);font-weight:900;letter-spacing:-1px;
+  color:#164d2f;z-index:5;animation:iigBrand .34s ease both;
 }
-.launch-scene{
-  position:relative;width:300px;height:150px;margin:0 auto;
+.launch-brand small{
+  display:block;margin-top:4px;font-size:11px;letter-spacing:3px;font-weight:800;color:#648c47
 }
-.launch-hills,
-.launch-hills:before,
-.launch-hills:after{
-  position:absolute;content:"";border-radius:50% 50% 0 0;
+.launch-sun{
+  position:absolute;left:50%;bottom:22%;width:220px;height:220px;margin-left:-110px;
+  border-radius:50%;background:#fff7d9;opacity:.75
 }
-.launch-hills{
-  left:0;right:0;bottom:14px;height:48px;background:#7fae58;
-}
-.launch-hills:before{
-  width:190px;height:52px;left:-12px;bottom:0;background:#9bc46d;
-}
-.launch-hills:after{
-  width:190px;height:44px;right:-10px;bottom:0;background:#5f9348;
+.launch-hill{position:absolute;left:-18%;width:136%;border-radius:50% 50% 0 0}
+.launch-hill.back{height:28%;bottom:-6%;background:#a9c777;transform:rotate(2deg)}
+.launch-hill.mid{height:23%;bottom:-3%;background:#78a953;transform:rotate(-4deg)}
+.launch-hill.front{height:18%;bottom:-2%;background:#3e7d42;transform:rotate(3deg)}
+.launch-green{
+  position:absolute;right:-12%;bottom:2%;width:72%;height:14%;
+  border-radius:50%;background:#75a94e;transform:rotate(-3deg)
 }
 .launch-tee{
-  position:absolute;left:69px;bottom:38px;width:3px;height:18px;
-  border-radius:3px;background:#0f5a32;
+  position:absolute;left:27%;bottom:19.5%;width:5px;height:25px;background:#835e37;
+  clip-path:polygon(0 0,100% 0,72% 100%,28% 100%);z-index:7
 }
 .launch-ball{
-  position:absolute;left:61px;bottom:52px;width:17px;height:17px;
-  border-radius:50%;background:#fff;border:1px solid #d7d2c8;
-  box-shadow:0 1px 3px rgba(0,0,0,.12);
-  animation:iigBallFlight .62s cubic-bezier(.2,.72,.28,1) .43s both;
+  position:absolute;left:calc(27% - 10px);bottom:calc(19.5% + 20px);
+  width:25px;height:25px;border-radius:50%;z-index:9;
+  background:
+    radial-gradient(circle at 35% 32%,#fff 0 2px,transparent 2.4px),
+    radial-gradient(circle at 67% 48%,#d8d6ce 0 1.3px,transparent 1.8px),
+    radial-gradient(circle at 43% 72%,#ddd9cf 0 1.3px,transparent 1.8px),
+    #fffdf8;
+  border:1px solid #d7d1c4;box-shadow:0 2px 5px rgba(0,0,0,.16);
+  animation:iigBallFlight .72s cubic-bezier(.2,.65,.25,1) .47s both
 }
 .launch-club{
-  position:absolute;left:58px;bottom:49px;width:5px;height:75px;
-  border-radius:5px;background:#0b3f29;
-  transform-origin:50% 100%;
-  animation:iigSwing .48s ease-in-out .08s both;
+  position:absolute;left:calc(27% - 5px);bottom:calc(19.5% + 25px);
+  width:7px;height:142px;border-radius:7px;background:#173e2b;z-index:8;
+  transform-origin:50% 100%;animation:iigSwing .52s cubic-bezier(.42,0,.25,1) .08s both
 }
-.launch-club:after{
-  content:"";position:absolute;left:-16px;top:-4px;width:27px;height:12px;
-  border-radius:45% 55% 50% 50%;background:#0b3f29;
+.launch-club:before{
+  content:"";position:absolute;top:-3px;left:-22px;width:40px;height:18px;
+  border-radius:60% 40% 45% 55%;background:#173e2b;transform:rotate(-8deg)
+}
+.launch-impact{
+  position:absolute;left:calc(27% - 25px);bottom:calc(19.5% + 10px);
+  width:65px;height:65px;z-index:6;opacity:0;
+  background:repeating-conic-gradient(from 0deg,#78a82e 0 5deg,transparent 5deg 22deg);
+  border-radius:50%;animation:iigImpact .24s ease .48s both
 }
 .launch-flight{
-  position:absolute;left:79px;bottom:70px;width:145px;height:66px;
-  border-top:3px solid #6ca326;border-radius:50%;
-  transform:rotate(-7deg);opacity:0;
-  animation:iigFlightLine .62s ease .43s both;
+  position:absolute;left:31%;bottom:31%;width:47%;height:31%;z-index:6;
+  border-top:4px solid #6f9f38;border-radius:58% 42% 0 0;
+  transform:rotate(-7deg) scaleX(.15);transform-origin:left center;opacity:0;
+  animation:iigFlightLine .68s ease .5s both
 }
-.launch-flag{
-  position:absolute;right:44px;bottom:39px;width:3px;height:71px;
-  background:#0f5a32;border-radius:4px;
+.launch-flight.two{
+  border-top-width:2px;bottom:29%;transform:rotate(-4deg) scaleX(.15);
+  animation-delay:.54s;opacity:.55
 }
-.launch-flag:before{
-  content:"";position:absolute;left:3px;top:2px;
-  width:36px;height:22px;background:#0f5a32;
-  clip-path:polygon(0 0,100% 50%,0 100%);
+.launch-flagpole{
+  position:absolute;right:18%;bottom:13%;width:4px;height:125px;background:#174c2e;z-index:5
+}
+.launch-flagpole:before{
+  content:"";position:absolute;left:4px;top:3px;width:50px;height:30px;background:#174c2e;
+  clip-path:polygon(0 0,100% 45%,0 100%)
 }
 .launch-hole{
-  position:absolute;right:35px;bottom:33px;width:22px;height:7px;
-  border-radius:50%;background:#28492f;
+  position:absolute;right:calc(18% - 12px);bottom:12.5%;width:28px;height:8px;
+  border-radius:50%;background:#244d2e;z-index:5
+}
+@keyframes iigBrand{
+  0%{opacity:0;transform:translateY(-7px)}
+  100%{opacity:1;transform:none}
 }
 @keyframes iigSwing{
-  0%{transform:rotate(-64deg)}
-  55%{transform:rotate(10deg)}
-  100%{transform:rotate(34deg)}
+  0%{transform:rotate(-78deg)}
+  52%{transform:rotate(-32deg)}
+  72%{transform:rotate(12deg)}
+  100%{transform:rotate(48deg)}
+}
+@keyframes iigImpact{
+  0%{opacity:0;transform:scale(.2) rotate(0)}
+  40%{opacity:1}
+  100%{opacity:0;transform:scale(1.25) rotate(25deg)}
 }
 @keyframes iigBallFlight{
-  0%{transform:translate(0,0) scale(1)}
-  45%{transform:translate(92px,-63px) scale(.9)}
-  100%{transform:translate(164px,6px) scale(.68)}
+  0%,8%{transform:translate(0,0) scale(1)}
+  48%{transform:translate(37vw,-28vh) scale(.78)}
+  100%{transform:translate(55vw,-7vh) scale(.48)}
 }
 @keyframes iigFlightLine{
-  0%{opacity:0;transform:rotate(-7deg) scaleX(.2)}
-  35%{opacity:.7}
+  0%{opacity:0;transform:rotate(-7deg) scaleX(.12)}
+  22%{opacity:.8}
+  82%{opacity:.55}
   100%{opacity:0;transform:rotate(-7deg) scaleX(1)}
 }
+@media (min-width:700px){
+  .launch-inner{max-width:480px;max-height:850px}
+  @keyframes iigBallFlight{
+    0%,8%{transform:translate(0,0) scale(1)}
+    48%{transform:translate(175px,-220px) scale(.78)}
+    100%{transform:translate(260px,-55px) scale(.48)}
+  }
+}
 @media (prefers-reduced-motion:reduce){
-  .launch-ball,.launch-club,.launch-flight{animation:none!important}
+  .launch-club,.launch-ball,.launch-impact,.launch-flight,.launch-brand{animation:none!important}
 }
 
 </style>
@@ -129,27 +158,19 @@ nav button{flex:1;background:transparent;color:#6d756f;padding:11px 2px;font-siz
 
 <div id="launchSplash" aria-hidden="true">
   <div class="launch-inner">
-    <div class="launch-brand">I'M IN GOLF</div>
-    <div class="launch-scene">
-      <div class="launch-hills"></div>
-      <div class="launch-tee"></div>
-      <div class="launch-club"></div>
-      <div class="launch-ball"></div>
-      <div class="launch-flight"></div>
-      <div class="launch-flag"></div>
-      <div class="launch-hole"></div>
-    </div>
+    <div class="launch-brand">I'M IN GOLF<small>READY TO PLAY</small></div>
+    <div class="launch-sun"></div>
+    <div class="launch-hill back"></div>
+    <div class="launch-hill mid"></div>
+    <div class="launch-hill front"></div>
+    <div class="launch-green"></div>
+    <div class="launch-flight"></div><div class="launch-flight two"></div>
+    <div class="launch-impact"></div><div class="launch-tee"></div>
+    <div class="launch-club"></div><div class="launch-ball"></div>
+    <div class="launch-flagpole"></div><div class="launch-hole"></div>
   </div>
 </div>
-  </div>
-</div>
-
-<div id="setupOverlay">
- <div class="setup">
-  <div class="card">
-   <h1 style="margin-top:0">⛳ I'm In Golf</h1>
-   <p>Golf. Mates. You're In.</p>
-   <div id="configMissing" class="notice warning hidden"><b>One-time setup needed.</b><br>This shared version needs your Supabase project details added to <code>config.js</code>.</div>
+<div id="configMissing" class="notice warning hidden"><b>One-time setup needed.</b><br>This shared version needs your Supabase project details added to <code>config.js</code>.</div>
    <label><b>Group PIN</b></label>
 <input id="pinInput" inputmode="numeric" autocomplete="off" placeholder="Enter your shared PIN">
 <button class="primary full" onclick="connect()">Open I'm In Golf</button>
@@ -404,14 +425,8 @@ function finishLaunchSplash(){
 (function setupLaunchSplash(){
   const splash=document.getElementById("launchSplash");
   if(!splash)return;
-  const alreadyShown=sessionStorage.getItem("iigLaunchShown")==="1";
-  if(alreadyShown){
-    splash.remove();
-    return;
-  }
-  sessionStorage.setItem("iigLaunchShown","1");
   const reduced=window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  setTimeout(finishLaunchSplash,reduced?100:850);
+  setTimeout(finishLaunchSplash,reduced?180:1500);
 })();
 
 window.addEventListener("load",()=>{
