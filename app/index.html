@@ -1061,7 +1061,7 @@ $("screen").innerHTML=`
       <div>
         <div class="muted">CURRENT ROUND</div>
         <h2>${esc(state.course)}</h2>
-        <div class="muted">${esc(formatDate(state.date))} • ${state.players.length} players</div>
+        <div class="muted">${esc(formatDate(state.date))} • ${state.gameType==="money" && Number(state.stake||0)>0 ? paidCount()+" entered" : state.players.length+" players"}</div>
 
         <div style="margin-top:8px;display:flex;gap:7px;flex-wrap:wrap;">
           <span class="pill paid">
