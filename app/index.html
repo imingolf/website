@@ -29,6 +29,7 @@ nav button{flex:1;background:transparent;color:#6d756f;padding:11px 2px;font-siz
 .pay-sticky{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(72px + env(safe-area-inset-bottom));width:min(488px,calc(100% - 32px));background:white;border:1px solid var(--line);border-radius:16px;padding:10px;box-shadow:0 6px 22px rgba(0,0,0,.14);z-index:19}
 .pay-sticky .full{margin-top:0}.pay-screen-spacer{height:82px}
 .finish-sticky{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(72px + env(safe-area-inset-bottom));width:min(488px,calc(100% - 32px));background:white;border:1px solid var(--line);border-radius:16px;padding:10px;box-shadow:0 6px 22px rgba(0,0,0,.14);z-index:19}.finish-sticky .full{margin-top:0}.finish-screen-spacer{height:82px}
+.app-toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(150px + env(safe-area-inset-bottom));width:min(440px,calc(100% - 40px));background:#edf5ef;color:var(--green);border:1px solid #d7eadc;border-radius:16px;padding:13px 16px;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,.14);z-index:10020;opacity:0;transition:opacity .18s ease,transform .18s ease}.app-toast.show{opacity:1;transform:translateX(-50%) translateY(-4px)}.app-toast b{display:block;font-size:15px}.app-toast span{display:block;font-size:13px;margin-top:3px;color:#51655a}
 .score{width:78px;margin:0}.pos{font-weight:800;font-size:18px;min-width:24px}.money{font-weight:800}
 #setupOverlay{position:fixed;inset:0;background:#f4f6f3;z-index:50;display:flex;align-items:flex-start;justify-content:center;padding:45px 16px;overflow:auto}
 .setup{width:min(480px,100%)}.hidden{display:none!important}
@@ -1192,6 +1193,20 @@ function beginPlayerPayment(){
   sessionStorage.setItem(paymentReturnKey(),JSON.stringify({playerId:me.id,startedAt:Date.now()}));
   window.open(link,"_blank");
 }
+function showAppToast(title,subtitle="",duration=2800){
+  document.querySelectorAll(".app-toast").forEach(el=>el.remove());
+  const toast=document.createElement("div");
+  toast.className="app-toast";
+  toast.setAttribute("role","status");
+  toast.setAttribute("aria-live","polite");
+  toast.innerHTML=`<b>${esc(title)}</b>${subtitle ? `<span>${esc(subtitle)}</span>` : ""}`;
+  document.body.appendChild(toast);
+  requestAnimationFrame(()=>toast.classList.add("show"));
+  setTimeout(()=>{
+    toast.classList.remove("show");
+    setTimeout(()=>toast.remove(),220);
+  },duration);
+}
 async function recognisePaymentReturn(){
   if(paymentReturnBusy || document.visibilityState==="hidden")return;
   let journey=null;
@@ -1207,7 +1222,7 @@ async function recognisePaymentReturn(){
   await save();
   paymentReturnBusy=false;
   render();
-  alert("✅ Payment journey complete — you're marked paid.\n\nYour payment went directly to your Group Admin. I'm In Golf does not receive or hold the money.");
+  showAppToast("✅ You’re marked paid","Good luck! ⛳");
 }
 window.addEventListener("focus",()=>setTimeout(recognisePaymentReturn,250));
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")setTimeout(recognisePaymentReturn,250);});
