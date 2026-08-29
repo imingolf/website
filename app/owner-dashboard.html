@@ -398,6 +398,44 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
     // Money Games only require payment when the organiser has set a stake above £0.
     return Number(s.stake||0)>0 ? p.paid===true : true;
   }
+  function liveScoreValue(s,p){
+    const comp=currentCompetition(s);
+    if(p?.noReturn===true)return null;
+    if(comp==="net"){
+      const v=Number(p?.netScore);
+      return Number.isFinite(v)?v:null;
+    }
+    const v=Number(p?.stableford);
+    return Number.isFinite(v)?v:null;
+  }
+  function liveLeaderboardPlayers(s,players){
+    const comp=currentCompetition(s);
+    return players.slice().sort((a,b)=>{
+      const aEntered=playerEnteredCurrentRound(s,a), bEntered=playerEnteredCurrentRound(s,b);
+      const aSubmitted=a.scoreSubmitted===true||a.stableford!=null||a.netScore!=null||a.noReturn===true;
+      const bSubmitted=b.scoreSubmitted===true||b.stableford!=null||b.netScore!=null||b.noReturn===true;
+      const aValid=aEntered&&aSubmitted&&a.noReturn!==true&&liveScoreValue(s,a)!=null;
+      const bValid=bEntered&&bSubmitted&&b.noReturn!==true&&liveScoreValue(s,b)!=null;
+      const aNR=aEntered&&a.noReturn===true, bNR=bEntered&&b.noReturn===true;
+
+      const bucket=xValid=>xValid?0:null;
+      const aBucket=aValid?0:aNR?1:aEntered?2:3;
+      const bBucket=bValid?0:bNR?1:bEntered?2:3;
+      if(aBucket!==bBucket)return aBucket-bBucket;
+
+      if(aValid&&bValid){
+        const av=liveScoreValue(s,a), bv=liveScoreValue(s,b);
+        if(av!==bv)return comp==="net"?av-bv:bv-av;
+      }
+      return String(a.name||"").localeCompare(String(b.name||""));
+    });
+  }
+  function ordinal(n){
+    const mod100=n%100;
+    if(mod100>=11&&mod100<=13)return `${n}th`;
+    const mod10=n%10;
+    return `${n}${mod10===1?"st":mod10===2?"nd":mod10===3?"rd":"th"}`;
+  }
   function submittedCount(s){
     if(!s)return [0,0];
     const ps=s.players||[];
@@ -437,20 +475,34 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
         <div class="detail-row"><span>Trial / renewal</span><b>${esc(trialText(g))}</b></div>
         <div class="detail-row"><span>Last activity</span><b>${esc(activityText(pin))}</b></div>
       </div>
-      <div class="members"><h3>📝 Live Score Entry</h3>
-        ${s?.roundOpen===false ? `<div class="empty">No competition is currently open.</div>` : players.length ? players.slice().sort((a,b)=>String(a.name).localeCompare(String(b.name))).map(p=>{
-          const entered=playerEnteredCurrentRound(s,p);
-          const submitted=p.scoreSubmitted===true||p.stableford!=null||p.netScore!=null||p.noReturn===true;
-          const comp=currentCompetition(s);
-          const compLabel=comp==="net" ? "Net" : "Stableford";
-          let result="⏳ Waiting";
-          if(!entered) result="Not entered";
-          else if(p.noReturn===true) result="✅ NR";
-          else if(submitted){
-            result=comp==="net" ? `✅ Net ${esc(p.netScore??"—")}` : `✅ ${esc(p.stableford??"—")} pts`;
-          }
-          return `<div class="member"><div><b>${esc(p.name||"Player")}</b><div class="role">${compLabel}</div></div><div><b>${result}</b></div></div>`;
-        }).join("") : `<div class="empty">No players have joined yet.</div>`}
+      <div class="members"><h3>🏆 Live Leaderboard</h3>
+        ${s?.roundOpen===false ? `<div class="empty">No competition is currently open.</div>` : players.length ? (()=>{
+          const ordered=liveLeaderboardPlayers(s,players);
+          let previousScore=null;
+          let previousRank=0;
+          return ordered.map((p,index)=>{
+            const entered=playerEnteredCurrentRound(s,p);
+            const submitted=p.scoreSubmitted===true||p.stableford!=null||p.netScore!=null||p.noReturn===true;
+            const comp=currentCompetition(s);
+            const compLabel=comp==="net" ? "Net" : "Stableford";
+            const score=liveScoreValue(s,p);
+            const validScore=entered&&submitted&&p.noReturn!==true&&score!=null;
+            let rankText="";
+            if(validScore){
+              const rank=previousScore!==null&&score===previousScore ? previousRank : index+1;
+              previousScore=score;
+              previousRank=rank;
+              rankText=`<span style="display:inline-block;min-width:34px;color:#176b3a">${ordinal(rank)}</span> `;
+            }
+            let result="⏳ Waiting";
+            if(!entered) result="Not entered";
+            else if(p.noReturn===true) result="NR";
+            else if(validScore){
+              result=comp==="net" ? `Net ${esc(p.netScore??"—")}` : `${esc(p.stableford??"—")} pts`;
+            }
+            return `<div class="member"><div><b>${rankText}${esc(p.name||"Player")}</b><div class="role">${compLabel}</div></div><div><b>${validScore?"✅ ":""}${result}</b></div></div>`;
+          }).join("");
+        })() : `<div class="empty">No players have joined yet.</div>`}
       </div>
       ${moneyRounds.length||liveMoney ? `<div class="members"><h3>💷 Money Activity</h3>
         ${liveMoney ? `<div class="member"><div><b>Current round</b><div class="role">£${liveMoney.stake} entry • ${liveMoney.paid}/${liveMoney.players} paid</div></div><div><b>£${liveMoney.current}</b><div class="sub">£${liveMoney.expected} expected</div></div></div>` : ``}
