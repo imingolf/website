@@ -64,14 +64,15 @@ nav button{flex:1;background:transparent;color:#6d756f;padding:11px 2px;font-siz
   width:34px;height:10px;border-radius:50%;background:#153c27;z-index:6;
 }
 .iig-open-ball{
-  position:absolute;left:-44px;top:57%;width:42px;height:42px;border-radius:50%;
-  z-index:10;border:1px solid #d8d3c8;
+  position:absolute;left:5%;top:54%;width:58px;height:58px;border-radius:50%;
+  z-index:20;border:3px solid #174d30;
   background:
-    radial-gradient(circle at 30% 28%,#d9d5cc 0 1.6px,transparent 2px),
-    radial-gradient(circle at 62% 34%,#d9d5cc 0 1.5px,transparent 1.9px),
-    radial-gradient(circle at 45% 61%,#d9d5cc 0 1.6px,transparent 2px),
-    radial-gradient(circle at 70% 70%,#d9d5cc 0 1.4px,transparent 1.8px),#fff;
-  box-shadow:0 3px 8px rgba(0,0,0,.18);
+    radial-gradient(circle at 30% 28%,#d2cec5 0 2px,transparent 2.5px),
+    radial-gradient(circle at 62% 34%,#d2cec5 0 2px,transparent 2.5px),
+    radial-gradient(circle at 45% 61%,#d2cec5 0 2px,transparent 2.5px),
+    radial-gradient(circle at 70% 70%,#d2cec5 0 2px,transparent 2.5px),
+    #fff;
+  box-shadow:0 4px 10px rgba(0,0,0,.25);
   animation:iigBallToCup 1.12s cubic-bezier(.18,.62,.25,1) .05s both;
 }
 .iig-open-arc{
@@ -88,12 +89,12 @@ nav button{flex:1;background:transparent;color:#6d756f;padding:11px 2px;font-siz
   animation:iigCupFlash .23s ease 1.03s both;
 }
 @keyframes iigBallToCup{
-  0%{left:-44px;top:58%;transform:scale(1.15) rotate(0)}
-  45%{left:44%;top:24%;transform:scale(.84) rotate(260deg)}
-  73%{left:72%;top:39%;transform:scale(.64) rotate(430deg)}
-  88%{left:calc(81% - 10px);top:69%;transform:scale(.52) rotate(505deg)}
-  95%{left:calc(81% - 10px);top:79%;transform:scale(.47) rotate(530deg)}
-  100%{left:calc(81% - 10px);top:87.4%;transform:scale(.20) rotate(550deg);opacity:0}
+  0%{left:5%;top:54%;transform:scale(1) rotate(0);opacity:1}
+  42%{left:43%;top:23%;transform:scale(.78) rotate(250deg);opacity:1}
+  72%{left:70%;top:38%;transform:scale(.58) rotate(420deg);opacity:1}
+  88%{left:79%;top:68%;transform:scale(.48) rotate(500deg);opacity:1}
+  96%{left:80.5%;top:79%;transform:scale(.42) rotate(530deg);opacity:1}
+  100%{left:81%;top:87%;transform:scale(.18) rotate(550deg);opacity:0}
 }
 @keyframes iigArc{
   0%{opacity:0;transform:rotate(-5deg) scaleX(.08)}
