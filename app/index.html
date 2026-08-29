@@ -37,87 +37,102 @@ nav button{flex:1;background:transparent;color:#6d756f;padding:11px 2px;font-siz
 #iigOpenSplash{
   position:fixed;inset:0;z-index:200000;overflow:hidden;
   background:#f7f3e9;
-  transition:opacity .16s ease,visibility .16s ease;
+  transition:opacity .14s ease,visibility .14s ease;
 }
 #iigOpenSplash.iig-open-hide{opacity:0;visibility:hidden;pointer-events:none}
-.iig-open-sky{position:absolute;inset:0;background:#f7f3e9}
-.iig-open-hill1,.iig-open-hill2,.iig-open-green{
-  position:absolute;left:-12%;width:124%;border-radius:50% 50% 0 0;
+.iig-open-brand{
+  position:absolute;top:12%;left:0;right:0;text-align:center;
+  font-size:clamp(30px,8vw,42px);font-weight:900;letter-spacing:-1px;color:#174d30;
 }
-.iig-open-hill1{height:27%;bottom:-7%;background:#a7c978;transform:rotate(2deg)}
-.iig-open-hill2{height:21%;bottom:-4%;background:#76a951;transform:rotate(-3deg)}
-.iig-open-green{left:42%;width:72%;height:15%;bottom:1%;background:#4f8b45;transform:rotate(-2deg)}
+.iig-open-brand span{color:#6e9f35}
+.iig-open-green{
+  position:absolute;right:-13%;bottom:-4%;width:72%;height:28%;
+  border-radius:55% 45% 0 0;background:#78a956;transform:rotate(-3deg);
+}
+.iig-open-green:before{
+  content:"";position:absolute;left:-45%;bottom:-12%;width:125%;height:76%;
+  border-radius:50% 50% 0 0;background:#a8c77b;z-index:-1;
+}
 .iig-open-flagpole{
-  position:absolute;right:18%;bottom:12%;width:4px;height:118px;
-  background:#174b2d;z-index:4
+  position:absolute;right:19%;bottom:13%;width:4px;height:128px;background:#174d30;z-index:5;
 }
 .iig-open-flagpole:before{
-  content:"";position:absolute;left:4px;top:2px;width:48px;height:29px;
-  background:#174b2d;clip-path:polygon(0 0,100% 46%,0 100%)
+  content:"";position:absolute;left:4px;top:1px;width:52px;height:31px;background:#174d30;
+  clip-path:polygon(0 0,100% 45%,0 100%);
 }
 .iig-open-hole{
-  position:absolute;right:calc(18% - 13px);bottom:11.4%;
-  width:30px;height:9px;border-radius:50%;background:#173d27;z-index:5
+  position:absolute;right:calc(19% - 15px);bottom:12.2%;
+  width:34px;height:10px;border-radius:50%;background:#153c27;z-index:6;
 }
 .iig-open-ball{
-  position:absolute;left:-38px;top:39%;width:34px;height:34px;border-radius:50%;
-  z-index:8;border:1px solid #d8d3c8;
+  position:absolute;left:-42px;top:55%;width:42px;height:42px;border-radius:50%;
+  z-index:10;border:1px solid #d8d3c8;
   background:
-    radial-gradient(circle at 31% 29%,#ddd8ce 0 1.5px,transparent 1.9px),
-    radial-gradient(circle at 64% 34%,#ddd8ce 0 1.4px,transparent 1.8px),
-    radial-gradient(circle at 45% 63%,#ddd8ce 0 1.5px,transparent 1.9px),
-    radial-gradient(circle at 72% 69%,#ddd8ce 0 1.3px,transparent 1.7px),
-    #fff;
-  box-shadow:0 3px 7px rgba(0,0,0,.16);
-  animation:iigOpenBall 1.08s cubic-bezier(.18,.65,.28,1) .06s both;
+    radial-gradient(circle at 30% 28%,#d9d5cc 0 1.6px,transparent 2px),
+    radial-gradient(circle at 62% 34%,#d9d5cc 0 1.5px,transparent 1.9px),
+    radial-gradient(circle at 45% 61%,#d9d5cc 0 1.6px,transparent 2px),
+    radial-gradient(circle at 70% 70%,#d9d5cc 0 1.4px,transparent 1.8px),#fff;
+  box-shadow:0 3px 8px rgba(0,0,0,.18);
+  animation:iigBallToCup 1.17s cubic-bezier(.18,.62,.25,1) .04s both;
 }
-.iig-open-trail{
-  position:absolute;left:-4%;top:46%;width:72%;height:27%;
-  border-top:3px solid rgba(93,145,54,.65);border-radius:52% 48% 0 0;
-  transform:rotate(-9deg) scaleX(.05);transform-origin:left center;
-  opacity:0;animation:iigOpenTrail .82s ease .12s both;
+.iig-open-arc{
+  position:absolute;left:4%;top:34%;width:70%;height:37%;z-index:7;
+  border-top:4px solid rgba(104,153,55,.68);
+  border-radius:55% 45% 0 0;transform:rotate(-5deg) scaleX(.08);
+  transform-origin:left center;opacity:0;
+  animation:iigArc 0.83s ease .10s both;
 }
-.iig-open-ripple{
-  position:absolute;right:calc(18% - 19px);bottom:10.5%;
-  width:42px;height:15px;border:2px solid rgba(247,243,233,.75);
-  border-radius:50%;opacity:0;z-index:7;
-  animation:iigOpenCup .22s ease 1.03s both;
+.iig-open-drop{
+  position:absolute;right:calc(19% - 2px);bottom:17%;height:48px;width:3px;
+  border-left:3px dotted rgba(104,153,55,.6);opacity:0;z-index:7;
+  animation:iigDropGuide .25s ease .88s both;
 }
-@keyframes iigOpenBall{
-  0%{left:-38px;top:43%;transform:scale(1.12) rotate(0)}
-  42%{left:45%;top:22%;transform:scale(.82) rotate(240deg)}
-  76%{left:72%;top:39%;transform:scale(.58) rotate(430deg)}
-  91%{left:calc(82% - 8px);top:72%;transform:scale(.42) rotate(510deg)}
-  100%{left:calc(82% - 8px);top:calc(88.6% - 8px);transform:scale(.2) rotate(540deg);opacity:0}
+.iig-open-cupflash{
+  position:absolute;right:calc(19% - 23px);bottom:10.8%;
+  width:50px;height:18px;border:3px solid rgba(255,255,255,.82);
+  border-radius:50%;opacity:0;z-index:8;
+  animation:iigCupFlash .25s ease 1.08s both;
 }
-@keyframes iigOpenTrail{
-  0%{opacity:0;transform:rotate(-9deg) scaleX(.05)}
-  22%{opacity:.75}
-  78%{opacity:.45}
-  100%{opacity:0;transform:rotate(-9deg) scaleX(1)}
+@keyframes iigBallToCup{
+  0%{left:-42px;top:58%;transform:scale(1.15) rotate(0)}
+  45%{left:44%;top:25%;transform:scale(.84) rotate(260deg)}
+  72%{left:72%;top:37%;transform:scale(.64) rotate(430deg)}
+  84%{left:calc(81% - 10px);top:65%;transform:scale(.54) rotate(500deg)}
+  91%{left:calc(81% - 10px);top:76%;transform:scale(.50) rotate(525deg)}
+  100%{left:calc(81% - 10px);top:87.2%;transform:scale(.24) rotate(550deg);opacity:0}
 }
-@keyframes iigOpenCup{
+@keyframes iigArc{
+  0%{opacity:0;transform:rotate(-5deg) scaleX(.08)}
+  18%{opacity:.8}
+  80%{opacity:.5}
+  100%{opacity:0;transform:rotate(-5deg) scaleX(1)}
+}
+@keyframes iigDropGuide{
+  0%{opacity:0}
+  35%{opacity:.7}
+  100%{opacity:0}
+}
+@keyframes iigCupFlash{
   0%{opacity:0;transform:scale(.35)}
-  45%{opacity:.8}
+  45%{opacity:.9}
   100%{opacity:0;transform:scale(1.25)}
 }
 @media (prefers-reduced-motion:reduce){
-  .iig-open-ball,.iig-open-trail,.iig-open-ripple{animation:none!important}
+  .iig-open-ball,.iig-open-arc,.iig-open-drop,.iig-open-cupflash{animation:none!important}
 }
 </style>
 </head>
 <body>
 
 <div id="iigOpenSplash" aria-hidden="true">
-  <div class="iig-open-sky"></div>
-  <div class="iig-open-hill1"></div>
-  <div class="iig-open-hill2"></div>
+  <div class="iig-open-brand">I'M IN <span>GOLF</span></div>
   <div class="iig-open-green"></div>
-  <div class="iig-open-trail"></div>
+  <div class="iig-open-arc"></div>
+  <div class="iig-open-drop"></div>
   <div class="iig-open-ball"></div>
   <div class="iig-open-flagpole"></div>
   <div class="iig-open-hole"></div>
-  <div class="iig-open-ripple"></div>
+  <div class="iig-open-cupflash"></div>
 </div>
 <div id="configMissing" class="notice warning hidden"><b>One-time setup needed.</b><br>This shared version needs your Supabase project details added to <code>config.js</code>.</div>
    <label><b>Group PIN</b></label>
@@ -375,7 +390,7 @@ function finishIigOpenSplash(){
   const splash=document.getElementById("iigOpenSplash");
   if(!splash)return;
   const reduced=window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  setTimeout(finishIigOpenSplash,reduced?180:1250);
+  setTimeout(finishIigOpenSplash,reduced?180:1380);
 })();
 
 window.addEventListener("load",()=>{
