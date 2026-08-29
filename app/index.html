@@ -50,7 +50,7 @@ nav button{flex:1;background:transparent;color:#6d756f;padding:11px 2px;font-siz
 
 <div id="openingSplash" aria-hidden="true">
   <div class="opening-stage">
-    <svg viewBox="0 0 1000 700" preserveAspectRatio="xMidYMid slice" aria-label="Golf ball flying into the hole">
+    <svg id="iigOpeningSvg" viewBox="0 0 1000 700" preserveAspectRatio="xMidYMid slice" aria-label="Golf ball flying into the hole">
       <defs>
         <linearGradient id="iigOpeningGreenShade" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stop-color="#6fba68"/>
@@ -84,6 +84,13 @@ nav button{flex:1;background:transparent;color:#6d756f;padding:11px 2px;font-siz
   const brand=document.getElementById('iigOpeningBrand');
   const tag=document.getElementById('iigOpeningTag');
   if(!splash || !path || !ball)return;
+
+  const openingSvg=document.getElementById('iigOpeningSvg');
+  // On portrait phones, show the whole animation instead of cropping the left/right edges.
+  // Landscape/laptop keeps the original full-screen 'slice' look.
+  if(openingSvg && window.innerHeight > window.innerWidth){
+    openingSvg.setAttribute('preserveAspectRatio','xMidYMid meet');
+  }
 
   const reduced=window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   function closeSplash(delay){
