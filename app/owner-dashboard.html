@@ -842,10 +842,11 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
       x.fillStyle=green;x.font=`800 ${Math.max(16,rowH*.43)}px Arial`;x.textAlign="right";x.fillText(scoreTextForRound(page.round,p),978,y+rowH*.67);
     });
 
-    // Footer
-    drawRounded(x,22,1230,W-44,102,30,dark);
-    x.textAlign="center";x.fillStyle=lime;x.font="900 29px Arial";x.fillText("🎉 WELL PLAYED! 🎉",W/2,1275);
-    x.fillStyle="#fff";x.font="600 20px Arial";x.fillText("Thanks for playing — see you next time!",W/2,1308);
+    // Compact footer — matches the app Share Results design.
+    x.strokeStyle=green;x.lineWidth=2;x.beginPath();x.moveTo(68,1223);x.lineTo(1012,1223);x.stroke();
+    const footerWinner=page.winner.length>25 ? page.winner.slice(0,23)+"…" : page.winner;
+    x.textAlign="center";x.fillStyle=green;x.font="900 21px Arial";
+    x.fillText(`🎉 WELL PLAYED!   |   🏆 WINNER: ${footerWinner}   |   NEXT COMP COMING SOON ⛳`,W/2,1274);
     return c;
   }
   async function shareBrandedRound(groupName,r){
