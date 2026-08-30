@@ -1238,11 +1238,11 @@ function pay(){
 
  $("screen").innerHTML=`
  <div class="card">
-   <h2>💷 Pay Your Group Admin</h2>
-   <div class="notice"><b>Your group's money stays with your group.</b><br>Payments go directly to your Group Admin using the payment link they provided. I'm In Golf does not receive or hold your money.</div>
+   <h2>💷 Pay & Enter</h2>
+   <div class="notice"><b>Pay your Group Admin directly.</b><br>I'm In Golf does not receive or hold your money.</div>
    <div class="big">£${pot()}</div>
-   <div class="muted"><b>Paid so far</b></div>
-   <div class="muted" style="margin-top:6px;">Expected pot: £${potentialPot()} • Entry fee: £${state.stake} per player</div>
+   <div class="muted"><b>Current pot</b></div>
+   <div class="muted" style="margin-top:6px;">Full pot if everyone enters: £${potentialPot()} • Entry: £${state.stake}</div>
  </div>
 
  <div class="card">
