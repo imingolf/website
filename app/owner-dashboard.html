@@ -731,6 +731,155 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
     }
     return lines.join("\n");
   }
+
+  function resultCardPages(groupName,r){
+    const standings=sortedRoundStandings(r);
+    const pageSize=20;
+    const pages=[];
+    for(let i=0;i<Math.max(1,Math.ceil(standings.length/pageSize));i++){
+      pages.push(standings.slice(i*pageSize,(i+1)*pageSize));
+    }
+    const comp=inferRoundCompetition(r);
+    const winner=getRoundWinner(r)||"—";
+    const pot=r?.gameType==="money"
+      ? Number(r?.stablefordPot||0)+Number(r?.netPot||0)
+      : 0;
+    return pages.map((players,pageIndex)=>({
+      groupName,round:r,players,pageIndex,pageCount:pages.length,comp,winner,pot,total:standings.length
+    }));
+  }
+  function drawRounded(ctx,x,y,w,h,r,fill,stroke){
+    ctx.beginPath();
+    ctx.roundRect(x,y,w,h,r);
+    if(fill){ctx.fillStyle=fill;ctx.fill()}
+    if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=2;ctx.stroke()}
+  }
+  function fitCanvasText(ctx,text,maxWidth,startSize,minSize=18){
+    let size=startSize;
+    do{ctx.font=`900 ${size}px Arial, sans-serif`;if(ctx.measureText(text).width<=maxWidth)return size;size-=2}while(size>minSize);
+    return minSize;
+  }
+  function brandedResultCanvas(page){
+    const W=1080,H=1350;
+    const c=document.createElement("canvas");c.width=W;c.height=H;
+    const x=c.getContext("2d");
+    const green="#126b3b", dark="#0b4b2d", pale="#eef7ef", ink="#17221b", grey="#69746e", lime="#9bd22d";
+    x.fillStyle="#f7f8f5";x.fillRect(0,0,W,H);
+
+    // Header
+    drawRounded(x,22,18,W-44,150,32,dark);
+    x.fillStyle="#fff";x.font="900 60px Arial, sans-serif";x.fillText("I’M IN GOLF",72,88);
+    x.fillStyle=lime;x.font="800 25px Arial, sans-serif";x.fillText("GOLF. MATES. YOU’RE IN.",74,126);
+    x.font="54px Arial";x.fillText("⛳",930,103);
+
+    // Title area
+    x.textAlign="center";x.fillStyle=green;x.font="900 46px Arial, sans-serif";x.fillText("🏆 TODAY’S RESULT",W/2,230);
+    x.fillStyle=grey;x.font="700 25px Arial, sans-serif";x.fillText(fmtDate(page.round?.date||""),W/2,270);
+    const title=String(page.round?.course||"Completed Round").toUpperCase();
+    const titleSize=fitCanvasText(x,title,W-120,37,22);
+    x.fillStyle=ink;x.font=`900 ${titleSize}px Arial, sans-serif`;x.fillText(title,W/2,318);
+    x.fillStyle=grey;x.font="700 23px Arial, sans-serif";
+    x.fillText(`${page.groupName}  •  ${page.round?.gameType==="points"?"Points Game":"Money Game"}  •  ${page.comp==="net"?"Net":"Stableford"}`,W/2,355);
+
+    let tableTop;
+    if(page.pageIndex===0){
+      // Compact winner panel, intentionally much smaller than old winner-only card.
+      drawRounded(x,68,390,W-136,135,24,"#ffffff","#dbe6dc");
+      x.textAlign="left";x.fillStyle=green;x.font="800 19px Arial";x.fillText("WINNER",112,426);
+      x.fillStyle=ink;x.font="900 34px Arial";x.fillText(page.winner,112,468);
+      x.fillStyle=green;x.font="800 19px Arial";x.fillText("SCORE",540,426);
+      const winPlayer=page.players.find(p=>String(p.name)===String(page.winner))||page.players[0];
+      x.fillStyle=ink;x.font="900 34px Arial";x.fillText(winPlayer?scoreTextForRound(page.round,winPlayer):"—",540,468);
+      if(page.round?.gameType==="money"){
+        x.fillStyle=green;x.font="800 19px Arial";x.fillText("WON",790,426);
+        x.fillStyle=ink;x.font="900 34px Arial";x.fillText(`£${Number(page.pot||0).toFixed(2).replace(/\.00$/,"")}`,790,468);
+      }
+      tableTop=575;
+    }else{
+      x.fillStyle=grey;x.font="800 22px Arial";x.textAlign="center";
+      x.fillText(`FINAL STANDINGS — CONTINUED`,W/2,415);
+      tableTop=470;
+    }
+
+    // Standings heading
+    x.textAlign="left";x.fillStyle=green;x.font="900 31px Arial";x.fillText("📊 FINAL STANDINGS",72,tableTop-35);
+    if(page.pageCount>1){
+      drawRounded(x,865,tableTop-66,140,42,14,green);
+      x.fillStyle="#fff";x.font="800 19px Arial";x.textAlign="center";x.fillText(`${page.pageIndex+1} OF ${page.pageCount}`,935,tableTop-38);
+    }
+
+    // Table header
+    x.textAlign="left";x.fillStyle=green;x.fillRect(68,tableTop,W-136,48);
+    x.fillStyle="#fff";x.font="800 18px Arial";x.fillText("POS",92,tableTop+31);x.fillText("PLAYER",185,tableTop+31);
+    x.textAlign="right";x.fillText(page.comp==="net"?"SCORE (NET)":"POINTS",978,tableTop+31);
+
+    const available=1190-(tableTop+48);
+    const rowH=Math.min(48,Math.floor(available/Math.max(1,page.players.length)));
+    let lastValue=null,lastPos=page.pageIndex*20;
+    page.players.forEach((p,localIndex)=>{
+      const absoluteIndex=page.pageIndex*20+localIndex;
+      const y=tableTop+48+localIndex*rowH;
+      if(localIndex%2===0){x.fillStyle=pale;x.fillRect(68,y,W-136,rowH)}
+      let pos="—";
+      if(p.noReturn!==true){
+        const val=page.comp==="net"?Number(p.netScore):Number(p.stableford);
+        const key=String(val);
+        // For continuation pages, derive tied position from the complete sorted list.
+        const all=sortedRoundStandings(page.round);
+        let first=absoluteIndex;
+        while(first>0){
+          const prev=all[first-1];
+          if(prev.noReturn===true)break;
+          const pv=page.comp==="net"?Number(prev.netScore):Number(prev.stableford);
+          if(String(pv)!==key)break;
+          first--;
+        }
+        pos=first+1;
+      }
+      x.fillStyle=green;x.beginPath();x.arc(112,y+rowH/2,18,0,Math.PI*2);x.fill();
+      x.fillStyle="#fff";x.font=`900 ${Math.max(15,rowH*.42)}px Arial`;x.textAlign="center";x.fillText(String(pos),112,y+rowH*.67);
+      x.fillStyle=ink;x.font=`800 ${Math.max(16,rowH*.43)}px Arial`;x.textAlign="left";x.fillText(String(p.name||"Player"),185,y+rowH*.67);
+      x.fillStyle=green;x.font=`800 ${Math.max(16,rowH*.43)}px Arial`;x.textAlign="right";x.fillText(scoreTextForRound(page.round,p),978,y+rowH*.67);
+    });
+
+    // Footer
+    drawRounded(x,22,1230,W-44,102,30,dark);
+    x.textAlign="center";x.fillStyle=lime;x.font="900 29px Arial";x.fillText("🎉 WELL PLAYED! 🎉",W/2,1275);
+    x.fillStyle="#fff";x.font="600 20px Arial";x.fillText("Thanks for playing — see you next time!",W/2,1308);
+    return c;
+  }
+  async function shareBrandedRound(groupName,r){
+    const pages=resultCardPages(groupName,r);
+    const files=[];
+    for(let i=0;i<pages.length;i++){
+      const canvas=brandedResultCanvas(pages[i]);
+      const blob=await new Promise(resolve=>canvas.toBlob(resolve,"image/png",0.95));
+      files.push(new File([blob],`im-in-golf-results-${i+1}-of-${pages.length}.png`,{type:"image/png"}));
+    }
+    const shareData={
+      title:"I’m In Golf — Results",
+      text:`${r?.course||"Completed round"} — ${fmtDate(r?.date||"")}`,
+      files
+    };
+    try{
+      if(navigator.canShare && navigator.canShare({files}) && navigator.share){
+        await navigator.share(shareData);
+        return;
+      }
+    }catch(e){
+      if(e?.name==="AbortError")return;
+    }
+    // Desktop fallback: download all generated result pages.
+    files.forEach((file,i)=>{
+      const a=document.createElement("a");
+      a.href=URL.createObjectURL(file);
+      a.download=file.name;
+      document.body.appendChild(a);a.click();a.remove();
+      setTimeout(()=>URL.revokeObjectURL(a.href),1500);
+    });
+    toast(pages.length===1 ? "Branded result image downloaded" : `${pages.length} branded result pages downloaded`);
+  }
+
   function openWhatsAppShare(text){
     const clean=String(text||"").trim();
     if(!clean)return;
@@ -754,11 +903,11 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
       <h3 style="margin:20px 0 6px;">📊 Final standings</h3>
       ${roundStandingsHtml(r)}
       <div class="modal-actions">
-        <button class="secondary" id="shareRoundWhatsApp">💬 Share Standings</button>
+        <button class="secondary" id="shareRoundWhatsApp">📤 Share Results</button>
         <button class="primary" id="closeHistoryDetail">Close</button>
       </div>
     `);
-    $("shareRoundWhatsApp").onclick=()=>openWhatsAppShare(roundStandingsText(groupName,r));
+    $("shareRoundWhatsApp").onclick=()=>shareBrandedRound(groupName,r);
     $("closeHistoryDetail").onclick=closeModal;
   }
   function showTripHistoryModal(groupName,trip){
