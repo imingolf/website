@@ -1280,9 +1280,9 @@ function pay(){
    ${pin==="2026"
      ? `<button class="secondary full" onclick="alert('👀 Demo Mode\n\nPayments are disabled in the demo.')">🔒 Demo — Payments Disabled</button>`
      : (me && me.paid
-         ? `<button class="secondary full" disabled>✓ You are marked paid</button>`
+         ? `<button class="secondary full" disabled>✅ You’re In — Good Luck! ⛳</button>`
          : (String(state.paymentLink||"").trim()
-             ? `<button class="primary full" onclick="beginPlayerPayment()">💳 Pay £${Number(state.stake||0)} to your Group Admin</button>`
+             ? `<button class="primary full" onclick="beginPlayerPayment()">💳 Pay £${Number(state.stake||0)} & Enter</button>`
              : `<button class="secondary full" disabled>Payment link not set up — ask your Group Admin</button>`))
    }
  </div>`;
@@ -1559,7 +1559,7 @@ function scores(){
 
                 <button class="primary full" style="margin-top:8px;"
                   onclick="submitPlayerScore(${i},'${type}')">
-                  Submit score
+                  🏌️ Submit My Score
                 </button>
 
                 ${type==="net" ? `
