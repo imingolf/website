@@ -996,6 +996,28 @@ function showTripSummary(){
   window.scrollTo(0,0);
 }
 
+function playerNextActionHtml(){
+  if(isAdmin || demoReadOnly() || !myPlayerId)return "";
+  const me=state.players.find(p=>p.id===myPlayerId);
+  if(!me)return "";
+
+  const comp=state.pointsCompetition||state.trip?.competition||"stableford";
+  const submitted=me.scoreSubmitted===true ||
+    (comp==="net" ? me.noReturn===true || me.netScore!=null : me.stableford!=null);
+  const moneyGame=state.gameType==="money" && Number(state.stake||0)>0;
+
+  if(moneyGame && !me.paid && !roundLocked()){
+    return `<div class="card" style="text-align:center;"><div class="muted">YOUR NEXT STEP</div><button class="primary full" style="font-size:18px;margin-top:8px;" onclick="show('pay')">💳 Pay £${Number(state.stake||0)} & Enter</button></div>`;
+  }
+  if(submitted){
+    return `<div class="card" style="text-align:center;"><div class="muted">YOUR NEXT STEP</div><button class="secondary full" style="font-size:18px;margin-top:8px;" onclick="show('scores')">✅ Score In — View Leaderboard</button></div>`;
+  }
+  if(roundLocked() && (!moneyGame || me.paid)){
+    return `<div class="card" style="text-align:center;"><div class="muted">YOUR NEXT STEP</div><button class="primary full" style="font-size:18px;margin-top:8px;" onclick="show('scores')">🏌️ Enter My Score</button></div>`;
+  }
+  return `<div class="card" style="text-align:center;"><div class="muted">YOUR NEXT STEP</div><button class="secondary full" style="font-size:18px;margin-top:8px;" disabled>✅ You’re In — Good Luck! ⛳</button></div>`;
+}
+
 function round(){
 
   if(state.trip?.completed){
@@ -1043,6 +1065,8 @@ function round(){
 $("screen").innerHTML=`
 
   ${myPlayerId && state.players.some(p=>p.id===myPlayerId) ? `<div class="notice" style="margin-top:0;">👤 You: <b>${esc(state.players.find(p=>p.id===myPlayerId)?.name||"")}</b></div>` : ""}
+
+  ${playerNextActionHtml()}
 
   ${state.trip?.active ? `
     <div class="card" style="text-align:center;">
@@ -1315,6 +1339,31 @@ function showAppToast(title,subtitle="",duration=2800){
     setTimeout(()=>toast.remove(),220);
   },duration);
 }
+function showBigPlayerMessage(title,subtitle="",duration=3000){
+  document.querySelectorAll(".player-big-message").forEach(el=>el.remove());
+  const overlay=document.createElement("div");
+  overlay.className="player-big-message";
+  overlay.setAttribute("role","status");
+  overlay.setAttribute("aria-live","polite");
+  overlay.style.cssText="position:fixed;inset:0;z-index:12000;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(0,0,0,.28);opacity:0;transition:opacity .25s ease;pointer-events:none;";
+  overlay.innerHTML=`
+    <div class="card" style="width:min(430px,92vw);margin:0;text-align:center;padding:30px 22px;border-radius:24px;box-shadow:0 20px 55px rgba(0,0,0,.22);transform:scale(.96);transition:transform .25s ease;">
+      <div style="font-size:34px;font-weight:900;line-height:1.15;">${esc(title)}</div>
+      ${subtitle ? `<div style="font-size:20px;font-weight:700;margin-top:10px;">${esc(subtitle)}</div>` : ""}
+    </div>`;
+  document.body.appendChild(overlay);
+  requestAnimationFrame(()=>{
+    overlay.style.opacity="1";
+    const card=overlay.querySelector(".card");
+    if(card)card.style.transform="scale(1)";
+  });
+  setTimeout(()=>{
+    overlay.style.opacity="0";
+    const card=overlay.querySelector(".card");
+    if(card)card.style.transform="scale(.98)";
+    setTimeout(()=>overlay.remove(),520);
+  },Math.max(1200,duration-500));
+}
 async function recognisePaymentReturn(){
   if(demoReadOnly())return;
   if(paymentReturnBusy || document.visibilityState==="hidden")return;
@@ -1331,7 +1380,7 @@ async function recognisePaymentReturn(){
   await save();
   paymentReturnBusy=false;
   render();
-  showAppToast("✅ You’re marked paid","Good luck! ⛳");
+  showBigPlayerMessage("✅ YOU’RE IN!","Good luck! ⛳",3000);
 }
 window.addEventListener("focus",()=>setTimeout(recognisePaymentReturn,250));
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")setTimeout(recognisePaymentReturn,250);});
@@ -1678,7 +1727,8 @@ async function submitPlayerScore(i,type){
   scoreDraftActive=false;
 
   render();
-  await save();
+  const saved=await save();
+  if(saved && !isAdmin)showBigPlayerMessage("✅ SCORE IN!","You’re all done.",3000);
 }
 
 async function submitNoReturn(i){
@@ -1709,7 +1759,8 @@ async function submitNoReturn(i){
   scoreDraftActive=false;
 
   render();
-  await save();
+  const saved=await save();
+  if(saved && !isAdmin)showBigPlayerMessage("✅ SCORE IN!","NR recorded — you’re all done.",3000);
 }
 
 async function adminEditSubmittedScore(i,type){
