@@ -792,7 +792,10 @@ function waitingScreen(){
       <div class="muted">${first ? "NEXT ROUND" : "NEXT COMPETITION"}</div>
       <h2 style="font-size:28px;margin:8px 0;">${isAdmin ? "Ready for the next one?" : (first ? "Your first round is coming soon" : "Coming soon…")}</h2>
       <div class="muted">${isAdmin ? "Set up your group's next competition." : (first ? "Your Admin hasn't set up the first round yet." : "Your Admin will set up the next competition.")}</div>
-      ${isAdmin ? `<button class="primary full" style="margin-top:18px;" onclick="newRound()">➕ Set Up Next Competition</button>` : ``}
+      ${isAdmin
+        ? `<button class="primary full" style="margin-top:18px;" onclick="newRound()">➕ Set Up Next Competition</button>`
+        : `<button class="primary full" style="margin-top:18px;" onclick="adminLoginFromWaiting()">🔐 Admin — Set Up Next Competition</button>`
+      }
     </div>
     ${first ? "" : `<div class="card"><div class="notice">✅ The last result has been saved in <b>League → Previous rounds</b>.</div></div>`}
   `;
