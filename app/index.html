@@ -3579,7 +3579,7 @@ function playersPage(){
 
  $("screen").innerHTML=`
  <div class="card">
-   <h2>👥 Players</h2>
+   <h2>👥 Players <span class="muted" style="font-size:14px;font-weight:700;">(${state.players.length})</span></h2>
 
    <div class="notice">
      👤 You: ${esc(state.players.find(p=>p.id===myPlayerId)?.name || "Not selected")}
