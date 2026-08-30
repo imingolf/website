@@ -2337,6 +2337,91 @@ if(isTrip){
     showWinnerScreen(record);
   }
 }
+
+function resultCompetition(record){
+  if(record?.pointsCompetition==="net" || record?.pointsCompetition==="stableford")return record.pointsCompetition;
+  const players=record?.players||[];
+  const netCount=players.filter(p=>p?.netScore!=null || p?.noReturn===true).length;
+  const sfCount=players.filter(p=>p?.stableford!=null).length;
+  if(netCount && !sfCount)return "net";
+  if(sfCount && !netCount)return "stableford";
+  if(netCount>=sfCount && netCount)return "net";
+  return "stableford";
+}
+function resultEntrants(record){
+  const comp=resultCompetition(record);
+  return (record?.players||[]).filter(p=>p?.noReturn===true || (comp==="net" ? p?.netScore!=null : p?.stableford!=null));
+}
+function sortedFinalStandings(record){
+  const comp=resultCompetition(record);
+  return resultEntrants(record).slice().sort((a,b)=>{
+    if(a.noReturn===true && b.noReturn!==true)return 1;
+    if(b.noReturn===true && a.noReturn!==true)return -1;
+    if(a.noReturn===true && b.noReturn===true)return String(a.name||"").localeCompare(String(b.name||""));
+    const av=Number(comp==="net"?a.netScore:a.stableford);
+    const bv=Number(comp==="net"?b.netScore:b.stableford);
+    if(av!==bv)return comp==="net" ? av-bv : bv-av;
+    return String(a.name||"").localeCompare(String(b.name||""));
+  });
+}
+function finalStandingPosition(record,sorted,index){
+  const p=sorted[index];
+  if(!p || p.noReturn===true)return "—";
+  const comp=resultCompetition(record);
+  const value=Number(comp==="net"?p.netScore:p.stableford);
+  let first=index;
+  while(first>0){
+    const prev=sorted[first-1];
+    if(prev.noReturn===true)break;
+    const prevValue=Number(comp==="net"?prev.netScore:prev.stableford);
+    if(prevValue!==value)break;
+    first--;
+  }
+  return String(first+1);
+}
+function finalStandingScore(record,p){
+  if(p?.noReturn===true)return "NR";
+  return resultCompetition(record)==="net" ? `Net ${p?.netScore??"—"}` : `${p?.stableford??"—"} pts`;
+}
+function resultWinnerText(record){
+  if(record?.gameType==="points" && record?.pointsResults?.length)return record.pointsResults[0].name||"";
+  const comp=resultCompetition(record);
+  const names=comp==="net" ? (record?.netWinnerNames||[]) : (record?.stablefordWinnerNames||[]);
+  return names.join(" & ") || (record?.winners||[]).join(" & ");
+}
+function resultWinnerScore(record){
+  const winnerName=(record?.gameType==="points" && record?.pointsResults?.length)
+    ? record.pointsResults[0].name
+    : ((resultCompetition(record)==="net" ? record?.netWinnerNames?.[0] : record?.stablefordWinnerNames?.[0]) || record?.winners?.[0]);
+  const p=(record?.players||[]).find(x=>x.name===winnerName);
+  if(p)return finalStandingScore(record,p);
+  if(record?.gameType==="points" && record?.pointsResults?.length){
+    const r=record.pointsResults[0];
+    return resultCompetition(record)==="net" ? `Net ${r.score}` : `${r.score} pts`;
+  }
+  return "—";
+}
+function resultWinnerValue(record){
+  if(record?.gameType==="points"){
+    return record?.pointsResults?.[0]?.points!=null ? `+${record.pointsResults[0].points} league pts` : "";
+  }
+  const comp=resultCompetition(record);
+  const pot=Number(comp==="net"?record?.netPot:record?.stablefordPot)||0;
+  const names=comp==="net" ? (record?.netWinnerNames||[]) : (record?.stablefordWinnerNames||[]);
+  if(names.length>1)return `£${(pot/names.length).toFixed(2).replace(/\.00$/,"")} each`;
+  return `£${pot.toFixed(2).replace(/\.00$/,"")}`;
+}
+function finalStandingsHtml(record){
+  const sorted=sortedFinalStandings(record);
+  if(!sorted.length)return `<div class="muted">No final standings saved.</div>`;
+  return sorted.map((p,i)=>`
+    <div class="player row">
+      <span class="pos">${esc(finalStandingPosition(record,sorted,i))}</span>
+      <div style="flex:1"><b>${esc(p.name||"Player")}</b><div class="muted">HCP ${esc(String(p.handicap??"—"))}</div></div>
+      <span class="money">${esc(finalStandingScore(record,p))}</span>
+    </div>`).join("");
+}
+
 function showRoundHistory(historyIndex){
   const h=(state.history||[])[Number(historyIndex)];
   if(!h){
@@ -2403,30 +2488,8 @@ function showRoundHistory(historyIndex){
     `}
 
     <div class="card">
-      <h2>🏌️ Players & scores</h2>
-
-      ${players.length ? players.map(p=>`
-        <div class="player">
-          <div class="row">
-            <div>
-              <b>${esc(p.name)}</b>
-              <div class="muted">
-                HCP ${Number(p.handicap||0)}
-                ${p.competition ? " • "+(p.competition==="stableford" ? "Stableford" : "Net") : ""}
-              </div>
-            </div>
-            <div style="text-align:right;font-weight:800;">
-              ${p.noReturn===true
-                ? "NR"
-                : p.stableford!=null
-                ? esc(String(p.stableford))+" pts"
-                : p.netScore!=null
-                ? "Net "+esc(String(p.netScore))
-                : ""}
-            </div>
-          </div>
-        </div>
-      `).join("") : `<div class="muted">No player scores saved for this round.</div>`}
+      <h2>📊 Final standings</h2>
+      ${finalStandingsHtml(h)}
     </div>
 
     <div class="card">
@@ -2517,6 +2580,11 @@ function showWinnerScreen(record){
           ` : ""}
         </div>
       `).join("")}
+
+      <div class="card">
+        <h2>📊 Final standings</h2>
+        ${finalStandingsHtml(record)}
+      </div>
 
       <div class="card" style="text-align:center;">
         <div style="font-size:28px;">🎉 ⛳ 🎉</div>
@@ -2645,6 +2713,11 @@ function showWinnerScreen(record){
       </div>
     ` : ""}
 
+    <div class="card">
+      <h2>📊 Final standings</h2>
+      ${finalStandingsHtml(record)}
+    </div>
+
     <div class="card" style="text-align:center;">
       <div style="font-size:28px;">🎉 ⛳ 🎉</div>
       <div style="font-weight:800;margin-top:8px;">Congratulations!</div>
@@ -2663,598 +2736,150 @@ function showWinnerScreen(record){
   `;
 }
 async function shareWinnerImage(){
-
   const record=lastWinnerRecord;
+  if(!record){alert("No result available to share.");return;}
 
-  if(!record){
-    alert("No result available to share.");
-    return;
+  const standings=sortedFinalStandings(record);
+  if(!standings.length){alert("No final standings are available to share.");return;}
+
+  const pageSize=20;
+  const pageCount=Math.max(1,Math.ceil(standings.length/pageSize));
+  const competition=resultCompetition(record);
+  const winner=resultWinnerText(record)||"Winner";
+  const winnerScore=resultWinnerScore(record);
+  const winnerValue=resultWinnerValue(record);
+
+  const green="#176b3a", darkGreen="#09512f", dark="#17231b", muted="#68736c",
+        pale="#edf5ef", white="#ffffff", line="#dce3dd", lime="#9bd22d";
+
+  function roundedRect(ctx,x,y,w,h,r,fill,stroke){
+    ctx.beginPath();ctx.roundRect(x,y,w,h,r);
+    if(fill){ctx.fillStyle=fill;ctx.fill()}
+    if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=2;ctx.stroke()}
   }
-
-  const isPointsGame=record.gameType==="points";
-
-  const canvas=document.createElement("canvas");
-  canvas.width=1080;
-
-  if(isPointsGame){
-    const count=(record.pointsResults||[]).length;
-    canvas.height=count>=3 ? 1500 : count===2 ? 1250 : 1000;
-  }else{
-    const resultCount=
-      (record.stablefordWinnerNames?.length ? 1 : 0) +
-      (record.netWinnerNames?.length ? 1 : 0);
-
-    canvas.height=resultCount===2 ? 1500 : 950;
-  }
-
-  const ctx=canvas.getContext("2d");
-
-  const green="#176b3a";
-  const dark="#17231b";
-  const muted="#68736c";
-  const pale="#edf5ef";
-  const white="#ffffff";
-  const line="#dce3dd";
-
-  function roundedRect(x,y,w,h,r,fill,stroke){
-    ctx.beginPath();
-    ctx.roundRect(x,y,w,h,r);
-
-    if(fill){
-      ctx.fillStyle=fill;
-      ctx.fill();
-    }
-
-    if(stroke){
-      ctx.strokeStyle=stroke;
-      ctx.lineWidth=2;
-      ctx.stroke();
-    }
-  }
-
-  function centreText(text,y,size,weight="700",colour=dark){
-    ctx.fillStyle=colour;
-    ctx.font=`${weight} ${size}px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif`;
-    ctx.textAlign="center";
-    ctx.fillText(text,canvas.width/2,y);
-  }
-
-  function fitText(text,maxWidth,startSize,weight="800"){
+  function fitText(ctx,text,maxWidth,startSize,minSize=20,weight="800"){
     let size=startSize;
-
-    while(size>32){
+    while(size>minSize){
       ctx.font=`${weight} ${size}px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif`;
-
       if(ctx.measureText(text).width<=maxWidth)break;
-
       size-=2;
     }
-
     return size;
   }
+  function centreText(ctx,text,y,size,weight="700",colour=dark){
+    ctx.fillStyle=colour;ctx.font=`${weight} ${size}px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif`;
+    ctx.textAlign="center";ctx.fillText(text,540,y);
+  }
+  function createPage(pageIndex){
+    const players=standings.slice(pageIndex*pageSize,(pageIndex+1)*pageSize);
+    const canvas=document.createElement("canvas");canvas.width=1080;canvas.height=1350;
+    const ctx=canvas.getContext("2d");
 
-  ctx.fillStyle="#f4f6f3";
-  ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.fillStyle="#f4f6f3";ctx.fillRect(0,0,1080,1350);
+    roundedRect(ctx,22,18,1036,1314,34,white,green);
+    roundedRect(ctx,22,18,1036,150,34,darkGreen);
 
-  roundedRect(
-    24,
-    24,
-    1032,
-    canvas.height-48,
-    42,
-    white,
-    green
-  );
+    ctx.fillStyle=white;ctx.textAlign="left";
+    ctx.font='900 58px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';
+    ctx.fillText("I’M IN GOLF",72,88);
+    ctx.fillStyle=lime;ctx.font='800 24px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';
+    ctx.fillText("GOLF. MATES. YOU’RE IN.",74,126);
+    ctx.font='52px Arial';ctx.textAlign="right";ctx.fillStyle=white;ctx.fillText("⛳",986,105);
 
-  roundedRect(
-    24,
-    24,
-    1032,
-    190,
-    42,
-    green
-  );
+    centreText(ctx,"🏆 TODAY’S RESULT",230,47,"900",green);
+    centreText(ctx,formatDate(record.date||""),272,27,"700",muted);
 
-  ctx.fillStyle=white;
-  ctx.textAlign="left";
+    const course=String(record.course||"Completed Round").toUpperCase();
+    centreText(ctx,course,322,fitText(ctx,course,920,38,22,"900"),"900",dark);
 
-  ctx.font='800 62px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';
-  ctx.fillText("I'M IN GOLF",85,105);
+    const gameLabel=record.gameType==="points" ? "Points Game" : "Money Game";
+    centreText(ctx,`${state.groupName||"I’m In Golf"}  •  ${gameLabel}  •  ${competition==="net"?"Net":"Stableford"}`,360,22,"700",muted);
 
-  ctx.font='700 26px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';
-  ctx.fillText("GOLF. MATES. YOU'RE IN.",88,151);
+    let tableTop;
+    if(pageIndex===0){
+      roundedRect(ctx,68,395,944,132,24,white,line);
+      ctx.textAlign="left";ctx.fillStyle=green;ctx.font='800 18px Arial';
+      ctx.fillText("WINNER",108,430);
+      ctx.fillStyle=dark;ctx.font=`900 ${fitText(ctx,winner,355,35,22,"900")}px Arial`;ctx.fillText(winner,108,473);
 
-  ctx.font='60px Arial';
-  ctx.textAlign="right";
-  ctx.fillText("⛳",980,125);
+      ctx.fillStyle=green;ctx.font='800 18px Arial';ctx.fillText("SCORE",540,430);
+      ctx.fillStyle=dark;ctx.font='900 34px Arial';ctx.fillText(winnerScore,540,473);
 
+      ctx.fillStyle=green;ctx.font='800 18px Arial';ctx.fillText(record.gameType==="points"?"LEAGUE":"WON",795,430);
+      ctx.fillStyle=dark;ctx.font=`900 ${fitText(ctx,winnerValue,190,32,19,"900")}px Arial`;ctx.fillText(winnerValue,795,473);
+      tableTop=590;
+    }else{
+      centreText(ctx,"FINAL STANDINGS — CONTINUED",430,28,"900",green);
+      tableTop=490;
+    }
 
-  // =====================================
-  // 🏆 POINTS GAME SHARE IMAGE
-  // =====================================
+    ctx.textAlign="left";ctx.fillStyle=green;ctx.font='900 31px Arial';
+    ctx.fillText("📊 FINAL STANDINGS",72,tableTop-34);
 
-  if(isPointsGame){
+    if(pageCount>1){
+      roundedRect(ctx,872,tableTop-66,132,40,13,green);
+      ctx.fillStyle=white;ctx.font='800 18px Arial';ctx.textAlign="center";
+      ctx.fillText(`${pageIndex+1} OF ${pageCount}`,938,tableTop-39);
+    }
 
-    const results=record.pointsResults || [];
+    ctx.fillStyle=green;ctx.fillRect(68,tableTop,944,46);
+    ctx.fillStyle=white;ctx.font='800 17px Arial';ctx.textAlign="left";
+    ctx.fillText("POS",92,tableTop+30);ctx.fillText("PLAYER",182,tableTop+30);
+    ctx.textAlign="right";ctx.fillText(competition==="net"?"SCORE (NET)":"POINTS",978,tableTop+30);
 
-    centreText(
-      "🏆  POINTS GAME RESULT",
-      290,
-      54,
-      "800",
-      green
-    );
+    const rowH=Math.min(46,Math.floor((1196-(tableTop+46))/Math.max(1,players.length)));
+    players.forEach((p,localIndex)=>{
+      const absoluteIndex=pageIndex*pageSize+localIndex;
+      const y=tableTop+46+localIndex*rowH;
+      if(localIndex%2===0){ctx.fillStyle=pale;ctx.fillRect(68,y,944,rowH)}
 
-    centreText(
-      formatDate(record.date),
-      350,
-      31,
-      "700",
-      muted
-    );
+      const pos=finalStandingPosition(record,standings,absoluteIndex);
+      ctx.beginPath();ctx.fillStyle=green;ctx.arc(112,y+rowH/2,Math.min(18,rowH*.38),0,Math.PI*2);ctx.fill();
+      ctx.fillStyle=white;ctx.font=`900 ${Math.max(14,rowH*.38)}px Arial`;ctx.textAlign="center";ctx.fillText(pos,112,y+rowH*.66);
 
-    const courseSize=
-      fitText(
-        String(record.course||""),
-        900,
-        42,
-        "800"
-      );
+      const name=String(p.name||"Player");
+      ctx.fillStyle=dark;ctx.font=`800 ${fitText(ctx,name,510,Math.max(15,rowH*.40),13,"800")}px Arial`;ctx.textAlign="left";
+      ctx.fillText(name,182,y+rowH*.66);
 
-    centreText(
-      String(record.course||"").toUpperCase(),
-      410,
-      courseSize,
-      "800",
-      dark
-    );
-
-    centreText(
-      record.pointsCompetition==="net"
-        ? "⛳ NET"
-        : "🏆 STABLEFORD",
-      465,
-      28,
-      "800",
-      green
-    );
-
-    let y=510;
-
-    results.forEach((r,i)=>{
-
-      roundedRect(
-        72,
-        y,
-        936,
-        220,
-        28,
-        white,
-        line
-      );
-
-      roundedRect(
-        72,
-        y,
-        220,
-        220,
-        28,
-        pale
-      );
-
-      ctx.textAlign="center";
-      ctx.font="66px Arial";
-
-      ctx.fillText(
-        i===0 ? "🥇" : i===1 ? "🥈" : "🥉",
-        182,
-        y+90
-      );
-
-      ctx.fillStyle=green;
-      ctx.font='800 26px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';
-
-      ctx.fillText(
-        i===0 ? "1ST PLACE" :
-        i===1 ? "2ND PLACE" :
-        "3RD PLACE",
-        182,
-        y+150
-      );
-
-      const nameSize=
-        fitText(
-          String(r.name||""),
-          570,
-          48,
-          "800"
-        );
-
-      ctx.fillStyle=dark;
-      ctx.font=`800 ${nameSize}px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif`;
-
-      ctx.fillText(
-        String(r.name||"").toUpperCase(),
-        645,
-        y+65
-      );
-
-      ctx.fillStyle=muted;
-      ctx.font='700 28px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';
-
-      ctx.fillText(
-        record.pointsCompetition==="stableford"
-          ? `${r.score} PTS`
-          : `NET ${r.score}`,
-        645,
-        y+112
-      );
-
-      roundedRect(
-        440,
-        y+135,
-        410,
-        62,
-        18,
-        green
-      );
-
-      ctx.fillStyle=white;
-      ctx.font='800 32px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';
-
-      ctx.fillText(
-        `+${r.points} LEAGUE PTS`,
-        645,
-        y+177
-      );
-
-      y+=240;
-
-      if(r.countback){
-
-        roundedRect(
-          120,
-          y,
-          840,
-          58,
-          18,
-          pale,
-          green
-        );
-
-        centreText(
-          "★  COUNTBACK — ADMIN DECLARED",
-          y+38,
-          22,
-          "800",
-          green
-        );
-
-        y+=78;
-      }
+      ctx.fillStyle=green;ctx.font=`800 ${Math.max(15,rowH*.40)}px Arial`;ctx.textAlign="right";
+      ctx.fillText(finalStandingScore(record,p),978,y+rowH*.66);
     });
 
-    centreText(
-      "🎉  WELL PLAYED!  🎉",
-      canvas.height-105,
-      34,
-      "800",
-      green
-    );
+    ctx.strokeStyle=green;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(68,1223);ctx.lineTo(1012,1223);ctx.stroke();
+    const footerWinner=winner.length>25 ? winner.slice(0,23)+"…" : winner;
+    ctx.textAlign="center";ctx.fillStyle=green;ctx.font='900 21px Arial';
+    ctx.fillText(`🎉 WELL PLAYED!   |   🏆 WINNER: ${footerWinner}   |   NEXT COMP COMING SOON ⛳`,540,1274);
 
-    centreText(
-      "League points updated",
-      canvas.height-60,
-      25,
-      "600",
-      muted
-    );
+    return canvas;
   }
 
-
-  // =====================================
-  // 💷 MONEY GAME SHARE IMAGE
-  // =====================================
-
-  else{
-
-    const stablefordWinner=
-      record.stablefordWinnerNames?.[0] || "";
-
-    const netWinner=
-      record.netWinnerNames?.[0] || "";
-
-    const stablefordPlayer=
-      (record.players||[]).find(
-        p=>p.name===stablefordWinner
-      );
-
-    const netPlayer=
-      (record.players||[]).find(
-        p=>p.name===netWinner
-      );
-
-    const stablefordScore=
-      stablefordPlayer?.stableford ?? "";
-
-    const netScore=
-      netPlayer?.netScore ?? "";
-
-    const stablefordPotValue=
-      Number(record.stablefordPot||0);
-
-    const netPotValue=
-      Number(record.netPot||0);
-
-
-    centreText(
-      "🏆  TODAY'S RESULT",
-      290,
-      58,
-      "800",
-      green
-    );
-
-    centreText(
-      formatDate(record.date),
-      350,
-      31,
-      "700",
-      muted
-    );
-
-    const courseSize=
-      fitText(
-        String(record.course||""),
-        900,
-        42,
-        "800"
-      );
-
-    centreText(
-      String(record.course||"").toUpperCase(),
-      410,
-      courseSize,
-      "800",
-      dark
-    );
-
-    let y=470;
-
-    function drawWinnerCard(
-      type,
-      name,
-      score,
-      pot,
-      countback
-    ){
-
-      roundedRect(
-        72,
-        y,
-        936,
-        285,
-        28,
-        white,
-        line
-      );
-
-      roundedRect(
-        72,
-        y,
-        250,
-        285,
-        28,
-        pale
-      );
-
-      ctx.textAlign="center";
-      ctx.fillStyle=green;
-      ctx.font="64px Arial";
-
-      ctx.fillText(
-        type==="stableford" ? "🏆" : "⛳",
-        197,
-        y+82
-      );
-
-      ctx.font='800 27px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';
-
-      ctx.fillText(
-        type==="stableford"
-          ? "STABLEFORD"
-          : "NET",
-        197,
-        y+145
-      );
-
-      ctx.fillText(
-        "WINNER",
-        197,
-        y+182
-      );
-
-      const nameSize=
-        fitText(
-          name,
-          570,
-          55,
-          "800"
-        );
-
-      ctx.fillStyle=dark;
-
-      ctx.font=`800 ${nameSize}px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif`;
-
-      ctx.fillText(
-        name.toUpperCase(),
-        645,
-        y+78
-      );
-
-      roundedRect(
-        410,
-        y+105,
-        470,
-        90,
-        20,
-        green
-      );
-
-      ctx.fillStyle=white;
-
-      ctx.font='800 55px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';
-
-      ctx.fillText(
-        type==="stableford"
-          ? `${score} PTS`
-          : `${score}`,
-        645,
-        y+168
-      );
-
-      ctx.fillStyle=green;
-
-      ctx.font='800 27px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';
-
-      ctx.fillText(
-        "WON",
-        645,
-        y+222
-      );
-
-      ctx.fillStyle=dark;
-
-      ctx.font='800 48px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';
-
-      ctx.fillText(
-        `£${pot}`,
-        645,
-        y+270
-      );
-
-      y+=305;
-
-      if(countback){
-
-        roundedRect(
-          100,
-          y,
-          880,
-          68,
-          20,
-          pale,
-          green
-        );
-
-        centreText(
-          "★  WINNER ON COUNTBACK — ADMIN DECLARED",
-          y+44,
-          24,
-          "800",
-          green
-        );
-
-        y+=90;
-      }
-    }
-
-    if(stablefordWinner){
-
-      drawWinnerCard(
-        "stableford",
-        stablefordWinner,
-        stablefordScore,
-        stablefordPotValue,
-        record.stablefordCountback
-      );
-    }
-
-    if(netWinner){
-
-      drawWinnerCard(
-        "net",
-        netWinner,
-        netScore,
-        netPotValue,
-        record.netCountback
-      );
-    }
-
-    centreText(
-      "🎉  WELL PLAYED!  🎉",
-      canvas.height-115,
-      34,
-      "800",
-      green
-    );
-
-    centreText(
-      "Thanks for playing — see you next time!",
-      canvas.height-65,
-      25,
-      "600",
-      muted
-    );
+  const files=[];
+  for(let i=0;i<pageCount;i++){
+    const blob=await new Promise(resolve=>createPage(i).toBlob(resolve,"image/png",0.95));
+    if(!blob){alert("Couldn't create the result image.");return;}
+    files.push(new File([blob],`Im-In-Golf-Result-${i+1}-of-${pageCount}.png`,{type:"image/png"}));
   }
 
-
-  // =====================================
-  // SHARE THE CREATED PNG
-  // =====================================
-
-  canvas.toBlob(async blob=>{
-
-    if(!blob){
-      alert("Couldn't create the result image.");
+  try{
+    if(navigator.share && navigator.canShare && navigator.canShare({files})){
+      await navigator.share({
+        title:"I'm In Golf — Results",
+        text:`🏆 ${record.course||"I'm In Golf"} — Final Results`,
+        files
+      });
       return;
     }
 
-    const file=new File(
-      [blob],
-      "Im-In-Golf-Result.png",
-      {type:"image/png"}
-    );
-
-    try{
-
-      if(
-        navigator.share &&
-        navigator.canShare &&
-        navigator.canShare({files:[file]})
-      ){
-
-        await navigator.share({
-          title:"I'm In Golf — Result",
-          text:"🏆 I'm In Golf — Result",
-          files:[file]
-        });
-
-      }else{
-
-        const url=
-          URL.createObjectURL(blob);
-
-        window.open(
-          url,
-          "_blank"
-        );
-
-        alert(
-          "Result image created. Use your phone's Share button to send it to WhatsApp."
-        );
-      }
-
-    }catch(err){
-
-      if(err.name!=="AbortError"){
-        alert(
-          "Couldn't share the image. Please try again."
-        );
-      }
-    }
-
-  },"image/png");
+    files.forEach(file=>{
+      const url=URL.createObjectURL(file);
+      const a=document.createElement("a");a.href=url;a.download=file.name;
+      document.body.appendChild(a);a.click();a.remove();
+      setTimeout(()=>URL.revokeObjectURL(url),1500);
+    });
+    alert(pageCount===1 ? "Result image created." : `${pageCount} result images created.`);
+  }catch(err){
+    if(err.name!=="AbortError")alert("Couldn't share the result image. Please try again.");
+  }
 }
 async function shareTripSummary(){
   const past=state.trip?.pastTrips||[];
