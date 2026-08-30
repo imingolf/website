@@ -64,7 +64,7 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
 .toast{position:fixed;right:24px;bottom:24px;background:#163d26;color:white;padding:12px 16px;border-radius:12px;box-shadow:0 12px 30px rgba(0,0,0,.2);z-index:80;font-weight:800}
 .toolbar{display:flex;gap:8px;flex-wrap:wrap}.filterbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:10px 0 14px}.filterbar label{font-size:12px;color:var(--muted);font-weight:900;text-transform:uppercase;letter-spacing:.04em}.filterbar select{width:auto;min-width:220px;margin:0}.sortable{cursor:pointer;user-select:none}.sortable:hover{text-decoration:underline}
 .small-btn{padding:8px 10px;border-radius:9px}
-.view-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.view-card{border:1px solid var(--line);border-radius:15px;padding:15px;background:#fbfdfb}.view-card h3{margin:0 0 5px}.view-card .big{font-size:27px;font-weight:950}.view-table{margin-top:12px;overflow:auto}.view-table table{min-width:700px}.nav button.active{background:rgba(255,255,255,.18)}
+.view-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.view-card{border:1px solid var(--line);border-radius:15px;padding:15px;background:#fbfdfb}.view-card h3{margin:0 0 5px}.view-card .big{font-size:27px;font-weight:950}.view-table{margin-top:12px;overflow:auto}.view-table table{min-width:700px}.standings-table{overflow:visible}.standings-table table{min-width:0;width:100%}.nav button.active{background:rgba(255,255,255,.18)}
 @media(max-width:1250px){.stats{grid-template-columns:repeat(3,1fr)}.workspace{grid-template-columns:1fr}.shell{grid-template-columns:86px minmax(0,1fr)}.brand span,.brand small,.nav .txt,.side-foot{display:none}.nav button{text-align:center;font-size:20px}}
 @media(max-width:720px){.shell{display:block}.side{padding:10px 12px;flex-direction:row;align-items:center;position:sticky;top:0;z-index:20}.brand{font-size:20px}.nav{display:flex;margin:0;overflow:auto}.nav button{padding:9px}.content{padding:16px}.hero-inner{padding:24px 16px}.hero h1{font-size:30px}.stats{grid-template-columns:1fr 1fr}.action-grid{grid-template-columns:1fr}.hero{min-height:180px}}
 </style>
@@ -391,7 +391,7 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
         <button class="secondary" data-act="invite">${s?.adminPin?"📤 Player Invite":"📨 Organiser Invite"}</button>
         <button class="secondary" data-act="reset">🔐 Reset Admin PIN</button>
         <button class="secondary" data-act="history">📚 Group History</button>
-        <button class="secondary" data-act="emailhistory">📧 Email History</button>
+        <button class="secondary" data-act="whatsappadmin">💬 WhatsApp Admin</button>
         <button class="secondary" data-act="refresh">↻ Refresh Group</button>
         ${pin!==OWNER_PROTECTED_PIN?`<button class="danger" data-act="suspend">${String(g.status)==="suspended"?"▶ Reactivate Group":"⏸ Suspend Group"}</button><button class="danger" data-act="delete">🗑 Delete Group</button>`:`<button class="ghost" disabled>🔐 Owner group protected</button>`}
       </div>
@@ -437,7 +437,7 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
     const pin=String(g.group_pin);
     if(act==="edit"){editModal(g);return}
     if(act==="history"){viewState.roundsGroup=pin;showRoundsView();return}
-    if(act==="emailhistory"){emailGroupHistory(pin);return}
+    if(act==="whatsappadmin"){whatsappAdminHistory(pin);return}
     if(act==="refresh"){await refreshAll();toast("Live data refreshed");return}
     if(act==="invite"){
       let msg="", inviteTitle="Player invite";
@@ -677,8 +677,66 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
       }
       return `<tr><td><b>${esc(String(pos))}</b></td><td><b>${esc(p.name||"Player")}</b><div class="sub">HCP ${esc(p.handicap??"—")}</div></td><td><b>${esc(score)}</b></td></tr>`;
     }).join("");
-    return `<div class="view-table" style="margin-top:12px;"><table><thead><tr><th>Pos</th><th>Player</th><th>Score</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    return `<div class="view-table standings-table" style="margin-top:12px;"><table><thead><tr><th>Pos</th><th>Player</th><th>Score</th></tr></thead><tbody>${rows}</tbody></table></div>`;
   }
+
+  function roundStandingsText(groupName,r){
+    const lines=[
+      "⛳ I'M IN GOLF",
+      "",
+      `${r?.course||"Completed round"} — ${fmtDate(r?.date||"")}`,
+      `${groupName} • ${roundGameLabel(r)}`,
+      `🏆 Winner: ${getRoundWinner(r)||"—"}`,
+      ""
+    ];
+    if(r?.gameType==="money"){
+      const pot=Number(r?.stablefordPot||0)+Number(r?.netPot||0);
+      if(pot>0)lines.push(`💷 Pot: £${pot.toFixed(2).replace(/\.00$/,"")}`,"");
+    }
+    lines.push("📊 FINAL STANDINGS");
+    const standings=sortedRoundStandings(r);
+    let lastValue=null,lastPos=0;
+    standings.forEach((p,i)=>{
+      if(p.noReturn===true){
+        lines.push(`— ${p.name||"Player"} — NR`);
+        return;
+      }
+      const value=inferRoundCompetition(r)==="net" ? Number(p.netScore) : Number(p.stableford);
+      const key=String(value);
+      let pos;
+      if(key===lastValue)pos=lastPos;
+      else{lastPos=i+1;lastValue=key;pos=lastPos;}
+      lines.push(`${pos}. ${p.name||"Player"} — ${scoreTextForRound(r,p)}`);
+    });
+    return lines.join("\n");
+  }
+  function tripHistoryText(groupName,trip){
+    const rounds=trip?.rounds||[];
+    const standings=Object.entries(trip?.standings||{})
+      .map(([name,points])=>({name,points:Number(points||0)}))
+      .sort((a,b)=>b.points-a.points||a.name.localeCompare(b.name));
+    const lines=[
+      "⛳ I'M IN GOLF",
+      "",
+      `✈️ ${trip?.name||"Golf Trip"}`,
+      groupName,
+      `🏆 Champion: ${trip?.champion||standings[0]?.name||"—"}`,
+      "",
+      "OVERALL TRIP STANDINGS"
+    ];
+    standings.forEach((x,i)=>lines.push(`${i+1}. ${x.name} — ${x.points} pts`));
+    if(rounds.length){
+      lines.push("","TRIP ROUNDS");
+      rounds.forEach((r,i)=>lines.push(`${i+1}. ${fmtDate(r.date||"")} • ${r.course||"Round"} • ${roundGameLabel(r)} • Winner: ${getRoundWinner(r)||"—"}`));
+    }
+    return lines.join("\n");
+  }
+  function openWhatsAppShare(text){
+    const clean=String(text||"").trim();
+    if(!clean)return;
+    window.open(`https://wa.me/?text=${encodeURIComponent(clean)}`,"_blank","noopener");
+  }
+
   function showHistoryRoundModal(groupName,r,titlePrefix="Completed Round"){
     const winner=getRoundWinner(r)||"—";
     const pot=r?.gameType==="money"
@@ -695,8 +753,12 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
       </div>
       <h3 style="margin:20px 0 6px;">📊 Final standings</h3>
       ${roundStandingsHtml(r)}
-      <div class="modal-actions"><button class="primary" id="closeHistoryDetail">Close</button></div>
+      <div class="modal-actions">
+        <button class="secondary" id="shareRoundWhatsApp">💬 Share Standings</button>
+        <button class="primary" id="closeHistoryDetail">Close</button>
+      </div>
     `);
+    $("shareRoundWhatsApp").onclick=()=>openWhatsAppShare(roundStandingsText(groupName,r));
     $("closeHistoryDetail").onclick=closeModal;
   }
   function showTripHistoryModal(groupName,trip){
@@ -714,14 +776,18 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
         <div class="detail-row"><span>Rounds</span><b>${rounds.length}</b></div>
       </div>
       <h3 style="margin:20px 0 6px;">🏆 Overall trip standings</h3>
-      ${standings.length ? `<div class="view-table"><table><thead><tr><th>Pos</th><th>Player</th><th>Points</th></tr></thead><tbody>${standings.map((x,i)=>`<tr><td><b>${i+1}</b></td><td><b>${esc(x.name)}</b></td><td><b>${x.points}</b></td></tr>`).join("")}</tbody></table></div>` : `<div class="empty">No trip standings saved.</div>`}
+      ${standings.length ? `<div class="view-table standings-table"><table><thead><tr><th>Pos</th><th>Player</th><th>Points</th></tr></thead><tbody>${standings.map((x,i)=>`<tr><td><b>${i+1}</b></td><td><b>${esc(x.name)}</b></td><td><b>${x.points}</b></td></tr>`).join("")}</tbody></table></div>` : `<div class="empty">No trip standings saved.</div>`}
       <h3 style="margin:20px 0 6px;">⛳ Trip rounds</h3>
       ${rounds.length ? rounds.map((r,i)=>`
         <button class="secondary full trip-round-detail" data-trip-round="${i}" style="margin-top:${i?8:0}px;text-align:left;">
           ${i+1}. ${esc(r.course||"Round")} • ${esc(fmtDate(r.date||""))} • ${esc(roundGameLabel(r))} • Winner: ${esc(getRoundWinner(r)||"—")}
         </button>`).join("") : `<div class="empty">No rounds saved for this trip.</div>`}
-      <div class="modal-actions"><button class="primary" id="closeTripHistory">Close</button></div>
+      <div class="modal-actions">
+        <button class="secondary" id="shareTripWhatsApp">💬 Share Trip</button>
+        <button class="primary" id="closeTripHistory">Close</button>
+      </div>
     `);
+    $("shareTripWhatsApp").onclick=()=>openWhatsAppShare(tripHistoryText(groupName,trip));
     $("closeTripHistory").onclick=closeModal;
     document.querySelectorAll(".trip-round-detail").forEach(b=>b.onclick=()=>{
       const r=rounds[Number(b.dataset.tripRound)];
@@ -777,21 +843,19 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
     setTimeout(()=>URL.revokeObjectURL(a.href),1000);
     toast("History report downloaded");
   }
-  function emailGroupHistory(pin){
+  function whatsappAdminHistory(pin){
     const g=groups.find(x=>String(x.group_pin)===String(pin)),s=states.get(String(pin));
     if(!g||!s)return;
     const saved=String(g.admin_contact||"").trim();
-    let email=/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(saved)?saved:"";
-    if(!email){
-      const entered=prompt("Admin email address:",saved.includes("@")?saved:"");
-      if(entered===null)return;
-      email=entered.trim();
-      if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){alert("Please enter a valid email address.");return}
+    const digits=saved.replace(/\D/g,"");
+    if(!digits){
+      alert("No Admin mobile number is saved for this group.");
+      return;
     }
-    const name=displayGroupName(g,s);
-    const subject=`I'm In Golf — ${name} history`;
-    const body=groupHistoryText(pin);
-    window.location.href=`mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    let phone=digits;
+    if(phone.startsWith("0"))phone="44"+phone.slice(1);
+    const text=groupHistoryText(pin);
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`,"_blank","noopener");
   }
 
   function showRoundsView(){
@@ -840,7 +904,8 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
           <select id="roundGroupFilter">${realGroupOptions()}</select>
           ${selectedPin!=="all" ? `
             <button class="secondary" id="downloadHistoryBtn">⬇️ Download History</button>
-            <button class="primary" id="emailHistoryBtn">📧 Email Admin</button>
+            <button class="secondary" id="whatsappHistoryBtn">💬 WhatsApp History</button>
+            <button class="primary" id="whatsappAdminBtn">💬 WhatsApp Admin</button>
           ` : ""}
         </div>
         ${selectedPin!=="all" && selectedState ? `
@@ -875,7 +940,8 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
         else showHistoryRoundModal(row.group,row.raw);
       });
       if($("downloadHistoryBtn"))$("downloadHistoryBtn").onclick=()=>downloadGroupHistory(selectedPin);
-      if($("emailHistoryBtn"))$("emailHistoryBtn").onclick=()=>emailGroupHistory(selectedPin);
+      if($("whatsappHistoryBtn"))$("whatsappHistoryBtn").onclick=()=>openWhatsAppShare(groupHistoryText(selectedPin));
+      if($("whatsappAdminBtn"))$("whatsappAdminBtn").onclick=()=>whatsappAdminHistory(selectedPin);
     }
     renderHistory();
   }
