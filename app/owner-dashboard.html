@@ -94,7 +94,7 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
       <button class="active" id="dashboardNav" type="button">📊 <span class="txt">Dashboard</span></button>
       <button id="groupsNav" type="button">👥 <span class="txt">Groups</span></button>
       <button id="playersNav" type="button">🏌️ <span class="txt">All Players</span></button>
-      <button id="roundsNav" type="button">🏆 <span class="txt">Rounds</span></button>
+      <button id="roundsNav" type="button">📚 <span class="txt">History</span></button>
       <button id="refreshBtn" type="button">↻ <span class="txt">Refresh</span></button>
       <button id="openAppBtn" type="button">📱 <span class="txt">Open App</span></button>
       <button id="logoutBtn" type="button">↪ <span class="txt">Log out</span></button>
@@ -133,8 +133,6 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
         <div class="stat"><div class="k">Total Groups</div><div class="v" id="statGroups">—</div><div class="s" id="statGroupsSub">Loading…</div></div>
         <div class="stat"><div class="k">Total Players</div><div class="v" id="statPlayers">—</div><div class="s">Across real groups</div></div>
         <div class="stat"><div class="k">Rounds Played</div><div class="v" id="statRounds">—</div><div class="s">Saved round history</div></div>
-        <div class="stat"><div class="k">Live Pots</div><div class="v" id="statLivePots">—</div><div class="s" id="statLivePotsSub">Current money rounds</div></div>
-        <div class="stat"><div class="k">Pots Played For</div><div class="v" id="statPotsPlayed">—</div><div class="s" id="statMoneyRounds">Completed money rounds</div></div>
         <div class="stat"><div class="k">Trial Groups</div><div class="v" id="statTrials">—</div><div class="s">Currently on trial</div></div>
         <div class="stat"><div class="k">Paid Groups</div><div class="v" id="statPaid">—</div><div class="s" id="statRevenue">Annual value —</div></div>
       </section>
@@ -270,61 +268,16 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
     }
   }
   function realGroups(){return groups.filter(g=>!TEST_PINS.has(String(g.group_pin)))}
-  function roundPotValue(r){
-    if(!r)return 0;
-    const sf=Number(r.stablefordPot||0), net=Number(r.netPot||0);
-    if(sf>0||net>0)return sf+net;
-    const stake=Number(r.stake||0);
-    if(stake<=0)return 0;
-    const ps=Array.isArray(r.players)?r.players:[];
-    const entered=ps.filter(p=>p.scoreSubmitted===true||p.stableford!=null||p.netScore!=null||p.noReturn===true).length;
-    return stake*(entered||ps.length||0);
-  }
-  function completedMoneyRounds(s){
-    if(!s)return [];
-    const rows=[];
-    (s.history||[]).forEach(r=>{if(Number(r?.stake||0)>0||String(r?.gameType||"")==="money"&&roundPotValue(r)>0)rows.push({...r,_tripName:""})});
-    const past=s.trip?.pastTrips||[];
-    past.forEach(t=>(t.rounds||[]).forEach(r=>{if(Number(r?.stake||0)>0||roundPotValue(r)>0)rows.push({...r,_tripName:t.name||"Trip"})}));
-    if(s.trip && (s.trip.active||s.trip.completed) && Array.isArray(s.trip.rounds)){
-      s.trip.rounds.forEach(r=>{if(Number(r?.stake||0)>0||roundPotValue(r)>0)rows.push({...r,_tripName:s.trip.name||"Trip"})});
-    }
-    return rows;
-  }
-  function liveMoneyInfo(s){
-    const stake=Number(s?.stake||0), open=s?.roundOpen!==false;
-    if(!s||!open||stake<=0)return null;
-    const ps=s.players||[], paid=ps.filter(p=>p.paid===true).length;
-    return {stake,paid,players:ps.length,current:stake*paid,expected:stake*ps.length};
-  }
-  function moneyWinnerText(r){
-    const names=Array.isArray(r?.winners)?r.winners:(r?.winnerName?[r.winnerName]:[]);
-    return names.filter(Boolean).join(", ")||getRoundWinner(r)||"—";
-  }
-
   function renderStats(){
     const real=realGroups();
-    let players=0,rounds=0,livePots=0,livePotGroups=0,potsPlayed=0,moneyRounds=0;
-    real.forEach(g=>{
-      const s=states.get(String(g.group_pin));
-      players+=(s?.players||[]).length;
-      rounds+=(s?.history||[]).length;
-      const live=liveMoneyInfo(s);
-      if(live){livePots+=live.current;livePotGroups++;}
-      const completed=completedMoneyRounds(s);
-      moneyRounds+=completed.length;
-      potsPlayed+=completed.reduce((sum,r)=>sum+roundPotValue(r),0);
-    });
+    let players=0,rounds=0;
+    real.forEach(g=>{const s=states.get(String(g.group_pin));players+=(s?.players||[]).length;rounds+=completedRoundCount(s)});
     const trials=real.filter(g=>String(g.plan_type||"trial")==="trial"&&String(g.status||"active")==="active").length;
     const paid=real.filter(g=>String(g.plan_type)==="paid"&&String(g.paid_status)==="paid"&&String(g.status||"active")==="active").length;
     $("statGroups").textContent=real.length;
     $("statGroupsSub").textContent=`${real.length} real • ${groups.length-real.length} test`;
     $("statPlayers").textContent=players;
     $("statRounds").textContent=rounds;
-    $("statLivePots").textContent=`£${livePots.toFixed(2).replace(/\.00$/,'')}`;
-    $("statLivePotsSub").textContent=`${livePotGroups} current money round${livePotGroups===1?"":"s"}`;
-    $("statPotsPlayed").textContent=`£${potsPlayed.toFixed(2).replace(/\.00$/,'')}`;
-    $("statMoneyRounds").textContent=`${moneyRounds} completed money round${moneyRounds===1?"":"s"}`;
     $("statTrials").textContent=trials;
     $("statPaid").textContent=paid;
     $("statRevenue").textContent=`Annual value £${(paid*PRICE_PER_YEAR).toFixed(2)}`;
@@ -364,7 +317,7 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
       const pin=String(g.group_pin||""),s=states.get(pin),test=TEST_PINS.has(pin);
       return `<tr data-pin="${esc(pin)}" class="${pin===selectedPin?"selected":""}">
         <td><div class="group-name">${esc(displayGroupName(g,s))}</div><div class="sub">${test?"Permanent sandbox":(g.admin_name?`Admin: ${esc(g.admin_name)}`:"")}</div></td>
-        <td>${esc(pin)}</td><td>${(s?.players||[]).length}</td><td>${(s?.history||[]).length}</td>
+        <td>${esc(pin)}</td><td>${(s?.players||[]).length}</td><td>${completedRoundCount(s)}</td>
         <td>${planBadge(g)}</td><td>${esc(trialText(g))}</td><td>${esc(activityText(pin))}</td><td>${statusBadge(g)}</td>
       </tr>`;
     }).join("");
@@ -389,57 +342,10 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
     if(s.roundOpen===false)return "Waiting for next competition";
     return `${s.gameType==="points"?"Points Game":"Money Game"}${s.gameType==="points"?" • "+(s.pointsCompetition==="net"?"Net":"Stableford"):""}`;
   }
-  function currentCompetition(s){
-    return String(s?.pointsCompetition||s?.trip?.competition||"stableford")==="net" ? "net" : "stableford";
-  }
-  function playerEnteredCurrentRound(s,p){
-    if(!s||!p)return false;
-    if(s.gameType==="points")return true;
-    // Money Games only require payment when the organiser has set a stake above £0.
-    return Number(s.stake||0)>0 ? p.paid===true : true;
-  }
-  function liveScoreValue(s,p){
-    const comp=currentCompetition(s);
-    if(p?.noReturn===true)return null;
-    if(comp==="net"){
-      const v=Number(p?.netScore);
-      return Number.isFinite(v)?v:null;
-    }
-    const v=Number(p?.stableford);
-    return Number.isFinite(v)?v:null;
-  }
-  function liveLeaderboardPlayers(s,players){
-    const comp=currentCompetition(s);
-    return players.slice().sort((a,b)=>{
-      const aEntered=playerEnteredCurrentRound(s,a), bEntered=playerEnteredCurrentRound(s,b);
-      const aSubmitted=a.scoreSubmitted===true||a.stableford!=null||a.netScore!=null||a.noReturn===true;
-      const bSubmitted=b.scoreSubmitted===true||b.stableford!=null||b.netScore!=null||b.noReturn===true;
-      const aValid=aEntered&&aSubmitted&&a.noReturn!==true&&liveScoreValue(s,a)!=null;
-      const bValid=bEntered&&bSubmitted&&b.noReturn!==true&&liveScoreValue(s,b)!=null;
-      const aNR=aEntered&&a.noReturn===true, bNR=bEntered&&b.noReturn===true;
-
-      const bucket=xValid=>xValid?0:null;
-      const aBucket=aValid?0:aNR?1:aEntered?2:3;
-      const bBucket=bValid?0:bNR?1:bEntered?2:3;
-      if(aBucket!==bBucket)return aBucket-bBucket;
-
-      if(aValid&&bValid){
-        const av=liveScoreValue(s,a), bv=liveScoreValue(s,b);
-        if(av!==bv)return comp==="net"?av-bv:bv-av;
-      }
-      return String(a.name||"").localeCompare(String(b.name||""));
-    });
-  }
-  function ordinal(n){
-    const mod100=n%100;
-    if(mod100>=11&&mod100<=13)return `${n}th`;
-    const mod10=n%10;
-    return `${n}${mod10===1?"st":mod10===2?"nd":mod10===3?"rd":"th"}`;
-  }
   function submittedCount(s){
     if(!s)return [0,0];
     const ps=s.players||[];
-    const eligible=ps.filter(p=>playerEnteredCurrentRound(s,p));
+    const eligible=s.gameType==="points"?ps:ps.filter(p=>p.paid&&(p.competition==="stableford"||p.competition==="net"));
     const n=eligible.filter(p=>p.scoreSubmitted===true||p.stableford!=null||p.netScore!=null||p.noReturn===true).length;
     return [n,eligible.length];
   }
@@ -448,9 +354,6 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
     if(!g){$("detailPanel").innerHTML=`<div class="empty">Select a group.</div>`;return}
     const players=s?.players||[], [done,total]=submittedCount(s), pct=total?Math.round(done/total*100):0;
     const adminSetup=s?.adminPin?"Complete":"Waiting";
-    const liveMoney=liveMoneyInfo(s);
-    const moneyRounds=completedMoneyRounds(s);
-    const moneyTotal=moneyRounds.reduce((sum,r)=>sum+roundPotValue(r),0);
     $("detailPanel").innerHTML=`
       <div class="detail-top"><div><div class="label">GROUP</div><h2>${esc(displayGroupName(g,s))}</h2><div class="sub">PIN ${esc(pin)}</div></div>${statusBadge(g)}</div>
       <div class="detail-grid">
@@ -458,56 +361,28 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
         <div class="detail-row"><span>Admin setup</span><b>${adminSetup}</b></div>
         <div class="detail-row"><span>Players</span><b>${players.length}</b></div>
         <div class="detail-row"><span>Current round</span><b>${esc(currentRoundText(s))}</b></div>
-        ${liveMoney ? `
-          <div class="detail-row"><span>Entry fee</span><b>£${liveMoney.stake}</b></div>
-          <div class="detail-row"><span>Current pot</span><b>£${liveMoney.current} paid in</b></div>
-          <div class="detail-row"><span>Paid</span><b>${liveMoney.paid} / ${liveMoney.players}</b></div>
-          <div class="detail-row"><span>Expected pot</span><b>£${liveMoney.expected}</b></div>
-        ` : ``}
-        <div class="detail-row"><span>Money rounds played</span><b>${moneyRounds.length}</b></div>
-        <div class="detail-row"><span>Total pots played for</span><b>£${moneyTotal.toFixed(2).replace(/\.00$/,'')}</b></div>
-        ${s?.roundOpen===false ? `` : `
-          <div class="detail-row"><span>Scores submitted</span><b>${done} / ${total}</b></div>
-          <div class="progress"><span style="width:${pct}%"></span></div>
-        `}
-        <div class="detail-row"><span>Rounds completed</span><b>${(s?.history||[]).length}</b></div>
+        <div class="detail-row"><span>Scores submitted</span><b>${done} / ${total}</b></div>
+        <div class="progress"><span style="width:${pct}%"></span></div>
+        <div class="detail-row"><span>Rounds completed</span><b>${completedRoundCount(s)}</b></div>
         <div class="detail-row"><span>Plan</span><b>${String(g.plan_type||"trial")==="trial"?"Free Trial":String(g.plan_type||"").replace(/^./,c=>c.toUpperCase())}</b></div>
         <div class="detail-row"><span>Trial / renewal</span><b>${esc(trialText(g))}</b></div>
         <div class="detail-row"><span>Last activity</span><b>${esc(activityText(pin))}</b></div>
       </div>
-      <div class="members"><h3>🏆 Live Leaderboard</h3>
-        ${s?.roundOpen===false ? `<div class="empty">No competition is currently open.</div>` : players.length ? (()=>{
-          const ordered=liveLeaderboardPlayers(s,players);
-          let previousScore=null;
-          let previousRank=0;
-          return ordered.map((p,index)=>{
-            const entered=playerEnteredCurrentRound(s,p);
-            const submitted=p.scoreSubmitted===true||p.stableford!=null||p.netScore!=null||p.noReturn===true;
-            const comp=currentCompetition(s);
-            const compLabel=comp==="net" ? "Net" : "Stableford";
-            const score=liveScoreValue(s,p);
-            const validScore=entered&&submitted&&p.noReturn!==true&&score!=null;
-            let rankText="";
-            if(validScore){
-              const rank=previousScore!==null&&score===previousScore ? previousRank : index+1;
-              previousScore=score;
-              previousRank=rank;
-              rankText=`<span style="display:inline-block;min-width:34px;color:#176b3a">${ordinal(rank)}</span> `;
-            }
-            let result="⏳ Waiting";
-            if(!entered) result="Not entered";
-            else if(p.noReturn===true) result="NR";
-            else if(validScore){
-              result=comp==="net" ? `Net ${esc(p.netScore??"—")}` : `${esc(p.stableford??"—")} pts`;
-            }
-            return `<div class="member"><div><b>${rankText}${esc(p.name||"Player")}</b><div class="role">${compLabel}</div></div><div><b>${validScore?"✅ ":""}${result}</b></div></div>`;
-          }).join("");
-        })() : `<div class="empty">No players have joined yet.</div>`}
+      <div class="members"><h3>📝 Live Score Entry</h3>
+        ${s?.roundOpen===false ? `<div class="empty">No competition is currently open.</div>` : players.length ? players.slice().sort((a,b)=>String(a.name).localeCompare(String(b.name))).map(p=>{
+          const eligible=s?.gameType==="points" ? true : (p.paid===true && (p.competition==="stableford"||p.competition==="net"));
+          const submitted=p.scoreSubmitted===true||p.stableford!=null||p.netScore!=null||p.noReturn===true;
+          let result="⏳ Waiting";
+          if(!eligible) result=s?.gameType==="money" ? (p.paid===true?"Waiting for game choice":"Not entered") : "⏳ Waiting";
+          else if(p.noReturn===true) result="✅ NR";
+          else if(submitted){
+            const comp=s?.gameType==="points" ? String(s.pointsCompetition||"stableford") : String(p.competition||"stableford");
+            result=comp==="net" ? `✅ Net ${esc(p.netScore??"—")}` : `✅ ${esc(p.stableford??"—")} pts`;
+          }
+          const compLabel=s?.gameType==="money"&&p.competition ? (p.competition==="net"?"Net":"Stableford") : "";
+          return `<div class="member"><div><b>${esc(p.name||"Player")}</b><div class="role">${compLabel}</div></div><div><b>${result}</b></div></div>`;
+        }).join("") : `<div class="empty">No players have joined yet.</div>`}
       </div>
-      ${moneyRounds.length||liveMoney ? `<div class="members"><h3>💷 Money Activity</h3>
-        ${liveMoney ? `<div class="member"><div><b>Current round</b><div class="role">£${liveMoney.stake} entry • ${liveMoney.paid}/${liveMoney.players} paid</div></div><div><b>£${liveMoney.current}</b><div class="sub">£${liveMoney.expected} expected</div></div></div>` : ``}
-        ${moneyRounds.slice().sort((a,b)=>String(b.date||"").localeCompare(String(a.date||""))).slice(0,5).map(r=>`<div class="member"><div><b>${esc(r.course||"Completed round")}</b><div class="role">${esc(fmtDate(r.date||""))}${r._tripName?` • ${esc(r._tripName)}`:""}</div></div><div style="text-align:right"><b>£${roundPotValue(r).toFixed(2).replace(/\.00$/,'')}</b><div class="sub">${esc(moneyWinnerText(r))}</div></div></div>`).join("")}
-      </div>` : ``}
       <div class="members"><h3>👥 Group Members</h3>
         ${players.length?players.slice().sort((a,b)=>String(a.name).localeCompare(String(b.name))).map(p=>`<div class="member"><div><b>${esc(p.name||"Player")}</b><div class="role">${p.id===s?.adminPlayerId?"Admin":"Member"}</div></div><div>HCP ${esc(p.handicap??"—")}</div></div>`).join(""):`<div class="empty">No players have joined yet.</div>`}
       </div>
@@ -515,6 +390,8 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
         <button class="secondary" data-act="edit">✏️ Edit Group</button>
         <button class="secondary" data-act="invite">${s?.adminPin?"📤 Player Invite":"📨 Organiser Invite"}</button>
         <button class="secondary" data-act="reset">🔐 Reset Admin PIN</button>
+        <button class="secondary" data-act="history">📚 Group History</button>
+        <button class="secondary" data-act="emailhistory">📧 Email History</button>
         <button class="secondary" data-act="refresh">↻ Refresh Group</button>
         ${pin!==OWNER_PROTECTED_PIN?`<button class="danger" data-act="suspend">${String(g.status)==="suspended"?"▶ Reactivate Group":"⏸ Suspend Group"}</button><button class="danger" data-act="delete">🗑 Delete Group</button>`:`<button class="ghost" disabled>🔐 Owner group protected</button>`}
       </div>
@@ -559,14 +436,16 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
   async function handleAction(act,g,s){
     const pin=String(g.group_pin);
     if(act==="edit"){editModal(g);return}
+    if(act==="history"){viewState.roundsGroup=pin;showRoundsView();return}
+    if(act==="emailhistory"){emailGroupHistory(pin);return}
     if(act==="refresh"){await refreshAll();toast("Live data refreshed");return}
     if(act==="invite"){
       let msg="", inviteTitle="Player invite";
       if(!s?.adminPin&&s?.adminSetupToken){
         inviteTitle="Organiser invite";
-        msg=`⛳ I'm In Golf\n\nYou've been invited to manage ${displayGroupName(g,s)}.\nGroup PIN: ${pin}\n\nTap below to set up your 4-digit Admin PIN:\nhttps://imingolf.co.uk/app/?pin=${encodeURIComponent(pin)}&adminsetup=${encodeURIComponent(s.adminSetupToken)}\n\n🔒 Keep this link private.`;
+        msg=`⛳ I'm In Golf\n\nYou've been invited to manage: ${displayGroupName(g,s)}\n\nGroup PIN: ${pin}\n\nOpen this private Admin setup link:\nhttps://imingolf.co.uk/app/?pin=${encodeURIComponent(pin)}&adminsetup=${encodeURIComponent(s.adminSetupToken)}\n\nOn first opening, you'll be asked to choose your own 4-digit Admin PIN.\n\nKeep this setup link private.`;
       }else{
-        msg=`⛳ I'm In Golf\n\nYou've been invited to join ${displayGroupName(g,s)}.\nGroup PIN: ${pin}\n\nTap below to join:\nhttps://imingolf.co.uk/app/?pin=${encodeURIComponent(pin)}`;
+        msg=`⛳ You're invited to I'm In Golf\n\nTap the link below to join our golf group:\nhttps://imingolf.co.uk/app/?pin=${encodeURIComponent(pin)}\n\nGroup PIN: ${pin}`;
       }
       showModal(`<h2>📨 ${esc(inviteTitle)}</h2><p><b>${esc(displayGroupName(g,s))}</b><br>Group PIN: <b>${esc(pin)}</b></p><textarea id="inviteText" readonly>${esc(msg)}</textarea><div class="modal-actions"><button class="ghost" id="closeInvite">Close</button><button class="secondary" id="copyInvite">📋 Copy Invite</button><button class="primary" id="whatsAppInvite">🟢 Send via WhatsApp</button></div>`);
       $("closeInvite").onclick=closeModal;
@@ -601,7 +480,7 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
     const name=prompt("New golf group name:");if(name===null)return;const clean=name.trim();if(!clean){alert("Please enter a group name.");return}
     const adminNameInput=prompt("Organiser / customer name:");if(adminNameInput===null)return;const adminName=adminNameInput.trim();if(!adminName){alert("Please enter the organiser's name.");return}
     const contactInput=prompt("Organiser contact (mobile or email):");if(contactInput===null)return;const adminContact=contactInput.trim();if(!adminContact){alert("Please enter a mobile number or email address.");return}
-    const newState={groupName:clean,course:"",date:"",stake:0,gameType:"money",roundOpen:false,pointsCompetition:"stableford",pointsValue:10,adminPin:"",adminSetupToken:"",players:[],history:[]};
+    const newState={groupName:clean,course:"",date:"",stake:20,gameType:"money",pointsCompetition:"stableford",pointsValue:10,adminPin:"",adminSetupToken:"",players:[],history:[]};
     const {data,error}=await db.rpc("create_golf_group",{p_group_name:clean,p_state:newState,p_creation_code:ownerCode});
     if(error){alert("Group could not be created.\n\n"+(error.message||"Please try again."));return}
     const newPin=String(data);const setupToken=(crypto.randomUUID?crypto.randomUUID():(Date.now().toString(36)+Math.random().toString(36).slice(2)));
@@ -630,7 +509,7 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
       }
     }
 
-    const invite=`⛳ I'm In Golf\n\nHi ${adminName},\nYou've been invited to manage ${clean}.\nGroup PIN: ${newPin}\n\nTap below to set up your 4-digit Admin PIN:\nhttps://imingolf.co.uk/app/?pin=${encodeURIComponent(newPin)}&adminsetup=${encodeURIComponent(setupToken)}\n\n🔒 Keep this link private.`;
+    const invite=`⛳ I'm In Golf\n\nHi ${adminName},\n\nYou've been invited to manage: ${clean}\n\nGroup PIN: ${newPin}\n\nOpen this private Admin setup link:\nhttps://imingolf.co.uk/app/?pin=${encodeURIComponent(newPin)}&adminsetup=${encodeURIComponent(setupToken)}\n\nOn first opening, you'll be asked to choose your own 4-digit Admin PIN.\n\nKeep this setup link private.`;
     showModal(`<h2>✅ New group created</h2><p><b>${esc(clean)}</b><br>Organiser: <b>${esc(adminName)}</b><br>Group PIN: <b>${esc(newPin)}</b></p><p class="note">Send this private organiser invite now, or resend it later from the group panel while Admin setup is still waiting.</p><textarea id="inviteText" readonly>${esc(invite)}</textarea><div class="modal-actions"><button class="ghost" id="closeInvite">Close</button><button class="secondary" id="copyInvite">📋 Copy Admin Invite</button><button class="primary" id="whatsAppInvite">🟢 Send via WhatsApp</button></div>`);
     $("closeInvite").onclick=async()=>{closeModal();await refreshAll()};
     $("copyInvite").onclick=async()=>{try{await navigator.clipboard.writeText(invite);toast("Admin invite copied")}catch(e){prompt("Copy this invite:",invite)}};
@@ -655,7 +534,7 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
     $("altView").classList.remove("hidden");
     $("altView").innerHTML=`<div class="panel-head"><div><h2>👥 All Groups</h2><div class="sub">A simple overview of every group on I'm In Golf.</div></div><button class="primary" id="altCreate">＋ Create Group</button></div>
       <div class="view-cards"><div class="view-card"><div class="label">Real groups</div><div class="big">${real.length}</div></div><div class="view-card"><div class="label">Test groups</div><div class="big">${tests.length}</div></div><div class="view-card"><div class="label">Active groups</div><div class="big">${groups.filter(g=>String(g.status||"active")==="active").length}</div></div></div>
-      <div class="view-table"><table><thead><tr><th>Group</th><th>PIN</th><th>Admin</th><th>Players</th><th>Rounds</th><th>Plan</th><th>Status</th></tr></thead><tbody>${groups.map(g=>{const pin=String(g.group_pin),s=states.get(pin);return `<tr><td><b>${esc(displayGroupName(g,s))}</b></td><td>${esc(pin)}</td><td>${esc(g.admin_name||"—")}</td><td>${(s?.players||[]).length}</td><td>${(s?.history||[]).length}</td><td>${planBadge(g)}</td><td>${statusBadge(g)}</td></tr>`}).join("")}</tbody></table></div>`;
+      <div class="view-table"><table><thead><tr><th>Group</th><th>PIN</th><th>Admin</th><th>Players</th><th>Rounds</th><th>Plan</th><th>Status</th></tr></thead><tbody>${groups.map(g=>{const pin=String(g.group_pin),s=states.get(pin);return `<tr><td><b>${esc(displayGroupName(g,s))}</b></td><td>${esc(pin)}</td><td>${esc(g.admin_name||"—")}</td><td>${(s?.players||[]).length}</td><td>${completedRoundCount(s)}</td><td>${planBadge(g)}</td><td>${statusBadge(g)}</td></tr>`}).join("")}</tbody></table></div>`;
     $("altCreate").onclick=createGroup;
   }
 
@@ -737,32 +616,268 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
     }
     renderPlayers();
   }
+
+  function pastTripsOf(s){
+    return Array.isArray(s?.trip?.pastTrips) ? s.trip.pastTrips : [];
+  }
+  function completedRoundCount(s){
+    const normal=(s?.history||[]).length;
+    const tripRounds=pastTripsOf(s).reduce((n,t)=>n+(t?.rounds||[]).length,0);
+    return normal+tripRounds;
+  }
+  function inferRoundCompetition(r){
+    if(r?.gameType==="points" && r?.pointsCompetition)return String(r.pointsCompetition);
+    const ps=r?.players||[];
+    const hasNet=ps.some(p=>p?.netScore!=null || p?.noReturn===true);
+    const hasStableford=ps.some(p=>p?.stableford!=null);
+    if(hasNet && !hasStableford)return "net";
+    if(hasStableford && !hasNet)return "stableford";
+    return hasNet ? "net" : "stableford";
+  }
+  function roundEntrants(r){
+    return (r?.players||[]).filter(p=>
+      p?.stableford!=null || p?.netScore!=null || p?.noReturn===true
+    );
+  }
+  function sortedRoundStandings(r){
+    const comp=inferRoundCompetition(r);
+    const players=roundEntrants(r).slice();
+    players.sort((a,b)=>{
+      if(a.noReturn===true && b.noReturn!==true)return 1;
+      if(b.noReturn===true && a.noReturn!==true)return -1;
+      if(a.noReturn===true && b.noReturn===true)return String(a.name||"").localeCompare(String(b.name||""));
+      const av=comp==="net" ? Number(a.netScore) : Number(a.stableford);
+      const bv=comp==="net" ? Number(b.netScore) : Number(b.stableford);
+      if(av!==bv)return comp==="net" ? av-bv : bv-av;
+      return String(a.name||"").localeCompare(String(b.name||""));
+    });
+    return players;
+  }
+  function scoreTextForRound(r,p){
+    if(p?.noReturn===true)return "NR";
+    const comp=inferRoundCompetition(r);
+    if(comp==="net")return p?.netScore!=null ? "Net "+p.netScore : "—";
+    return p?.stableford!=null ? p.stableford+" pts" : "—";
+  }
+  function roundGameLabel(r){
+    const comp=inferRoundCompetition(r)==="net" ? "Net" : "Stableford";
+    return `${r?.gameType==="points" ? "Points Game" : "Money Game"} • ${comp}`;
+  }
+  function roundStandingsHtml(r){
+    const standings=sortedRoundStandings(r);
+    if(!standings.length)return `<div class="empty">No player scores were saved for this round.</div>`;
+    let lastScore=null, lastPos=0;
+    const rows=standings.map((p,i)=>{
+      const score=p.noReturn===true ? "NR" : scoreTextForRound(r,p);
+      let pos="—";
+      if(p.noReturn!==true){
+        const key=score;
+        if(key===lastScore)pos=lastPos;
+        else{lastPos=i+1;lastScore=key;pos=lastPos;}
+      }
+      return `<tr><td><b>${esc(String(pos))}</b></td><td><b>${esc(p.name||"Player")}</b><div class="sub">HCP ${esc(p.handicap??"—")}</div></td><td><b>${esc(score)}</b></td></tr>`;
+    }).join("");
+    return `<div class="view-table" style="margin-top:12px;"><table><thead><tr><th>Pos</th><th>Player</th><th>Score</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  }
+  function showHistoryRoundModal(groupName,r,titlePrefix="Completed Round"){
+    const winner=getRoundWinner(r)||"—";
+    const pot=r?.gameType==="money"
+      ? Number(r?.stablefordPot||0)+Number(r?.netPot||0)
+      : 0;
+    showModal(`
+      <div class="label">${esc(titlePrefix.toUpperCase())}</div>
+      <h2 style="margin:4px 0 3px;">${esc(r?.course||"Completed round")}</h2>
+      <div class="sub">${esc(groupName)} • ${esc(fmtDate(r?.date||""))} • ${esc(roundGameLabel(r))}</div>
+      <div class="detail-grid" style="margin-top:18px;">
+        <div class="detail-row"><span>Winner</span><b>${esc(winner)}</b></div>
+        <div class="detail-row"><span>Entrants</span><b>${roundEntrants(r).length}</b></div>
+        ${r?.gameType==="money" ? `<div class="detail-row"><span>Pot</span><b>£${Number(pot||0).toFixed(2).replace(/\.00$/,"")}</b></div>` : ""}
+      </div>
+      <h3 style="margin:20px 0 6px;">📊 Final standings</h3>
+      ${roundStandingsHtml(r)}
+      <div class="modal-actions"><button class="primary" id="closeHistoryDetail">Close</button></div>
+    `);
+    $("closeHistoryDetail").onclick=closeModal;
+  }
+  function showTripHistoryModal(groupName,trip){
+    const rounds=trip?.rounds||[];
+    const standings=Object.entries(trip?.standings||{})
+      .map(([name,points])=>({name,points:Number(points||0)}))
+      .sort((a,b)=>b.points-a.points||a.name.localeCompare(b.name));
+    showModal(`
+      <div class="label">PAST TRIP</div>
+      <h2 style="margin:4px 0 3px;">✈️ ${esc(trip?.name||"Golf Trip")}</h2>
+      <div class="sub">${esc(groupName)} • ${rounds.length} round${rounds.length===1?"":"s"}</div>
+      <div class="detail-grid" style="margin-top:18px;">
+        <div class="detail-row"><span>Champion</span><b>${esc(trip?.champion||standings[0]?.name||"—")}</b></div>
+        <div class="detail-row"><span>Competition</span><b>${esc(trip?.competition==="net"?"Net":"Stableford")}</b></div>
+        <div class="detail-row"><span>Rounds</span><b>${rounds.length}</b></div>
+      </div>
+      <h3 style="margin:20px 0 6px;">🏆 Overall trip standings</h3>
+      ${standings.length ? `<div class="view-table"><table><thead><tr><th>Pos</th><th>Player</th><th>Points</th></tr></thead><tbody>${standings.map((x,i)=>`<tr><td><b>${i+1}</b></td><td><b>${esc(x.name)}</b></td><td><b>${x.points}</b></td></tr>`).join("")}</tbody></table></div>` : `<div class="empty">No trip standings saved.</div>`}
+      <h3 style="margin:20px 0 6px;">⛳ Trip rounds</h3>
+      ${rounds.length ? rounds.map((r,i)=>`
+        <button class="secondary full trip-round-detail" data-trip-round="${i}" style="margin-top:${i?8:0}px;text-align:left;">
+          ${i+1}. ${esc(r.course||"Round")} • ${esc(fmtDate(r.date||""))} • ${esc(roundGameLabel(r))} • Winner: ${esc(getRoundWinner(r)||"—")}
+        </button>`).join("") : `<div class="empty">No rounds saved for this trip.</div>`}
+      <div class="modal-actions"><button class="primary" id="closeTripHistory">Close</button></div>
+    `);
+    $("closeTripHistory").onclick=closeModal;
+    document.querySelectorAll(".trip-round-detail").forEach(b=>b.onclick=()=>{
+      const r=rounds[Number(b.dataset.tripRound)];
+      if(r)showHistoryRoundModal(groupName,r,trip?.name||"Trip Round");
+    });
+  }
+  function groupHistoryText(pin){
+    const g=groups.find(x=>String(x.group_pin)===String(pin));
+    const s=states.get(String(pin));
+    if(!g||!s)return "";
+    const name=displayGroupName(g,s);
+    const lines=[
+      "I'M IN GOLF — GROUP HISTORY",
+      name,
+      "Group PIN: "+pin,
+      ""
+    ];
+    const normal=s.history||[];
+    const trips=pastTripsOf(s);
+    lines.push(`SUMMARY: ${normal.length} normal round${normal.length===1?"":"s"} • ${trips.length} trip${trips.length===1?"":"s"} • ${completedRoundCount(s)} rounds in total`,"");
+    if(normal.length){
+      lines.push("NORMAL ROUNDS","-------------");
+      normal.forEach((r,idx)=>{
+        lines.push(`${idx+1}. ${fmtDate(r.date||"")} — ${r.course||"Completed round"} — ${roundGameLabel(r)}`);
+        lines.push(`Winner: ${getRoundWinner(r)||"—"}`);
+        const standings=sortedRoundStandings(r);
+        standings.forEach((p,i)=>lines.push(`   ${p.noReturn===true?"—":i+1}. ${p.name||"Player"} — ${scoreTextForRound(r,p)}`));
+        lines.push("");
+      });
+    }
+    if(trips.length){
+      lines.push("TRIPS","-----");
+      trips.forEach((t,ti)=>{
+        lines.push(`${ti+1}. ${t.name||"Golf Trip"} — Champion: ${t.champion||"—"} — ${(t.rounds||[]).length} rounds`);
+        const overall=Object.entries(t.standings||{}).sort((a,b)=>Number(b[1])-Number(a[1]));
+        overall.forEach(([n,pts],i)=>lines.push(`   ${i+1}. ${n} — ${Number(pts||0)} pts`));
+        (t.rounds||[]).forEach((r,ri)=>lines.push(`   Round ${ri+1}: ${fmtDate(r.date||"")} • ${r.course||"Round"} • ${roundGameLabel(r)} • Winner: ${getRoundWinner(r)||"—"}`));
+        lines.push("");
+      });
+    }
+    if(!normal.length&&!trips.length)lines.push("No completed history is saved for this group.");
+    return lines.join("\n");
+  }
+  function downloadGroupHistory(pin){
+    const g=groups.find(x=>String(x.group_pin)===String(pin)),s=states.get(String(pin));
+    const text=groupHistoryText(pin);
+    if(!g||!s||!text)return;
+    const blob=new Blob([text],{type:"text/plain;charset=utf-8"});
+    const a=document.createElement("a");
+    a.href=URL.createObjectURL(blob);
+    a.download=(displayGroupName(g,s)||"golf-group").replace(/[^a-z0-9]+/gi,"-").replace(/^-|-$/g,"")+"-history.txt";
+    document.body.appendChild(a);a.click();a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+    toast("History report downloaded");
+  }
+  function emailGroupHistory(pin){
+    const g=groups.find(x=>String(x.group_pin)===String(pin)),s=states.get(String(pin));
+    if(!g||!s)return;
+    const saved=String(g.admin_contact||"").trim();
+    let email=/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(saved)?saved:"";
+    if(!email){
+      const entered=prompt("Admin email address:",saved.includes("@")?saved:"");
+      if(entered===null)return;
+      email=entered.trim();
+      if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){alert("Please enter a valid email address.");return}
+    }
+    const name=displayGroupName(g,s);
+    const subject=`I'm In Golf — ${name} history`;
+    const body=groupHistoryText(pin);
+    window.location.href=`mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  }
+
   function showRoundsView(){
     setNavActive("roundsNav");
     document.querySelector(".attention").classList.add("hidden");
     $("dashboardWorkspace").classList.add("hidden");
+
     function collectRows(){
       const rows=[];
       realGroups().forEach(g=>{
-        const pin=String(g.group_pin),s=states.get(pin);
+        const pin=String(g.group_pin),s=states.get(pin),group=displayGroupName(g,s);
         (s?.history||[]).forEach((r,i)=>rows.push({
-          group:displayGroupName(g,s),pin,date:r.date||"",course:r.course||"",
-          type:niceGameName(r.gameType||r.type||""),winner:getRoundWinner(r),pot:roundPotValue(r),raw:r,idx:i
+          kind:"round",group,pin,date:r.date||"",title:r.course||"Completed round",
+          type:roundGameLabel(r),winner:getRoundWinner(r),raw:r,idx:i
         }));
+        pastTripsOf(s).forEach((t,i)=>{
+          const dates=(t.rounds||[]).map(r=>String(r.date||"")).filter(Boolean).sort();
+          rows.push({
+            kind:"trip",group,pin,date:dates[dates.length-1]||"",
+            title:t.name||"Golf Trip",type:`Trip • ${(t.rounds||[]).length} rounds`,
+            winner:t.champion||"—",raw:t,idx:i
+          });
+        });
       });
       rows.sort((a,b)=>String(b.date).localeCompare(String(a.date)));
       return rows;
     }
-    function renderRounds(){
-      const rows=collectRows().filter(r=>viewState.roundsGroup==="all"||r.pin===viewState.roundsGroup);
+
+    function renderHistory(){
+      const all=collectRows();
+      const rows=all.filter(r=>viewState.roundsGroup==="all"||r.pin===viewState.roundsGroup);
+      const selectedPin=viewState.roundsGroup;
+      const selectedGroup=selectedPin!=="all"
+        ? groups.find(g=>String(g.group_pin)===selectedPin)
+        : null;
+      const selectedState=selectedPin!=="all" ? states.get(selectedPin) : null;
+
       $("altView").classList.remove("hidden");
-      $("altView").innerHTML=`<div class="panel-head"><div><h2>🏆 Saved Rounds</h2><div class="sub">Round history across your real groups.</div></div><span class="badge active">${rows.length} round${rows.length===1?"":"s"}</span></div>
-        <div class="filterbar"><label for="roundGroupFilter">Group</label><select id="roundGroupFilter">${realGroupOptions()}</select></div>
-        <div class="view-table"><table><thead><tr><th>Date</th><th>Group</th><th>PIN</th><th>Course</th><th>Game</th><th>Pot</th><th>Winner</th></tr></thead><tbody>${rows.length?rows.map(r=>`<tr><td>${esc(fmtDate(r.date))}</td><td><b>${esc(r.group)}</b></td><td>${esc(r.pin)}</td><td>${esc(r.course||"—")}</td><td>${esc(r.type)}</td><td>${r.pot>0?`<b>£${r.pot.toFixed(2).replace(/\.00$/,'')}</b>`:"—"}</td><td>${esc(r.winner||"—")}</td></tr>`).join(""):'<tr><td colspan="7"><div class="empty">No saved rounds found.</div></td></tr>'}</tbody></table></div>`;
+      $("altView").innerHTML=`
+        <div class="panel-head">
+          <div><h2>📚 Competition History</h2><div class="sub">Money Games, Points Games and completed Trips — with full saved results.</div></div>
+          <span class="badge active">${rows.length} saved item${rows.length===1?"":"s"}</span>
+        </div>
+        <div class="filterbar">
+          <label for="roundGroupFilter">Group</label>
+          <select id="roundGroupFilter">${realGroupOptions()}</select>
+          ${selectedPin!=="all" ? `
+            <button class="secondary" id="downloadHistoryBtn">⬇️ Download History</button>
+            <button class="primary" id="emailHistoryBtn">📧 Email Admin</button>
+          ` : ""}
+        </div>
+        ${selectedPin!=="all" && selectedState ? `
+          <div class="view-cards">
+            <div class="view-card"><div class="label">Rounds played</div><div class="big">${completedRoundCount(selectedState)}</div></div>
+            <div class="view-card"><div class="label">Normal rounds</div><div class="big">${(selectedState.history||[]).length}</div></div>
+            <div class="view-card"><div class="label">Trips</div><div class="big">${pastTripsOf(selectedState).length}</div></div>
+          </div>
+        ` : ""}
+        <div class="view-table">
+          <table>
+            <thead><tr><th>Date</th><th>Group</th><th>Competition / Trip</th><th>Type</th><th>Winner / Champion</th><th></th></tr></thead>
+            <tbody>${rows.length ? rows.map((r,i)=>`
+              <tr>
+                <td>${esc(fmtDate(r.date))}</td>
+                <td><b>${esc(r.group)}</b><div class="sub">PIN ${esc(r.pin)}</div></td>
+                <td><b>${esc(r.title)}</b></td>
+                <td>${esc(r.type)}</td>
+                <td>${esc(r.winner||"—")}</td>
+                <td><button class="secondary small history-detail" data-row="${i}">View ›</button></td>
+              </tr>`).join("") : '<tr><td colspan="6"><div class="empty">No completed rounds or trips found.</div></td></tr>'}
+            </tbody>
+          </table>
+        </div>`;
+
       $("roundGroupFilter").value=viewState.roundsGroup;
-      $("roundGroupFilter").addEventListener("change",e=>{viewState.roundsGroup=e.target.value;renderRounds()});
+      $("roundGroupFilter").addEventListener("change",e=>{viewState.roundsGroup=e.target.value;renderHistory()});
+      document.querySelectorAll(".history-detail").forEach(b=>b.onclick=()=>{
+        const row=rows[Number(b.dataset.row)];
+        if(!row)return;
+        if(row.kind==="trip")showTripHistoryModal(row.group,row.raw);
+        else showHistoryRoundModal(row.group,row.raw);
+      });
+      if($("downloadHistoryBtn"))$("downloadHistoryBtn").onclick=()=>downloadGroupHistory(selectedPin);
+      if($("emailHistoryBtn"))$("emailHistoryBtn").onclick=()=>emailGroupHistory(selectedPin);
     }
-    renderRounds();
+    renderHistory();
   }
   function logout(){clearInterval(timer);timer=null;localStorage.removeItem(OWNER_REMEMBER_KEY);ownerCode="";db=null;groups=[];states.clear();fingerprints.clear();observedActivity.clear();selectedPin="";viewState.playersGroup="all";viewState.playersSortKey="name";viewState.playersSortDir=1;viewState.roundsGroup="all";$("ownerCodeInput").value="";if($("rememberOwner"))$("rememberOwner").checked=false;$("dashView").classList.add("hidden");$("loginView").classList.remove("hidden");$("loginBtn").disabled=false;$("loginBtn").textContent="Open Owner Dashboard";$("loginMsg").textContent=""}
 
