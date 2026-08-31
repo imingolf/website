@@ -223,6 +223,61 @@ function demoCanEdit(){
   }
   return true;
 }
+
+function ensureDemoMoneyHistory(){
+  if(!demoReadOnly() || !state || !(state.players||[]).length)return;
+
+  state.history=state.history || [];
+
+  const alreadyHasDemoMoney=state.history.some(h=>
+    h && h.gameType==="money" && h.demoMoneyExample===true
+  );
+  if(alreadyHasDemoMoney)return;
+
+  const demoScores={
+    "Rory McIlroy":40,
+    "Scottie Scheffler":38,
+    "Tommy Fleetwood":37,
+    "Shane Lowry":36,
+    "Matt Fitzpatrick":35,
+    "Tyrrell Hatton":34,
+    "Justin Rose":33
+  };
+
+  const players=(state.players||[]).map(p=>({
+    name:p.name,
+    handicap:p.handicap,
+    competition:"stableford",
+    stableford:Object.prototype.hasOwnProperty.call(demoScores,p.name)
+      ? demoScores[p.name]
+      : 32,
+    netScore:null,
+    noReturn:false,
+    scoreSubmitted:true
+  }));
+
+  const winner=players.some(p=>p.name==="Rory McIlroy")
+    ? "Rory McIlroy"
+    : players[0].name;
+
+  state.history.push({
+    demoMoneyExample:true,
+    date:"2026-08-15",
+    course:"Sunningdale — Demo Money Game",
+    stake:5,
+    gameType:"money",
+    stablefordPot:players.length*5,
+    netPot:0,
+    winners:[winner],
+    stablefordWinnerNames:[winner],
+    netWinnerNames:[],
+    stablefordCountback:false,
+    stablefordSplit:false,
+    netCountback:false,
+    netSplit:false,
+    players
+  });
+}
 let lastWinnerRecord=null;
 let statsPlayerId=null;
 let myPlayerId="";
@@ -492,6 +547,7 @@ async function connect(){
  const {data,error}=await db.rpc("get_group_state",{p_pin:pin});
  if(error || !data){$("connectMsg").textContent="PIN not recognised, or database setup is incomplete.";return}
 state=data;
+ensureDemoMoneyHistory();
 if(!state.groupName && access?.group_name) state.groupName=String(access.group_name);
 localStorage.setItem("tensInPin",pin);
 loadMyPlayerForGroup();
@@ -635,6 +691,7 @@ async function refresh(){
  const {data,error}=await db.rpc("get_group_state",{p_pin:pin});
 if(!error && data){
   state=data;
+  ensureDemoMoneyHistory();
 
   // Only redraw the app if this phone's saved player still exists
   // in the current group. This prevents "Find my name" from being
