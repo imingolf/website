@@ -141,8 +141,7 @@ button{
   function frame(ts){
     if(!t0)t0=ts;
     const raw=Math.min(1,(ts-t0)/flightMs);
-    const eased=easeOutCubic(raw);
-    const p=path.getPointAtLength(length*eased);
+    const p=path.getPointAtLength(length*raw);
     ball.setAttribute('transform',`translate(${p.x-start.x} ${p.y-start.y})`);
     if(raw<1){requestAnimationFrame(frame);return;}
 
