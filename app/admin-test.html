@@ -85,14 +85,14 @@ button{
   box-shadow:0 4px 14px rgba(23,107,58,.08);
 }
 .admin-priority-grid{
-  display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px
+  display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:10px
 }
 .admin-priority-stat{
   background:#f4f8f5;border:1px solid #dce8df;border-radius:12px;
-  text-align:center;padding:11px 5px
+  text-align:center;padding:8px 3px
 }
-.admin-priority-stat b{display:block;font-size:21px;color:var(--green)}
-.admin-priority-stat span{display:block;font-size:11px;color:var(--muted);margin-top:3px}
+.admin-priority-stat b{display:block;font-size:19px;color:var(--green);line-height:1.05}
+.admin-priority-stat span{display:block;font-size:9px;color:var(--muted);margin-top:3px;line-height:1.1}
 .admin-priority-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:10px}
 .admin-ready{
   background:#def4e5;color:var(--green);font-weight:800;
@@ -103,8 +103,8 @@ button{
   text-align:center;padding:12px;border-radius:12px;margin-top:10px
 }
 @media(max-width:360px){
-  .admin-priority-grid{grid-template-columns:1fr}
-  .admin-priority-actions{grid-template-columns:1fr}
+  .admin-priority-grid{grid-template-columns:repeat(3,1fr)}
+  .admin-priority-actions{grid-template-columns:1fr 1fr}
 }
 
 </style>
@@ -1129,7 +1129,7 @@ function adminLiveRoundStatusHtml(){
   return `
     <div class="card admin-priority-card">
       <div class="muted">ADMIN ROUND CHECK</div>
-      <h2 style="margin:4px 0 0;">Everything you need at a glance</h2>
+      <h2 style="margin:4px 0 0;">Round check</h2>
 
       <div class="admin-priority-grid">
         <div class="admin-priority-stat">
@@ -1159,6 +1159,14 @@ function adminLiveRoundStatusHtml(){
       </div>
     </div>
   `;
+}
+
+function toggleAdminRoundDetails(btn){
+  const d=document.getElementById("adminRoundDetails");
+  if(!d)return;
+  const opening=d.style.display==="none";
+  d.style.display=opening?"block":"none";
+  btn.innerHTML=opening?"✖ Close Round Details":"✏️ Edit Round Details";
 }
 
 function round(){
@@ -1257,8 +1265,10 @@ $("screen").innerHTML=`
 
   ${isAdmin ? `
   <div class="card">
-    <h2>Round details</h2>
-    <div class="muted" style="margin:-4px 0 14px;">Change these only if something needs correcting.</div>
+    <button class="secondary full" style="margin-top:0;" onclick="toggleAdminRoundDetails(this)">✏️ Edit Round Details</button>
+    <div id="adminRoundDetails" style="display:none;margin-top:16px;">
+      <h2 style="margin-top:0;">Round details</h2>
+      <div class="muted" style="margin:-4px 0 14px;">Change these only if something needs correcting.</div>
 
       <label class="muted">Course</label>
       <input value="${escAttr(state.course)}" onchange="state.course=this.value;save()">
@@ -1279,10 +1289,11 @@ $("screen").innerHTML=`
           </div>
         `}
       </div>
+    </div>
   </div>
   ` : ``}
 
-  ${state.gameType==="money" && Number(state.stake||0)>0 ? `
+  ${state.gameType==="money" && Number(state.stake||0)>0 && !isAdmin ? `
     <div class="card">
       <h2>💷 Pay Before Play</h2>
 
