@@ -29,6 +29,7 @@ nav button{flex:1;background:transparent;color:#6d756f;padding:11px 2px;font-siz
 .pay-sticky{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(72px + env(safe-area-inset-bottom));width:min(488px,calc(100% - 32px));background:white;border:1px solid var(--line);border-radius:16px;padding:10px;box-shadow:0 6px 22px rgba(0,0,0,.14);z-index:19}
 .pay-sticky .full{margin-top:0}.pay-screen-spacer{height:82px}
 .finish-sticky{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(72px + env(safe-area-inset-bottom));width:min(488px,calc(100% - 32px));background:white;border:1px solid var(--line);border-radius:16px;padding:10px;box-shadow:0 6px 22px rgba(0,0,0,.14);z-index:19}.finish-sticky .full{margin-top:0}.finish-screen-spacer{height:82px}
+.advanced-controls{margin-top:12px}.advanced-controls summary{cursor:pointer;list-style:none;background:#fce2df;color:var(--red);border-radius:12px;padding:14px;text-align:center;font-weight:800}.advanced-controls summary::-webkit-details-marker{display:none}.advanced-controls[open] summary{margin-bottom:10px}.advanced-controls .red{margin-top:8px}
 .app-toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(150px + env(safe-area-inset-bottom));width:min(440px,calc(100% - 40px));background:#edf5ef;color:var(--green);border:1px solid #d7eadc;border-radius:16px;padding:13px 16px;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,.14);z-index:10020;opacity:0;transition:opacity .18s ease,transform .18s ease}.app-toast.show{opacity:1;transform:translateX(-50%) translateY(-4px)}.app-toast b{display:block;font-size:15px}.app-toast span{display:block;font-size:13px;margin-top:3px;color:#51655a}
 .score{width:78px;margin:0}.pos{font-weight:800;font-size:18px;min-width:24px}.money{font-weight:800}
 #setupOverlay{position:fixed;inset:0;background:#f4f6f3;z-index:50;display:flex;align-items:flex-start;justify-content:center;padding:45px 16px;overflow:auto}
@@ -680,7 +681,7 @@ async function refresh(){
 
  // Keep Owner utility screens on display.
  // Do not let the 5-second background sync redraw them while they are open.
- if(page==="admininvite" || page==="managegroups" || page==="editgroup" || page==="adminhelp")return;
+ if(page==="settings" || page==="admininvite" || page==="managegroups" || page==="editgroup" || page==="adminhelp")return;
 
  const editing=document.activeElement &&
    document.activeElement.tagName==="INPUT";
@@ -847,10 +848,12 @@ function waitingScreen(){
       <div style="font-size:46px;">⛳</div>
       <div class="muted">${first ? "NEXT ROUND" : "NEXT COMPETITION"}</div>
       <h2 style="font-size:28px;margin:8px 0;">${isAdmin ? "Ready for the next one?" : (first ? "Your first round is coming soon" : "Coming soon…")}</h2>
-      <div class="muted">${isAdmin ? "Set up your group's next competition." : (first ? "Your Admin hasn't set up the first round yet." : "Your Admin will set up the next competition.")}</div>
+      <div style="font-size:17px;line-height:1.45;font-weight:600;color:#40564a;margin-top:12px;">${isAdmin ? "Set up your group's next competition." : (first ? "Your Group Admin hasn't set up the first round yet." : "Your Group Admin will set up the next competition.")}</div>
       ${isAdmin
         ? `<button class="primary full" style="margin-top:18px;" onclick="newRound()">➕ Set Up Next Competition</button>`
-        : `<button class="primary full" style="margin-top:18px;" onclick="adminLoginFromWaiting()">🔐 Admin — Set Up Next Competition</button>`
+        : (adminDeviceRecognised()
+            ? `<button class="primary full" style="margin-top:18px;" onclick="openRememberedAdminFromWaiting()">🔐 Admin — Set Up Next Competition</button>`
+            : "")
       }
     </div>
     ${first ? "" : `<div class="card"><div class="notice">✅ The last result has been saved in <b>League → Previous rounds</b>.</div></div>`}
@@ -1041,7 +1044,7 @@ function showTripSummary(){
         <div class="notice">
           The organiser will close and archive the completed trip.
         </div>
-        ${demoReadOnly() ? "" : `
+        ${demoReadOnly() || !adminDeviceRecognised() ? "" : `
         <button class="ghost full" onclick="adminLogin()">
           🔐 Organiser / Admin
         </button>`}
@@ -1070,6 +1073,9 @@ function playerNextActionHtml(){
   }
   if(roundLocked() && (!moneyGame || me.paid)){
     return `<div class="card" style="text-align:center;"><div class="muted">YOUR NEXT STEP</div><button class="primary full" style="font-size:18px;margin-top:8px;" onclick="show('scores')">🏌️ Enter My Score</button></div>`;
+  }
+  if(moneyGame && me.paid){
+    return "";
   }
   return `<div class="card" style="text-align:center;"><div class="muted">YOUR NEXT STEP</div><button class="secondary full" style="font-size:18px;margin-top:8px;" disabled>✅ You’re In — Good Luck! ⛳</button></div>`;
 }
@@ -1114,6 +1120,9 @@ function round(){
     waitingScreen();
     return;
   }
+
+  const currentPlayer=state.players.find(p=>p.id===myPlayerId);
+  const currentPlayerPaid=!!currentPlayer?.paid;
 
   const pointsFirst=Number(state.pointsValue||10);
   const pointsSecond=Math.round(pointsFirst*0.6);
@@ -1192,7 +1201,17 @@ $("screen").innerHTML=`
   </div>
   ` : ``}
 
-  ${state.gameType==="money" && Number(state.stake||0)>0 ? `
+  ${state.gameType==="money" && Number(state.stake||0)>0 && !isAdmin && currentPlayerPaid ? `
+    <div class="card">
+      <div class="row">
+        <div>
+          <b>✅ You’re paid — £${state.stake} entry confirmed. You’re in — good luck! ⛳</b>
+          <div class="muted" style="margin-top:4px;">${paidCount()} of ${state.players.length} players paid</div>
+        </div>
+        <button class="secondary small" onclick="show('pay')">View payments</button>
+      </div>
+    </div>
+  ` : state.gameType==="money" && Number(state.stake||0)>0 ? `
     <div class="card">
       <h2>💷 Pay Before Play</h2>
 
@@ -1254,7 +1273,6 @@ $("screen").innerHTML=`
 
   <div class="card">
     <button class="secondary full" onclick="shareApp()">📤 Share I'm In Golf</button>
-    ${demoReadOnly() ? "" : `<button class="ghost full" onclick="adminLogin()">🔐 Admin Login</button>`}
   </div>`;
 }
 function shareApp(){
@@ -1294,8 +1312,11 @@ function pay(){
 
  $("screen").innerHTML=`
  <div class="card">
-   <h2>💷 Pay & Enter</h2>
-   <div class="notice"><b>Pay your Group Admin directly.</b><br>I'm In Golf does not receive or hold your money.</div>
+   <h2>💷 ${isAdmin ? "Manage Payments" : (me?.paid ? "Payments" : "Pay & Enter")}</h2>
+   <div class="notice">${isAdmin
+     ? "<b>Players pay you directly.</b><br>I'm In Golf does not receive, hold or manage your group's money."
+     : "<b>Pay your Group Admin directly.</b><br>I'm In Golf does not receive or hold your money."
+   }</div>
    <div class="big">£${pot()}</div>
    <div class="muted"><b>Current pot</b></div>
    <div class="muted" style="margin-top:6px;">Full pot if everyone enters: £${potentialPot()} • Entry: £${state.stake}</div>
@@ -1325,23 +1346,29 @@ function pay(){
 
    ${pin==="2026"
      ? '<div class="notice"><b>👀 Demo Mode — no real payments are taken.</b></div>'
-     : (paidCount()===state.players.length
-         ? '<div class="notice"><b>🔒 All paid. Ready to play.</b></div>'
-         : (isAdmin ? '<button class="secondary full" onclick="reminder()">🔔 Copy payment reminder</button>' : ''))
+     : isAdmin
+       ? (paidCount()===state.players.length
+           ? '<div class="notice"><b>🔒 All paid. Ready to play.</b></div>'
+           : '<button class="secondary full" onclick="reminder()">🔔 Copy payment reminder</button>')
+       : me?.paid
+         ? (paidCount()===state.players.length
+             ? '<div class="notice"><b>✅ You’re paid. Everyone is ready to play.</b></div>'
+             : `<div class="notice"><b>✅ You’re paid — ${paidCount()} of ${state.players.length} players paid.</b></div>`)
+         : ''
    }
  </div>
 
- <div class="pay-screen-spacer"></div>
- <div class="pay-sticky">
-   ${pin==="2026"
-     ? `<button class="secondary full" onclick="alert('👀 Demo Mode\n\nPayments are disabled in the demo.')">🔒 Demo — Payments Disabled</button>`
-     : (me && me.paid
-         ? `<button class="secondary full" disabled>✅ You’re In — Good Luck! ⛳</button>`
-         : (String(state.paymentLink||"").trim()
-             ? `<button class="primary full" onclick="beginPlayerPayment()">💳 Pay £${Number(state.stake||0)} & Enter</button>`
-             : `<button class="secondary full" disabled>Payment link not set up — ask your Group Admin</button>`))
-   }
- </div>`;
+ ${!isAdmin && !(me && me.paid) ? `
+   <div class="pay-screen-spacer"></div>
+   <div class="pay-sticky">
+     ${pin==="2026"
+       ? `<button class="secondary full" onclick="alert('👀 Demo Mode\n\nPayments are disabled in the demo.')">🔒 Demo — Payments Disabled</button>`
+       : (String(state.paymentLink||"").trim()
+           ? `<button class="primary full" onclick="beginPlayerPayment()">💳 Pay £${Number(state.stake||0)} & Enter</button>`
+           : `<button class="secondary full" disabled>Payment link not set up — ask your Group Admin</button>`)
+     }
+   </div>
+ ` : ""}`;
 }
 let paymentReturnBusy=false;
 function paymentReturnKey(){return "iigPaymentJourney_"+String(pin||"");}
@@ -1546,8 +1573,8 @@ function scores(){
           </div>
         ` : `
           <div class="notice">
-            <b>${pointsComp==="stableford" ? "🏆 STABLEFORD" : "⛳ NET"}</b><br>
-            Your Group Admin chose the competition for everyone.
+            <b>${isAdmin ? "CURRENT COMPETITION — " : ""}${pointsComp==="stableford" ? "🏆 STABLEFORD" : "⛳ NET"}</b><br>
+            ${isAdmin ? "Enter or correct player scores below." : "Your Group Admin chose the competition for everyone."}
           </div>
           ${Number(state.stake||0)>0 ? `<div class="notice">💷 Only paid players are eligible to win the pot.</div>` : ""}
         `}
@@ -1574,8 +1601,6 @@ function scores(){
           <div>
             <b>${esc(p.name)}</b>
             <div class="muted">HCP ${p.handicap}</div>
-
-            <div class="muted">Competition: ${pointsComp==="stableford" ? "Stableford" : "Net"}</div>
           </div>
 
           ${canControl ? `
@@ -1604,7 +1629,9 @@ function scores(){
                 ` : ""}
               ` : `
                 <label class="muted">
-                  ${type==="stableford" ? "🏆 Stableford" : "⛳ Net Score"}
+                  ${type==="stableford"
+                    ? `🏆 Enter Stableford points${isAdmin ? ` for ${esc(p.name)}` : ""}`
+                    : `⛳ Enter Net score${isAdmin ? ` for ${esc(p.name)}` : ""}`}
                 </label>
                 <input
                   id="scoreInput_${i}"
@@ -1615,7 +1642,7 @@ function scores(){
 
                 <button class="primary full" style="margin-top:8px;"
                   onclick="submitPlayerScore(${i},'${type}')">
-                  🏌️ Submit My Score
+                  🏌️ ${isAdmin ? `Submit ${esc(p.name)}'s Score` : "Submit My Score"}
                 </button>
 
                 ${type==="net" ? `
@@ -3695,6 +3722,14 @@ function playersPage(){
      👤 You: ${esc(state.players.find(p=>p.id===myPlayerId)?.name || "Not selected")}
    </div>
 
+   ${isAdmin ? `
+   <button class="secondary full" onclick="show('settings');window.scrollTo(0,0)">
+     ⚙️ Admin Settings
+   </button>
+   <button class="primary full" onclick="returnToPlayerView()">
+     👤 Return to Player View
+   </button>` : ""}
+
    <button class="secondary full" onclick="changeMyPlayer()">
      🔄 Change who I am
    </button>
@@ -3703,6 +3738,11 @@ function playersPage(){
    <button class="secondary full" onclick="switchGolfGroup()">
      🔁 Switch Golf Group
    </button>`}
+
+   ${!isAdmin && !demoReadOnly() ? `
+   <button class="ghost full" onclick="openAdminFromPlayers()">
+     🔐 ${adminDeviceRecognised() ? "Open Admin Mode" : "Admin Login"}
+   </button>` : ""}
 
    ${sortedPlayers.map(p=>{
 
@@ -3741,6 +3781,14 @@ function playersPage(){
  </div>`;
 }
 function changeMyPlayer(){
+  // A remembered Admin session belongs to the selected player, not the device generally.
+  if(pin){
+    localStorage.removeItem(adminDeviceKey(pin));
+    sessionStorage.removeItem(adminSessionKey(pin));
+  }
+  isAdmin=false;
+  isOwner=false;
+  ownerCreationCode="";
   clearMyPlayerForGroup();
   chooseMyPlayer();
 }
@@ -3884,16 +3932,29 @@ function adminSessionKey(groupPin){
   return "tensInAdmin_" + String(groupPin||"").trim();
 }
 
+function adminDeviceKey(groupPin){
+  return "iigAdminDevice_" + String(groupPin||"").trim();
+}
+
+function adminDeviceRecognised(){
+  if(!pin || !myPlayerId)return false;
+  return localStorage.getItem(adminDeviceKey(pin))===myPlayerId;
+}
+
 function loadAdminForGroup(){
-  isAdmin=pin!=="2026" && !!pin && sessionStorage.getItem(adminSessionKey(pin))==="yes";
-  if(!isAdmin){
-    isOwner=false;
-    ownerCreationCode="";
-  }
+  // A browser refresh always reopens the clean Player View. The separate
+  // player-bound device record still permits PIN-free re-entry to Admin Mode.
+  if(pin)sessionStorage.removeItem(adminSessionKey(pin));
+  isAdmin=false;
+  isOwner=false;
+  ownerCreationCode="";
 }
 
 function saveAdminForGroup(){
-  if(pin && isAdmin)sessionStorage.setItem(adminSessionKey(pin),"yes");
+  if(pin && isAdmin){
+    sessionStorage.setItem(adminSessionKey(pin),"yes");
+    if(myPlayerId)localStorage.setItem(adminDeviceKey(pin),myPlayerId);
+  }
 }
 
 function clearAdminForGroup(){
@@ -3909,11 +3970,7 @@ function updateAdminUI(){
   const payButton=$("npay");
 
   if(settingsButton){
-    if(isAdmin){
-      settingsButton.classList.remove("hidden");
-    }else{
-      settingsButton.classList.add("hidden");
-    }
+    settingsButton.classList.add("hidden");
   }
 
   if(payButton){
@@ -3927,6 +3984,29 @@ function updateAdminUI(){
       payButton.classList.remove("hidden");
     }
   }
+}
+
+function openAdminFromPlayers(){
+  if(adminDeviceRecognised()){
+    isAdmin=true;
+    sessionStorage.setItem(adminSessionKey(pin),"yes");
+    updateAdminUI();
+    show("settings");
+    window.scrollTo(0,0);
+    return;
+  }
+  adminLogin();
+}
+
+function returnToPlayerView(){
+  isAdmin=false;
+  isOwner=false;
+  ownerCreationCode="";
+  sessionStorage.removeItem(adminSessionKey(pin));
+  updateAdminUI();
+  show("round");
+  window.scrollTo(0,0);
+  showAppToast("👤 Player View","Admin controls are hidden.",2600);
 }
 function adminPinForGroup(){
   if(Object.prototype.hasOwnProperty.call(state,"adminPin")){
@@ -3946,7 +4026,7 @@ function adminPinEntryModal(title="Admin Access",subtitle="Enter your 4-digit Ad
         <div style="font-size:36px;text-align:center;margin-bottom:6px;">🔐</div>
         <h2 style="text-align:center;margin:0 0 6px;">${esc(title)}</h2>
         <p class="muted" style="text-align:center;margin:0 0 20px;">${esc(subtitle)}</p>
-        <input id="adminAccessPin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="current-password" placeholder="4 digits" style="text-align:center;font-size:28px;letter-spacing:10px;font-weight:800;">
+        <input id="adminAccessPin" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="one-time-code" placeholder="4 digits" aria-label="4-digit Admin PIN" style="text-align:center;font-size:28px;letter-spacing:10px;font-weight:800;-webkit-text-security:disc;">
         <div id="adminAccessMsg" class="muted" style="min-height:22px;text-align:center;color:var(--red);margin-top:4px;"></div>
         <button class="primary full" id="adminAccessContinue">Continue</button>
         <button class="ghost full" id="adminAccessCancel" style="margin-top:8px;">Cancel</button>
@@ -4001,6 +4081,18 @@ async function adminLoginFromWaiting(){
  newRound();
 }
 
+function openRememberedAdminFromWaiting(){
+ if(!adminDeviceRecognised()){
+   show("players");
+   return;
+ }
+ isAdmin=true;
+ saveAdminForGroup();
+ updateAdminUI();
+ newRound();
+ window.scrollTo(0,0);
+}
+
 async function adminLogin(){
  if(demoReadOnly()){
    showAppToast("👀 Demo Mode","Admin access is disabled in the demo.",3200);
@@ -4012,6 +4104,7 @@ async function adminLogin(){
  saveAdminForGroup();
  updateAdminUI();
  show("settings");
+ window.scrollTo(0,0);
 }
 
 function changeAdminPinModal(){
@@ -4099,8 +4192,10 @@ function adminLogout(){
  isOwner=false;
  ownerCreationCode="";
  clearAdminForGroup();
+ if(pin)localStorage.removeItem(adminDeviceKey(pin));
  updateAdminUI();
  show("round");
+ window.scrollTo(0,0);
 }
 
 async function changeGroupName(){
@@ -4156,6 +4251,7 @@ function settingsPage(){
  if(!isAdmin){adminLogin();return}
  $("screen").innerHTML=`<div class="card"><h2>⚙️ Admin / Settings</h2>
  <div class="muted">Shared controls for your golf group.</div>
+ <button class="primary full" onclick="returnToPlayerView()">👤 Return to Player View</button>
  <div class="notice" style="margin-top:12px;">
    <div class="muted">GROUP NAME</div>
    <b>${esc(state.groupName||"My Golf Group")}</b>
@@ -4172,9 +4268,11 @@ function settingsPage(){
  </div>
  <div class="card"><h2>Round controls</h2>
  ${!state.trip?.active && !state.trip?.completed ? `
-  <button class="secondary full" onclick="newRound()">
-    Start new round
-  </button>
+  ${!roundOpenNow() ? `
+    <button class="secondary full" onclick="newRound()">
+      Start new round
+    </button>
+  ` : ""}
   ${roundOpenNow() && !roundLocked() ? `
     <div class="notice" style="margin-top:12px;">
       <div class="muted">CURRENT COMPETITION</div>
@@ -4184,18 +4282,10 @@ function settingsPage(){
       🔄 Change to ${state.pointsCompetition==="net" ? "Stableford" : "Net"}
     </button>
   ` : ""}
-  <button class="red full" onclick="cancelCurrentRound()">
-    🗑️ Cancel Current Round
-  </button>
 ` : ""}
 ${state.trip?.active && Number(state.trip.currentRound)>1 ? `
   <button class="primary full" onclick="nextTripRound()">
     ✈️ Start Trip Round ${state.trip.currentRound} of ${state.trip.totalRounds}
-  </button>
-` : ""}
-${state.trip?.active ? `
-  <button class="red full" onclick="cancelTrip()">
-    🗑️ Cancel Current Trip
   </button>
 ` : ""}
 ${state.trip?.completed ? `
@@ -4203,16 +4293,25 @@ ${state.trip?.completed ? `
     🏁 Finish Trip & Return to Normal Round
   </button>
 ` : ""}
-${state.trip?.pastTrips?.length ? `
-  <button class="red full" onclick="deletePastTrip()">
-    🗑️ Delete Past Trip
-  </button>
-` : ""}
 <button class="primary full" onclick="competitionReminder()">🔔 Competition Reminder</button>
- <button class="red full" onclick="resetPayments()">Reset payments</button>
-<button class="red full" onclick="resetScores()">Clear scores</button>
-<button class="red full" onclick="deleteLastRound()">↩️ Delete Last Round</button>
-<button class="red full" onclick="clearLeague()">🗑️ Clear League & History</button></div>
+
+<details class="advanced-controls">
+  <summary>⚠️ Advanced reset and delete controls</summary>
+  <div class="notice warning"><b>Use these controls carefully.</b><br>You will still be asked to confirm before anything is changed or deleted.</div>
+  ${roundOpenNow() && !state.trip?.active ? `
+    <button class="red full" onclick="cancelCurrentRound()">🗑️ Cancel Current Round</button>
+  ` : ""}
+  ${state.trip?.active ? `
+    <button class="red full" onclick="cancelTrip()">🗑️ Cancel Current Trip</button>
+  ` : ""}
+  ${state.trip?.pastTrips?.length ? `
+    <button class="red full" onclick="deletePastTrip()">🗑️ Delete Past Trip</button>
+  ` : ""}
+  <button class="red full" onclick="resetPayments()">Reset payments</button>
+  <button class="red full" onclick="resetScores()">Clear scores</button>
+  <button class="red full" onclick="deleteLastRound()">↩️ Delete Last Round</button>
+  <button class="red full" onclick="clearLeague()">🗑️ Clear League & History</button>
+</details></div>
  <div class="card"><h2>Players</h2><button class="primary full" onclick="show('players')">Manage players & handicaps</button></div>
 <div class="card">
   <h2>Group access</h2>
@@ -4281,13 +4380,13 @@ function adminHelpBack(){
 
 function adminHelpTopicContent(topic){
   const topics={
-    setup:`<h2>⛳ Set up the next competition</h2><div class="notice"><b>1.</b> Go to <b>Round</b>.<br><br><b>2.</b> If needed, tap <b>Admin — Set Up Next Competition</b> and enter your 4-digit Admin PIN.<br><br><b>3.</b> Choose Money Game, Points Game or Trip Mode.<br><br><b>4.</b> Enter the course, date and choose <b>Stableford or Net</b> for everyone.<br><br><b>5.</b> For a Money Game, set the entry fee and make sure players pay before scoring starts.</div><div class="notice warning">Once the first score is submitted, entries close automatically.</div>`,
+    setup:`<h2>⛳ Set up the next competition</h2><div class="notice"><b>1.</b> Go to <b>Round</b>.<br><br><b>2.</b> A remembered Admin can tap <b>Admin — Set Up Next Competition</b>. On a new device, use <b>Players → Admin Login</b> and enter the 4-digit Admin PIN.<br><br><b>3.</b> Choose Money Game, Points Game or Trip Mode.<br><br><b>4.</b> Enter the course, date and choose <b>Stableford or Net</b> for everyone.<br><br><b>5.</b> For a Money Game, set the entry fee and make sure players pay before scoring starts.</div><div class="notice warning">Once the first score is submitted, entries close automatically.</div>`,
     players:`<h2>👥 Add or edit players</h2><div class="notice">Go to <b>Players</b>.<br><br>Players can join themselves, or the Admin can manage names and handicaps while Admin is unlocked.<br><br>A player can use <b>Change who I am</b> if the wrong name is selected on their phone.</div>`,
     payments:`<h2>💷 Payments</h2><div class="notice">In a Money Game, players go to <b>Pay</b> and use the Group Admin's payment link before scoring starts.<br><br>Only paid players are entered in the pot and can submit a score.<br><br>When a player returns to I’m In Golf after opening the payment link, the app marks them paid.<br><br>Once scoring starts, entries are closed so nobody can join late.</div><div class="muted">Payments go directly to the Group Admin. I’m In Golf does not receive or hold the money.</div>`,
     scoring:`<h2>🏌️ Scores</h2><div class="notice">Players enter their own score and tap <b>Submit My Score</b>.<br><br>The app asks <b>Are you sure?</b> before saving.<br><br>Once submitted, the player's score is locked.</div><div class="notice">Admin can use <b>Correct score</b> if a genuine mistake needs fixing.</div>`,
     nr:`<h2>NR — No Return</h2><div class="notice">In a <b>Net</b> competition, a player who does not return a score should tap <b>NR — No Return</b>.<br><br>NR counts as submitted, removes the player from <b>Still to enter</b>, and the player cannot win the Net competition.</div>`,
     waiting:`<h2>⏳ Still to enter</h2><div class="notice">Once scoring starts, the Scores screen shows the names of everyone who still needs to submit.<br><br>For a Money Game, only players who were paid and entered before scoring started are included.<br><br>The list updates automatically as scores or NR results are submitted.</div>`,
-    finish:`<h2>🏁 Finish a round</h2><div class="notice">When every entered player has submitted a score or valid NR, Admin will see <b>Finish Round</b> at the bottom of Scores.<br><br>Check the leaderboard, tap the button and confirm the result.<br><br>The winner and <b>full final standings</b> are saved in <b>League → Previous rounds</b> and can be shared as an I’m In Golf results image.</div><div class="notice">After a normal round finishes, players see <b>Next Competition — Coming soon…</b>. The Admin can tap <b>Admin — Set Up Next Competition</b> to start the next one.</div>`,
+    finish:`<h2>🏁 Finish a round</h2><div class="notice">When every entered player has submitted a score or valid NR, Admin will see <b>Finish Round</b> at the bottom of Scores.<br><br>Check the leaderboard, tap the button and confirm the result.<br><br>The winner and <b>full final standings</b> are saved in <b>League → Previous rounds</b> and can be shared as an I’m In Golf results image.</div><div class="notice">After a normal round finishes, players see <b>Next Competition — Coming soon…</b>. A remembered Admin can tap <b>Admin — Set Up Next Competition</b>. On a new device, use <b>Players → Admin Login</b>.</div>`,
     points:`<h2>🏆 Points Games</h2><div class="notice">Everyone plays the same competition — Stableford or Net.<br><br>There is no payment step.<br><br>Players enter their score in the normal Scores screen and the top three receive league points based on the value chosen when the round is set up.</div>`,
     trip:`<h2>✈️ Trip Mode</h2><div class="notice">Choose <b>Trip Mode</b> when setting up a competition, then enter the trip name and number of rounds.<br><br>Each round is saved inside the trip and Trip Championship points build across the trip.<br><br>After the final round, the app shows a Trip Summary with daily winners, final standings and the Trip winner.</div><div class="notice">The organiser then taps <b>Save Trip & Return to Normal Golf</b>.</div>`,
     pin:`<h2>🔐 Admin PIN</h2><div class="notice">Admin can change the PIN in <b>Settings → Change Admin PIN</b>.<br><br>If the Admin PIN is forgotten, the I'm In Golf owner can reset it securely from Owner Controls.</div>`,
