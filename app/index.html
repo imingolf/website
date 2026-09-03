@@ -829,11 +829,59 @@ function setFirstRoundCompetition(type){
   $("firstCompNet")?.classList.toggle("selected",value==="net");
 }
 
+const IIG_NOTIFICATION_TEST_GROUP="1260";
+const IIG_VAPID_PUBLIC_KEY="BBJMYnSjC5ZCpLAvav0h0v4Am3TkOCH6YYbcijEuNoU9uPurDpRri5yKNKCF7IJqV2iDn9o4DUqIIS8hoMPu48E";
+
+function notificationDeviceKey(){return `iigNotifications_${pin}_${myPlayerId||"none"}`;}
+function notificationDeviceEnabled(){return localStorage.getItem(notificationDeviceKey())==="on";}
+function base64UrlToUint8Array(value){
+  const padding="=".repeat((4-value.length%4)%4);
+  const base64=(value+padding).replace(/-/g,"+").replace(/_/g,"/");
+  const raw=atob(base64);
+  return Uint8Array.from([...raw].map(char=>char.charCodeAt(0)));
+}
+function notificationCardHtml(){
+  if(pin!==IIG_NOTIFICATION_TEST_GROUP || !myPlayerId)return "";
+  if(!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window))return `<div class="card"><b>🔔 Competition updates</b><div class="muted" style="margin-top:6px;">Notifications are not supported by this browser.</div></div>`;
+  if(Notification.permission==="denied")return `<div class="card"><b>🔕 Notifications are blocked</b><div class="muted" style="margin-top:6px;">Allow notifications for I’m In Golf in your phone or browser settings.</div></div>`;
+  if(notificationDeviceEnabled() && Notification.permission==="granted")return `<div class="card"><div class="row"><div><b>🔔 Competition updates are on</b><div class="muted" style="margin-top:4px;">This phone will receive friendly reminders for your golf group.</div></div><button class="secondary small" onclick="disableIigNotifications()">Turn off</button></div></div>`;
+  return `<div class="card"><h2>🔔 Competition updates</h2><div class="muted" style="margin-bottom:14px;">Get a friendly message when a competition is ready and before golf day.</div><button class="primary full" onclick="enableIigNotifications()">Turn on notifications</button><div class="muted" style="font-size:12px;text-align:center;margin-top:10px;">Test group only • You can turn these off anytime</div></div>`;
+}
+async function enableIigNotifications(){
+  if(pin!==IIG_NOTIFICATION_TEST_GROUP || !myPlayerId)return;
+  const isAppleMobile=/iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const standalone=window.matchMedia?.("(display-mode: standalone)")?.matches || navigator.standalone===true;
+  if(isAppleMobile && !standalone){alert("On iPhone or iPad, first add I’m In Golf to your Home Screen. Open it from the new icon, then tap Turn on notifications again.");return;}
+  try{
+    const permission=await Notification.requestPermission();
+    if(permission!=="granted"){render();return;}
+    const registration=await navigator.serviceWorker.register("./notification-sw.js",{scope:"./"});
+    await navigator.serviceWorker.ready;
+    let subscription=await registration.pushManager.getSubscription();
+    if(!subscription)subscription=await registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:base64UrlToUint8Array(IIG_VAPID_PUBLIC_KEY)});
+    const details=subscription.toJSON();
+    const {error}=await db.rpc("register_iig_push_subscription",{p_group_pin:pin,p_player_id:myPlayerId,p_endpoint:subscription.endpoint,p_p256dh:details.keys?.p256dh||"",p_auth:details.keys?.auth||"",p_user_agent:navigator.userAgent});
+    if(error)throw error;
+    localStorage.setItem(notificationDeviceKey(),"on");
+    render();
+    alert("✅ Competition updates are on for this phone.");
+  }catch(error){console.error("Notification setup failed",error);alert("Notifications could not be turned on yet. Please try again.");}
+}
+async function disableIigNotifications(){
+  try{
+    const registration=await navigator.serviceWorker.getRegistration("./");
+    const subscription=await registration?.pushManager.getSubscription();
+    if(subscription){await db.rpc("disable_iig_push_subscription",{p_group_pin:pin,p_player_id:myPlayerId,p_endpoint:subscription.endpoint});await subscription.unsubscribe();}
+  }catch(error){console.error("Notification disable failed",error);}
+  localStorage.removeItem(notificationDeviceKey());render();
+}
+
 function waitingScreen(){
   const first=firstRoundNotYetCreated();
   if(first && isAdmin){
     $("screen").innerHTML=`
       ${myPlayerId && state.players.some(p=>p.id===myPlayerId) ? `<div class="notice" style="margin-top:0;">👤 You: <b>${esc(state.players.find(p=>p.id===myPlayerId)?.name||"")}</b></div>` : ""}
+      ${notificationCardHtml()}
       <div class="card">
         <div style="font-size:38px;text-align:center;">⛳</div>
         <h2 style="text-align:center;margin-bottom:6px;">Set up your first round</h2>
@@ -857,6 +905,7 @@ function waitingScreen(){
 
   $("screen").innerHTML=`
     ${myPlayerId && state.players.some(p=>p.id===myPlayerId) ? `<div class="notice" style="margin-top:0;">👤 You: <b>${esc(state.players.find(p=>p.id===myPlayerId)?.name||"")}</b></div>` : ""}
+    ${notificationCardHtml()}
     <div class="card" style="text-align:center;padding:28px 18px;">
       <div style="font-size:46px;">⛳</div>
       <div class="muted">${first ? "NEXT ROUND" : "NEXT COMPETITION"}</div>
@@ -1143,6 +1192,8 @@ function round(){
 $("screen").innerHTML=`
 
   ${myPlayerId && state.players.some(p=>p.id===myPlayerId) ? `<div class="notice" style="margin-top:0;">👤 You: <b>${esc(state.players.find(p=>p.id===myPlayerId)?.name||"")}</b></div>` : ""}
+
+  ${notificationCardHtml()}
 
   ${playerNextActionHtml()}
 
