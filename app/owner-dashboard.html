@@ -211,6 +211,7 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
     const slim={
       players:(s.players||[]).map(p=>[p.id,p.name,p.handicap,p.paid,p.competition,p.stableford,p.netScore,p.scoreSubmitted,p.noReturn]),
       history:(s.history||[]).length, roundOpen:s.roundOpen, course:s.course,date:s.date,gameType:s.gameType,
+      pointsCompetition:s.pointsCompetition,stake:s.stake,
       trip:s.trip?{active:s.trip.active,completed:s.trip.completed,currentRound:s.trip.currentRound,totalRounds:s.trip.totalRounds,rounds:(s.trip.rounds||[]).length}:null
     };
     return JSON.stringify(slim);
@@ -336,16 +337,21 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
     if(TEST_PINS.has("2894")&&groups.some(g=>String(g.group_pin)==="2894"))items.push(`<span class="attention-item"><b>Paid test 2894</b><br>TEST — excluded from business totals</span>`);
     $("attentionList").innerHTML=items.length?items.join(""):`<span class="attention-item">✅ Nothing needs attention right now.</span>`;
   }
+  function roundCompetition(s){
+    const value=s?.trip?.active ? s.trip.competition : s?.pointsCompetition;
+    return String(value||"stableford")==="net" ? "net" : "stableford";
+  }
   function currentRoundText(s){
     if(!s)return "—";
     if(s.trip?.active)return `Trip • Round ${s.trip.currentRound||1} of ${s.trip.totalRounds||"?"}`;
     if(s.roundOpen===false)return "Waiting for next competition";
-    return `${s.gameType==="points"?"Points Game":"Money Game"}${s.gameType==="points"?" • "+(s.pointsCompetition==="net"?"Net":"Stableford"):""}`;
+    return `${s.gameType==="points"?"Points Game":"Money Game"} • ${roundCompetition(s)==="net"?"Net":"Stableford"}`;
   }
   function submittedCount(s){
     if(!s)return [0,0];
     const ps=s.players||[];
-    const eligible=s.gameType==="points"?ps:ps.filter(p=>p.paid&&(p.competition==="stableford"||p.competition==="net"));
+    const paidEntryRequired=s.gameType==="money"&&Number(s.stake||0)>0;
+    const eligible=s.gameType==="points"||!paidEntryRequired ? ps : ps.filter(p=>p.paid===true);
     const n=eligible.filter(p=>p.scoreSubmitted===true||p.stableford!=null||p.netScore!=null||p.noReturn===true).length;
     return [n,eligible.length];
   }
@@ -370,16 +376,17 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
       </div>
       <div class="members"><h3>📝 Live Score Entry</h3>
         ${s?.roundOpen===false ? `<div class="empty">No competition is currently open.</div>` : players.length ? players.slice().sort((a,b)=>String(a.name).localeCompare(String(b.name))).map(p=>{
-          const eligible=s?.gameType==="points" ? true : (p.paid===true && (p.competition==="stableford"||p.competition==="net"));
+          const paidEntryRequired=s?.gameType==="money"&&Number(s?.stake||0)>0;
+          const eligible=s?.gameType==="points"||!paidEntryRequired||p.paid===true;
           const submitted=p.scoreSubmitted===true||p.stableford!=null||p.netScore!=null||p.noReturn===true;
-          let result="⏳ Waiting";
-          if(!eligible) result=s?.gameType==="money" ? (p.paid===true?"Waiting for game choice":"Not entered") : "⏳ Waiting";
+          const comp=roundCompetition(s);
+          let result="⏳ Waiting for score";
+          if(!eligible) result="Not entered";
           else if(p.noReturn===true) result="✅ NR";
           else if(submitted){
-            const comp=s?.gameType==="points" ? String(s.pointsCompetition||"stableford") : String(p.competition||"stableford");
             result=comp==="net" ? `✅ Net ${esc(p.netScore??"—")}` : `✅ ${esc(p.stableford??"—")} pts`;
           }
-          const compLabel=s?.gameType==="money"&&p.competition ? (p.competition==="net"?"Net":"Stableford") : "";
+          const compLabel=eligible ? (comp==="net"?"Net":"Stableford") : "";
           return `<div class="member"><div><b>${esc(p.name||"Player")}</b><div class="role">${compLabel}</div></div><div><b>${result}</b></div></div>`;
         }).join("") : `<div class="empty">No players have joined yet.</div>`}
       </div>
