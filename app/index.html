@@ -749,7 +749,7 @@ function render(){
   if(page==="adminhelp")adminHelpPage();
 }
 function roundLocked(){
-  return state.players.some(p=>
+  return Object.values(state.trip?.currentTeamScores||{}).some(v=>v!=null && v!=="") || state.players.some(p=>
     p.stableford!=null ||
     p.netScore!=null ||
     p.noReturn===true
@@ -923,18 +923,47 @@ function waitingScreen(){
   `;
 }
 
-function paidCount(){return state.players.filter(p=>p.paid).length}
-function potentialPot(){return Number(state.stake||0)*state.players.length}
+function tripRoundFormat(){
+  if(!state.trip?.active)return "individual";
+  return state.trip.currentFormat || state.trip.plan?.[Number(state.trip.currentRound||1)-1]?.format || "individual";
+}
+function tripPlayingIds(){
+  if(!state.trip?.active)return null;
+  const ids=state.trip.currentPlayingIds;
+  return Array.isArray(ids) ? ids : (Array.isArray(state.trip.playerIds) ? state.trip.playerIds : state.players.map(p=>p.id));
+}
+function tripPlayerIsPlaying(player){
+  const ids=tripPlayingIds();
+  return !ids || ids.includes(player?.id);
+}
+function tripBetterBallActive(){return Boolean(state.trip?.active && tripRoundFormat()==="betterball");}
+function tripPairsAggregateActive(){return Boolean(state.trip?.active && tripRoundFormat()==="pairsaggregate");}
+function tripTeamRoundActive(){return tripBetterBallActive() || tripPairsAggregateActive();}
+function tripFormatLabel(format=tripRoundFormat()){
+  return format==="betterball" ? "Better Ball" : format==="pairsaggregate" ? "Pairs Aggregate" : "Individual";
+}
+function currentRoundPlayers(){return state.players.filter(p=>tripPlayerIsPlaying(p));}
+function tripTeamName(team){
+  return (team?.playerIds||[]).map(id=>state.players.find(p=>p.id===id)?.name).filter(Boolean).join(" & ") || team?.name || "Pair";
+}
+function tripGroupsHtml(){
+  if(!state.trip?.active || !Array.isArray(state.trip.currentGroups))return "";
+  const groups=state.trip.currentGroups;
+  const resting=state.players.filter(p=>Array.isArray(state.trip.playerIds) && state.trip.playerIds.includes(p.id) && !tripPlayerIsPlaying(p));
+  return `<div class="card"><h2>🎲 Today's fourballs</h2>${groups.map((ids,i)=>`<div class="notice"><b>Fourball ${i+1}</b><br>${ids.map(id=>esc(state.players.find(p=>p.id===id)?.name||"")).filter(Boolean).join(" • ")}</div>`).join("")}${tripTeamRoundActive()?`<div class="muted" style="margin-top:8px;">${esc(tripFormatLabel())} pairs: ${(state.trip.currentTeams||[]).map(t=>esc(tripTeamName(t))).join(" • ")}</div>`:""}${resting.length?`<div class="muted" style="margin-top:10px;"><b>Not playing today:</b> ${resting.map(p=>esc(p.name)).join(", ")}</div>`:""}</div>`;
+}
+function paidCount(){return currentRoundPlayers().filter(p=>p.paid).length}
+function potentialPot(){return Number(state.stake||0)*currentRoundPlayers().length}
 function pot(){return Number(state.stake||0)*paidCount()}
 function stablefordPaidCount(){
   return (state.pointsCompetition || "stableford")==="stableford"
-    ? state.players.filter(p=>p.paid).length
+    ? currentRoundPlayers().filter(p=>p.paid).length
     : 0;
 }
 
 function netPaidCount(){
   return (state.pointsCompetition || "stableford")==="net"
-    ? state.players.filter(p=>p.paid).length
+    ? currentRoundPlayers().filter(p=>p.paid).length
     : 0;
 }
 
@@ -951,9 +980,20 @@ function tripStandingsSorted(){
     .map(([name,points])=>({name,points:Number(points||0)}))
     .sort((a,b)=>b.points-a.points || a.name.localeCompare(b.name));
 }
+function tripTeamStandingsSorted(){
+  const standings=state.trip?.teamStandings || {};
+  return Object.entries(standings).map(([name,points])=>({name,points:Number(points||0)})).sort((a,b)=>b.points-a.points || a.name.localeCompare(b.name));
+}
 
 function tripRoundWinner(record){
   if(!record)return null;
+
+  if(record.tripFormat==="betterball" || record.tripFormat==="pairsaggregate"){
+    const first=(record.teamResults||[])[0];
+    if(!first)return null;
+    const suffix=record.tripFormat==="pairsaggregate" && record.pointsCompetition==="net" ? " combined net" : " pts";
+    return {name:(record.winnerNames||[first.name]).join(" & "),score:Number(first.score)+suffix,label:tripFormatLabel(record.tripFormat)};
+  }
 
   if(record.gameType==="points"){
     const first=(record.pointsResults||[])[0];
@@ -994,6 +1034,8 @@ function setTripChampion(){
   if(!state.trip)return;
   const sorted=tripStandingsSorted();
   state.trip.champion=sorted.length ? sorted[0].name : null;
+  const teamSorted=tripTeamStandingsSorted();
+  state.trip.teamChampion=teamSorted.length ? teamSorted[0].name : null;
 }
 
 function showTripSummary(){
@@ -1001,10 +1043,19 @@ function showTripSummary(){
   const rounds=trip.rounds || [];
   const standings=tripStandingsSorted();
   const champion=trip.champion || standings[0]?.name || null;
+  const teamStandings=tripTeamStandingsSorted();
+  const teamChampion=trip.teamChampion || teamStandings[0]?.name || null;
 
   const tripMoney={};
   rounds.forEach(r=>{
     if(r.gameType!=="money")return;
+
+    if(r.tripFormat==="betterball" || r.tripFormat==="pairsaggregate"){
+      const names=Array.isArray(r.winnerPlayerNames)?r.winnerPlayerNames:[];
+      const share=names.length?Number(r.teamPot||0)/names.length:0;
+      names.forEach(name=>{tripMoney[name]=(tripMoney[name]||0)+share;});
+      return;
+    }
 
     const stableNames=Array.isArray(r.stablefordWinnerNames) ? r.stablefordWinnerNames : [];
     const netNames=Array.isArray(r.netWinnerNames) ? r.netWinnerNames : [];
@@ -1038,9 +1089,19 @@ function showTripSummary(){
     ${champion ? `
       <div class="card" style="text-align:center;">
         <div style="font-size:38px;">👑</div>
-        <div class="muted">TRIP WINNER</div>
+        <div class="muted">INDIVIDUAL TRIP CHAMPION</div>
         <h2 style="font-size:28px;margin:6px 0;">${esc(champion)}</h2>
         <div class="big">${Number((trip.standings||{})[champion]||0)} pts</div>
+      </div>
+    ` : ""}
+
+    ${teamChampion ? `
+      <div class="card" style="text-align:center;">
+        <div style="font-size:38px;">🤝</div>
+        <div class="muted">TEAM-EVENT CHAMPION</div>
+        <h2 style="font-size:28px;margin:6px 0;">${esc(teamChampion)}</h2>
+        <div class="big">${Number((trip.teamStandings||{})[teamChampion]||0)} pts</div>
+        <div class="muted">Points earned across the pairs rounds</div>
       </div>
     ` : ""}
 
@@ -1048,8 +1109,9 @@ function showTripSummary(){
       <h2>📅 Daily results</h2>
       ${rounds.length ? rounds.map((r,i)=>{
         const w=tripRoundWinner(r);
-        const gameLabel=r.gameType==="points" ? "🏆 Points Game" : "💷 Money Game";
-        const compLabel=r.gameType==="points"
+        const isTeam=r.tripFormat==="betterball" || r.tripFormat==="pairsaggregate";
+        const gameLabel=isTeam ? `🤝 ${tripFormatLabel(r.tripFormat)}` : (r.gameType==="points" ? "🏆 Points Game" : "💷 Money Game");
+        const compLabel=isTeam ? "Team-event points" : r.gameType==="points"
           ? (r.pointsCompetition==="net" ? "Net" : "Stableford")
           : (trip.competition==="net" ? "Net" : "Stableford");
         return `
@@ -1070,6 +1132,14 @@ function showTripSummary(){
           </div>
         `;
       }).join("") : `<div class="muted">No completed trip rounds saved.</div>`}
+    </div>
+
+    <div class="card">
+      <h2>🤝 Team-event standings</h2>
+      <div class="muted" style="margin-bottom:10px;">Each player keeps the points earned in pairs rounds, even with a different partner.</div>
+      ${teamStandings.length ? teamStandings.map((s,i)=>`
+        <div class="player row"><div><b>${i===0?"🏆 ":i===1?"🥈 ":i===2?"🥉 ":""}${i+1}. ${esc(s.name)}</b></div><div class="money">${s.points} pts</div></div>
+      `).join("") : `<div class="muted">No team rounds were played.</div>`}
     </div>
 
     <div class="card">
@@ -1122,6 +1192,14 @@ function playerNextActionHtml(){
   if(isAdmin || demoReadOnly() || !myPlayerId)return "";
   const me=state.players.find(p=>p.id===myPlayerId);
   if(!me)return "";
+  if(state.trip?.active && !tripPlayerIsPlaying(me)){
+    return `<div class="card" style="text-align:center;"><div class="muted">TODAY'S ROUND</div><div style="font-size:30px;margin:8px;">☕</div><b>Not playing today</b><div class="muted" style="margin-top:5px;">You are still part of the Trip and can follow today's result.</div></div>`;
+  }
+  if(tripTeamRoundActive()){
+    const team=(state.trip.currentTeams||[]).find(t=>(t.playerIds||[]).includes(me.id));
+    const submitted=team && state.trip.currentTeamScores?.[team.id]!=null;
+    return `<div class="card" style="text-align:center;"><div class="muted">YOUR NEXT STEP</div><button class="${submitted?'secondary':'primary'} full" style="font-size:18px;margin-top:8px;" onclick="show('scores')">${submitted?'✅ Pair Score In — View Result':`🏌️ Enter Our ${esc(tripFormatLabel())} Score`}</button></div>`;
+  }
 
   const comp=state.pointsCompetition||state.trip?.competition||"stableford";
   const submitted=me.scoreSubmitted===true ||
@@ -1169,7 +1247,7 @@ function round(){
           <h2>${esc(planned.course||"Round "+nextNo)}</h2>
           <div class="muted">${planned.date ? esc(formatDate(planned.date)) : ""}</div>
           <div style="margin-top:10px;"><span class="pill paid">${planned.gameType==="points" ? "🏆 POINTS GAME" : "💷 MONEY GAME"}</span></div>
-          <div class="notice" style="margin-top:12px;"><b>Competition: ${state.trip.competition==="net" ? "⛳ Net" : "🏆 Stableford"}</b>${planned.gameType==="money" ? `<br>Stake: £${Number(planned.stake||0)}` : `<br>Trip points: 10 / 6 / 3`}</div>
+          <div class="notice" style="margin-top:12px;"><b>Competition: ${planned.format==="betterball"?"🤝 Better Ball Stableford":(state.trip.competition==="net" ? "⛳ Net" : "🏆 Stableford")}</b>${planned.gameType==="money" ? `<br>Stake: £${Number(planned.stake||0)}` : (planned.format==="betterball"?`<br>Team round • no Trip points`:`<br>Trip points: 10 / 6 / 3`)}</div>
         </div>` : ""}
       <div class="card" style="text-align:center;">
         <div style="font-weight:800;margin-bottom:10px;">Round ${nextNo-1} is complete.</div>
@@ -1210,7 +1288,9 @@ $("screen").innerHTML=`
       <div style="font-weight:800;">
         Round ${state.trip.currentRound} of ${state.trip.totalRounds}
       </div>
+      <div style="margin-top:9px;"><span class="pill paid">${tripTeamRoundActive()?`🤝 ${esc(tripFormatLabel().toUpperCase())}`:"👤 INDIVIDUAL"}</span></div>
     </div>
+    ${tripGroupsHtml()}
   ` : ""}
 
   <div class="card">
@@ -1219,14 +1299,14 @@ $("screen").innerHTML=`
       <div>
         <div class="muted">CURRENT ROUND</div>
         <h2>${esc(state.course)}</h2>
-        <div class="muted">${esc(formatDate(state.date))} • ${state.gameType==="money" && Number(state.stake||0)>0 ? paidCount()+" entered" : state.players.length+" players"}</div>
+        <div class="muted">${esc(formatDate(state.date))} • ${state.gameType==="money" && Number(state.stake||0)>0 ? paidCount()+" entered" : currentRoundPlayers().length+" players"}</div>
 
         <div style="margin-top:8px;display:flex;gap:7px;flex-wrap:wrap;">
           <span class="pill paid">
-            ${state.gameType==="points" ? "🏆 POINTS GAME" : (Number(state.stake||0)>0 ? "💷 MONEY GAME" : "⛳ NO STAKE")}
+            ${tripTeamRoundActive() ? `🤝 ${esc(tripFormatLabel().toUpperCase())}` : (state.gameType==="points" ? "🏆 POINTS GAME" : (Number(state.stake||0)>0 ? "💷 MONEY GAME" : "⛳ NO STAKE"))}
           </span>
           <span class="pill" style="background:#edf5ef;color:var(--green);">
-            ${(state.pointsCompetition||state.trip?.competition||"stableford")==="net" ? "⛳ Net" : "🏆 Stableford"}
+            ${tripTeamRoundActive()?`🤝 ${esc(tripFormatLabel())} ${(state.pointsCompetition||"stableford")==="net"?"Net":"Stableford"}`:((state.pointsCompetition||state.trip?.competition||"stableford")==="net" ? "⛳ Net" : "🏆 Stableford")}
           </span>
           ${state.gameType==="money" && Number(state.stake||0)>0 ? `
             <span class="pill" style="background:#edf5ef;color:var(--green);">£${state.stake} entry</span>
@@ -1251,15 +1331,15 @@ $("screen").innerHTML=`
         <label class="muted">Date</label>
         <input type="date" value="${escAttr(state.date)}" onchange="state.date=this.value;save();render()">
 
-        <div class="notice"><b>Competition: ${state.pointsCompetition==="stableford" ? "🏆 Stableford" : "⛳ Net"}</b></div>
+        <div class="notice"><b>Competition: ${tripTeamRoundActive()?`🤝 ${esc(tripFormatLabel())}`:(state.pointsCompetition==="stableford" ? "🏆 Stableford" : "⛳ Net")}</b></div>
 
         ${state.gameType==="money" ? `
           <label class="muted">Stake per player (£)</label>
           <input type="number" min="0" step="1" value="${Number(state.stake||0)>0 ? state.stake : ""}" placeholder="No stake" onchange="state.stake=this.value==='' ? 0 : +this.value;save();render()">
         ` : `
           <div class="notice">
-            <b>${state.pointsCompetition==="stableford" ? "🏆 Stableford" : "⛳ Net"}</b><br>
-            Points Game • Top 3 score league points
+            <b>${tripTeamRoundActive()?`🤝 ${esc(tripFormatLabel())}`:(state.pointsCompetition==="stableford" ? "🏆 Stableford" : "⛳ Net")}</b><br>
+            ${tripTeamRoundActive()?"Team round • Builds the separate Team-event standings":"Points Game • Top 3 score league points"}
           </div>
         `}
       </div>
@@ -1271,7 +1351,7 @@ $("screen").innerHTML=`
       <div class="row">
         <div>
           <b>✅ You’re paid — £${state.stake} entry confirmed. You’re in — good luck! ⛳</b>
-          <div class="muted" style="margin-top:4px;">${paidCount()} of ${state.players.length} players paid</div>
+          <div class="muted" style="margin-top:4px;">${paidCount()} of ${currentRoundPlayers().length} players paid</div>
         </div>
         <button class="secondary small" onclick="show('pay')">View payments</button>
       </div>
@@ -1287,13 +1367,13 @@ $("screen").innerHTML=`
           <div class="muted" style="margin-top:6px;">Expected pot: £${potentialPot()} • Entry fee: £${state.stake} per player</div>
         </div>
 
-        <span class="pill ${paidCount()===state.players.length?'paid':'pending'}">
-          ${paidCount()}/${state.players.length} PAID
+        <span class="pill ${paidCount()===currentRoundPlayers().length?'paid':'pending'}">
+          ${paidCount()}/${currentRoundPlayers().length} PAID
         </span>
       </div>
 
       <div class="notice">
-        ${state.players.length>0 && paidCount()===state.players.length
+        ${currentRoundPlayers().length>0 && paidCount()===currentRoundPlayers().length
           ? "🔒 Everyone is paid — ready to play."
           : "Players are marked paid automatically when they return from the payment link."}
       </div>
@@ -1302,36 +1382,36 @@ $("screen").innerHTML=`
     </div>
   ` : `
     <div class="card">
-      <h2>🏆 Points Game</h2>
+      <h2>${tripTeamRoundActive()?`🤝 ${esc(tripFormatLabel())}`:"🏆 Points Game"}</h2>
 
       <div class="notice">
-        <b>${state.pointsCompetition==="stableford" ? "🏆 Stableford" : "⛳ Net"}</b><br>
-        Everyone plays the same competition.
+        <b>${tripTeamRoundActive()?"One final pair score":(state.pointsCompetition==="stableford" ? "🏆 Stableford" : "⛳ Net")}</b><br>
+        ${tripBetterBallActive()?"Use the better score on every hole and enter the pair total.":tripPairsAggregateActive()?"Add both partners’ final scores and enter the combined total.":"Everyone plays the same competition."}
       </div>
 
-      <div class="player row">
+      ${tripTeamRoundActive()?"":`<div class="player row">
         <div>
           <b>🥇 1st place</b>
         </div>
         <span class="money">${pointsFirst} pts</span>
-      </div>
+      </div>`}
 
-      <div class="player row">
+      ${tripTeamRoundActive()?"":`<div class="player row">
         <div>
           <b>🥈 2nd place</b>
         </div>
         <span class="money">${pointsSecond} pts</span>
-      </div>
+      </div>`}
 
-      <div class="player row">
+      ${tripTeamRoundActive()?"":`<div class="player row">
         <div>
           <b>🥉 3rd place</b>
         </div>
         <span class="money">${pointsThird} pts</span>
-      </div>
+      </div>`}
 
       <div class="muted" style="margin-top:10px;">
-        Top 3 players score league points.
+        ${tripTeamRoundActive()?"Top three pairs earn 10, 6 and 3 Team-event points for each partner.":"Top 3 players score league points."}
       </div>
     </div>
   `}
@@ -1371,9 +1451,14 @@ function pay(){
    return;
  }
 
- const sortedPlayers=[...state.players]
+ const sortedPlayers=[...currentRoundPlayers()]
    .sort((a,b)=>a.name.localeCompare(b.name));
  const me=state.players.find(p=>p.id===myPlayerId);
+
+ if(state.trip?.active && me && !tripPlayerIsPlaying(me) && !isAdmin){
+   $("screen").innerHTML=`<div class="card" style="text-align:center;"><div style="font-size:42px;">☕</div><h2>Not playing today</h2><div class="notice">You do not need to pay or enter a score for this round. You are still part of the Trip.</div><button class="secondary full" onclick="show('round')">← Back to Round</button></div>`;
+   return;
+ }
 
  $("screen").innerHTML=`
  <div class="card">
@@ -1603,11 +1688,74 @@ async function togglePaid(i){
  await save();
 }
 
-function reminder(){const names=state.players.filter(p=>!p.paid).map(p=>p.name).join(", ");const txt=`I'm In Golf: ${names} — your £${state.stake} golf stake is still due for ${state.course}. Please pay before tee-off.`;navigator.clipboard?.writeText(txt);alert("Reminder copied. Paste it into WhatsApp.");}
+function reminder(){const names=currentRoundPlayers().filter(p=>!p.paid).map(p=>p.name).join(", ");const txt=`I'm In Golf: ${names} — your £${state.stake} golf stake is still due for ${state.course}. Please pay before tee-off.`;navigator.clipboard?.writeText(txt);alert("Reminder copied. Paste it into WhatsApp.");}
+function tripBetterBallEligibleTeams(){
+  const teams=state.trip?.currentTeams||[];
+  if(state.gameType!=="money" || Number(state.stake||0)<=0)return teams;
+  return teams.filter(team=>(team.playerIds||[]).every(id=>state.players.find(p=>p.id===id)?.paid));
+}
+function tripBetterBallScores(){
+  const teams=state.trip?.currentTeams||[];
+  const scores=state.trip?.currentTeamScores||{};
+  const eligible=tripBetterBallEligibleTeams();
+  const me=state.players.find(p=>p.id===myPlayerId);
+  const myTeam=teams.find(t=>(t.playerIds||[]).includes(myPlayerId));
+  const visibleTeams=isAdmin ? teams : (myTeam ? [myTeam] : []);
+  const waiting=eligible.filter(t=>scores[t.id]==null);
+  const lowerWins=tripPairsAggregateActive() && state.pointsCompetition==="net";
+  const ranked=eligible.filter(t=>scores[t.id]!=null).sort((a,b)=>lowerWins?Number(scores[a.id])-Number(scores[b.id]):Number(scores[b.id])-Number(scores[a.id]));
+  const formatLabel=tripFormatLabel();
+  $("screen").innerHTML=`
+    <div class="card">
+      <h2>🤝 ${esc(formatLabel)}</h2>
+      <div class="notice"><b>One final score per pair</b><br>${tripBetterBallActive()?"Use the better score on each hole, then either partner enters the pair’s final total.":"Add both partners’ final scores together, then either partner enters the combined total."}</div>
+      ${me && !tripPlayerIsPlaying(me)?`<div class="notice">☕ <b>You are not playing today.</b><br>You can still follow the scores.</div>`:""}
+      ${waiting.length?`<div class="notice warning"><b>⏳ ${waiting.length} pair score${waiting.length===1?"":"s"} still to enter</b><br>${waiting.map(t=>esc(tripTeamName(t))).join(" • ")}</div>`:`<div class="notice"><b>✅ All entered pair scores are in</b></div>`}
+      ${visibleTeams.map(team=>{
+        const teamScore=scores[team.id];
+        const canEnter=eligible.some(t=>t.id===team.id);
+        return `<div class="player"><div><b>${esc(tripTeamName(team))}</b><div class="muted">${esc(formatLabel)} pair</div></div><div style="margin-top:10px;">${teamScore!=null?`<div class="notice">✅ <b>Pair score submitted</b><br>${Number(teamScore)} ${state.pointsCompetition==="net"?"combined net":"pts"}</div>${isAdmin?`<button class="secondary small" onclick="editTripTeamScore('${escAttr(team.id)}')">✏️ Correct score</button>`:""}`:canEnter?`<label class="muted">Enter final ${esc(formatLabel)} total</label><input id="tripTeamScore_${escAttr(team.id)}" type="number" min="0" inputmode="numeric" placeholder="Total" oninput="scoreDraftActive=true"><button class="primary full" onclick="submitTripTeamScore('${escAttr(team.id)}')">🏌️ Submit Pair Score</button>`:`<div class="notice warning">Both partners must be marked paid before this pair can enter.</div>`}</div></div>`;
+      }).join("")}
+    </div>
+    <div class="card"><h2>🏆 ${esc(formatLabel)} Leaderboard</h2>${ranked.length?ranked.map((team,i)=>`<div class="player row"><span class="pos">${i+1}</span><div style="flex:1"><b>${esc(tripTeamName(team))}</b></div><span class="money">${Number(scores[team.id])}</span></div>`).join(""):`<div class="muted">No pair scores yet.</div>`}</div>
+    ${isAdmin?(eligible.length && waiting.length===0?`<div class="finish-screen-spacer"></div><div class="finish-sticky"><button class="primary full" onclick="finishRound()">🏁 Finish Better Ball Round</button></div>`:`<div class="card"><div class="notice warning">${eligible.length?"Finish Round will appear when every entered pair has submitted.":"No pairs are entered yet."}</div></div>`):""}`;
+}
+async function submitTripTeamScore(teamId){
+  if(!demoCanEdit())return;
+  const team=(state.trip?.currentTeams||[]).find(t=>t.id===teamId);
+  if(!team)return;
+  if(!isAdmin && !(team.playerIds||[]).includes(myPlayerId))return;
+  if(!tripBetterBallEligibleTeams().some(t=>t.id===teamId)){alert("Both partners must be marked paid before entering the pair score.");return;}
+  const raw=String($("tripTeamScore_"+teamId)?.value||"").trim();
+  const value=Number(raw);
+  if(!raw || !Number.isFinite(value) || value<0){alert("Please enter a valid Better Ball score.");return;}
+  if(!confirm(`Submit ${value} Better Ball points for ${tripTeamName(team)}?\n\nAre you sure?`))return;
+  state.trip.currentTeamScores=state.trip.currentTeamScores||{};
+  state.trip.currentTeamScores[teamId]=value;
+  scoreDraftActive=false;
+  render();
+  const saved=await save();
+  if(saved && !isAdmin)showBigPlayerMessage("✅ PAIR SCORE IN!","You’re all done.",3000);
+}
+async function editTripTeamScore(teamId){
+  if(!isAdmin || !demoCanEdit())return;
+  const team=(state.trip?.currentTeams||[]).find(t=>t.id===teamId);
+  if(!team)return;
+  const answer=prompt(`Correct the Better Ball score for ${tripTeamName(team)}.`,String(state.trip?.currentTeamScores?.[teamId]??""));
+  if(answer===null)return;
+  const value=Number(String(answer).trim());
+  if(!Number.isFinite(value)||value<0){alert("Please enter a valid score.");return;}
+  state.trip.currentTeamScores[teamId]=value;
+  render();await save();
+}
 function scores(){
 
   if(waitingForNextCompetition()){
     waitingScreen();
+    return;
+  }
+  if(tripTeamRoundActive()){
+    tripBetterBallScores();
     return;
   }
 
@@ -1622,16 +1770,17 @@ function scores(){
       : p.netScore!=null;
   };
 
+  const roundPlayers=currentRoundPlayers();
   const eligiblePlayers=isPointsGame
-    ? [...state.players]
-    : (Number(state.stake||0)>0 ? state.players.filter(p=>p.paid) : [...state.players]);
+    ? [...roundPlayers]
+    : (Number(state.stake||0)>0 ? roundPlayers.filter(p=>p.paid) : [...roundPlayers]);
 
   const stillToEnter=eligiblePlayers.filter(p=>{
     const type=pointsComp;
     return !submitted(p,type);
   });
 
-  const sortedPlayers=[...state.players]
+  const sortedPlayers=[...roundPlayers]
     .sort((a,b)=>a.name.localeCompare(b.name));
 
   // Keep scoring simple for ordinary players: they only need their own score card.
@@ -1643,7 +1792,7 @@ function scores(){
         (!roundLocked() || eligiblePlayers.some(ep=>ep.id===p.id))
       );
 
-  const stablefordRanked=[...state.players]
+  const stablefordRanked=[...roundPlayers]
     .filter(p=>
       p.stableford!=null &&
       p.noReturn!==true &&
@@ -1651,7 +1800,7 @@ function scores(){
     )
     .sort((a,b)=>Number(b.stableford)-Number(a.stableford));
 
-  const netRanked=[...state.players]
+  const netRanked=[...roundPlayers]
     .filter(p=>
       p.netScore!=null &&
       p.noReturn!==true &&
@@ -2017,11 +2166,85 @@ async function adminEditSubmittedScore(i,type){
   await save();
 }
 
+function resolveTripTeamTie(teams,score){
+  return new Promise(resolve=>{
+    const overlay=document.createElement("div");
+    overlay.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.42);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;";
+    overlay.innerHTML=`<div class="card" style="width:min(440px,100%);margin:0;padding:24px;border-radius:20px;"><div style="font-size:40px;text-align:center;">🤝</div><h2 style="text-align:center;">Better Ball tie</h2><div class="notice"><b>${Number(score)} points</b><br>${teams.map(t=>esc(tripTeamName(t))).join("<br>")}</div><button class="primary full" id="shareTeamWin">🤝 Share the win</button><div class="muted" style="text-align:center;margin:12px 0 6px;">Or use your scorecard countback and choose the winning pair:</div>${teams.map((t,i)=>`<button class="secondary full" data-team-winner="${i}">🏆 ${esc(tripTeamName(t))}</button>`).join("")}<button class="ghost full" id="cancelTeamTie">Cancel</button></div>`;
+    document.body.appendChild(overlay);
+    const done=value=>{overlay.remove();resolve(value);};
+    overlay.querySelector("#shareTeamWin").onclick=()=>done(teams);
+    overlay.querySelectorAll("[data-team-winner]").forEach(btn=>btn.onclick=()=>done([teams[Number(btn.dataset.teamWinner)]]));
+    overlay.querySelector("#cancelTeamTie").onclick=()=>done(null);
+  });
+}
+
+async function finishTripBetterBallRound(){
+  const teams=tripBetterBallEligibleTeams();
+  const scores=state.trip?.currentTeamScores||{};
+  const scored=teams.filter(t=>scores[t.id]!=null);
+  if(!scored.length){alert("Enter at least one Better Ball pair score first.");return;}
+  if(scored.length!==teams.length){alert("Every entered pair must submit before the round can finish.");return;}
+  const format=tripRoundFormat();
+  const lowerWins=format==="pairsaggregate" && state.pointsCompetition==="net";
+  const ordered=[...scored].sort((a,b)=>lowerWins?Number(scores[a.id])-Number(scores[b.id]):Number(scores[b.id])-Number(scores[a.id]));
+  const best=Number(scores[ordered[0].id]);
+  let winners=scored.filter(t=>Number(scores[t.id])===best);
+  let shared=false;
+  if(winners.length>1){
+    const resolved=await resolveTripTeamTie(winners,best);
+    if(!resolved)return;
+    shared=resolved.length>1;
+    winners=resolved;
+  }
+  const winnerPlayerIds=[...new Set(winners.flatMap(t=>t.playerIds||[]))];
+  const winnerPlayerNames=winnerPlayerIds.map(id=>state.players.find(p=>p.id===id)?.name).filter(Boolean);
+  state.trip.teamStandings=state.trip.teamStandings||{};
+  const awards=[10,6,3];
+  const rankedTeams=[...winners,...ordered.filter(t=>!winners.some(w=>w.id===t.id))];
+  rankedTeams.slice(0,3).forEach((team,index)=>(team.playerIds||[]).forEach(id=>{
+    const name=state.players.find(p=>p.id===id)?.name;
+    if(name)state.trip.teamStandings[name]=Number(state.trip.teamStandings[name]||0)+awards[index];
+  }));
+  const record={
+    date:state.date,course:state.course,stake:state.stake,gameType:state.gameType,
+    tripFormat:format,pointsCompetition:state.pointsCompetition||"stableford",teamPot:pot(),
+    playingIds:[...(state.trip.currentPlayingIds||[])],groups:(state.trip.currentGroups||[]).map(g=>[...g]),
+    teams:(state.trip.currentTeams||[]).map(t=>({id:t.id,playerIds:[...(t.playerIds||[])],name:tripTeamName(t)})),
+    teamResults:rankedTeams.map(t=>({id:t.id,name:tripTeamName(t),playerIds:[...(t.playerIds||[])],score:Number(scores[t.id])})),
+    winnerTeamIds:winners.map(t=>t.id),winnerNames:winners.map(t=>tripTeamName(t)),winnerPlayerNames,
+    sharedWin:shared,tripPointsExcluded:true,teamEventPointsAwarded:true,
+    notPlayingNames:state.players.filter(p=>Array.isArray(state.trip.playerIds)&&state.trip.playerIds.includes(p.id)&&!tripPlayerIsPlaying(p)).map(p=>p.name)
+  };
+  state.trip.rounds=state.trip.rounds||[];
+  state.trip.rounds.push(record);
+  state.players.forEach(p=>{p.paid=false;p.stableford=null;p.netScore=null;p.noReturn=false;p.scoreSubmitted=false;p.competition=null;});
+  state.trip.currentTeamScores={};
+  if(state.trip.currentRound<state.trip.totalRounds){state.trip.currentRound+=1;state.roundOpen=false;}
+  else{state.trip.completed=true;state.trip.active=false;setTripChampion();}
+  await save();
+  if(state.trip?.completed)showTripSummary();else showTripBetterBallResult(record);
+}
+
+function showTripBetterBallResult(record){
+  const results=record.teamResults||[];
+  const winnerText=(record.winnerNames||[]).join(" & ");
+  const each=(record.winnerPlayerNames||[]).length?Number(record.teamPot||0)/(record.winnerPlayerNames||[]).length:0;
+  page="winner";
+  $("screen").innerHTML=`<div class="card" style="text-align:center;"><div style="font-size:54px;">🏆</div><div class="muted">${esc(tripFormatLabel(record.tripFormat).toUpperCase())} RESULT</div><h2 style="font-size:25px;margin:7px 0;">${esc(winnerText)}</h2><div class="big">${Number(results[0]?.score||0)} ${record.pointsCompetition==="net"?"combined net":"pts"}</div>${Number(record.teamPot||0)>0?`<div class="notice" style="margin-top:12px;">💷 £${Number(record.teamPot).toFixed(2).replace(/\.00$/,"")} pot • £${each.toFixed(2).replace(/\.00$/,"")} per winning player</div>`:""}<div class="notice">Team-event points added • Individual standings unchanged</div></div><div class="card"><h2>📊 Pair standings</h2>${results.map((r,i)=>`<div class="player row"><span class="pos">${i+1}</span><div style="flex:1"><b>${esc(r.name)}</b></div><span class="money">${r.score}</span></div>`).join("")}</div><div class="card">${state.trip?.active&&state.roundOpen===false?`<div class="notice"><b>Round ${Number(state.trip.currentRound)-1} complete!</b><br>Next: Round ${state.trip.currentRound} of ${state.trip.totalRounds}.</div>${isAdmin?`<button class="primary full" onclick="nextTripRound()">✈️ Move on to Round ${state.trip.currentRound}</button>`:`<div class="notice">Waiting for the Group Admin to start the next round.</div>`}`:`<button class="secondary full" onclick="show('round')">Continue</button>`}</div>`;
+  window.scrollTo(0,0);
+}
+
 async function finishRound(){
 
   const isPointsGame=state.gameType==="points";
   const pointsComp=state.pointsCompetition || "stableford";
   const isTrip=Boolean(state.trip?.active);
+
+  if(tripTeamRoundActive()){
+    await finishTripBetterBallRound();
+    return;
+  }
 
   function chooseCountbackWinner(players,competition,score,position){
     const names=players.map((p,i)=>`${i+1}. ${p.name}`).join("\n");
@@ -2136,7 +2359,7 @@ async function finishRound(){
 
   if(isPointsGame){
 
-    const scoredPlayers=state.players.filter(p=>
+    const scoredPlayers=currentRoundPlayers().filter(p=>
       pointsComp==="stableford"
         ? p.stableford!=null
         : p.netScore!=null
@@ -2329,11 +2552,11 @@ if(isTrip){
   // =====================================
 
   const moneyEligible=p=>Number(state.stake||0)>0 ? p.paid : true;
-  const stablefordPlayers=state.players.filter(
+  const stablefordPlayers=currentRoundPlayers().filter(
     p=>moneyEligible(p) && pointsComp==="stableford" && p.stableford!=null
   );
 
-  const netPlayers=state.players.filter(
+  const netPlayers=currentRoundPlayers().filter(
     p=>moneyEligible(p) && pointsComp==="net" && p.netScore!=null
   );
 
@@ -2427,7 +2650,7 @@ if(isTrip){
 
   const tripComp=state.trip.competition || "stableford";
 
-  let tripPlayers=state.players.filter(p=>
+  let tripPlayers=currentRoundPlayers().filter(p=>
     tripComp==="stableford"
       ? p.stableford!=null
       : p.netScore!=null
@@ -4502,7 +4725,7 @@ function adminHelpTopicContent(topic){
     waiting:`<h2>⏳ Still to enter</h2><div class="notice">Once scoring starts, the Scores screen shows the names of everyone who still needs to submit.<br><br>For a Money Game, only players who were paid and entered before scoring started are included.<br><br>The list updates automatically as scores or NR results are submitted.</div>`,
     finish:`<h2>🏁 Finish a round</h2><div class="notice">When every entered player has submitted a score or valid NR, Admin will see <b>Finish Round</b> at the bottom of Scores.<br><br>Check the leaderboard, tap the button and confirm the result.<br><br>The winner and <b>full final standings</b> are saved in <b>League → Previous rounds</b> and can be shared as an I’m In Golf results image.</div><div class="notice">After a normal round finishes, players see <b>Next Competition — Coming soon…</b>. A remembered Admin can tap <b>Admin — Set Up Next Competition</b>. On a new device, use <b>Players → Admin Login</b>.</div>`,
     points:`<h2>🏆 Points Games</h2><div class="notice">Everyone plays the same competition — Stableford or Net.<br><br>There is no payment step.<br><br>Players enter their score in the normal Scores screen and the top three receive league points based on the value chosen when the round is set up.</div>`,
-    trip:`<h2>✈️ Trip Mode</h2><div class="notice">Choose <b>Trip Mode</b> when setting up a competition, then enter the trip name and number of rounds.<br><br>Each round is saved inside the trip and Trip Championship points build across the trip.<br><br>After the final round, the app shows a Trip Summary with daily winners, final standings and the Trip winner.</div><div class="notice">The organiser then taps <b>Save Trip & Return to Normal Golf</b>.</div>`,
+    trip:`<h2>✈️ Trip Mode</h2><div class="notice">Choose <b>Trip Mode</b>, enter the trip name, choose the Trip players and plan each round.<br><br>Each day can be <b>Individual</b> or <b>Better Ball</b>. Before the round, mark anyone <b>Not Playing Today</b>, then use <b>Randomise Fourballs</b> or <b>Pick Fourballs Myself</b>.</div><div class="notice"><b>Better Ball:</b> each pair works out one final Better Ball Stableford score from the scorecard. Either partner enters that one pair score. Team rounds are saved as daily results but do not change the individual Trip standings.</div><div class="notice">Individual rounds award Trip Championship points. After the final round, the Trip Summary shows all daily winners, final standings and the Trip winner. The organiser then taps <b>Save Trip & Return to Normal Golf</b>.</div>`,
     pin:`<h2>🔐 Admin PIN</h2><div class="notice">Admin can change the PIN in <b>Settings → Change Admin PIN</b>.<br><br>If the Admin PIN is forgotten, the I'm In Golf owner can reset it securely from Owner Controls.</div>`,
     install:`<h2>📱 Install on a phone</h2><div class="notice"><b>iPhone:</b> Safari → <b>•••</b> bottom-right → <b>Share</b> → <b>Add to Home Screen</b>.<br><br><b>Android:</b> Chrome → <b>⋮</b> → <b>Add to Home screen</b> or <b>Install app</b>.</div>`,
     problems:`<h2>🛠️ Something isn't working</h2><div class="notice"><b>1.</b> Check the Group PIN.<br><br><b>2.</b> Refresh or fully close and reopen the app.<br><br><b>3.</b> On a laptop, use <b>Ctrl + F5</b>.<br><br><b>4.</b> Wrong player? Go to <b>Players → Change who I am</b>.<br><br><b>5.</b> Forgotten Admin PIN? Contact the I'm In Golf owner for a reset.</div><div class="muted">The app will not redraw while someone is typing a score.</div>`
@@ -5130,11 +5353,11 @@ if(roundLocked()){
     return;
   }
 
-  const notPaid=state.players
+  const notPaid=currentRoundPlayers()
     .filter(p=>!p.paid)
     .map(p=>p.name);
 
-  const noCompetition=state.players
+  const noCompetition=tripBetterBallActive() ? [] : currentRoundPlayers()
     .filter(p=>p.paid && !p.competition)
     .map(p=>p.name);
 
@@ -5164,7 +5387,9 @@ ${noCompetition.join(", ")}
 `;
   }
 
-  message+="Please pay your entry and choose Stableford or Net before scoring starts.";
+  message+=tripBetterBallActive()
+    ? "Please pay your entry before the Better Ball round starts."
+    : "Please pay your entry and choose Stableford or Net before scoring starts.";
 
   if(navigator.share){
     navigator.share({
@@ -5718,8 +5943,14 @@ function tripSetupScreen(){
         <label style="display:block;margin:0 0 6px;">Number of rounds</label>
         <input id="tripSetupRounds" type="number" min="1" max="12" step="1" value="${Number(state.trip?.totalRounds||3)}" style="width:100%;margin-bottom:16px;">
 
+        <div style="margin-bottom:8px;font-weight:800;">Trip players</div>
+        <div class="muted" style="margin-bottom:10px;">Choose everyone going on the trip. You can mark anyone Not Playing Today before each round.</div>
+        <div class="notice" id="tripPlayerChoices" style="margin-bottom:18px;max-height:230px;overflow:auto;">
+          ${[...state.players].sort((a,b)=>a.name.localeCompare(b.name)).map(p=>`<label style="display:flex;align-items:center;gap:10px;padding:8px 2px;"><input type="checkbox" data-trip-player="${escAttr(p.id)}" checked style="width:22px;height:22px;margin:0;"><span><b>${esc(p.name)}</b> <span class="muted">HCP ${p.handicap}</span></span></label>`).join("")}
+        </div>
+
         <div style="margin-bottom:8px;font-weight:800;">Trip Championship</div>
-        <div class="muted" style="margin-bottom:10px;">Choose the scoring used for the overall trip standings. The same scoring is used for each trip round so players only enter one score.</div>
+        <div class="muted" style="margin-bottom:10px;">Individual rounds build the Individual Championship. Pairs rounds build a separate Team-event Championship.</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
           <button id="tripCompStableford" class="primary">🏆 Stableford</button>
           <button id="tripCompNet" class="secondary">⛳ Net</button>
@@ -5752,6 +5983,7 @@ function tripSetupScreen(){
         drafts[i].date=card.querySelector('[data-date]')?.value||'';
         drafts[i].stake=Number(card.querySelector('[data-stake]')?.value||0);
         drafts[i].gameType=card.dataset.gameType||'money';
+        drafts[i].format=card.dataset.format||'individual';
       });
     };
     function renderRounds(){
@@ -5759,11 +5991,12 @@ function tripSetupScreen(){
       const count=Math.max(1,Math.min(12,Number(roundsInput.value||1)));
       wrap.innerHTML='';
       for(let i=0;i<count;i++){
-        const d=drafts[i]||{course:'',date:'',stake:'',gameType:i===0?'money':'money'};
+        const d=drafts[i]||{course:'',date:'',stake:'',gameType:'money',format:'individual'};
         drafts[i]=d;
         const card=document.createElement('div');
         card.dataset.tripRound=i;
         card.dataset.gameType=d.gameType||'money';
+        card.dataset.format=d.format||'individual';
         card.className='notice';
         card.style.cssText='margin:0 0 14px;padding:16px;';
         card.innerHTML=`
@@ -5772,12 +6005,18 @@ function tripSetupScreen(){
           <input data-course type="text" value="${String(d.course||'').replace(/"/g,'&quot;')}" placeholder="Course" style="width:100%;margin-bottom:10px;">
           <label style="display:block;margin:0 0 5px;">Date</label>
           <input data-date type="date" value="${d.date||''}" style="width:100%;margin-bottom:10px;">
+          <div style="font-weight:700;margin-bottom:6px;">Daily format</div>
+          <div style="display:grid;grid-template-columns:1fr;gap:8px;margin-bottom:10px;">
+            <button type="button" data-individual class="${card.dataset.format==='individual'?'primary':'secondary'}">👤 Individual</button>
+            <button type="button" data-betterball class="${card.dataset.format==='betterball'?'primary':'secondary'}">🤝 Better Ball</button>
+            <button type="button" data-pairsaggregate class="${card.dataset.format==='pairsaggregate'?'primary':'secondary'}">➕ Pairs Aggregate</button>
+          </div>
           <div style="font-weight:700;margin-bottom:6px;">Game</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
             <button type="button" data-money class="${card.dataset.gameType==='money'?'primary':'secondary'}">💷 Money Game</button>
             <button type="button" data-points class="${card.dataset.gameType==='points'?'primary':'secondary'}">🏆 Points Game</button>
           </div>
-          <div style="margin-bottom:10px;"><b>Competition:</b> ${tripCompetition==='net'?'⛳ Net':'🏆 Stableford'}</div>
+          <div data-comp-label style="margin-bottom:10px;"><b>Competition:</b> ${card.dataset.format==='betterball'?'🤝 Better Ball Stableford':card.dataset.format==='pairsaggregate'?`➕ Pairs Aggregate ${tripCompetition==='net'?'Net':'Stableford'}`:(tripCompetition==='net'?'⛳ Net':'🏆 Stableford')}</div>
           <div data-stake-wrap style="${card.dataset.gameType==='money'?'':'display:none;'}">
             <label style="display:block;margin:0 0 5px;">Stake per player (£)</label>
             <input data-stake type="number" min="0" step="0.01" value="${d.stake==='' ? '' : (Number.isFinite(Number(d.stake)) ? Number(d.stake) : '')}" placeholder="Enter stake" style="width:100%;">
@@ -5786,6 +6025,10 @@ function tripSetupScreen(){
         const money=card.querySelector('[data-money]');
         const points=card.querySelector('[data-points]');
         const stakeWrap=card.querySelector('[data-stake-wrap]');
+        const individual=card.querySelector('[data-individual]');
+        const betterball=card.querySelector('[data-betterball]');
+        const pairsaggregate=card.querySelector('[data-pairsaggregate]');
+        const compLabel=card.querySelector('[data-comp-label]');
         const setGame=g=>{
           card.dataset.gameType=g; drafts[i].gameType=g;
           money.className=g==='money'?'primary':'secondary';
@@ -5794,6 +6037,16 @@ function tripSetupScreen(){
         };
         money.onclick=()=>setGame('money');
         points.onclick=()=>setGame('points');
+        const setFormat=format=>{
+          card.dataset.format=format;drafts[i].format=format;
+          individual.className=format==='individual'?'primary':'secondary';
+          betterball.className=format==='betterball'?'primary':'secondary';
+          pairsaggregate.className=format==='pairsaggregate'?'primary':'secondary';
+          compLabel.innerHTML=`<b>Competition:</b> ${format==='betterball'?'🤝 Better Ball Stableford':format==='pairsaggregate'?`➕ Pairs Aggregate ${tripCompetition==='net'?'Net':'Stableford'}`:(tripCompetition==='net'?'⛳ Net':'🏆 Stableford')}`;
+        };
+        individual.onclick=()=>setFormat('individual');
+        betterball.onclick=()=>setFormat('betterball');
+        pairsaggregate.onclick=()=>setFormat('pairsaggregate');
       }
     }
     roundsInput.addEventListener('change',renderRounds);
@@ -5805,9 +6058,11 @@ function tripSetupScreen(){
       readExisting();
       const name=overlay.querySelector('#tripSetupName').value.trim();
       const totalRounds=Number(roundsInput.value);
+      const playerIds=[...overlay.querySelectorAll('[data-trip-player]:checked')].map(input=>input.dataset.tripPlayer);
       let msg='';
       if(!name) msg='Please enter a trip name.';
       else if(!Number.isInteger(totalRounds)||totalRounds<1||totalRounds>12) msg='Please enter a valid number of rounds.';
+      else if(playerIds.length<2) msg='Please choose at least two Trip players.';
       const rounds=[];
       if(!msg){
         for(let i=0;i<totalRounds;i++){
@@ -5815,18 +6070,92 @@ function tripSetupScreen(){
           const course=card?.querySelector('[data-course]')?.value.trim()||'';
           const date=card?.querySelector('[data-date]')?.value||'';
           const gameType=card?.dataset.gameType||'money';
+          const format=card?.dataset.format||'individual';
           const stake=gameType==='money'?Number(card?.querySelector('[data-stake]')?.value||0):0;
           if(!course){ msg=`Please enter the course for Round ${i+1}.`; break; }
           if(!date){ msg=`Please choose the date for Round ${i+1}.`; break; }
           if(gameType==='money' && (!Number.isFinite(stake)||stake<0)){ msg=`Please enter a valid stake for Round ${i+1}.`; break; }
-          rounds.push({course,date,gameType,competition:tripCompetition,stake});
+          rounds.push({course,date,gameType,competition:format==='betterball'?'stableford':tripCompetition,format,stake});
         }
       }
       if(msg){ err.textContent=msg; err.style.display='block'; return; }
-      finish({name,totalRounds,competition:tripCompetition,tripPointsValue:10,rounds});
+      finish({name,totalRounds,competition:tripCompetition,tripPointsValue:10,playerIds,rounds});
     };
     overlay.addEventListener('click',e=>{ if(e.target===overlay) finish(null); });
     renderRounds();
+  });
+}
+
+function randomiseTripPlayerIds(ids){
+  const shuffled=[...ids];
+  for(let i=shuffled.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[shuffled[i],shuffled[j]]=[shuffled[j],shuffled[i]];}
+  return shuffled;
+}
+function createRandomFourballs(ids,betterBall=false){
+  const shuffled=randomiseTripPlayerIds(ids);
+  if(betterBall){
+    const groups=[];
+    for(let i=0;i<shuffled.length;i+=4)groups.push(shuffled.slice(i,i+4));
+    return groups;
+  }
+  const count=Math.max(1,Math.ceil(shuffled.length/4));
+  const groups=Array.from({length:count},()=>[]);
+  shuffled.forEach((id,i)=>groups[i%count].push(id));
+  return groups;
+}
+function createBetterBallTeams(groups,roundNumber){
+  const teams=[];
+  groups.forEach((group,groupIndex)=>{
+    for(let i=0;i<group.length;i+=2)teams.push({id:`trip_r${roundNumber}_g${groupIndex+1}_p${Math.floor(i/2)+1}`,playerIds:group.slice(i,i+2)});
+  });
+  return teams;
+}
+function tripRoundDaySetup(roundNumber,format,tripPlayerIds){
+  return new Promise(resolve=>{
+    const players=[...state.players].filter(p=>tripPlayerIds.includes(p.id)).sort((a,b)=>a.name.localeCompare(b.name));
+    const overlay=document.createElement("div");
+    overlay.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.42);z-index:10000;padding:14px;overflow:auto;";
+    overlay.innerHTML=`<div class="card" id="tripDayCard" style="width:min(560px,100%);margin:18px auto;padding:24px;border-radius:20px;"></div>`;
+    document.body.appendChild(overlay);
+    const card=overlay.querySelector("#tripDayCard");
+    let playingIds=players.map(p=>p.id);
+    let groups=[];
+    const finish=value=>{overlay.remove();resolve(value);};
+    const playerName=id=>state.players.find(p=>p.id===id)?.name||"Player";
+    const validateAttendance=()=>{
+      if(playingIds.length<2){alert("Please choose at least two players for today's round.");return false;}
+      if(format!=="individual" && playingIds.length%2!==0){alert("Pairs competitions need an even number of players. Mark one more player as Not Playing Today, or add one back.");return false;}
+      return true;
+    };
+    const renderAttendance=()=>{
+      card.innerHTML=`<div class="muted"><b>ROUND ${roundNumber} • STEP 1 OF 2</b></div><h2 style="font-size:25px;margin:6px 0;">Who is playing today?</h2><div class="muted" style="margin-bottom:15px;">Untick anyone who is <b>Not Playing Today</b>. They stay in the Trip.</div><div class="notice">${players.map(p=>`<label style="display:flex;align-items:center;gap:10px;padding:9px 2px;"><input type="checkbox" data-playing-id="${escAttr(p.id)}" ${playingIds.includes(p.id)?"checked":""} style="width:22px;height:22px;margin:0;"><span><b>${esc(p.name)}</b></span></label>`).join("")}</div>${format!=="individual"?`<div class="notice"><b>🤝 ${esc(tripFormatLabel(format))} needs pairs</b><br>Please choose an even number of players.</div>`:""}<button class="primary full" id="randomiseFourballs">🎲 Randomise Fourballs</button><button class="secondary full" id="pickFourballs">✋ Pick Fourballs Myself</button><button class="ghost full" id="cancelTripDay">Cancel</button>`;
+      const read=()=>{playingIds=[...card.querySelectorAll("[data-playing-id]:checked")].map(x=>x.dataset.playingId);};
+      card.querySelector("#randomiseFourballs").onclick=()=>{read();if(!validateAttendance())return;groups=createRandomFourballs(playingIds,format!=="individual");renderReview(true);};
+      card.querySelector("#pickFourballs").onclick=()=>{read();if(!validateAttendance())return;renderManual();};
+      card.querySelector("#cancelTripDay").onclick=()=>finish(null);
+    };
+    const renderManual=()=>{
+      const groupCount=Math.max(1,Math.ceil(playingIds.length/4));
+      const defaults=createRandomFourballs(playingIds,format!=="individual");
+      card.innerHTML=`<div class="muted"><b>ROUND ${roundNumber} • STEP 2 OF 2</b></div><h2 style="font-size:25px;margin:6px 0;">Pick the fourballs</h2><div class="muted" style="margin-bottom:15px;">Choose a fourball for each player. Maximum four players in each.</div><div class="notice">${playingIds.map(id=>{const defaultGroup=Math.max(0,defaults.findIndex(g=>g.includes(id)));return `<label style="display:grid;grid-template-columns:1fr 130px;gap:10px;align-items:center;padding:8px 0;"><b>${esc(playerName(id))}</b><select data-manual-player="${escAttr(id)}">${Array.from({length:groupCount},(_,i)=>`<option value="${i}" ${i===defaultGroup?"selected":""}>Fourball ${i+1}</option>`).join("")}</select></label>`;}).join("")}</div><button class="primary full" id="reviewManualGroups">Review Fourballs</button><button class="ghost full" id="backAttendance">← Back</button>`;
+      card.querySelector("#reviewManualGroups").onclick=()=>{
+        groups=Array.from({length:groupCount},()=>[]);
+        card.querySelectorAll("[data-manual-player]").forEach(select=>groups[Number(select.value)].push(select.dataset.manualPlayer));
+        if(groups.some(g=>g.length===0)){alert("Each fourball must contain at least one player.");return;}
+        if(groups.some(g=>g.length>4)){alert("A fourball cannot contain more than four players.");return;}
+        if(format!=="individual"&&groups.some(g=>g.length%2!==0)){alert("Each pairs fourball needs an even number of players so everyone has a partner.");return;}
+        renderReview(false);
+      };
+      card.querySelector("#backAttendance").onclick=renderAttendance;
+    };
+    const renderReview=randomised=>{
+      const teams=format!=="individual"?createBetterBallTeams(groups,roundNumber):[];
+      card.innerHTML=`<div class="muted"><b>ROUND ${roundNumber} • READY</b></div><h2 style="font-size:25px;margin:6px 0;">${randomised?"🎲 Fourballs randomised":"Fourballs ready"}</h2>${groups.map((group,i)=>`<div class="notice"><b>Fourball ${i+1}</b><br>${group.map(id=>esc(playerName(id))).join(" • ")}${format!=="individual"?`<br><span class="muted">Pairs: ${createBetterBallTeams([group],roundNumber).map(t=>esc((t.playerIds||[]).map(playerName).join(" & "))).join(" • ")}</span>`:""}</div>`).join("")}<button class="primary full" id="confirmTripGroups">✓ Use these Fourballs</button>${randomised?`<button class="secondary full" id="randomiseAgain">🎲 Randomise Again</button>`:""}<button class="ghost full" id="backTripGroups">← Back</button>`;
+      card.querySelector("#confirmTripGroups").onclick=()=>finish({playingIds:[...playingIds],groups:groups.map(g=>[...g]),teams});
+      card.querySelector("#randomiseAgain")?.addEventListener("click",()=>{groups=createRandomFourballs(playingIds,format!=="individual");renderReview(true);});
+      card.querySelector("#backTripGroups").onclick=renderAttendance;
+    };
+    renderAttendance();
   });
 }
 
@@ -5843,6 +6172,8 @@ async function newRound(){
     const setup=await tripSetupScreen();
     if(!setup)return;
     const first=setup.rounds[0];
+    const daySetup=await tripRoundDaySetup(1,first.format||"individual",setup.playerIds);
+    if(!daySetup)return;
     state.trip={
       active:true,
       name:setup.name,
@@ -5850,7 +6181,13 @@ async function newRound(){
       currentRound:1,
       competition:setup.competition,
       tripPointsValue:10,
+      playerIds:[...setup.playerIds],
       plan:setup.rounds,
+      currentFormat:first.format||"individual",
+      currentPlayingIds:[...daySetup.playingIds],
+      currentGroups:daySetup.groups.map(g=>[...g]),
+      currentTeams:(daySetup.teams||[]).map(t=>({id:t.id,playerIds:[...(t.playerIds||[])]})),
+      currentTeamScores:{},
       normalRoundBackup:{
         course:state.course,
         date:state.date,
@@ -5866,7 +6203,7 @@ async function newRound(){
           wins:p.wins||0,leaguePoints:p.leaguePoints||0,netWinnings:p.netWinnings||0
         }))
       },
-      rounds:[],standings:{},champion:null,completed:false,
+      rounds:[],standings:{},teamStandings:{},champion:null,teamChampion:null,completed:false,
       pastTrips:state.trip?.pastTrips||[]
     };
     state.roundOpen=true;
@@ -5875,9 +6212,11 @@ async function newRound(){
     state.gameType=first.gameType;
     state.stake=first.gameType==='money'?Number(first.stake||0):0;
     state.pointsCompetition=setup.competition;
+    if(first.format==="betterball")state.pointsCompetition="stableford";
     state.pointsValue=10;
     state.players.forEach(p=>{
       p.paid=false;p.stableford=null;p.netScore=null;p.noReturn=false;p.scoreSubmitted=false;p.competition=null;
+      p.tripNotPlayingToday=!daySetup.playingIds.includes(p.id);
     });
     await save();
     show('round');
@@ -5916,12 +6255,19 @@ async function nextTripRound(){
   // New Trip setup stores every round up front, so later rounds can start with one tap.
   const plannedRound=Array.isArray(state.trip.plan) ? state.trip.plan[roundNumber-1] : null;
   if(plannedRound){
+    const daySetup=await tripRoundDaySetup(roundNumber,plannedRound.format||"individual",state.trip.playerIds||state.players.map(p=>p.id));
+    if(!daySetup)return;
     state.roundOpen=true;
     state.course=plannedRound.course || "";
     state.date=plannedRound.date || "";
     state.gameType=plannedRound.gameType || "money";
     state.stake=state.gameType==="money" ? Number(plannedRound.stake||0) : 0;
-    state.pointsCompetition=state.trip.competition || plannedRound.competition || "stableford";
+    state.trip.currentFormat=plannedRound.format||"individual";
+    state.trip.currentPlayingIds=[...daySetup.playingIds];
+    state.trip.currentGroups=daySetup.groups.map(g=>[...g]);
+    state.trip.currentTeams=(daySetup.teams||[]).map(t=>({id:t.id,playerIds:[...(t.playerIds||[])]}));
+    state.trip.currentTeamScores={};
+    state.pointsCompetition=plannedRound.format==="betterball" ? "stableford" : (state.trip.competition || plannedRound.competition || "stableford");
     state.pointsValue=10;
     state.players.forEach(p=>{
       p.paid=false;
@@ -5930,6 +6276,7 @@ async function nextTripRound(){
       p.noReturn=false;
       p.scoreSubmitted=false;
       p.competition=null;
+      p.tripNotPlayingToday=!daySetup.playingIds.includes(p.id);
     });
     await save();
     show("round");
@@ -6146,6 +6493,8 @@ async function finishTrip(){
     currentRound:state.trip.currentRound,
     competition:state.trip.competition,
     tripPointsValue:state.trip.tripPointsValue,
+    playerIds:[...(state.trip.playerIds||[])],
+    plan:[...(state.trip.plan||[])],
     rounds:[...(state.trip.rounds || [])],
     standings:{...(state.trip.standings || {})},
     champion:state.trip.champion || tripStandingsSorted()[0]?.name || null,
@@ -6397,4 +6746,6 @@ function formatDate(d){
 function esc(s){return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
 function escAttr(s){return esc(s)}
 </script>
+</body></html>
+/script>
 </body></html>
