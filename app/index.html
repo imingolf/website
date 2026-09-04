@@ -1436,6 +1436,24 @@ function pay(){
 }
 let paymentReturnBusy=false;
 function paymentReturnKey(){return "iigPaymentJourney_"+String(pin||"");}
+function rememberPaymentJourney(journey){
+  const value=JSON.stringify(journey);
+  // Keep the journey in both stores. sessionStorage handles the normal
+  // same-tab return; localStorage survives iOS opening the banking app,
+  // Safari closing the tab, or the device temporarily suspending the page.
+  try{sessionStorage.setItem(paymentReturnKey(),value);}catch(e){}
+  try{localStorage.setItem(paymentReturnKey(),value);}catch(e){}
+}
+function readPaymentJourney(){
+  let raw=null;
+  try{raw=sessionStorage.getItem(paymentReturnKey());}catch(e){}
+  if(!raw){try{raw=localStorage.getItem(paymentReturnKey());}catch(e){}}
+  try{return JSON.parse(raw||"null");}catch(e){return null;}
+}
+function clearPaymentJourney(){
+  try{sessionStorage.removeItem(paymentReturnKey());}catch(e){}
+  try{localStorage.removeItem(paymentReturnKey());}catch(e){}
+}
 function paymentLinkForStake(rawLink,stake){
   const link=String(rawLink||"").trim();
   const amount=Number(stake||0);
@@ -1469,7 +1487,14 @@ function beginPlayerPayment(){
   const savedLink=String(state.paymentLink||"").trim();
   if(!savedLink){alert("Your Group Admin hasn't added a payment link yet.");return;}
   const link=paymentLinkForStake(savedLink,state.stake);
-  sessionStorage.setItem(paymentReturnKey(),JSON.stringify({playerId:me.id,startedAt:Date.now()}));
+  rememberPaymentJourney({
+    playerId:me.id,
+    startedAt:Date.now(),
+    groupPin:String(pin||""),
+    course:String(state.course||""),
+    roundDate:String(state.date||""),
+    stake:Number(state.stake||0)
+  });
   window.open(link,"_blank");
 }
 function showAppToast(title,subtitle="",duration=2800){
@@ -1514,23 +1539,40 @@ function showBigPlayerMessage(title,subtitle="",duration=3000){
 async function recognisePaymentReturn(){
   if(demoReadOnly())return;
   if(paymentReturnBusy || document.visibilityState==="hidden")return;
-  let journey=null;
-  try{journey=JSON.parse(sessionStorage.getItem(paymentReturnKey())||"null");}catch(e){}
+  const journey=readPaymentJourney();
   if(!journey || !journey.playerId || Date.now()-Number(journey.startedAt||0)<1200)return;
+  // A saved journey is valid for 48 hours and only for the same group and
+  // round. This prevents an old return from marking a later competition paid.
+  const journeyAge=Date.now()-Number(journey.startedAt||0);
+  const sameGroup=!journey.groupPin || String(journey.groupPin)===String(pin||"");
+  const sameRound=(!journey.course || String(journey.course)===String(state.course||"")) &&
+    (!journey.roundDate || String(journey.roundDate)===String(state.date||"")) &&
+    (journey.stake==null || Number(journey.stake)===Number(state.stake||0));
+  if(journeyAge>48*60*60*1000 || !sameGroup || !sameRound){clearPaymentJourney();return;}
   const player=state.players.find(p=>p.id===journey.playerId);
-  sessionStorage.removeItem(paymentReturnKey());
-  if(!player || player.paid || roundLocked())return;
+  if(!player || roundLocked()){clearPaymentJourney();return;}
+  if(player.paid){clearPaymentJourney();return;}
   paymentReturnBusy=true;
   player.paid=true;
   player.paymentMarkedAt=new Date().toISOString();
   player.paymentMarkMethod="payment-link-return";
-  await save();
+  const saved=await save();
   paymentReturnBusy=false;
+  if(!saved){
+    // Do not lose the return event when the phone briefly has no signal.
+    // Restore shared state locally and retry on focus/online/next page show.
+    player.paid=false;
+    showAppToast("Payment update waiting","We’ll retry when you’re online.",4200);
+    return;
+  }
+  clearPaymentJourney();
   render();
   showBigPlayerMessage("✅ YOU’RE IN!","Good luck! ⛳",3000);
 }
 window.addEventListener("focus",()=>setTimeout(recognisePaymentReturn,250));
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")setTimeout(recognisePaymentReturn,250);});
+window.addEventListener("pageshow",()=>setTimeout(recognisePaymentReturn,350));
+window.addEventListener("online",()=>setTimeout(recognisePaymentReturn,250));
 
 async function togglePaid(i){
 
