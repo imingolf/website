@@ -4496,7 +4496,7 @@ function adminHelpTopicContent(topic){
   const topics={
     setup:`<h2>⛳ Set up the next competition</h2><div class="notice"><b>1.</b> Go to <b>Round</b>.<br><br><b>2.</b> A remembered Admin can tap <b>Admin — Set Up Next Competition</b>. On a new device, use <b>Players → Admin Login</b> and enter the 4-digit Admin PIN.<br><br><b>3.</b> Choose Money Game, Points Game or Trip Mode.<br><br><b>4.</b> Enter the course, date and choose <b>Stableford or Net</b> for everyone.<br><br><b>5.</b> For a Money Game, set the entry fee and make sure players pay before scoring starts.</div><div class="notice warning">Once the first score is submitted, entries close automatically.</div>`,
     players:`<h2>👥 Add or edit players</h2><div class="notice">Go to <b>Players</b>.<br><br>Players can join themselves, or the Admin can manage names and handicaps while Admin is unlocked.<br><br>A player can use <b>Change who I am</b> if the wrong name is selected on their phone.</div>`,
-    payments:`<h2>💷 Payments</h2><div class="notice">In a Money Game, players go to <b>Pay</b> and use the Group Admin's payment link before scoring starts.<br><br>Only paid players are entered in the pot and can submit a score.<br><br>When a player returns to I’m In Golf after opening the payment link, the app marks them paid.<br><br>Once scoring starts, entries are closed so nobody can join late.</div><div class="muted">Payments go directly to the Group Admin. I’m In Golf does not receive or hold the money.</div>`,
+    payments:`<h2>💷 Payments</h2><div class="notice"><b>What is a payment link?</b><br><br>It is your personal web address that lets players pay money directly to your chosen account. You copy it from your banking or payment app and paste it into I’m In Golf once.</div><div class="notice"><b>Set yours up:</b><br><br><b>1.</b> Go to <b>Admin / Settings → Set Up Player Payments</b>.<br><br><b>2.</b> Choose Monzo, Revolut, PayPal, Starling, Wise or Other secure link.<br><br><b>3.</b> Follow the instructions shown for that provider.<br><br><b>4.</b> Paste the link, test it and save.</div><div class="notice">In a Money Game, players tap <b>Pay & Enter</b>. When they return to I’m In Golf after opening the payment link, the app marks them paid.<br><br>Only paid players are entered in the pot and can submit a score. Once scoring starts, entries close.</div><div class="muted">Payments go directly to the Group Admin. I’m In Golf does not receive, verify or hold the money.</div>`,
     scoring:`<h2>🏌️ Scores</h2><div class="notice">Players enter their own score and tap <b>Submit My Score</b>.<br><br>The app asks <b>Are you sure?</b> before saving.<br><br>Once submitted, the player's score is locked.</div><div class="notice">Admin can use <b>Correct score</b> if a genuine mistake needs fixing.</div>`,
     nr:`<h2>NR — No Return</h2><div class="notice">In a <b>Net</b> competition, a player who does not return a score should tap <b>NR — No Return</b>.<br><br>NR counts as submitted, removes the player from <b>Still to enter</b>, and the player cannot win the Net competition.</div>`,
     waiting:`<h2>⏳ Still to enter</h2><div class="notice">Once scoring starts, the Scores screen shows the names of everyone who still needs to submit.<br><br>For a Money Game, only players who were paid and entered before scoring started are included.<br><br>The list updates automatically as scores or NR results are submitted.</div>`,
@@ -5297,15 +5297,15 @@ function organiserAdminPinSetup(groupName){
 function normalisePaymentLink(value){
   const clean=String(value||"").trim();
   if(!clean)return "";
-  try{const u=new URL(clean);return (u.protocol==="https:" || u.protocol==="http:") ? u.href : "";}catch(e){return "";}
+  try{const u=new URL(clean);return u.protocol==="https:" ? u.href : "";}catch(e){return "";}
 }
 const PAYMENT_PROVIDERS={
-  monzo:{label:"Monzo",icon:"🟠",hint:"In Monzo: Payments → Request money → Share link",placeholder:"https://monzo.me/yourname"},
-  revolut:{label:"Revolut",icon:"⚫",hint:"In Revolut: Payments → New → Create a payment link",placeholder:"https://revolut.me/yourname"},
-  paypal:{label:"PayPal",icon:"🔵",hint:"Open PayPal and copy your PayPal.Me or request-payment link",placeholder:"https://paypal.me/yourname"},
-  starling:{label:"Starling",icon:"🟣",hint:"In Starling: Payments → Request Money → switch on Settle Up",placeholder:"Paste your Starling Settle Up link"},
-  wise:{label:"Wise",icon:"🟢",hint:"In Wise: Payments → Request → Anyone → create or share link",placeholder:"Paste your Wise payment link or Wisetag"},
-  other:{label:"Other secure link",icon:"🔗",hint:"Paste any secure payment or request-money link beginning with https://",placeholder:"https://…"}
+  monzo:{label:"Monzo",icon:"🟠",hint:"In Monzo: Payments → Request money → Share link",placeholder:"https://monzo.me/yourname",steps:["Open Monzo and tap Payments.","Tap Request money.","Choose the option to share your link.","Copy the link, then return to I'm In Golf."]},
+  revolut:{label:"Revolut",icon:"⚫",hint:"In Revolut: Payments → New → Create a payment link",placeholder:"https://revolut.me/yourname",steps:["Open Revolut and tap Payments.","Tap New or the + button.","Choose Create payment link or Request money.","Copy the link, then return to I'm In Golf."]},
+  paypal:{label:"PayPal",icon:"🔵",hint:"Open PayPal and copy your PayPal.Me or request-payment link",placeholder:"https://paypal.me/yourname",steps:["Open PayPal and go to Send/Request.","Choose Request or your PayPal.Me link.","Create or open your personal payment link.","Copy the link, then return to I'm In Golf."]},
+  starling:{label:"Starling",icon:"🟣",hint:"In Starling: Payments → Request Money → switch on Settle Up",placeholder:"Paste your Starling Settle Up link",steps:["Open Starling and tap Payments.","Tap Request Money.","Open or switch on your Settle Up link.","Copy the link, then return to I'm In Golf."]},
+  wise:{label:"Wise",icon:"🟢",hint:"In Wise: Payments → Request → Anyone → create or share link",placeholder:"Paste your Wise payment link or Wisetag",steps:["Open Wise and tap Payments.","Tap Request, then choose Anyone.","Create or share your payment link or Wisetag.","Copy the link, then return to I'm In Golf."]},
+  other:{label:"Other secure link",icon:"🔗",hint:"Paste any secure payment or request-money link beginning with https://",placeholder:"https://…",steps:["Open your banking or payment app.","Look for Request money, Get paid or Payment link.","Create or open your personal payment link.","Copy the complete https:// link, then return here."]}
 };
 function detectPaymentProvider(link){
   try{
@@ -5331,8 +5331,9 @@ function organiserPaymentSetup(groupName,options={}){
     let provider=PAYMENT_PROVIDERS[options.currentProvider] ? options.currentProvider : detectPaymentProvider(options.currentLink||"");
     let link=String(options.currentLink||"");
     const finish=value=>{overlay.remove();resolve(value);};
+    const closeLabel=options.allowRemove ? "Close without changing" : "Save and set this up later";
     const stepHeader=(step,title,subtitle)=>`
-      <div class="muted" style="font-weight:900;letter-spacing:.04em;">STEP ${step} OF 3</div>
+      <div class="muted" style="font-weight:900;letter-spacing:.04em;">${step==="HELP" ? "ADMIN HELP" : `STEP ${step} OF 3`}</div>
       <h2 style="font-size:25px;margin:6px 0;">${title}</h2>
       <div class="muted" style="font-size:16px;margin-bottom:18px;">${subtitle}</div>`;
     const renderChoose=()=>{
@@ -5341,20 +5342,29 @@ function organiserPaymentSetup(groupName,options={}){
           ${Object.entries(PAYMENT_PROVIDERS).map(([key,item])=>`<button type="button" class="${key===provider?'primary':'secondary'}" data-provider="${key}" style="min-height:68px;font-size:16px;"><span style="font-size:21px;">${item.icon}</span><br>${item.label}</button>`).join("")}
         </div>
         <div class="notice" style="margin-top:16px;"><b>Your group's money goes directly to you.</b><br>I'm In Golf never receives or holds it.</div>
-        ${options.allowRemove && options.currentLink ? `<button class="ghost full" id="removeSetupPayment">Remove current payment method</button>` : `<button class="ghost full" id="skipSetupPayment">Don't play for money — skip</button>`}`;
-      card.querySelectorAll("[data-provider]").forEach(button=>button.onclick=()=>{provider=button.dataset.provider;renderPaste();});
-      card.querySelector("#skipSetupPayment")?.addEventListener("click",()=>finish(null));
+        ${options.allowRemove && options.currentLink ? `<button class="ghost full" id="removeSetupPayment">Remove current payment method</button>` : ""}
+        <button class="ghost full" id="closeSetupPayment">${closeLabel}</button>`;
+      card.querySelectorAll("[data-provider]").forEach(button=>button.onclick=()=>{
+        const next=button.dataset.provider;
+        if(next!==provider)link="";
+        provider=next;
+        renderPaste();
+      });
+      card.querySelector("#closeSetupPayment")?.addEventListener("click",()=>finish(null));
       card.querySelector("#removeSetupPayment")?.addEventListener("click",()=>{if(confirm("Remove the current payment method?"))finish({remove:true});});
     };
     const renderPaste=()=>{
       const item=PAYMENT_PROVIDERS[provider]||PAYMENT_PROVIDERS.other;
-      card.innerHTML=`${stepHeader(2,`${item.icon} Add your ${esc(item.label)} link`,"Open your payment app, copy your link, then come back and paste it below.")}
+      card.innerHTML=`${stepHeader(2,`${item.icon} Add your ${esc(item.label)} link`,"Keep I'm In Golf open. Switch to your payment app, copy the link, then return here.")}
+        <div class="notice"><b>What is a payment link?</b><br>It is your personal web address that lets players pay money directly to your account.</div>
         <div class="notice"><b>Where to find it</b><br>${esc(item.hint)}</div>
         <label><b>Paste payment link</b></label>
         <input id="setupPaymentLink" type="url" inputmode="url" autocomplete="url" value="${escAttr(link)}" placeholder="${escAttr(item.placeholder)}">
         <div id="setupPaymentMsg" class="muted" style="min-height:20px;color:var(--red);"></div>
         <button class="primary full" id="continueSetupPayment">Continue</button>
-        <button class="ghost full" id="backSetupPayment">← Back</button>`;
+        <button class="secondary full" id="helpSetupPayment">❓ Not sure? Open Admin Help</button>
+        <button class="ghost full" id="backSetupPayment">← Back</button>
+        <button class="ghost full" id="closeSetupPayment">${closeLabel}</button>`;
       const input=card.querySelector("#setupPaymentLink");
       card.querySelector("#continueSetupPayment").onclick=()=>{
         const clean=normalisePaymentLink(input.value);
@@ -5367,8 +5377,21 @@ function organiserPaymentSetup(groupName,options={}){
         }
         renderConfirm();
       };
+      card.querySelector("#helpSetupPayment").onclick=()=>renderPaymentHelp(item);
       card.querySelector("#backSetupPayment").onclick=renderChoose;
+      card.querySelector("#closeSetupPayment").onclick=()=>finish(null);
       setTimeout(()=>input.focus(),50);
+    };
+    const renderPaymentHelp=item=>{
+      card.innerHTML=`${stepHeader("HELP",`How to find your ${esc(item.label)} link`,"Follow these steps in your banking or payment app.")}
+        <div class="notice" style="font-size:16px;line-height:1.5;">
+          ${item.steps.map((instruction,index)=>`<b>${index+1}.</b> ${esc(instruction)}${index<item.steps.length-1?"<br><br>":""}`).join("")}
+        </div>
+        <div class="notice"><b>You only do this once.</b><br>After it is saved, players simply tap <b>Pay & Enter</b>.</div>
+        <button class="primary full" id="backFromPaymentHelp">Got it — return to setup</button>
+        <button class="ghost full" id="closeSetupPayment">${closeLabel}</button>`;
+      card.querySelector("#backFromPaymentHelp").onclick=renderPaste;
+      card.querySelector("#closeSetupPayment").onclick=()=>finish(null);
     };
     const renderConfirm=()=>{
       const item=PAYMENT_PROVIDERS[provider]||PAYMENT_PROVIDERS.other;
@@ -5379,10 +5402,14 @@ function organiserPaymentSetup(groupName,options={}){
           <div class="muted">PAYMENT LINK</div><span style="word-break:break-all;">${esc(link)}</span>
         </div>
         <div class="notice"><b>Players keep it simple:</b><br>They tap <b>Pay & Enter</b>, pay you directly, then return to I'm In Golf.</div>
+        <button class="secondary full" id="testSetupPayment">↗ Test my payment link</button>
         <button class="primary full" id="saveSetupPayment">✓ Save payment method</button>
-        <button class="ghost full" id="backSetupPayment">← Back</button>`;
+        <button class="ghost full" id="backSetupPayment">← Back</button>
+        <button class="ghost full" id="closeSetupPayment">${closeLabel}</button>`;
+      card.querySelector("#testSetupPayment").onclick=()=>window.open(link,"_blank","noopener");
       card.querySelector("#saveSetupPayment").onclick=()=>finish({link,provider});
       card.querySelector("#backSetupPayment").onclick=renderPaste;
+      card.querySelector("#closeSetupPayment").onclick=()=>finish(null);
     };
     renderChoose();
   });
