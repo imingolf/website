@@ -984,6 +984,14 @@ function tripTeamStandingsSorted(){
   const standings=state.trip?.teamStandings || {};
   return Object.entries(standings).map(([name,points])=>({name,points:Number(points||0)})).sort((a,b)=>b.points-a.points || a.name.localeCompare(b.name));
 }
+function tripStandingPosition(sorted,index){
+  if(index<1)return 1;
+  return Number(sorted[index]?.points)===Number(sorted[index-1]?.points) ? tripStandingPosition(sorted,index-1) : index+1;
+}
+function tripStandingPositionLabel(sorted,index){
+  const tied=(index>0&&Number(sorted[index-1]?.points)===Number(sorted[index]?.points)) || (index<sorted.length-1&&Number(sorted[index+1]?.points)===Number(sorted[index]?.points));
+  return String(tripStandingPosition(sorted,index))+(tied?"=":"");
+}
 
 function tripRoundWinner(record){
   if(!record)return null;
@@ -1073,6 +1081,7 @@ function showTripSummary(){
   const tripMoneyRows=state.players
     .map(p=>({name:p.name,won:Number(tripMoney[p.name]||0)}))
     .sort((a,b)=>b.won-a.won || a.name.localeCompare(b.name));
+  const hasTripMoney=tripMoneyRows.some(m=>m.won>0);
 
   page="tripsummary";
   clearInterval(poller);
@@ -1138,12 +1147,12 @@ function showTripSummary(){
       <h2>🤝 Team-event standings</h2>
       <div class="muted" style="margin-bottom:10px;">Each player keeps the points earned in pairs rounds, even with a different partner.</div>
       ${teamStandings.length ? teamStandings.map((s,i)=>`
-        <div class="player row"><div><b>${i===0?"🏆 ":i===1?"🥈 ":i===2?"🥉 ":""}${i+1}. ${esc(s.name)}</b></div><div class="money">${s.points} pts</div></div>
+        <div class="player row"><div><b>${tripStandingPosition(teamStandings,i)===1?"🏆 ":tripStandingPosition(teamStandings,i)===2?"🥈 ":tripStandingPosition(teamStandings,i)===3?"🥉 ":""}${tripStandingPositionLabel(teamStandings,i)}. ${esc(s.name)}</b></div><div class="money">${s.points} pts</div></div>
       `).join("") : `<div class="muted">No team rounds were played.</div>`}
     </div>
 
     <div class="card">
-      <h2>🏆 Final Trip standings</h2>
+      <h2>🏆 Individual Trip standings</h2>
       ${standings.length ? standings.map((s,i)=>`
         <div class="player row">
           <div>
@@ -1154,7 +1163,7 @@ function showTripSummary(){
       `).join("") : `<div class="muted">No Trip standings recorded.</div>`}
     </div>
 
-    <div class="card">
+    ${hasTripMoney ? `<div class="card">
       <h2>💷 Trip Money Summary</h2>
       ${tripMoneyRows.length ? tripMoneyRows.map((m,i)=>`
         <div class="player row">
@@ -1164,7 +1173,7 @@ function showTripSummary(){
           <div class="money">£${Number(m.won).toFixed(2).replace(/\.00$/,"")}</div>
         </div>
       `).join("") : `<div class="muted">No money results recorded for this trip.</div>`}
-    </div>
+    </div>` : ""}
 
     ${isAdmin ? `
       <div class="card">
@@ -1247,7 +1256,7 @@ function round(){
           <h2>${esc(planned.course||"Round "+nextNo)}</h2>
           <div class="muted">${planned.date ? esc(formatDate(planned.date)) : ""}</div>
           <div style="margin-top:10px;"><span class="pill paid">${planned.gameType==="points" ? "🏆 POINTS GAME" : "💷 MONEY GAME"}</span></div>
-          <div class="notice" style="margin-top:12px;"><b>Competition: ${planned.format==="betterball"?"🤝 Better Ball Stableford":(state.trip.competition==="net" ? "⛳ Net" : "🏆 Stableford")}</b>${planned.gameType==="money" ? `<br>Stake: £${Number(planned.stake||0)}` : (planned.format==="betterball"?`<br>Team round • no Trip points`:`<br>Trip points: 10 / 6 / 3`)}</div>
+          <div class="notice" style="margin-top:12px;"><b>Competition: ${planned.format==="betterball"?"🤝 Better Ball Stableford":planned.format==="pairsaggregate"?`➕ Pairs Aggregate ${state.trip.competition==="net"?"Net":"Stableford"}`:(state.trip.competition==="net" ? "⛳ Net" : "🏆 Stableford")}</b>${planned.gameType==="money" ? `<br>Stake: £${Number(planned.stake||0)}` : (planned.format!=="individual"?`<br>Team round • builds Team-event standings`:`<br>Trip points: 10 / 6 / 3`)}</div>
         </div>` : ""}
       <div class="card" style="text-align:center;">
         <div style="font-weight:800;margin-bottom:10px;">Round ${nextNo-1} is complete.</div>
@@ -1339,7 +1348,7 @@ $("screen").innerHTML=`
         ` : `
           <div class="notice">
             <b>${tripTeamRoundActive()?`🤝 ${esc(tripFormatLabel())}`:(state.pointsCompetition==="stableford" ? "🏆 Stableford" : "⛳ Net")}</b><br>
-            ${tripTeamRoundActive()?"Team round • Builds the separate Team-event standings":"Points Game • Top 3 score league points"}
+            ${tripTeamRoundActive()?"Team round • Builds the separate Team-event standings":"Points Game • Top 3 score Trip points"}
           </div>
         `}
       </div>
@@ -2202,10 +2211,14 @@ async function finishTripBetterBallRound(){
   state.trip.teamStandings=state.trip.teamStandings||{};
   const awards=[10,6,3];
   const rankedTeams=[...winners,...ordered.filter(t=>!winners.some(w=>w.id===t.id))];
-  rankedTeams.slice(0,3).forEach((team,index)=>(team.playerIds||[]).forEach(id=>{
+  rankedTeams.forEach((team,index)=>{
+    const award=shared && winners.some(w=>w.id===team.id) ? 10 : awards[index];
+    if(!award)return;
+    (team.playerIds||[]).forEach(id=>{
     const name=state.players.find(p=>p.id===id)?.name;
-    if(name)state.trip.teamStandings[name]=Number(state.trip.teamStandings[name]||0)+awards[index];
-  }));
+    if(name)state.trip.teamStandings[name]=Number(state.trip.teamStandings[name]||0)+award;
+    });
+  });
   const record={
     date:state.date,course:state.course,stake:state.stake,gameType:state.gameType,
     tripFormat:format,pointsCompetition:state.pointsCompetition||"stableford",teamPot:pot(),
@@ -3042,7 +3055,7 @@ function showWinnerScreen(record){
                 +${r.points}
               </div>
               <div class="muted">
-                league pts
+                ${state.trip?.active ? "Trip pts" : "league pts"}
               </div>
             </div>
           </div>
