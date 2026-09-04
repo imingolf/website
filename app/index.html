@@ -642,9 +642,10 @@ if(!state.adminPin && setupTokenFromUrl){
   isAdmin=true;
   saveAdminForGroup();
   history.replaceState({},document.title,location.pathname+"?pin="+encodeURIComponent(pin));
-  const setupPaymentLink=await organiserPaymentSetup(state.groupName||currentSetupName);
-  if(setupPaymentLink){
-    state.paymentLink=setupPaymentLink;
+  const setupPayment=await organiserPaymentSetup(state.groupName||currentSetupName);
+  if(setupPayment?.link){
+    state.paymentLink=setupPayment.link;
+    state.paymentProvider=setupPayment.provider;
     await save();
   }
   await organiserAdminSetupComplete(state.groupName||currentSetupName,pin);
@@ -1472,6 +1473,13 @@ function paymentLinkForStake(rawLink,stake){
         url.pathname=`/${username}/${amount.toFixed(2)}`;
         return url.toString();
       }
+    }
+    // Wise Business open links support reusable amount/currency details.
+    if((host==="wise.com" || host==="www.wise.com") && url.pathname.toLowerCase().startsWith("/pay/business/")){
+      url.searchParams.set("amount",amount.toFixed(2));
+      url.searchParams.set("currency","GBP");
+      url.searchParams.set("description",`${state.groupName||"I'm In Golf"} entry`);
+      return url.toString();
     }
   }catch(e){}
 
@@ -4368,9 +4376,9 @@ function settingsPage(){
  <div class="card">
    <h2>💷 Player payments</h2>
    <div class="notice"><b>Payments go directly to you.</b><br>I'm In Golf does not receive, hold or manage your group's money.</div>
-   <div class="muted">PAYMENT LINK</div>
-   <b>${state.paymentLink ? esc(state.paymentLink) : "Not set up"}</b>
-   <button class="secondary full" onclick="changePaymentLink()">${state.paymentLink ? "✏️ Change Payment Link" : "➕ Add Payment Link"}</button>
+   <div class="muted">PAYMENT METHOD</div>
+   <b>${state.paymentLink ? `${esc(paymentProviderLabel(state.paymentProvider||detectPaymentProvider(state.paymentLink)))} — Link ready` : "Not set up"}</b>
+   <button class="secondary full" onclick="changePaymentLink()">${state.paymentLink ? "✏️ Change Payment Method" : "➕ Set Up Player Payments"}</button>
  </div>
  <div class="card"><h2>Round controls</h2>
  ${!state.trip?.active && !state.trip?.completed ? `
@@ -5291,47 +5299,110 @@ function normalisePaymentLink(value){
   if(!clean)return "";
   try{const u=new URL(clean);return (u.protocol==="https:" || u.protocol==="http:") ? u.href : "";}catch(e){return "";}
 }
-function organiserPaymentSetup(groupName){
+const PAYMENT_PROVIDERS={
+  monzo:{label:"Monzo",icon:"🟠",hint:"In Monzo: Payments → Request money → Share link",placeholder:"https://monzo.me/yourname"},
+  revolut:{label:"Revolut",icon:"⚫",hint:"In Revolut: Payments → New → Create a payment link",placeholder:"https://revolut.me/yourname"},
+  paypal:{label:"PayPal",icon:"🔵",hint:"Open PayPal and copy your PayPal.Me or request-payment link",placeholder:"https://paypal.me/yourname"},
+  starling:{label:"Starling",icon:"🟣",hint:"In Starling: Payments → Request Money → switch on Settle Up",placeholder:"Paste your Starling Settle Up link"},
+  wise:{label:"Wise",icon:"🟢",hint:"In Wise: Payments → Request → Anyone → create or share link",placeholder:"Paste your Wise payment link or Wisetag"},
+  other:{label:"Other secure link",icon:"🔗",hint:"Paste any secure payment or request-money link beginning with https://",placeholder:"https://…"}
+};
+function detectPaymentProvider(link){
+  try{
+    const host=new URL(String(link||"")).hostname.toLowerCase().replace(/^www\./,"");
+    if(host==="monzo.me" || host.endsWith(".monzo.com"))return "monzo";
+    if(host.includes("revolut"))return "revolut";
+    if(host.includes("paypal") || host==="paypal.me")return "paypal";
+    if(host.includes("starling"))return "starling";
+    if(host==="wise.com" || host.endsWith(".wise.com"))return "wise";
+  }catch(e){}
+  return "other";
+}
+function paymentProviderLabel(provider){
+  return PAYMENT_PROVIDERS[provider]?.label || PAYMENT_PROVIDERS.other.label;
+}
+function organiserPaymentSetup(groupName,options={}){
   return new Promise(resolve=>{
     const overlay=document.createElement("div");
-    overlay.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.42);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;";
-    overlay.innerHTML=`<div class="card" style="width:min(440px,100%);margin:0;padding:24px;border-radius:20px;box-shadow:0 18px 50px rgba(0,0,0,.18);">
-      <div style="font-size:38px;margin-bottom:8px;">💷</div>
-      <h2 style="margin:0 0 8px;">Set up where your players pay</h2>
-      <p>Add the payment link for the account where you want <b>${esc(groupName)}</b>'s entry fees sent.</p>
-      <div class="notice" style="padding:14px;"><b style="font-size:15px;">💷 YOUR GROUP'S MONEY GOES DIRECTLY TO YOU</b><br><br>Every player payment goes directly to the payment account you choose.<br><b>I'm In Golf never receives or holds your group's money.</b></div>
-      <div class="notice"><b>What you need to do:</b><br>1. Open the banking or payment app you want to receive money into.<br>2. Find its <b>payment link / request money / get paid</b> option.<br>3. Copy your payment link.<br>4. Come back here and paste it below.<br><br><span class="muted">For example: Monzo, Revolut or PayPal.</span></div>
-      <label><b>Paste your payment link here</b></label>
-      <input id="setupPaymentLink" type="url" inputmode="url" autocomplete="url" placeholder="https://…">
-      <div id="setupPaymentMsg" class="muted" style="min-height:18px;color:var(--red);"></div>
-      <button class="primary full" id="saveSetupPayment">Save Payment Link</button>
-      <button class="ghost full" id="skipSetupPayment">Don't play for money? Skip for now</button>
-      <div class="muted" style="margin-top:10px;text-align:center;">You can add or change this later in Admin / Settings.</div>
-    </div>`;
+    overlay.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.42);z-index:10000;display:flex;align-items:center;justify-content:center;padding:14px;overflow:auto;";
+    overlay.innerHTML=`<div class="card" style="width:min(470px,100%);margin:auto;padding:24px;border-radius:20px;box-shadow:0 18px 50px rgba(0,0,0,.18);" id="paymentSetupCard"></div>`;
     document.body.appendChild(overlay);
-    const input=overlay.querySelector("#setupPaymentLink");
-    const msg=overlay.querySelector("#setupPaymentMsg");
-    overlay.querySelector("#saveSetupPayment").onclick=()=>{
-      const link=normalisePaymentLink(input.value);
-      if(!link){msg.textContent="Please paste a valid payment link beginning with https://";input.focus();return;}
-      overlay.remove();resolve(link);
+    const card=overlay.querySelector("#paymentSetupCard");
+    let provider=PAYMENT_PROVIDERS[options.currentProvider] ? options.currentProvider : detectPaymentProvider(options.currentLink||"");
+    let link=String(options.currentLink||"");
+    const finish=value=>{overlay.remove();resolve(value);};
+    const stepHeader=(step,title,subtitle)=>`
+      <div class="muted" style="font-weight:900;letter-spacing:.04em;">STEP ${step} OF 3</div>
+      <h2 style="font-size:25px;margin:6px 0;">${title}</h2>
+      <div class="muted" style="font-size:16px;margin-bottom:18px;">${subtitle}</div>`;
+    const renderChoose=()=>{
+      card.innerHTML=`${stepHeader(1,"How should players pay you?","Choose the account where you want the entry money sent.")}
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          ${Object.entries(PAYMENT_PROVIDERS).map(([key,item])=>`<button type="button" class="${key===provider?'primary':'secondary'}" data-provider="${key}" style="min-height:68px;font-size:16px;"><span style="font-size:21px;">${item.icon}</span><br>${item.label}</button>`).join("")}
+        </div>
+        <div class="notice" style="margin-top:16px;"><b>Your group's money goes directly to you.</b><br>I'm In Golf never receives or holds it.</div>
+        ${options.allowRemove && options.currentLink ? `<button class="ghost full" id="removeSetupPayment">Remove current payment method</button>` : `<button class="ghost full" id="skipSetupPayment">Don't play for money — skip</button>`}`;
+      card.querySelectorAll("[data-provider]").forEach(button=>button.onclick=()=>{provider=button.dataset.provider;renderPaste();});
+      card.querySelector("#skipSetupPayment")?.addEventListener("click",()=>finish(null));
+      card.querySelector("#removeSetupPayment")?.addEventListener("click",()=>{if(confirm("Remove the current payment method?"))finish({remove:true});});
     };
-    overlay.querySelector("#skipSetupPayment").onclick=()=>{overlay.remove();resolve("");};
-    setTimeout(()=>input.focus(),50);
+    const renderPaste=()=>{
+      const item=PAYMENT_PROVIDERS[provider]||PAYMENT_PROVIDERS.other;
+      card.innerHTML=`${stepHeader(2,`${item.icon} Add your ${esc(item.label)} link`,"Open your payment app, copy your link, then come back and paste it below.")}
+        <div class="notice"><b>Where to find it</b><br>${esc(item.hint)}</div>
+        <label><b>Paste payment link</b></label>
+        <input id="setupPaymentLink" type="url" inputmode="url" autocomplete="url" value="${escAttr(link)}" placeholder="${escAttr(item.placeholder)}">
+        <div id="setupPaymentMsg" class="muted" style="min-height:20px;color:var(--red);"></div>
+        <button class="primary full" id="continueSetupPayment">Continue</button>
+        <button class="ghost full" id="backSetupPayment">← Back</button>`;
+      const input=card.querySelector("#setupPaymentLink");
+      card.querySelector("#continueSetupPayment").onclick=()=>{
+        const clean=normalisePaymentLink(input.value);
+        if(!clean){card.querySelector("#setupPaymentMsg").textContent="Please paste the complete link beginning with https://";input.focus();return;}
+        link=clean;
+        const detected=detectPaymentProvider(link);
+        if(provider!=="other" && detected!=="other" && detected!==provider){
+          card.querySelector("#setupPaymentMsg").textContent=`That looks like a ${paymentProviderLabel(detected)} link. Please check the link or go back and choose ${paymentProviderLabel(detected)}.`;
+          return;
+        }
+        renderConfirm();
+      };
+      card.querySelector("#backSetupPayment").onclick=renderChoose;
+      setTimeout(()=>input.focus(),50);
+    };
+    const renderConfirm=()=>{
+      const item=PAYMENT_PROVIDERS[provider]||PAYMENT_PROVIDERS.other;
+      card.innerHTML=`${stepHeader(3,"Ready to receive payments","Check this is the account you want your players to pay.")}
+        <div class="notice" style="padding:18px;">
+          <div class="muted">PAYMENT METHOD</div><b style="font-size:19px;">${item.icon} ${esc(item.label)}</b><br><br>
+          <div class="muted">FOR</div><b>${esc(groupName)}</b><br><br>
+          <div class="muted">PAYMENT LINK</div><span style="word-break:break-all;">${esc(link)}</span>
+        </div>
+        <div class="notice"><b>Players keep it simple:</b><br>They tap <b>Pay & Enter</b>, pay you directly, then return to I'm In Golf.</div>
+        <button class="primary full" id="saveSetupPayment">✓ Save payment method</button>
+        <button class="ghost full" id="backSetupPayment">← Back</button>`;
+      card.querySelector("#saveSetupPayment").onclick=()=>finish({link,provider});
+      card.querySelector("#backSetupPayment").onclick=renderPaste;
+    };
+    renderChoose();
   });
 }
 async function changePaymentLink(){
   if(!isAdmin)return;
-  const current=String(state.paymentLink||"");
-  const answer=prompt("Paste the payment link where players should pay you.\n\nPayments go directly to you — I'm In Golf does not receive or hold the money.",current);
-  if(answer===null)return;
-  if(!String(answer).trim()){
-    if(current && confirm("Remove the current payment link?")){state.paymentLink="";await save();render();}
-    return;
-  }
-  const link=normalisePaymentLink(answer);
-  if(!link){alert("Please enter a valid payment link beginning with https://");return;}
-  state.paymentLink=link;await save();render();alert("✅ Payment link saved.");
+  const result=await organiserPaymentSetup(state.groupName||"your group",{
+    currentLink:String(state.paymentLink||""),
+    currentProvider:state.paymentProvider||detectPaymentProvider(state.paymentLink||""),
+    allowRemove:true
+  });
+  if(!result)return;
+  const previousLink=state.paymentLink;
+  const previousProvider=state.paymentProvider;
+  if(result.remove){state.paymentLink="";state.paymentProvider="";}
+  else{state.paymentLink=result.link;state.paymentProvider=result.provider;}
+  const saved=await save();
+  if(!saved){state.paymentLink=previousLink;state.paymentProvider=previousProvider;alert("The payment method could not be saved. Please try again.");return;}
+  render();
+  alert(result.remove ? "Payment method removed." : `✅ ${paymentProviderLabel(result.provider)} payment link saved.`);
 }
 
 function organiserAdminSetupComplete(groupName,groupPin){
