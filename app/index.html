@@ -1308,7 +1308,11 @@ $("screen").innerHTML=`
       <div>
         <div class="muted">CURRENT ROUND</div>
         <h2>${esc(state.course)}</h2>
-        <div class="muted">${esc(formatDate(state.date))} • ${state.gameType==="money" && Number(state.stake||0)>0 ? paidCount()+" entered" : currentRoundPlayers().length+" players"}</div>
+        <div class="muted" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <span>${esc(formatDate(state.date))}</span>
+          <span>•</span>
+          <span style="font-weight:900;color:var(--green);">👥 ${state.gameType==="money" && Number(state.stake||0)>0 ? paidCount() : currentRoundPlayers().length} PLAYERS IN</span>
+        </div>
 
         <div style="margin-top:8px;display:flex;gap:7px;flex-wrap:wrap;">
           <span class="pill paid">
@@ -3542,9 +3546,10 @@ const moneyWon=(playerName)=>{
   },0);
 };
   const moneySorted=[...state.players].sort((a,b)=>{
-    const winDiff=
-      moneyWins(b.name)-moneyWins(a.name);
+    const wonDiff=moneyWon(b.name)-moneyWon(a.name);
+    if(wonDiff!==0)return wonDiff;
 
+    const winDiff=moneyWins(b.name)-moneyWins(a.name);
     if(winDiff!==0)return winDiff;
 
     return moneyPlayed(b.name)-moneyPlayed(a.name);
