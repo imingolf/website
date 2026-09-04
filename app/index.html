@@ -1727,7 +1727,7 @@ function tripBetterBallScores(){
       }).join("")}
     </div>
     <div class="card"><h2>🏆 ${esc(formatLabel)} Leaderboard</h2>${ranked.length?ranked.map((team,i)=>`<div class="player row"><span class="pos">${i+1}</span><div style="flex:1"><b>${esc(tripTeamName(team))}</b></div><span class="money">${Number(scores[team.id])}</span></div>`).join(""):`<div class="muted">No pair scores yet.</div>`}</div>
-    ${isAdmin?(eligible.length && waiting.length===0?`<div class="finish-screen-spacer"></div><div class="finish-sticky"><button class="primary full" onclick="finishRound()">🏁 Finish Better Ball Round</button></div>`:`<div class="card"><div class="notice warning">${eligible.length?"Finish Round will appear when every entered pair has submitted.":"No pairs are entered yet."}</div></div>`):""}`;
+    ${isAdmin?(eligible.length && waiting.length===0?`<div class="finish-screen-spacer"></div><div class="finish-sticky"><button class="primary full" onclick="finishRound()">🏁 Finish Round</button></div>`:`<div class="card"><div class="notice warning">${eligible.length?"Finish Round will appear when every entered pair has submitted.":"No pairs are entered yet."}</div></div>`):""}`;
 }
 async function submitTripTeamScore(teamId){
   if(!demoCanEdit())return;
