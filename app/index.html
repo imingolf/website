@@ -1381,7 +1381,7 @@ $("screen").innerHTML=`
 
       <div class="row">
         <div>
-          <div class="muted">Entry fee: £${state.stake} per player</div>
+          <b>Payment status</b>
         </div>
 
         <span class="pill ${paidCount()===currentRoundPlayers().length?'paid':'pending'}">
@@ -1473,7 +1473,18 @@ function pay(){
  const me=state.players.find(p=>p.id===myPlayerId);
 
  if(state.trip?.active && me && !tripPlayerIsPlaying(me) && !isAdmin){
-   $("screen").innerHTML=`<div class="card" style="text-align:center;"><div style="font-size:42px;">☕</div><h2>Not playing today</h2><div class="notice">You do not need to pay or enter a score for this round. You are still part of the Trip.</div><button class="secondary full" onclick="show('round')">← Back to Round</button></div>`;
+   if(state.gameType==="points" || Number(state.stake||0)<=0){
+   $("screen").innerHTML=`
+     <div class="card" style="text-align:center;">
+       <div style="font-size:42px;">✅</div>
+       <h2 style="margin:8px 0;">No payment needed</h2>
+       <div class="notice">${state.gameType==="points" ? "<b>This is a Points Game.</b><br>Everyone playing today can enter their score — there is no payment step." : "<b>This round has no entry fee.</b><br>There is nothing to pay for this competition."}</div>
+       <button class="secondary full" onclick="show('round')">← Back to Round</button>
+     </div>`;
+   return;
+ }
+
+ $("screen").innerHTML=`<div class="card" style="text-align:center;"><div style="font-size:42px;">☕</div><h2>Not playing today</h2><div class="notice">You do not need to pay or enter a score for this round. You are still part of the Trip.</div><button class="secondary full" onclick="show('round')">← Back to Round</button></div>`;
    return;
  }
 
@@ -1514,13 +1525,13 @@ function pay(){
    ${pin==="2026"
      ? '<div class="notice"><b>👀 Demo Mode — no real payments are taken.</b></div>'
      : isAdmin
-       ? (paidCount()===state.players.length
-           ? '<div class="notice"><b>🔒 All paid. Ready to play.</b></div>'
+       ? (paidCount()===currentRoundPlayers().length
+           ? '<div class="notice"><b>🔒 All players in today’s round are paid. Ready to play.</b></div>'
            : '<button class="secondary full" onclick="reminder()">🔔 Copy payment reminder</button>')
        : me?.paid
-         ? (paidCount()===state.players.length
-             ? '<div class="notice"><b>✅ You’re paid. Everyone is ready to play.</b></div>'
-             : `<div class="notice"><b>✅ You’re paid — ${paidCount()} of ${state.players.length} players paid.</b></div>`)
+         ? (paidCount()===currentRoundPlayers().length
+             ? '<div class="notice"><b>✅ You’re paid. Everyone playing today is ready to play.</b></div>'
+             : `<div class="notice"><b>✅ You’re paid — ${paidCount()} of ${currentRoundPlayers().length} players in today’s round paid.</b></div>`)
          : ''
    }
  </div>
@@ -1621,6 +1632,51 @@ function showAppToast(title,subtitle="",duration=2800){
     setTimeout(()=>toast.remove(),220);
   },duration);
 }
+
+function appConfirm(title,message="",confirmLabel="Confirm",danger=false){
+  return new Promise(resolve=>{
+    const overlay=document.createElement("div");
+    overlay.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.42);z-index:11000;display:flex;align-items:center;justify-content:center;padding:20px;";
+    overlay.innerHTML=`
+      <div class="card" style="width:min(440px,100%);margin:0;padding:24px;border-radius:20px;box-shadow:0 18px 50px rgba(0,0,0,.18);">
+        <h2 style="font-size:22px;margin:0 0 10px;text-align:center;">${esc(title)}</h2>
+        ${message ? `<div class="notice" style="white-space:pre-line;">${esc(message)}</div>` : ""}
+        <button id="appConfirmYes" class="${danger?"red":"primary"} full">${esc(confirmLabel)}</button>
+        <button id="appConfirmNo" class="ghost full">Cancel</button>
+      </div>`;
+    document.body.appendChild(overlay);
+    const finish=value=>{overlay.remove();resolve(value);};
+    overlay.querySelector("#appConfirmYes").onclick=()=>finish(true);
+    overlay.querySelector("#appConfirmNo").onclick=()=>finish(false);
+    overlay.addEventListener("click",e=>{if(e.target===overlay)finish(false);});
+  });
+}
+function appPrompt(title,message="",initial="",options={}){
+  return new Promise(resolve=>{
+    const overlay=document.createElement("div");
+    const inputType=options.type||"text";
+    const inputMode=options.inputmode||"";
+    const placeholder=options.placeholder||"";
+    overlay.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.42);z-index:11000;display:flex;align-items:center;justify-content:center;padding:20px;";
+    overlay.innerHTML=`
+      <div class="card" style="width:min(440px,100%);margin:0;padding:24px;border-radius:20px;box-shadow:0 18px 50px rgba(0,0,0,.18);">
+        <h2 style="font-size:22px;margin:0 0 8px;text-align:center;">${esc(title)}</h2>
+        ${message ? `<div class="muted" style="text-align:center;margin-bottom:14px;white-space:pre-line;">${esc(message)}</div>` : ""}
+        <input id="appPromptInput" type="${escAttr(inputType)}" ${inputMode?`inputmode="${escAttr(inputMode)}"`:""} placeholder="${escAttr(placeholder)}" value="${escAttr(String(initial??""))}">
+        <button id="appPromptOk" class="primary full">${esc(options.okLabel||"Continue")}</button>
+        <button id="appPromptCancel" class="ghost full">Cancel</button>
+      </div>`;
+    document.body.appendChild(overlay);
+    const input=overlay.querySelector("#appPromptInput");
+    const finish=value=>{overlay.remove();resolve(value);};
+    overlay.querySelector("#appPromptOk").onclick=()=>finish(input.value);
+    overlay.querySelector("#appPromptCancel").onclick=()=>finish(null);
+    input.addEventListener("keydown",e=>{if(e.key==="Enter")finish(input.value);});
+    overlay.addEventListener("click",e=>{if(e.target===overlay)finish(null);});
+    setTimeout(()=>{input.focus();input.select();},50);
+  });
+}
+
 function showBigPlayerMessage(title,subtitle="",duration=3000){
   document.querySelectorAll(".player-big-message").forEach(el=>el.remove());
   const overlay=document.createElement("div");
@@ -1734,7 +1790,7 @@ function tripBetterBallScores(){
         return `<div class="player"><div><b>${esc(tripTeamName(team))}</b><div class="muted">${esc(formatLabel)} pair</div></div><div style="margin-top:10px;">${teamScore!=null?`<div class="notice">✅ <b>Pair score submitted</b><br>${Number(teamScore)} ${state.pointsCompetition==="net"?"combined net":"pts"}</div>${isAdmin?`<button class="secondary small" onclick="editTripTeamScore('${escAttr(team.id)}')">✏️ Correct score</button>`:""}`:canEnter?`<label class="muted">Enter final ${esc(formatLabel)} total</label><input id="tripTeamScore_${escAttr(team.id)}" type="number" min="0" inputmode="numeric" placeholder="Total" oninput="scoreDraftActive=true"><button class="primary full" onclick="submitTripTeamScore('${escAttr(team.id)}')">🏌️ Submit Pair Score</button>`:`<div class="notice warning">Both partners must be marked paid before this pair can enter.</div>`}</div></div>`;
       }).join("")}
     </div>
-    <div class="card"><h2>🏆 ${esc(formatLabel)} Leaderboard</h2>${ranked.length?ranked.map((team,i)=>`<div class="player row"><span class="pos">${i+1}</span><div style="flex:1"><b>${esc(tripTeamName(team))}</b></div><span class="money">${Number(scores[team.id])}</span></div>`).join(""):`<div class="muted">No pair scores yet.</div>`}</div>
+    <div class="card"><h2>🏆 ${esc(formatLabel)} Leaderboard</h2>${ranked.length?ranked.map((team,i)=>`<div class="player row"><span class="pos">${i+1}</span><div style="flex:1"><b>${esc(tripTeamName(team))}</b></div><span class="money">${Number(scores[team.id])}</span></div>`).join(""):`<div class="muted">Waiting for the first pair score…</div>`}</div>
     ${isAdmin?(eligible.length && waiting.length===0?`<div class="finish-screen-spacer"></div><div class="finish-sticky"><button class="primary full" onclick="finishRound()">🏁 Finish Round</button></div>`:`<div class="card"><div class="notice warning">${eligible.length?"Finish Round will appear when every entered pair has submitted.":"No pairs are entered yet."}</div></div>`):""}`;
 }
 async function submitTripTeamScore(teamId){
@@ -1746,7 +1802,7 @@ async function submitTripTeamScore(teamId){
   const raw=String($("tripTeamScore_"+teamId)?.value||"").trim();
   const value=Number(raw);
   if(!raw || !Number.isFinite(value) || value<0){alert("Please enter a valid Better Ball score.");return;}
-  if(!confirm(`Submit ${value} Better Ball points for ${tripTeamName(team)}?\n\nAre you sure?`))return;
+  if(!await appConfirm("Submit Pair Score",`${value} Better Ball points for ${tripTeamName(team)}.\n\nAre you sure?`,"Submit Score"))return;
   state.trip.currentTeamScores=state.trip.currentTeamScores||{};
   state.trip.currentTeamScores[teamId]=value;
   scoreDraftActive=false;
@@ -1758,7 +1814,7 @@ async function editTripTeamScore(teamId){
   if(!isAdmin || !demoCanEdit())return;
   const team=(state.trip?.currentTeams||[]).find(t=>t.id===teamId);
   if(!team)return;
-  const answer=prompt(`Correct the Better Ball score for ${tripTeamName(team)}.`,String(state.trip?.currentTeamScores?.[teamId]??""));
+  const answer=await appPrompt("Correct Pair Score",`Better Ball score for ${tripTeamName(team)}.`,String(state.trip?.currentTeamScores?.[teamId]??""),{type:"number",inputmode:"numeric",okLabel:"Save Correction"});
   if(answer===null)return;
   const value=Number(String(answer).trim());
   if(!Number.isFinite(value)||value<0){alert("Please enter a valid score.");return;}
@@ -1862,7 +1918,7 @@ function scores(){
         ${eligiblePlayers.length ? `
           <div class="notice ${stillToEnter.length ? "warning" : ""}">
             ${stillToEnter.length
-              ? `<b>⏳ ${stillToEnter.length} score${stillToEnter.length===1?"":"s"} still to enter</b>`
+              ? (isPointsGame ? `<b>⏳ ${stillToEnter.length} score${stillToEnter.length===1?"":"s"} still to enter</b>` : `<b>⏳ ${stillToEnter.length} paid player${stillToEnter.length===1?"":"s"} still to enter a score</b>`)
               : `<b>✅ All entered players have submitted.</b>`
             }
           </div>
@@ -1968,7 +2024,7 @@ function scores(){
               <span class="money">${p.stableford} pts</span>
             </div>
           `).join("")
-          : '<div class="muted">No Stableford scores yet.</div>'
+          : '<div class="muted">Waiting for the first score…</div>'
         }
       </div>
     ` : ""}
@@ -1992,7 +2048,7 @@ function scores(){
               <span class="money">${p.netScore}</span>
             </div>
           `).join("")
-          : '<div class="muted">No Net scores yet.</div>'
+          : '<div class="muted">Waiting for the first score…</div>'
         }
 
         ${eligiblePlayers.some(p=>pointsComp==="net" && p.noReturn===true) ? `
@@ -2075,7 +2131,7 @@ async function submitPlayerScore(i,type){
     ? "Stableford score " + value + " points"
     : "Net score " + value;
 
-  if(!confirm("Submit " + label + "?\n\nAre you sure?"))return;
+  if(!await appConfirm("Submit My Score",label + ".\n\nAre you sure?","Submit Score"))return;
 
   if(type==="stableford"){
     p.stableford=value;
@@ -2113,7 +2169,7 @@ async function submitNoReturn(i){
     return;
   }
 
-  if(!confirm("Submit NR — No Return?\n\nThis player will count as submitted but cannot win the Net competition."))return;
+  if(!await appConfirm("Submit NR — No Return","This counts as submitted, but the player cannot win the Net competition.","Submit NR"))return;
 
   p.netScore=null;
   p.stableford=null;
@@ -2138,11 +2194,12 @@ async function adminEditSubmittedScore(i,type){
     ? String(p.stableford??"")
     : String(p.netScore??"");
 
-  const answer=prompt(
-    "Correct " + p.name + "'s submitted " +
-    (type==="stableford" ? "Stableford score" : "Net score") +
-    (type==="net" ? ".\n\nEnter a number or NR." : "."),
-    current
+  const answer=await appPrompt(
+    "Correct Submitted Score",
+    p.name + " — " + (type==="stableford" ? "Stableford score" : "Net score") +
+      (type==="net" ? ". Enter a number or NR." : "."),
+    current,
+    {inputmode:type==="net"?"text":"numeric",okLabel:"Continue"}
   );
 
   if(answer===null)return;
@@ -2150,7 +2207,7 @@ async function adminEditSubmittedScore(i,type){
   const clean=String(answer).trim().toUpperCase();
 
   if(type==="net" && clean==="NR"){
-    if(!confirm("Change " + p.name + "'s result to NR — No Return?"))return;
+    if(!await appConfirm("Change to NR — No Return",p.name + " will count as submitted but cannot win the Net competition.","Change to NR"))return;
     p.netScore=null;
     p.stableford=null;
     p.noReturn=true;
@@ -2166,7 +2223,7 @@ async function adminEditSubmittedScore(i,type){
     return;
   }
 
-  if(!confirm("Change " + p.name + "'s submitted score to " + value + "?"))return;
+  if(!await appConfirm("Correct Submitted Score","Change " + p.name + "'s submitted score to " + value + "?","Save Correction"))return;
 
   if(type==="stableford"){
     p.stableford=value;
@@ -2267,14 +2324,14 @@ async function finishRound(){
     return;
   }
 
-  function chooseCountbackWinner(players,competition,score,position){
+  async function chooseCountbackWinner(players,competition,score,position){
     const names=players.map((p,i)=>`${i+1}. ${p.name}`).join("\n");
 
-    const answer=prompt(
-      `${competition} tie for ${position} on ${score}.\n\n` +
-      `Use your normal scorecard countback and choose the winner.\nNo hole-by-hole entry is needed in the app.\n\n` +
-      names +
-      `\n\nEnter the player's number.`
+    const answer=await appPrompt(
+      "Countback Required",
+      `${competition} tie for ${position} on ${score}.\n\nUse your normal scorecard countback — no hole-by-hole entry is needed.\n\n${names}\n\nEnter the player's number.`,
+      "",
+      {type:"number",inputmode:"numeric",okLabel:"Choose Winner"}
     );
 
     if(answer===null)return null;
@@ -2282,8 +2339,8 @@ async function finishRound(){
     const selected=Number(answer)-1;
 
     if(selected<0 || selected>=players.length){
-      alert("Please choose one of the listed players.");
-      return chooseCountbackWinner(
+      showAppToast("Choose a listed player","Enter one of the player numbers shown.",3000);
+      return await chooseCountbackWinner(
         players,
         competition,
         score,
@@ -2418,7 +2475,7 @@ async function finishRound(){
 
       if(state.gameType==="points" && (tied.length>1)){
 
-        selectedPlayer=chooseCountbackWinner(
+        selectedPlayer=await chooseCountbackWinner(
           tied,
           pointsComp==="stableford" ? "Stableford" : "Net",
           pointsComp==="stableford"
@@ -2705,7 +2762,7 @@ for(let place=0; place<3 && remainingTrip.length; place++){
 
   if(state.gameType==="points" && (tied.length>1)){
 
-    selectedPlayer=chooseCountbackWinner(
+    selectedPlayer=await chooseCountbackWinner(
       tied,
       tripComp==="stableford" ? "Stableford" : "Net",
       tripComp==="stableford"
@@ -4174,7 +4231,7 @@ async function changeMyHandicap(i){
 
  if(p.id!==myPlayerId && !isAdmin)return;
 
- const h=prompt("Enter your new handicap",p.handicap);
+ const h=await appPrompt("Change Handicap","Enter the new golf handicap.",p.handicap,{type:"number",inputmode:"decimal",okLabel:"Save Handicap"});
  if(h===null)return;
 
  const newHandicap=Number(h);
@@ -4278,7 +4335,7 @@ async function adminAddPlayer(){
 }
 
 async function editPlayer(i){const p=state.players[i];const name=prompt("Player name",p.name);if(!name)return;const h=prompt("Handicap",p.handicap);p.name=name.trim();p.handicap=Number(h)||0;render();await save()}
-async function removePlayer(i){if(!confirm("Remove "+state.players[i].name+"? Their past round history will stay saved."))return;state.players.splice(i,1);render();await save()}
+async function removePlayer(i){const p=state.players[i];if(!p)return;if(!await appConfirm("Remove Player","Remove "+p.name+" from this group? Their past round history will stay saved.","Remove Player",true))return;state.players.splice(i,1);render();await save()}
 
 
 let isAdmin=false;
@@ -4743,7 +4800,7 @@ function adminHelpTopicContent(topic){
     waiting:`<h2>⏳ Still to enter</h2><div class="notice">Once scoring starts, the Scores screen shows the names of everyone who still needs to submit.<br><br>For a Money Game, only players who were paid and entered before scoring started are included.<br><br>The list updates automatically as scores or NR results are submitted.</div>`,
     finish:`<h2>🏁 Finish a round</h2><div class="notice">When every entered player has submitted a score or valid NR, Admin will see <b>Finish Round</b> at the bottom of Scores.<br><br>Check the leaderboard, tap the button and confirm the result.<br><br>The winner and <b>full final standings</b> are saved in <b>League → Previous rounds</b> and can be shared as an I’m In Golf results image.</div><div class="notice">After a normal round finishes, players see <b>Next Competition — Coming soon…</b>. A remembered Admin can tap <b>Admin — Set Up Next Competition</b>. On a new device, use <b>Players → Admin Login</b>.</div>`,
     points:`<h2>🏆 Points Games</h2><div class="notice">Everyone plays the same competition — Stableford or Net.<br><br>There is no payment step.<br><br>Players enter their score in the normal Scores screen and the top three receive league points based on the value chosen when the round is set up.</div>`,
-    trip:`<h2>✈️ Trip Mode</h2><div class="notice">Choose <b>Trip Mode</b>, enter the trip name, choose the Trip players and plan each round.<br><br>Each day can be <b>Individual</b> or <b>Better Ball</b>. Before the round, mark anyone <b>Not Playing Today</b>, then use <b>Randomise Fourballs</b> or <b>Pick Fourballs Myself</b>.</div><div class="notice"><b>Better Ball:</b> each pair works out one final Better Ball Stableford score from the scorecard. Either partner enters that one pair score. Team rounds are saved as daily results but do not change the individual Trip standings.</div><div class="notice">Individual rounds award Trip Championship points. After the final round, the Trip Summary shows all daily winners, final standings and the Trip winner. The organiser then taps <b>Save Trip & Return to Normal Golf</b>.</div>`,
+    trip:`<h2>✈️ Trip Mode</h2><div class="notice">Choose <b>Trip Mode</b>, enter the trip name, choose the Trip players and plan each round.<br><br>Rounds can be <b>Individual</b>, <b>Better Ball</b> or <b>Pairs Aggregate</b>. Before each round, mark anyone <b>Not Playing Today</b>, then use <b>Randomise Fourballs</b> or <b>Pick Fourballs Myself</b>.</div><div class="notice"><b>Pairs rounds:</b> either partner enters the pair’s one final score. Better Ball uses the pair’s final Better Ball Stableford total. Pairs Aggregate combines both partners’ final scores. These rounds build the separate <b>Team-event standings</b>.</div><div class="notice"><b>Individual rounds</b> build the Individual Trip Championship standings. After the final round, the Trip Summary shows daily winners, Individual and Team-event standings, any Trip money summary and the Trip champion. The organiser then taps <b>Save Trip & Return to Normal Golf</b>.</div>`,
     pin:`<h2>🔐 Admin PIN</h2><div class="notice">Admin can change the PIN in <b>Settings → Change Admin PIN</b>.<br><br>If the Admin PIN is forgotten, the I'm In Golf owner can reset it securely from Owner Controls.</div>`,
     install:`<h2>📱 Install on a phone</h2><div class="notice"><b>iPhone:</b> Safari → <b>•••</b> bottom-right → <b>Share</b> → <b>Add to Home Screen</b>.<br><br><b>Android:</b> Chrome → <b>⋮</b> → <b>Add to Home screen</b> or <b>Install app</b>.</div>`,
     problems:`<h2>🛠️ Something isn't working</h2><div class="notice"><b>1.</b> Check the Group PIN.<br><br><b>2.</b> Refresh or fully close and reopen the app.<br><br><b>3.</b> On a laptop, use <b>Ctrl + F5</b>.<br><br><b>4.</b> Wrong player? Go to <b>Players → Change who I am</b>.<br><br><b>5.</b> Forgotten Admin PIN? Contact the I'm In Golf owner for a reset.</div><div class="muted">The app will not redraw while someone is typing a score.</div>`
