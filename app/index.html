@@ -1311,7 +1311,7 @@ $("screen").innerHTML=`
         <div class="muted" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
           <span>${esc(formatDate(state.date))}</span>
           <span>•</span>
-          <span style="font-weight:900;color:var(--green);">👥 ${state.gameType==="money" && Number(state.stake||0)>0 ? paidCount() : currentRoundPlayers().length} PLAYERS IN</span>
+          <span style="display:inline-flex;align-items:center;padding:4px 9px;border-radius:999px;background:#e5f5e9;color:var(--green);font-weight:900;">👥 ${state.gameType==="money" && Number(state.stake||0)>0 ? paidCount() : currentRoundPlayers().length} PLAYERS IN</span>
         </div>
 
         <div style="margin-top:8px;display:flex;gap:7px;flex-wrap:wrap;">
