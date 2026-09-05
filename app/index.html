@@ -974,6 +974,44 @@ function stablefordPot(){
 function netPot(){
   return Number(state.stake||0)*netPaidCount();
 }
+
+function tripIndividualScoreRows(trip=state.trip){
+  const t=trip||{};
+  const comp=t.competition==="net"?"net":"stableford";
+  const totals={};
+  (t.rounds||[]).forEach(r=>{
+    if(r.tripFormat==="betterball" || r.tripFormat==="pairsaggregate")return;
+    (r.players||[]).forEach(p=>{
+      const value=comp==="net" ? p.netScore : p.stableford;
+      if(value==null || p.noReturn===true)return;
+      const name=String(p.name||"").trim();
+      if(!name)return;
+      totals[name]=totals[name]||{name,total:0,played:0};
+      totals[name].total+=Number(value||0);
+      totals[name].played+=1;
+    });
+  });
+  const rows=Object.values(totals);
+  if(comp==="net"){
+    const maxPlayed=Math.max(0,...rows.map(r=>r.played));
+    return rows.sort((a,b)=>
+      (b.played-a.played) ||
+      (a.played===maxPlayed && b.played===maxPlayed ? a.total-b.total : a.total-b.total) ||
+      a.name.localeCompare(b.name)
+    );
+  }
+  return rows.sort((a,b)=>b.total-a.total || b.played-a.played || a.name.localeCompare(b.name));
+}
+function tripPerformanceLeader(trip=state.trip){
+  return tripIndividualScoreRows(trip)[0]||null;
+}
+function tripPerformanceScoreLabel(row,trip=state.trip){
+  if(!row)return "";
+  return (trip?.competition==="net" ? `Net total ${Number(row.total)}` : `${Number(row.total)} Stableford pts`);
+}
+function tripPointsEnabled(trip=state.trip){
+  return trip?.tripPointsEnabled!==false;
+}
 function tripStandingsSorted(){
   const standings=state.trip?.standings || {};
   return Object.entries(standings)
@@ -1040,8 +1078,10 @@ function tripRoundWinner(record){
 
 function setTripChampion(){
   if(!state.trip)return;
-  const sorted=tripStandingsSorted();
-  state.trip.champion=sorted.length ? sorted[0].name : null;
+  const performanceLeader=tripPerformanceLeader(state.trip);
+  state.trip.champion=performanceLeader?.name || null;
+  const pointsSorted=tripStandingsSorted();
+  state.trip.pointsChampion=tripPointsEnabled() && pointsSorted.length ? pointsSorted[0].name : null;
   const teamSorted=tripTeamStandingsSorted();
   state.trip.teamChampion=teamSorted.length ? teamSorted[0].name : null;
 }
@@ -1050,7 +1090,10 @@ function showTripSummary(){
   const trip=state.trip || {};
   const rounds=trip.rounds || [];
   const standings=tripStandingsSorted();
-  const champion=trip.champion || standings[0]?.name || null;
+  const performanceRows=tripIndividualScoreRows(trip);
+  const performanceChampion=trip.champion || performanceRows[0]?.name || null;
+  const performanceLeader=performanceRows.find(r=>r.name===performanceChampion) || performanceRows[0] || null;
+  const pointsChampion=trip.pointsChampion || (tripPointsEnabled(trip) ? standings[0]?.name : null);
   const teamStandings=tripTeamStandingsSorted();
   const teamChampion=trip.teamChampion || teamStandings[0]?.name || null;
 
@@ -1095,12 +1138,13 @@ function showTripSummary(){
       <div class="muted">${rounds.length} round${rounds.length===1?"":"s"} completed</div>
     </div>
 
-    ${champion ? `
+    ${performanceLeader ? `
       <div class="card" style="text-align:center;">
         <div style="font-size:38px;">👑</div>
-        <div class="muted">INDIVIDUAL TRIP CHAMPION</div>
-        <h2 style="font-size:28px;margin:6px 0;">${esc(champion)}</h2>
-        <div class="big">${Number((trip.standings||{})[champion]||0)} pts</div>
+        <div class="muted">${trip.competition==="net" ? "NET TRIP CHAMPION" : "STABLEFORD TRIP CHAMPION"}</div>
+        <h2 style="font-size:28px;margin:6px 0;">${esc(performanceLeader.name)}</h2>
+        <div class="big">${trip.competition==="net" ? "Net "+Number(performanceLeader.total) : Number(performanceLeader.total)+" pts"}</div>
+        <div class="muted">${performanceLeader.played} round${performanceLeader.played===1?"":"s"} counted</div>
       </div>
     ` : ""}
 
@@ -1119,7 +1163,7 @@ function showTripSummary(){
       ${rounds.length ? rounds.map((r,i)=>{
         const w=tripRoundWinner(r);
         const isTeam=r.tripFormat==="betterball" || r.tripFormat==="pairsaggregate";
-        const gameLabel=isTeam ? `🤝 ${tripFormatLabel(r.tripFormat)}` : (r.gameType==="points" ? "🏆 Points Game" : "💷 Money Game");
+        const gameLabel=isTeam ? `🤝 ${tripFormatLabel(r.tripFormat)}` : (r.gameType==="points" ? "✈️ Trip Round" : "💷 Money Game");
         const compLabel=isTeam ? "Team-event points" : r.gameType==="points"
           ? (r.pointsCompetition==="net" ? "Net" : "Stableford")
           : (trip.competition==="net" ? "Net" : "Stableford");
@@ -1144,24 +1188,40 @@ function showTripSummary(){
     </div>
 
     <div class="card">
-      <h2>🤝 Team-event standings</h2>
-      <div class="muted" style="margin-bottom:10px;">Each player keeps the points earned in pairs rounds, even with a different partner.</div>
-      ${teamStandings.length ? teamStandings.map((s,i)=>`
-        <div class="player row"><div><b>${tripStandingPosition(teamStandings,i)===1?"🏆 ":tripStandingPosition(teamStandings,i)===2?"🥈 ":tripStandingPosition(teamStandings,i)===3?"🥉 ":""}${tripStandingPositionLabel(teamStandings,i)}. ${esc(s.name)}</b></div><div class="money">${s.points} pts</div></div>
-      `).join("") : `<div class="muted">No team rounds were played.</div>`}
-    </div>
-
-    <div class="card">
-      <h2>🏆 Individual Trip standings</h2>
-      ${standings.length ? standings.map((s,i)=>`
+      <h2>${trip.competition==="net" ? "⛳ Cumulative Net standings" : "🏆 Cumulative Stableford standings"}</h2>
+      <div class="muted" style="margin-bottom:10px;">Actual golf scores accumulated across the individual Trip rounds.</div>
+      ${performanceRows.length ? performanceRows.map((s,i)=>`
         <div class="player row">
           <div>
             <b>${i===0?"👑 ":i===1?"🥈 ":i===2?"🥉 ":""}${i+1}. ${esc(s.name)}</b>
+            <div class="muted">Played ${s.played}</div>
+          </div>
+          <div class="money">${trip.competition==="net" ? "Net "+Number(s.total) : Number(s.total)+" pts"}</div>
+        </div>
+      `).join("") : `<div class="muted">No individual Trip scores recorded.</div>`}
+    </div>
+
+    ${teamStandings.length ? `
+    <div class="card">
+      <h2>🤝 Team-event standings</h2>
+      <div class="muted" style="margin-bottom:10px;">Each player keeps the points earned in pairs rounds, even with a different partner.</div>
+      ${teamStandings.map((s,i)=>`
+        <div class="player row"><div><b>${tripStandingPosition(teamStandings,i)===1?"🏆 ":tripStandingPosition(teamStandings,i)===2?"🥈 ":tripStandingPosition(teamStandings,i)===3?"🥉 ":""}${tripStandingPositionLabel(teamStandings,i)}. ${esc(s.name)}</b></div><div class="money">${s.points} pts</div></div>
+      `).join("")}
+    </div>` : ""}
+
+    ${tripPointsEnabled(trip) ? `
+    <div class="card">
+      <h2>🏅 Trip points standings <span class="muted" style="font-size:13px;font-weight:700;">optional bonus</span></h2>
+      ${standings.length ? standings.map((s,i)=>`
+        <div class="player row">
+          <div>
+            <b>${i===0?"🏅 ":i===1?"🥈 ":i===2?"🥉 ":""}${i+1}. ${esc(s.name)}</b>
           </div>
           <div class="money">${s.points} pts</div>
         </div>
-      `).join("") : `<div class="muted">No Trip standings recorded.</div>`}
-    </div>
+      `).join("") : `<div class="muted">No Trip points recorded.</div>`}
+    </div>` : ""}
 
     ${hasTripMoney ? `<div class="card">
       <h2>💷 Trip Money Summary</h2>
@@ -1352,7 +1412,7 @@ $("screen").innerHTML=`
         ` : `
           <div class="notice">
             <b>${tripTeamRoundActive()?`🤝 ${esc(tripFormatLabel())}`:(state.pointsCompetition==="stableford" ? "🏆 Stableford" : "⛳ Net")}</b><br>
-            ${tripTeamRoundActive()?"Team round • Builds the separate Team-event standings":"Points Game • Top 3 score Trip points"}
+            ${tripTeamRoundActive()?"Team round • Builds the separate Team-event standings":"Trip round • Top 3 score Trip points"}
           </div>
         `}
       </div>
@@ -1428,7 +1488,7 @@ $("screen").innerHTML=`
       </div>`}
 
       <div class="muted" style="margin-top:10px;">
-        ${tripTeamRoundActive()?"Top three pairs earn 10, 6 and 3 Team-event points for each partner.":"Top 3 players score league points."}
+        ${tripTeamRoundActive() ? "Top three pairs earn 10, 6 and 3 Team-event points for each partner." : (state.trip?.active ? (tripPointsEnabled() ? "Top 3 players score Trip points." : "Trip points are off — actual golf scores decide the Trip.") : "Top 3 players score league points.")}
       </div>
     </div>
   `}
@@ -2516,10 +2576,11 @@ places.forEach((place,i)=>{
 
   if(isTrip){
 
-    state.trip.standings=state.trip.standings || {};
-
-    state.trip.standings[place.name]=
-      Number(state.trip.standings[place.name]||0)+place.points;
+    if(tripPointsEnabled()){
+      state.trip.standings=state.trip.standings || {};
+      state.trip.standings[place.name]=
+        Number(state.trip.standings[place.name]||0)+place.points;
+    }
 
   }else{
 
@@ -2787,14 +2848,15 @@ for(let place=0; place<3 && remainingTrip.length; place++){
   Math.round(tripFirst*0.6),
   Math.round(tripFirst*0.3)
 ];
-  state.trip.standings=state.trip.standings || {};
+  if(tripPointsEnabled()){
+    state.trip.standings=state.trip.standings || {};
 
-  tripPlaces.forEach((p,i)=>{
-    const points=tripAwards[i];
-
-    state.trip.standings[p.name]=
-      Number(state.trip.standings[p.name]||0)+points;
-  });
+    tripPlaces.forEach((p,i)=>{
+      const points=tripAwards[i];
+      state.trip.standings[p.name]=
+        Number(state.trip.standings[p.name]||0)+points;
+    });
+  }
 }
 
 
@@ -2916,9 +2978,27 @@ function sortedFinalStandings(record){
     return String(a.name||"").localeCompare(String(b.name||""));
   });
 }
+
+function countbackOrderedFinalStandings(record){
+  const sorted=countbackOrderedFinalStandings(record);
+  if(!record?.pointsResults?.length)return sorted;
+  const placeOrder=new Map((record.pointsResults||[]).map((r,i)=>[String(r.name||""),i]));
+  return sorted.slice().sort((a,b)=>{
+    const ai=placeOrder.has(a.name)?placeOrder.get(a.name):9999;
+    const bi=placeOrder.has(b.name)?placeOrder.get(b.name):9999;
+    const comp=resultCompetition(record);
+    const av=Number(comp==="net"?a.netScore:a.stableford);
+    const bv=Number(comp==="net"?b.netScore:b.stableford);
+    if(av===bv && ai!==bi)return ai-bi;
+    if(av!==bv)return comp==="net" ? av-bv : bv-av;
+    return String(a.name||"").localeCompare(String(b.name||""));
+  });
+}
 function finalStandingPosition(record,sorted,index){
   const p=sorted[index];
   if(!p || p.noReturn===true)return "—";
+  const declared=(record?.pointsResults||[]).find(r=>r.name===p.name);
+  if(declared?.position!=null)return String(declared.position);
   const comp=resultCompetition(record);
   const value=Number(comp==="net"?p.netScore:p.stableford);
   let first=index;
@@ -2955,6 +3035,11 @@ function resultWinnerScore(record){
 }
 function resultWinnerValue(record){
   if(record?.gameType==="points"){
+    if(state.trip?.active || state.trip?.completed){
+      return tripPointsEnabled() && record?.pointsResults?.[0]?.points!=null
+        ? `+${record.pointsResults[0].points} Trip pts`
+        : resultWinnerScore(record);
+    }
     return record?.pointsResults?.[0]?.points!=null ? `+${record.pointsResults[0].points} league pts` : "";
   }
   const comp=resultCompetition(record);
@@ -3075,7 +3160,7 @@ function showWinnerScreen(record){
       <div class="card" style="text-align:center;">
         <div style="font-size:54px;">🏆</div>
         <h2 style="font-size:24px;margin-bottom:4px;">
-          POINTS GAME RESULT
+          ${state.trip?.active || state.trip?.completed ? "TRIP ROUND RESULT" : "POINTS GAME RESULT"}
         </h2>
         ${(record.course || record.date) ? `
         <div class="muted">
@@ -3117,10 +3202,10 @@ function showWinnerScreen(record){
 
             <div style="text-align:right;">
               <div class="money" style="font-size:22px;">
-                +${r.points}
+                ${state.trip?.active && !tripPointsEnabled() ? (record.pointsCompetition==="net" ? "Net "+r.score : r.score+" pts") : "+"+r.points}
               </div>
               <div class="muted">
-                ${state.trip?.active ? "Trip pts" : "league pts"}
+                ${state.trip?.active && tripPointsEnabled() ? "Trip pts" : state.trip?.active ? "Golf score" : "league pts"}
               </div>
             </div>
           </div>
@@ -3291,7 +3376,7 @@ async function shareWinnerImage(){
   const record=lastWinnerRecord;
   if(!record){alert("No result available to share.");return;}
 
-  const standings=sortedFinalStandings(record);
+  const standings=countbackOrderedFinalStandings(record);
   if(!standings.length){alert("No final standings are available to share.");return;}
 
   const pageSize=20;
@@ -3344,7 +3429,7 @@ async function shareWinnerImage(){
     const course=String(record.course||"Completed Round").toUpperCase();
     centreText(ctx,course,322,fitText(ctx,course,920,38,22,"900"),"900",dark);
 
-    const gameLabel=record.gameType==="points" ? "Points Game" : "Money Game";
+    const gameLabel=(state.trip?.active||state.trip?.completed) ? "Trip Round" : (record.gameType==="points" ? "Points Game" : "Money Game");
     centreText(ctx,`${state.groupName||"I’m In Golf"}  •  ${gameLabel}  •  ${competition==="net"?"Net":"Stableford"}`,360,22,"700",muted);
 
     let tableTop;
@@ -3357,7 +3442,7 @@ async function shareWinnerImage(){
       ctx.fillStyle=green;ctx.font='800 18px Arial';ctx.fillText("SCORE",540,430);
       ctx.fillStyle=dark;ctx.font='900 34px Arial';ctx.fillText(winnerScore,540,473);
 
-      ctx.fillStyle=green;ctx.font='800 18px Arial';ctx.fillText(record.gameType==="points"?"LEAGUE":"WON",795,430);
+      ctx.fillStyle=green;ctx.font='800 18px Arial';ctx.fillText(record.gameType==="points" ? ((state.trip?.active||state.trip?.completed) ? (tripPointsEnabled()?"TRIP PTS":"RESULT") : "LEAGUE") : "WON",795,430);
       ctx.fillStyle=dark;ctx.font=`900 ${fitText(ctx,winnerValue,190,32,19,"900")}px Arial`;ctx.fillText(winnerValue,795,473);
       tableTop=590;
     }else{
@@ -3654,18 +3739,15 @@ const tripPlayed=(playerName)=>{
   }).length;
 };
 
+const tripPerformanceRows=tripIndividualScoreRows(leagueTrip);
+const tripPerformanceMap=new Map(tripPerformanceRows.map((r,i)=>[r.name,{...r,rank:i+1}]));
 const tripSorted=[...state.players].sort((a,b)=>{
-  const aPoints=
-    Number(leagueTrip?.standings?.[a.name]||0);
-
-  const bPoints=
-    Number(leagueTrip?.standings?.[b.name]||0);
-
-  if(bPoints!==aPoints){
-    return bPoints-aPoints;
-  }
-
-  return tripPlayed(b.name)-tripPlayed(a.name);
+  const ar=tripPerformanceMap.get(a.name);
+  const br=tripPerformanceMap.get(b.name);
+  if(ar && br)return ar.rank-br.rank;
+  if(ar)return -1;
+  if(br)return 1;
+  return a.name.localeCompare(b.name);
 });
   $("screen").innerHTML=`
 
@@ -3713,7 +3795,7 @@ const tripSorted=[...state.players].sort((a,b)=>{
   <div class="muted" style="margin-bottom:10px;">
     ${
       leagueView==="trip"
-        ? esc(leagueTrip?.name || "Trip Championship")
+        ? `${esc(leagueTrip?.name || "Trip")} • ${leagueTrip?.competition==="net"?"Cumulative Net":"Cumulative Stableford"}${tripPointsEnabled(leagueTrip)?" • Trip points on":""}`
         : leagueView==="money"
         ? "Ranked by total winnings"
         : "Points Games only"
@@ -3787,12 +3869,15 @@ ${leagueTrip ? `
   </div>
 ` : ""}
 
-${tripSorted.map((p,i)=>`
+${tripSorted.map((p,i)=>{
+  const perf=tripPerformanceMap.get(p.name);
+  const tripPts=Number(leagueTrip?.standings?.[p.name]||0);
+  return `
   <div class="player row">
     <div>
       <b>
-        ${i===0 && Number(leagueTrip?.standings?.[p.name]||0)>0 ? "👑 " : ""}
-        ${i+1}. ${esc(p.name)}
+        ${i===0 && perf ? "👑 " : ""}
+        ${perf ? (i+1)+". " : ""}${esc(p.name)}
       </b>
 
       <div class="muted">
@@ -3801,16 +3886,15 @@ ${tripSorted.map((p,i)=>`
     </div>
 
     <div style="text-align:right;">
-      <div class="money">
-        ${Number(leagueTrip?.standings?.[p.name]||0)} pts
+      <div class="money" style="font-size:18px;font-weight:900;">
+        ${perf ? (leagueTrip?.competition==="net" ? "Net "+Number(perf.total) : Number(perf.total)+" pts") : "—"}
       </div>
 
       <div style="font-weight:800;">
-        Played ${tripPlayed(p.name)}
+        Played ${perf?.played||0}${tripPointsEnabled(leagueTrip) ? ` • Trip pts ${tripPts}` : ""}
       </div>
     </div>
-  </div>
-`).join("")}
+  </div>`}).join("")}
 
     <div style="margin-top:16px">
       <button class="primary full" onclick="shareTripSummary()">📤 Share Trip Summary</button>
@@ -6024,13 +6108,20 @@ function tripSetupScreen(){
           ${[...state.players].sort((a,b)=>a.name.localeCompare(b.name)).map(p=>`<label style="display:flex;align-items:center;gap:10px;padding:8px 2px;"><input type="checkbox" data-trip-player="${escAttr(p.id)}" checked style="width:22px;height:22px;margin:0;"><span><b>${esc(p.name)}</b> <span class="muted">HCP ${p.handicap}</span></span></label>`).join("")}
         </div>
 
-        <div style="margin-bottom:8px;font-weight:800;">Trip Championship</div>
-        <div class="muted" style="margin-bottom:10px;">Individual rounds build the Individual Championship. Pairs rounds build a separate Team-event Championship.</div>
+        <div style="margin-bottom:8px;font-weight:800;">Main Trip scoring</div>
+        <div class="muted" style="margin-bottom:10px;">Choose the golf score everyone will follow each day and across the whole Trip.</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
           <button id="tripCompStableford" class="primary">🏆 Stableford</button>
           <button id="tripCompNet" class="secondary">⛳ Net</button>
         </div>
-        <div class="notice" style="margin-bottom:18px;"><b>🏆 Trip Championship points</b><br>🥇 1st — 10 pts&nbsp;&nbsp; 🥈 2nd — 6 pts&nbsp;&nbsp; 🥉 3rd — 3 pts</div>
+
+        <div style="margin-bottom:8px;font-weight:800;">Optional Trip points</div>
+        <div class="muted" style="margin-bottom:10px;">Keep a separate 10 / 6 / 3 points championship as a bonus, or turn it off and base the Trip purely on golf scores.</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+          <button id="tripPointsOn" class="primary">✅ Trip points on</button>
+          <button id="tripPointsOff" class="secondary">No Trip points</button>
+        </div>
+        <div id="tripPointsInfo" class="notice" style="margin-bottom:18px;"><b>🏆 Trip points</b><br>🥇 1st — 10 pts&nbsp;&nbsp; 🥈 2nd — 6 pts&nbsp;&nbsp; 🥉 3rd — 3 pts</div>
 
         <div id="tripRoundsWrap"></div>
         <div id="tripSetupError" class="notice warning" style="display:none;margin:10px 0 12px;"></div>
@@ -6040,6 +6131,7 @@ function tripSetupScreen(){
     document.body.appendChild(overlay);
 
     let tripCompetition='stableford';
+    let tripPointsEnabled=true;
     let drafts=[];
     const roundsInput=overlay.querySelector('#tripSetupRounds');
     const wrap=overlay.querySelector('#tripRoundsWrap');
@@ -6089,7 +6181,7 @@ function tripSetupScreen(){
           <div style="font-weight:700;margin-bottom:6px;">Game</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
             <button type="button" data-money class="${card.dataset.gameType==='money'?'primary':'secondary'}">💷 Money Game</button>
-            <button type="button" data-points class="${card.dataset.gameType==='points'?'primary':'secondary'}">🏆 Points Game</button>
+            <button type="button" data-points class="${card.dataset.gameType==='points'?'primary':'secondary'}">⛳ No Money</button>
           </div>
           <div data-comp-label style="margin-bottom:10px;"><b>Competition:</b> ${card.dataset.format==='betterball'?'🤝 Better Ball Stableford':card.dataset.format==='pairsaggregate'?`➕ Pairs Aggregate ${tripCompetition==='net'?'Net':'Stableford'}`:(tripCompetition==='net'?'⛳ Net':'🏆 Stableford')}</div>
           <div data-stake-wrap style="${card.dataset.gameType==='money'?'':'display:none;'}">
@@ -6127,6 +6219,14 @@ function tripSetupScreen(){
     roundsInput.addEventListener('change',renderRounds);
     overlay.querySelector('#tripCompStableford').onclick=()=>setTripComp('stableford');
     overlay.querySelector('#tripCompNet').onclick=()=>setTripComp('net');
+    const setTripPoints=enabled=>{
+      tripPointsEnabled=Boolean(enabled);
+      overlay.querySelector('#tripPointsOn').className=tripPointsEnabled?'primary':'secondary';
+      overlay.querySelector('#tripPointsOff').className=tripPointsEnabled?'secondary':'primary';
+      overlay.querySelector('#tripPointsInfo').style.display=tripPointsEnabled?'':'none';
+    };
+    overlay.querySelector('#tripPointsOn').onclick=()=>setTripPoints(true);
+    overlay.querySelector('#tripPointsOff').onclick=()=>setTripPoints(false);
     const finish=value=>{ overlay.remove(); resolve(value); };
     overlay.querySelector('#tripSetupCancel').onclick=()=>finish(null);
     overlay.querySelector('#tripSetupStart').onclick=()=>{
@@ -6154,7 +6254,7 @@ function tripSetupScreen(){
         }
       }
       if(msg){ err.textContent=msg; err.style.display='block'; return; }
-      finish({name,totalRounds,competition:tripCompetition,tripPointsValue:10,playerIds,rounds});
+      finish({name,totalRounds,competition:tripCompetition,tripPointsEnabled,tripPointsValue:10,playerIds,rounds});
     };
     overlay.addEventListener('click',e=>{ if(e.target===overlay) finish(null); });
     renderRounds();
@@ -6255,6 +6355,7 @@ async function newRound(){
       totalRounds:setup.totalRounds,
       currentRound:1,
       competition:setup.competition,
+      tripPointsEnabled:setup.tripPointsEnabled!==false,
       tripPointsValue:10,
       playerIds:[...setup.playerIds],
       plan:setup.rounds,
@@ -6567,12 +6668,16 @@ async function finishTrip(){
     totalRounds:state.trip.totalRounds,
     currentRound:state.trip.currentRound,
     competition:state.trip.competition,
+    tripPointsEnabled:state.trip.tripPointsEnabled!==false,
     tripPointsValue:state.trip.tripPointsValue,
     playerIds:[...(state.trip.playerIds||[])],
     plan:[...(state.trip.plan||[])],
     rounds:[...(state.trip.rounds || [])],
     standings:{...(state.trip.standings || {})},
-    champion:state.trip.champion || tripStandingsSorted()[0]?.name || null,
+    teamStandings:{...(state.trip.teamStandings || {})},
+    champion:state.trip.champion || tripPerformanceLeader(state.trip)?.name || null,
+    pointsChampion:state.trip.pointsChampion || null,
+    teamChampion:state.trip.teamChampion || null,
     completed:true,
     active:false,
     normalRoundBackup:state.trip.normalRoundBackup || backup
@@ -6616,10 +6721,14 @@ async function finishTrip(){
     totalRounds:0,
     currentRound:0,
     competition:null,
+    tripPointsEnabled:true,
     tripPointsValue:10,
     rounds:[],
     standings:{},
+    teamStandings:{},
     champion:null,
+    pointsChampion:null,
+    teamChampion:null,
     completed:false,
     pastTrips:pastTrips
   };
