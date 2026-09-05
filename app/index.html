@@ -3030,6 +3030,12 @@ function countbackOrderedFinalStandings(record){
   if(!countbackWinner && !placeOrder.size)return sorted;
 
   return sorted.slice().sort((a,b)=>{
+    // No Returns must always stay at the bottom, even when countback or
+    // Points Game ordering is being applied to the rest of the field.
+    if(a.noReturn===true && b.noReturn!==true)return 1;
+    if(b.noReturn===true && a.noReturn!==true)return -1;
+    if(a.noReturn===true && b.noReturn===true)return String(a.name||"").localeCompare(String(b.name||""));
+
     const comp=resultCompetition(record);
     const av=Number(comp==="net"?a.netScore:a.stableford);
     const bv=Number(comp==="net"?b.netScore:b.stableford);
