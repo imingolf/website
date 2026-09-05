@@ -3014,10 +3014,13 @@ function sortedFinalStandings(record){
   });
 }
 
+function resultNameKey(value){
+  return String(value||"").trim().toLocaleLowerCase();
+}
 function countbackWinnerName(record){
   const comp=resultCompetition(record);
-  if(comp==="net" && record?.netCountback)return String(record?.netWinnerNames?.[0]||"");
-  if(comp==="stableford" && record?.stablefordCountback)return String(record?.stablefordWinnerNames?.[0]||"");
+  if(comp==="net" && record?.netCountback)return String(record?.netWinnerNames?.[0]||"").trim();
+  if(comp==="stableford" && record?.stablefordCountback)return String(record?.stablefordWinnerNames?.[0]||"").trim();
   return "";
 }
 function countbackOrderedFinalStandings(record){
@@ -3035,8 +3038,11 @@ function countbackOrderedFinalStandings(record){
     // A money-game countback creates one declared winner at the tied winning score.
     // Put that player first so the final table matches the Admin's decision.
     if(countbackWinner){
-      if(a.name===countbackWinner && b.name!==countbackWinner)return -1;
-      if(b.name===countbackWinner && a.name!==countbackWinner)return 1;
+      const winnerKey=resultNameKey(countbackWinner);
+      const aIsWinner=resultNameKey(a.name)===winnerKey;
+      const bIsWinner=resultNameKey(b.name)===winnerKey;
+      if(aIsWinner && !bIsWinner)return -1;
+      if(bIsWinner && !aIsWinner)return 1;
     }
 
     const ai=placeOrder.has(a.name)?placeOrder.get(a.name):9999;
@@ -3056,13 +3062,14 @@ function finalStandingPosition(record,sorted,index){
   const countbackWinner=countbackWinnerName(record);
 
   if(countbackWinner){
-    const winner=sorted.find(x=>x.name===countbackWinner);
+    const winnerKey=resultNameKey(countbackWinner);
+    const winner=sorted.find(x=>resultNameKey(x.name)===winnerKey);
     if(winner && winner.noReturn!==true){
       const winnerValue=Number(comp==="net"?winner.netScore:winner.stableford);
       if(value===winnerValue){
         // The Admin-declared player is the sole winner. Other players tied on
         // the winning score are shown as 2nd (2= if more than one remains tied).
-        return p.name===countbackWinner ? "1" : "2";
+        return resultNameKey(p.name)===winnerKey ? "1" : "2";
       }
     }
   }
@@ -3123,6 +3130,13 @@ function finalStandingsHtml(record){
       <div style="flex:1"><b>${esc(p.name||"Player")}</b><div class="muted">HCP ${esc(String(p.handicap??"—"))}</div></div>
       <span class="money">${esc(finalStandingScore(record,p))}</span>
     </div>`).join("");
+}
+
+async function shareHistoricalResult(historyIndex){
+  const record=(state.history||[])[Number(historyIndex)];
+  if(!record){alert("Round details could not be found.");return;}
+  lastWinnerRecord=record;
+  await shareWinnerImage();
 }
 
 function showRoundHistory(historyIndex){
@@ -3196,6 +3210,7 @@ function showRoundHistory(historyIndex){
     </div>
 
     <div class="card">
+      <button class="primary full" onclick="shareHistoricalResult(${Number(historyIndex)})">📤 Share Result Again</button>
       <button class="secondary full" onclick="league()">← Back to League</button>
     </div>
   `;
