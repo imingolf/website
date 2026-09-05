@@ -1361,9 +1361,8 @@ $("screen").innerHTML=`
 
   ${state.gameType==="money" && Number(state.stake||0)>0 ? `
     <div class="card" style="text-align:center;">
-      <div class="muted" style="font-weight:800;letter-spacing:.4px;">CURRENT POT</div>
+      <div class="muted" style="font-weight:800;letter-spacing:.4px;">💰 CURRENT POT</div>
       <div class="big" style="font-size:36px;margin:4px 0 2px;">£${pot()}</div>
-      <div class="muted">£${state.stake} entry</div>
     </div>
   ` : ``}
 
