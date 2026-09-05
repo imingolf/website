@@ -1359,12 +1359,19 @@ $("screen").innerHTML=`
   </div>
   ` : ``}
 
+  ${state.gameType==="money" && Number(state.stake||0)>0 ? `
+    <div class="card" style="text-align:center;">
+      <div class="muted" style="font-weight:800;letter-spacing:.4px;">CURRENT POT</div>
+      <div class="big" style="font-size:36px;margin:4px 0 2px;">£${pot()}</div>
+      <div class="muted">£${state.stake} entry</div>
+    </div>
+  ` : ``}
+
   ${state.gameType==="money" && Number(state.stake||0)>0 && !isAdmin && currentPlayerPaid ? `
     <div class="card">
       <div class="row">
         <div>
           <b>✅ You’re paid — £${state.stake} entry confirmed. You’re in — good luck! ⛳</b>
-          <div class="muted" style="margin-top:4px;">${paidCount()} of ${currentRoundPlayers().length} players paid</div>
         </div>
         <button class="secondary small" onclick="show('pay')">View payments</button>
       </div>
@@ -1375,9 +1382,7 @@ $("screen").innerHTML=`
 
       <div class="row">
         <div>
-          <div class="big">£${pot()}</div>
-          <div class="muted"><b>Paid so far</b></div>
-          <div class="muted" style="margin-top:6px;">Expected pot: £${potentialPot()} • Entry fee: £${state.stake} per player</div>
+          <div class="muted">Entry fee: £${state.stake} per player</div>
         </div>
 
         <span class="pill ${paidCount()===currentRoundPlayers().length?'paid':'pending'}">
