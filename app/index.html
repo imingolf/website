@@ -3014,18 +3014,34 @@ function sortedFinalStandings(record){
   });
 }
 
+function countbackWinnerName(record){
+  const comp=resultCompetition(record);
+  if(comp==="net" && record?.netCountback)return String(record?.netWinnerNames?.[0]||"");
+  if(comp==="stableford" && record?.stablefordCountback)return String(record?.stablefordWinnerNames?.[0]||"");
+  return "";
+}
 function countbackOrderedFinalStandings(record){
   const sorted=sortedFinalStandings(record);
-  if(!record?.pointsResults?.length)return sorted;
-  const placeOrder=new Map((record.pointsResults||[]).map((r,i)=>[String(r.name||""),i]));
+  const countbackWinner=countbackWinnerName(record);
+  const placeOrder=new Map((record?.pointsResults||[]).map((r,i)=>[String(r.name||""),i]));
+  if(!countbackWinner && !placeOrder.size)return sorted;
+
   return sorted.slice().sort((a,b)=>{
-    const ai=placeOrder.has(a.name)?placeOrder.get(a.name):9999;
-    const bi=placeOrder.has(b.name)?placeOrder.get(b.name):9999;
     const comp=resultCompetition(record);
     const av=Number(comp==="net"?a.netScore:a.stableford);
     const bv=Number(comp==="net"?b.netScore:b.stableford);
-    if(av===bv && ai!==bi)return ai-bi;
     if(av!==bv)return comp==="net" ? av-bv : bv-av;
+
+    // A money-game countback creates one declared winner at the tied winning score.
+    // Put that player first so the final table matches the Admin's decision.
+    if(countbackWinner){
+      if(a.name===countbackWinner && b.name!==countbackWinner)return -1;
+      if(b.name===countbackWinner && a.name!==countbackWinner)return 1;
+    }
+
+    const ai=placeOrder.has(a.name)?placeOrder.get(a.name):9999;
+    const bi=placeOrder.has(b.name)?placeOrder.get(b.name):9999;
+    if(ai!==bi)return ai-bi;
     return String(a.name||"").localeCompare(String(b.name||""));
   });
 }
@@ -3034,8 +3050,23 @@ function finalStandingPosition(record,sorted,index){
   if(!p || p.noReturn===true)return "—";
   const declared=(record?.pointsResults||[]).find(r=>r.name===p.name);
   if(declared?.position!=null)return String(declared.position);
+
   const comp=resultCompetition(record);
   const value=Number(comp==="net"?p.netScore:p.stableford);
+  const countbackWinner=countbackWinnerName(record);
+
+  if(countbackWinner){
+    const winner=sorted.find(x=>x.name===countbackWinner);
+    if(winner && winner.noReturn!==true){
+      const winnerValue=Number(comp==="net"?winner.netScore:winner.stableford);
+      if(value===winnerValue){
+        // The Admin-declared player is the sole winner. Other players tied on
+        // the winning score are shown as 2nd (2= if more than one remains tied).
+        return p.name===countbackWinner ? "1" : "2";
+      }
+    }
+  }
+
   let first=index;
   while(first>0){
     const prev=sorted[first-1];
@@ -3247,7 +3278,7 @@ function showWinnerScreen(record){
 
           ${r.countback ? `
             <div class="notice" style="margin-top:12px;">
-              Winner on countback — Admin declared
+              Winner on countback — decided by Admin
             </div>
           ` : ""}
         </div>
@@ -3351,7 +3382,7 @@ function showWinnerScreen(record){
 
         ${record.stablefordCountback ? `
           <div class="notice" style="margin-top:12px;">
-            Winner on countback — Admin declared
+            Winner on countback — decided by Admin
           </div>
         ` : ""}
       </div>
@@ -3379,7 +3410,7 @@ function showWinnerScreen(record){
 
         ${record.netCountback ? `
           <div class="notice" style="margin-top:12px;">
-            Winner on countback — Admin declared
+            Winner on countback — decided by Admin
           </div>
         ` : ""}
       </div>
@@ -3469,7 +3500,12 @@ async function shareWinnerImage(){
 
     let tableTop;
     if(pageIndex===0){
-      roundedRect(ctx,68,395,944,132,24,white,line);
+      const decidedOnCountback=Boolean(
+        (competition==="net" && record.netCountback) ||
+        (competition==="stableford" && record.stablefordCountback) ||
+        (record.gameType==="points" && record.pointsResults?.[0]?.countback)
+      );
+      roundedRect(ctx,68,395,944,decidedOnCountback?170:132,24,white,line);
       ctx.textAlign="left";ctx.fillStyle=green;ctx.font='800 18px Arial';
       ctx.fillText("WINNER",108,430);
       ctx.fillStyle=dark;ctx.font=`900 ${fitText(ctx,winner,355,35,22,"900")}px Arial`;ctx.fillText(winner,108,473);
@@ -3479,7 +3515,12 @@ async function shareWinnerImage(){
 
       ctx.fillStyle=green;ctx.font='800 18px Arial';ctx.fillText(record.gameType==="points" ? ((state.trip?.active||state.trip?.completed) ? (tripPointsEnabled()?"TRIP PTS":"RESULT") : "LEAGUE") : "WON",795,430);
       ctx.fillStyle=dark;ctx.font=`900 ${fitText(ctx,winnerValue,190,32,19,"900")}px Arial`;ctx.fillText(winnerValue,795,473);
-      tableTop=590;
+
+      if(decidedOnCountback){
+        ctx.fillStyle=green;ctx.font='800 19px Arial';ctx.textAlign="left";
+        ctx.fillText("🏆 Winner on countback — decided by Admin",108,530);
+      }
+      tableTop=decidedOnCountback?628:590;
     }else{
       centreText(ctx,"FINAL STANDINGS — CONTINUED",430,28,"900",green);
       tableTop=490;
@@ -4006,7 +4047,7 @@ ${tripSorted.map((p,i)=>{
                   🏆 Stableford:
                   ${h.stablefordWinnerNames.map(esc).join(", ")}
                   ${h.stablefordCountback
-                    ? " • Winner on countback — Admin declared"
+                    ? " • Winner on countback — decided by Admin"
                     : ""}
                 </div>
               ` : ""}
@@ -4016,7 +4057,7 @@ ${tripSorted.map((p,i)=>{
                   ⛳ Net:
                   ${h.netWinnerNames.map(esc).join(", ")}
                   ${h.netCountback
-                    ? " • Winner on countback — Admin declared"
+                    ? " • Winner on countback — decided by Admin"
                     : ""}
                 </div>
               ` : ""}
