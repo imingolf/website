@@ -3659,7 +3659,7 @@ const tripSorted=[...state.players].sort((a,b)=>{
       leagueView==="trip"
         ? esc(leagueTrip?.name || "Trip Championship")
         : leagueView==="money"
-        ? "Money Games only"
+        ? "Ranked by total winnings"
         : "Points Games only"
     }
   </div>
@@ -3708,16 +3708,12 @@ ${leagueView==="points" ? `
         </div>
       </div>
 <div style="text-align:right;">
-  <div style="font-weight:800;">
-    ${moneyWins(p.name)} win${moneyWins(p.name)===1 ? "" : "s"}
+  <div class="money" style="font-size:18px;font-weight:900;color:var(--green);">
+    £${moneyWon(p.name)} WON
   </div>
 
-  <div style="font-weight:800;">
-    Played ${moneyPlayed(p.name)}
-  </div>
-
-  <div class="money" style="margin-top:3px;color:var(--green);">
-    Won £${moneyWon(p.name)}
+  <div style="font-weight:800;margin-top:3px;">
+    ${moneyWins(p.name)} win${moneyWins(p.name)===1 ? "" : "s"} · Played ${moneyPlayed(p.name)}
   </div>
 </div>
           </div>
