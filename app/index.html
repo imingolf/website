@@ -3040,10 +3040,36 @@ function payoutProvider(link){
     if(parsed.protocol!=="https:")return "";
     const host=parsed.hostname.toLowerCase().replace(/^www\./,"");
     if(host==="monzo.me" || host.endsWith(".monzo.me"))return "Monzo";
-    if(host==="revolut.me" || host.endsWith(".revolut.me"))return "Revolut";
-    if(host==="paypal.me" || host.endsWith(".paypal.me"))return "PayPal";
+    if(host==="revolut.me" || host.endsWith(".revolut.me") || host.includes("revolut"))return "Revolut";
+    if(host==="paypal.me" || host.endsWith(".paypal.me") || host.includes("paypal"))return "PayPal";
+    if(host.includes("starlingbank.com"))return "Starling";
+    if(host==="wise.com" || host.endsWith(".wise.com"))return "Wise";
   }catch(e){}
   return "";
+}
+
+function chooseWinnerPayoutMethod(winnerName,amount){
+  return new Promise(resolve=>{
+    const overlay=document.createElement("div");
+    overlay.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.42);z-index:10000;display:flex;align-items:center;justify-content:center;padding:14px;overflow:auto;";
+    const methods=["monzo","revolut","paypal","starling","wise"];
+    overlay.innerHTML=`<div class="card" style="width:min(470px,100%);margin:auto;padding:24px;border-radius:20px;box-shadow:0 18px 50px rgba(0,0,0,.18);">
+      <div style="font-size:40px;text-align:center;">💷</div>
+      <h2 style="text-align:center;margin:7px 0;">Claim your £${moneyText(amount)} prize</h2>
+      <div class="muted" style="text-align:center;margin-bottom:18px;">${esc(winnerName)}, how would you like your Group Admin to pay you?</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        ${methods.map(key=>{const item=PAYMENT_PROVIDERS[key];return `<button type="button" class="secondary" data-payout-method="${key}" style="min-height:68px;font-size:16px;"><span style="font-size:21px;">${item.icon}</span><br>${esc(item.label)}</button>`}).join("")}
+      </div>
+      <button type="button" class="secondary full" id="winnerNeedsBankTransfer" style="margin-top:12px;">🏦 I don't have any of these</button>
+      <div class="muted" style="margin-top:8px;text-align:center;">Your bank details are never stored in I'm In Golf.</div>
+      <button type="button" class="ghost full" id="cancelWinnerPayout">Cancel</button>
+    </div>`;
+    document.body.appendChild(overlay);
+    const finish=value=>{overlay.remove();resolve(value);};
+    overlay.querySelectorAll("[data-payout-method]").forEach(button=>button.onclick=()=>finish(button.dataset.payoutMethod));
+    overlay.querySelector("#winnerNeedsBankTransfer").onclick=()=>finish("bank_transfer");
+    overlay.querySelector("#cancelWinnerPayout").onclick=()=>finish(null);
+  });
 }
 
 function payoutCardHtml(record,historyIndex){
@@ -3056,8 +3082,10 @@ function payoutCardHtml(record,historyIndex){
     const amount=moneyText(p.amount);
     if(p.status==="paid")return `<div class="notice"><b>✅ £${amount} paid to ${esc(p.winnerName)}</b><br><span class="muted">Paid ${esc(formatDate(String(p.paidAt||"").slice(0,10)))}</span></div>`;
     if(isAdmin && p.status==="ready")return `<div class="notice"><b>Payment details received from ${esc(p.winnerName)}</b><br>Prize: £${amount} via ${esc(p.paymentProvider)}</div><button class="primary full" onclick="openWinnerPaymentLink(${Number(historyIndex)},'${key}')">Pay ${esc(p.winnerName)} £${amount}</button><button class="secondary full" onclick="markWinnerPaid(${Number(historyIndex)},'${key}')">✅ Mark £${amount} as paid</button>`;
-    if(isAdmin)return `<div class="notice"><b>£${amount} owed to ${esc(p.winnerName)}</b><br>Waiting for the winner to provide a Monzo, Revolut or PayPal payment link.</div>`;
+    if(isAdmin && p.status==="bank_details_needed")return `<div class="notice warning"><b>${esc(p.winnerName)} needs a private bank transfer</b><br>They don't have a supported payment link. Contact them privately for their bank details—do not enter those details into I'm In Golf.</div><button class="secondary full" onclick="markWinnerPaid(${Number(historyIndex)},'${key}')">✅ Mark £${amount} as paid</button>`;
+    if(isAdmin)return `<div class="notice"><b>£${amount} owed to ${esc(p.winnerName)}</b><br>Waiting for the winner to choose Monzo, Revolut, PayPal, Starling, Wise or a private bank transfer.</div>`;
     if(p.status==="ready")return `<div class="notice"><b>✅ Payment details sent</b><br>Your Group Admin can now pay your £${amount} prize.</div>`;
+    if(p.status==="bank_details_needed")return `<div class="notice"><b>✅ Private bank transfer requested</b><br>Your Group Admin will contact you privately for your bank details. Do not add them to I'm In Golf.</div>`;
     return `<div class="notice"><b>Congratulations ${esc(p.winnerName)} — you won £${amount}</b><br>Add a payment link only when you have won. We do not ask every player for payment details.</div><button class="primary full" onclick="claimWinnerPrize(${Number(historyIndex)},'${key}')">Claim your £${amount} prize</button>`;
   }).join("")}</div>`;
 }
@@ -3069,11 +3097,22 @@ async function claimWinnerPrize(historyIndex,payoutId){
   if(!Array.isArray(record.payouts))record.payouts=createWinnerPayouts(record);
   const payout=record.payouts.find(p=>p.id===payoutId);
   if(!payout || !currentPlayerMatchesPayout(payout)){alert("This prize can only be claimed by the declared winner.");return;}
-  const link=await appPrompt("Claim your prize",`Paste your Monzo.me, Revolut.me or PayPal.me payment link. Your Group Admin will use it to send £${moneyText(payout.amount)}.`,"",{type:"url",okLabel:"Send to Admin"});
+  const method=await chooseWinnerPayoutMethod(payout.winnerName,payout.amount);
+  if(method===null)return;
+  if(method==="bank_transfer"){
+    payout.paymentLink="";
+    payout.paymentProvider="Private bank transfer";
+    payout.status="bank_details_needed";
+    payout.claimedAt=new Date().toISOString();
+    if(await save())showRoundHistory(historyIndex);
+    return;
+  }
+  const item=PAYMENT_PROVIDERS[method];
+  const link=await appPrompt(`Add your ${item.label} link`,`${item.hint}\n\nPaste the secure link below. Your Group Admin will use it to send £${moneyText(payout.amount)}.`,"",{type:"url",okLabel:"Send to Admin"});
   if(link===null)return;
   const clean=String(link).trim();
   const provider=payoutProvider(clean);
-  if(!provider){showAppToast("Use a supported payment link","Please paste a secure Monzo.me, Revolut.me or PayPal.me link.",4000);return;}
+  if(!provider || provider.toLowerCase()!==method){showAppToast("Check your payment link",`Please paste a secure ${item.label} payment link.`,4000);return;}
   payout.paymentLink=clean;
   payout.paymentProvider=provider;
   payout.status="ready";
@@ -3092,7 +3131,7 @@ async function markWinnerPaid(historyIndex,payoutId){
   if(!isAdmin || !demoCanEdit())return;
   const record=(state.history||[])[Number(historyIndex)];
   const payout=record?.payouts?.find(p=>p.id===payoutId);
-  if(!payout || payout.status!=="ready")return;
+  if(!payout || !["ready","bank_details_needed"].includes(payout.status))return;
   if(!confirm(`Confirm that £${moneyText(payout.amount)} has been sent to ${payout.winnerName}?`))return;
   payout.status="paid";
   payout.paidAt=new Date().toISOString();
