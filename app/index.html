@@ -735,7 +735,10 @@ function show(p){
 function render(){
   updateAdminUI();
 
-  if(page==="round")round();
+  if(page==="round"){
+    round();
+    setTimeout(showPrizeStatusAlert,80);
+  }
   if(page==="pay")pay();
   if(page==="scores")scores();
   if(page==="league")league();
@@ -883,6 +886,7 @@ function waitingScreen(){
     $("screen").innerHTML=`
       ${myPlayerId && state.players.some(p=>p.id===myPlayerId) ? `<div class="notice" style="margin-top:0;">👤 You: <b>${esc(state.players.find(p=>p.id===myPlayerId)?.name||"")}</b></div>` : ""}
       ${notificationCardHtml()}
+      ${prizeNextActionHtml()}
       <div class="card">
         <div style="font-size:38px;text-align:center;">⛳</div>
         <h2 style="text-align:center;margin-bottom:6px;">Set up your first round</h2>
@@ -907,6 +911,7 @@ function waitingScreen(){
   $("screen").innerHTML=`
     ${myPlayerId && state.players.some(p=>p.id===myPlayerId) ? `<div class="notice" style="margin-top:0;">👤 You: <b>${esc(state.players.find(p=>p.id===myPlayerId)?.name||"")}</b></div>` : ""}
     ${notificationCardHtml()}
+    ${prizeNextActionHtml()}
     <div class="card" style="text-align:center;padding:28px 18px;">
       <div style="font-size:46px;">⛳</div>
       <div class="muted">${first ? "NEXT ROUND" : "NEXT COMPETITION"}</div>
@@ -1339,6 +1344,7 @@ function round(){
     const planned=Array.isArray(state.trip.plan) ? state.trip.plan[nextNo-1] : null;
     $("screen").innerHTML=`
       ${myPlayerId && state.players.some(p=>p.id===myPlayerId) ? `<div class="notice" style="margin-top:0;">👤 You: <b>${esc(state.players.find(p=>p.id===myPlayerId)?.name||"")}</b></div>` : ""}
+      ${prizeNextActionHtml()}
       <div class="card" style="text-align:center;">
         <div style="font-size:36px;">✈️</div>
         <div class="muted">TRIP MODE</div>
@@ -1377,6 +1383,8 @@ $("screen").innerHTML=`
   ${myPlayerId && state.players.some(p=>p.id===myPlayerId) ? `<div class="notice" style="margin-top:0;">👤 You: <b>${esc(state.players.find(p=>p.id===myPlayerId)?.name||"")}</b></div>` : ""}
 
   ${notificationCardHtml()}
+
+  ${prizeNextActionHtml()}
 
   ${playerNextActionHtml()}
 
@@ -3032,6 +3040,52 @@ function currentPlayerMatchesPayout(payout){
   return payout.winnerPlayerId
     ? String(payout.winnerPlayerId)===String(me.id)
     : String(payout.winnerName||"").trim().toLowerCase()===String(me.name||"").trim().toLowerCase();
+}
+
+function nextPrizeAction(){
+  const candidates=[];
+  (state.history||[]).forEach((record,historyIndex)=>{
+    winnerPayouts(record).forEach(payout=>{
+      if(payout.status==="paid")return;
+      if(isAdmin || currentPlayerMatchesPayout(payout))candidates.push({record,historyIndex,payout});
+    });
+  });
+  if(isAdmin){
+    return candidates.find(x=>x.payout.status==="ready" || x.payout.status==="bank_details_needed") || candidates[0] || null;
+  }
+  return candidates[0] || null;
+}
+
+function prizeNextActionHtml(){
+  const action=nextPrizeAction();
+  if(!action)return "";
+  const p=action.payout;
+  const amount=moneyText(p.amount);
+  const open=`showRoundHistory(${Number(action.historyIndex)})`;
+  if(isAdmin && p.status==="ready")return `<div class="card" style="border:2px solid var(--green);text-align:center;"><div style="font-size:34px;">💷</div><div class="muted">PRIZE PAYMENT READY</div><h2 style="font-size:23px;margin:6px 0;">${esc(p.winnerName)} has submitted payment details</h2><button class="primary full" onclick="${open}">Pay ${esc(p.winnerName)} £${amount}</button></div>`;
+  if(isAdmin && p.status==="bank_details_needed")return `<div class="card" style="border:2px solid var(--green);text-align:center;"><div style="font-size:34px;">🏦</div><div class="muted">PRIZE PAYMENT READY</div><h2 style="font-size:23px;margin:6px 0;">${esc(p.winnerName)} needs a private bank transfer</h2><button class="primary full" onclick="${open}">View £${amount} Payment</button></div>`;
+  if(isAdmin)return `<div class="card" style="text-align:center;"><div style="font-size:30px;">⏳</div><div class="muted">PRIZE PAYMENT</div><h2 style="font-size:21px;margin:6px 0;">£${amount} awaiting ${esc(p.winnerName)}'s payment details</h2><button class="secondary full" onclick="${open}">View Prize Status</button></div>`;
+  if(p.status==="awaiting_details")return `<div class="card" style="border:2px solid var(--green);text-align:center;"><div style="font-size:38px;">🏆</div><div class="muted">YOU WON</div><h2 style="font-size:24px;margin:6px 0;">Your £${amount} prize is ready</h2><button class="primary full" onclick="${open}">Claim My £${amount} Prize</button></div>`;
+  if(p.status==="ready")return `<div class="card" style="text-align:center;"><div style="font-size:30px;">✅</div><h2 style="font-size:21px;margin:6px 0;">Your payment details have been sent</h2><div class="muted">Your Group Admin can now pay your £${amount} prize.</div><button class="secondary full" onclick="${open}">View Prize Status</button></div>`;
+  return `<div class="card" style="text-align:center;"><div style="font-size:30px;">✅</div><h2 style="font-size:21px;margin:6px 0;">Private bank transfer requested</h2><div class="muted">Your Group Admin will contact you about your £${amount} prize.</div><button class="secondary full" onclick="${open}">View Prize Status</button></div>`;
+}
+
+function showPrizeStatusAlert(){
+  if(page!=="round")return;
+  const action=nextPrizeAction();
+  if(!action)return;
+  const p=action.payout;
+  const shouldAlert=(!isAdmin && p.status==="awaiting_details") || (isAdmin && (p.status==="ready" || p.status==="bank_details_needed"));
+  if(!shouldAlert)return;
+  const role=isAdmin?"admin":"winner";
+  const key=`iigPrizeAlert_${pin}_${action.record.id||action.historyIndex}_${p.id}_${p.status}_${role}`;
+  if(localStorage.getItem(key)==="shown")return;
+  localStorage.setItem(key,"shown");
+  if(isAdmin){
+    showAppToast("💷 Prize payment ready",`${p.winnerName}'s £${moneyText(p.amount)} payment action is at the top of the Round tab.`,5200);
+  }else{
+    showAppToast("🏆 You won £"+moneyText(p.amount),"Claim your prize at the top of the Round tab.",5200);
+  }
 }
 
 function payoutProvider(link){
