@@ -175,7 +175,7 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
 (()=>{
   const TEST_PINS=new Set(["2894"]);
   const OWNER_PROTECTED_PIN="1010";
-  const PRICE_PER_YEAR=19.99;
+  const PRICE_PER_YEAR=29.99;
   const OWNER_REMEMBER_KEY="imingolfOwnerCode";
   let db=null, ownerCode="", groups=[], states=new Map(), selectedPin="", fingerprints=new Map(), observedActivity=new Map(), timer=null;
   const viewState={playersGroup:"all",playersSortKey:"name",playersSortDir:1,roundsGroup:"all"};
@@ -200,6 +200,7 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
     if(TEST_PINS.has(String(g.group_pin)))return `<span class="badge test">TEST</span>`;
     const p=String(g.plan_type||"trial");
     if(p==="paid")return `<span class="badge paid">Paid</span>`;
+    if(p==="complimentary")return `<span class="badge paid">Complimentary</span>`;
     if(p==="internal")return `<span class="badge internal">Internal</span>`;
     return `<span class="badge trial">Free Trial</span>`;
   }
@@ -414,7 +415,7 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
       <label>Group name</label><input id="mGroupName" value="${esc(displayGroupName(g,states.get(String(g.group_pin||""))))}" maxlength="80">
       <label>Admin / customer name</label><input id="mAdminName" value="${esc(g.admin_name||"")}">
       <label>Contact</label><input id="mContact" value="${esc(g.admin_contact||"")}">
-      <label>Plan</label><select id="mPlan" ${protectedGroup?"disabled":""}><option value="trial">Free Trial</option><option value="paid">Paid</option><option value="internal">Internal</option></select>
+      <label>Plan</label><select id="mPlan" ${protectedGroup?"disabled":""}><option value="trial">Free Trial</option><option value="paid">Paid</option><option value="complimentary">Complimentary</option><option value="internal">Internal</option></select>
       <label>Trial expiry</label><input id="mTrial" type="date" value="${esc(dateOnly(g.trial_expiry_date))}">
       <label>Payment status</label><select id="mPaid"><option value="unpaid">Unpaid</option><option value="paid">Paid</option><option value="not_applicable">N/A</option></select>
       <label>Renewal date</label><input id="mRenew" type="date" value="${esc(dateOnly(g.renewal_date))}">
