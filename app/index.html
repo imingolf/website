@@ -3377,6 +3377,8 @@ function showRoundHistory(historyIndex){
       </div>
     </div>
 
+    ${payoutCardHtml(h,historyIndex)}
+
     ${!isPoints ? `
       <div class="card">
         <h2>🏆 Result</h2>
@@ -3419,8 +3421,6 @@ function showRoundHistory(historyIndex){
       <h2>📊 Final standings</h2>
       ${finalStandingsHtml(h)}
     </div>
-
-    ${payoutCardHtml(h,historyIndex)}
 
     <div class="card">
       <button class="primary full" onclick="shareHistoricalResult(${Number(historyIndex)})">📤 Share Result Again</button>
@@ -3589,6 +3589,8 @@ function showWinnerScreen(record){
       </div>` : ""}
     </div>
 
+    ${historyIndex>=0 ? payoutCardHtml(record,historyIndex) : ""}
+
     ${stablefordWinner ? `
       <div class="card" style="text-align:center;">
         <div style="font-size:34px;">🏆</div>
@@ -3649,8 +3651,6 @@ function showWinnerScreen(record){
       <h2>📊 Final standings</h2>
       ${finalStandingsHtml(record)}
     </div>
-
-    ${historyIndex>=0 ? payoutCardHtml(record,historyIndex) : ""}
 
     <div class="card" style="text-align:center;">
       <div style="font-size:28px;">🎉 ⛳ 🎉</div>
