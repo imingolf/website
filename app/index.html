@@ -533,7 +533,7 @@ async function connect(){
          <h2>Your free trial has ended</h2>
          <p class="muted">${esc(access.group_name||"This group")}'s free trial has finished.</p>
          <div class="notice">
-           <b>Continue with I'm In Golf for £19.99 per year.</b><br>
+           <b>Continue with I'm In Golf for £29.99 per year.</b><br>
            Annual subscription payment will be available here soon.
          </div>
          <button class="secondary full" onclick="location.reload()">
@@ -2896,6 +2896,7 @@ for(let place=0; place<3 && remainingTrip.length; place++){
 
 
 const record={
+    id:(crypto.randomUUID ? crypto.randomUUID() : "round-"+Date.now()),
       date:state.date,
     course:state.course,
     stake:state.stake,
@@ -2926,6 +2927,7 @@ const record={
       netSplit,
 
     players:state.players.map(p=>({
+      id:p.id,
       name:p.name,
       handicap:p.handicap,
       competition:p.competition || null,
@@ -2935,6 +2937,8 @@ const record={
       scoreSubmitted:Boolean(p.scoreSubmitted)
     }))
   };
+
+  record.payouts=createWinnerPayouts(record);
 
 if(isTrip){
   state.trip.rounds=state.trip.rounds || [];
@@ -2985,6 +2989,114 @@ if(isTrip){
   }else{
     showWinnerScreen(record);
   }
+}
+
+function moneyText(value){
+  return Number(value||0).toFixed(2).replace(/\.00$/,'');
+}
+
+function createWinnerPayouts(record){
+  if(!record || record.gameType!=="money")return [];
+  const payouts=[];
+  const add=(competition,names,pot)=>{
+    const winners=Array.isArray(names)?names.filter(Boolean):[];
+    if(!winners.length || Number(pot||0)<=0)return;
+    winners.forEach((name,index)=>{
+      const savedPlayer=(record.players||[]).find(p=>String(p.name)===String(name));
+      payouts.push({
+        id:`${competition}-${index}-${String(name).toLowerCase().replace(/[^a-z0-9]+/g,"-")}`,
+        competition,
+        winnerName:name,
+        winnerPlayerId:savedPlayer?.id || null,
+        amount:Number((Number(pot)/winners.length).toFixed(2)),
+        status:"awaiting_details",
+        paymentProvider:"",
+        paymentLink:"",
+        claimedAt:null,
+        paidAt:null
+      });
+    });
+  };
+  add("stableford",record.stablefordWinnerNames,record.stablefordPot);
+  add("net",record.netWinnerNames,record.netPot);
+  return payouts;
+}
+
+function winnerPayouts(record){
+  return Array.isArray(record?.payouts) ? record.payouts : createWinnerPayouts(record);
+}
+
+function currentPlayerMatchesPayout(payout){
+  const me=(state.players||[]).find(p=>p.id===myPlayerId);
+  if(!me)return false;
+  return payout.winnerPlayerId
+    ? String(payout.winnerPlayerId)===String(me.id)
+    : String(payout.winnerName||"").trim().toLowerCase()===String(me.name||"").trim().toLowerCase();
+}
+
+function payoutProvider(link){
+  try{
+    const parsed=new URL(link);
+    if(parsed.protocol!=="https:")return "";
+    const host=parsed.hostname.toLowerCase().replace(/^www\./,"");
+    if(host==="monzo.me" || host.endsWith(".monzo.me"))return "Monzo";
+    if(host==="revolut.me" || host.endsWith(".revolut.me"))return "Revolut";
+    if(host==="paypal.me" || host.endsWith(".paypal.me"))return "PayPal";
+  }catch(e){}
+  return "";
+}
+
+function payoutCardHtml(record,historyIndex){
+  const payouts=winnerPayouts(record);
+  if(!payouts.length)return "";
+  const visible=isAdmin ? payouts : payouts.filter(currentPlayerMatchesPayout);
+  if(!visible.length)return "";
+  return `<div class="card"><h2>💷 Prize payment</h2>${visible.map(p=>{
+    const key=escAttr(p.id);
+    const amount=moneyText(p.amount);
+    if(p.status==="paid")return `<div class="notice"><b>✅ £${amount} paid to ${esc(p.winnerName)}</b><br><span class="muted">Paid ${esc(formatDate(String(p.paidAt||"").slice(0,10)))}</span></div>`;
+    if(isAdmin && p.status==="ready")return `<div class="notice"><b>Payment details received from ${esc(p.winnerName)}</b><br>Prize: £${amount} via ${esc(p.paymentProvider)}</div><button class="primary full" onclick="openWinnerPaymentLink(${Number(historyIndex)},'${key}')">Pay ${esc(p.winnerName)} £${amount}</button><button class="secondary full" onclick="markWinnerPaid(${Number(historyIndex)},'${key}')">✅ Mark £${amount} as paid</button>`;
+    if(isAdmin)return `<div class="notice"><b>£${amount} owed to ${esc(p.winnerName)}</b><br>Waiting for the winner to provide a Monzo, Revolut or PayPal payment link.</div>`;
+    if(p.status==="ready")return `<div class="notice"><b>✅ Payment details sent</b><br>Your Group Admin can now pay your £${amount} prize.</div>`;
+    return `<div class="notice"><b>Congratulations ${esc(p.winnerName)} — you won £${amount}</b><br>Add a payment link only when you have won. We do not ask every player for payment details.</div><button class="primary full" onclick="claimWinnerPrize(${Number(historyIndex)},'${key}')">Claim your £${amount} prize</button>`;
+  }).join("")}</div>`;
+}
+
+async function claimWinnerPrize(historyIndex,payoutId){
+  if(!demoCanEdit())return;
+  const record=(state.history||[])[Number(historyIndex)];
+  if(!record)return;
+  if(!Array.isArray(record.payouts))record.payouts=createWinnerPayouts(record);
+  const payout=record.payouts.find(p=>p.id===payoutId);
+  if(!payout || !currentPlayerMatchesPayout(payout)){alert("This prize can only be claimed by the declared winner.");return;}
+  const link=await appPrompt("Claim your prize",`Paste your Monzo.me, Revolut.me or PayPal.me payment link. Your Group Admin will use it to send £${moneyText(payout.amount)}.`,"",{type:"url",okLabel:"Send to Admin"});
+  if(link===null)return;
+  const clean=String(link).trim();
+  const provider=payoutProvider(clean);
+  if(!provider){showAppToast("Use a supported payment link","Please paste a secure Monzo.me, Revolut.me or PayPal.me link.",4000);return;}
+  payout.paymentLink=clean;
+  payout.paymentProvider=provider;
+  payout.status="ready";
+  payout.claimedAt=new Date().toISOString();
+  if(await save())showRoundHistory(historyIndex);
+}
+
+function openWinnerPaymentLink(historyIndex,payoutId){
+  if(!isAdmin)return;
+  const payout=winnerPayouts((state.history||[])[Number(historyIndex)]).find(p=>p.id===payoutId);
+  if(!payout || payout.status!=="ready" || !payoutProvider(payout.paymentLink)){alert("A valid winner payment link has not been provided.");return;}
+  window.open(payout.paymentLink,"_blank","noopener,noreferrer");
+}
+
+async function markWinnerPaid(historyIndex,payoutId){
+  if(!isAdmin || !demoCanEdit())return;
+  const record=(state.history||[])[Number(historyIndex)];
+  const payout=record?.payouts?.find(p=>p.id===payoutId);
+  if(!payout || payout.status!=="ready")return;
+  if(!confirm(`Confirm that £${moneyText(payout.amount)} has been sent to ${payout.winnerName}?`))return;
+  payout.status="paid";
+  payout.paidAt=new Date().toISOString();
+  if(await save())showRoundHistory(historyIndex);
 }
 
 function resultCompetition(record){
@@ -3215,6 +3327,8 @@ function showRoundHistory(historyIndex){
       ${finalStandingsHtml(h)}
     </div>
 
+    ${payoutCardHtml(h,historyIndex)}
+
     <div class="card">
       <button class="primary full" onclick="shareHistoricalResult(${Number(historyIndex)})">📤 Share Result Again</button>
       <button class="secondary full" onclick="league()">← Back to League</button>
@@ -3365,6 +3479,7 @@ function showWinnerScreen(record){
 
   const stablefordEach=stablefordNames.length ? stablefordPotValue/stablefordNames.length : 0;
   const netEach=netNames.length ? netPotValue/netNames.length : 0;
+  const historyIndex=(state.history||[]).indexOf(record);
 
 
   $("screen").innerHTML=`
@@ -3441,6 +3556,8 @@ function showWinnerScreen(record){
       <h2>📊 Final standings</h2>
       ${finalStandingsHtml(record)}
     </div>
+
+    ${historyIndex>=0 ? payoutCardHtml(record,historyIndex) : ""}
 
     <div class="card" style="text-align:center;">
       <div style="font-size:28px;">🎉 ⛳ 🎉</div>
@@ -5131,7 +5248,7 @@ async function manageGroupsPage(){
           </div>
 
           <div class="player row">
-            <div><div class="muted">Plan</div><b>${plan==="internal"?"Internal":plan==="trial"?"Free Trial":esc(plan)}</b></div>
+            <div><div class="muted">Plan</div><b>${plan==="internal"?"Internal":plan==="complimentary"?"Complimentary":plan==="trial"?"Free Trial":esc(plan)}</b></div>
             <div style="text-align:right;"><div class="muted">Payment</div><b>${paid==="not_applicable"?"N/A":esc(paid)}</b></div>
           </div>
 
@@ -5290,6 +5407,7 @@ function editGroupPage(){
       <select id="ownerPlanType" ${protectedGroup?"disabled":""} style="width:100%;padding:11px;border:1px solid var(--line);border-radius:10px;font-size:16px;background:white;margin:5px 0 11px;">
         <option value="trial" ${String(g.plan_type)==="trial"?"selected":""}>Free Trial</option>
         <option value="paid" ${String(g.plan_type)==="paid"?"selected":""}>Paid</option>
+        <option value="complimentary" ${String(g.plan_type)==="complimentary"?"selected":""}>Complimentary</option>
         <option value="internal" ${String(g.plan_type)==="internal"?"selected":""}>Internal</option>
       </select>
 
