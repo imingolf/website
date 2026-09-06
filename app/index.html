@@ -3158,7 +3158,10 @@ async function claimWinnerPrize(historyIndex,payoutId){
     payout.paymentProvider="Private bank transfer";
     payout.status="bank_details_needed";
     payout.claimedAt=new Date().toISOString();
-    if(await save())showRoundHistory(historyIndex);
+    if(await save()){
+      show("round");
+      window.scrollTo(0,0);
+    }
     return;
   }
   const item=PAYMENT_PROVIDERS[method];
@@ -3171,7 +3174,10 @@ async function claimWinnerPrize(historyIndex,payoutId){
   payout.paymentProvider=provider;
   payout.status="ready";
   payout.claimedAt=new Date().toISOString();
-  if(await save())showRoundHistory(historyIndex);
+  if(await save()){
+    show("round");
+    window.scrollTo(0,0);
+  }
 }
 
 function openWinnerPaymentLink(historyIndex,payoutId){
