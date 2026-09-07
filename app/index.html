@@ -1715,6 +1715,7 @@ function beginPlayerPayment(){
     playerId:me.id,
     startedAt:Date.now(),
     groupPin:String(pin||""),
+    roundId:String(state.roundId||""),
     course:String(state.course||""),
     roundDate:String(state.date||""),
     stake:Number(state.stake||0)
@@ -1814,9 +1815,16 @@ async function recognisePaymentReturn(){
   // round. This prevents an old return from marking a later competition paid.
   const journeyAge=Date.now()-Number(journey.startedAt||0);
   const sameGroup=!journey.groupPin || String(journey.groupPin)===String(pin||"");
-  const sameRound=(!journey.course || String(journey.course)===String(state.course||"")) &&
-    (!journey.roundDate || String(journey.roundDate)===String(state.date||"")) &&
-    (journey.stake==null || Number(journey.stake)===Number(state.stake||0));
+  const sameRoundId=
+  journey.roundId &&
+  state.roundId &&
+  String(journey.roundId)===String(state.roundId);
+
+const sameRound=
+  sameRoundId &&
+  (!journey.course || String(journey.course)===String(state.course||"")) &&
+  (!journey.roundDate || String(journey.roundDate)===String(state.date||"")) &&
+  (journey.stake==null || Number(journey.stake)===Number(state.stake||0));
   if(journeyAge>48*60*60*1000 || !sameGroup || !sameRound){clearPaymentJourney();return;}
   const player=state.players.find(p=>p.id===journey.playerId);
   if(!player || roundLocked()){clearPaymentJourney();return;}
@@ -6697,6 +6705,9 @@ async function newRound(){
       pastTrips:state.trip?.pastTrips||[]
     };
     state.roundOpen=true;
+    state.roundId=crypto.randomUUID
+  ? crypto.randomUUID()
+  : "round-"+Date.now()+"-"+Math.random().toString(36).slice(2);
     state.course=first.course;
     state.date=first.date;
     state.gameType=first.gameType;
