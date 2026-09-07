@@ -3145,7 +3145,7 @@ function payoutCardHtml(record,historyIndex){
     if(p.status==="paid")return `<div class="notice"><b>✅ £${amount} paid to ${esc(p.winnerName)}</b><br><span class="muted">Paid ${esc(formatDate(String(p.paidAt||"").slice(0,10)))}</span></div>`;
     if(isAdmin && p.status==="ready")return `<div class="notice"><b>Payment details received from ${esc(p.winnerName)}</b><br>Prize: £${amount} via ${esc(p.paymentProvider)}</div><button class="primary full" onclick="openWinnerPaymentLink(${Number(historyIndex)},'${key}')">Pay ${esc(p.winnerName)} £${amount}</button><button class="secondary full" onclick="markWinnerPaid(${Number(historyIndex)},'${key}')">✅ Mark £${amount} as paid</button>`;
     if(isAdmin && p.status==="bank_details_needed")return `<div class="notice warning"><b>${esc(p.winnerName)} needs a private bank transfer</b><br>They have been asked to contact you privately with their bank details. Do not enter those details into I'm In Golf.</div><button class="secondary full" onclick="markWinnerPaid(${Number(historyIndex)},'${key}')">✅ Mark £${amount} as paid</button>`;
-    if(isAdmin)return `<div class="notice"><b>£${amount} owed to ${esc(p.winnerName)}</b><br>Waiting for the winner to choose Monzo, Revolut, PayPal, Starling, Wise or a private bank transfer.</div>`;
+    if(isAdmin)return `<div class="notice"><b>£${amount} owed to ${esc(p.winnerName)}</b><br>Waiting for the winner to choose Monzo, Revolut, PayPal, Starling, Wise or a private bank transfer.</div><button class="secondary full" onclick="markWinnerPaid(${Number(historyIndex)},'${key}',true)">✅ Mark £${amount} as paid</button>`;
     if(p.status==="ready")return `<div class="notice"><b>✅ Payment details sent</b><br>Your Group Admin can now pay your £${amount} prize.</div>`;
     if(p.status==="bank_details_needed")return `<div class="notice"><b>✅ Private bank transfer selected</b><br>Contact your Group Admin privately and send them your bank details. Never enter your bank details into I'm In Golf.</div>`;
     return `<div class="notice"><b>Congratulations ${esc(p.winnerName)} — you won £${amount}</b><br>Add a payment link only when you have won. We do not ask every player for payment details.</div><button class="primary full" onclick="claimWinnerPrize(${Number(historyIndex)},'${key}')">Claim your £${amount} prize</button>`;
@@ -3195,11 +3195,14 @@ function openWinnerPaymentLink(historyIndex,payoutId){
   window.open(payout.paymentLink,"_blank","noopener,noreferrer");
 }
 
-async function markWinnerPaid(historyIndex,payoutId){
+async function markWinnerPaid(historyIndex,payoutId,allowAwaiting=false){
   if(!isAdmin || !demoCanEdit())return;
   const record=(state.history||[])[Number(historyIndex)];
   const payout=record?.payouts?.find(p=>p.id===payoutId);
-  if(!payout || !["ready","bank_details_needed"].includes(payout.status))return;
+  if(!payout)return;
+const allowed=["ready","bank_details_needed"];
+if(allowAwaiting)allowed.push("awaiting_details");
+if(!allowed.includes(payout.status))return;
   if(!confirm(`Confirm that £${moneyText(payout.amount)} has been sent to ${payout.winnerName}?`))return;
   payout.status="paid";
   payout.paidAt=new Date().toISOString();
