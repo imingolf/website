@@ -1316,7 +1316,7 @@ function playerNextActionHtml(){
   const moneyGame=state.gameType==="money" && Number(state.stake||0)>0;
 
   if(moneyGame && !me.paid && !roundLocked()){
-    return `<div class="card" style="text-align:center;"><div class="muted">YOUR NEXT STEP</div><button class="primary full" style="font-size:18px;margin-top:8px;" onclick="show('pay')">💳 Pay £${Number(state.stake||0)} & Enter</button></div>`;
+    return `<div class="card" style="text-align:center;"><div class="muted">YOUR NEXT STEP</div><button class="primary full" style="font-size:18px;margin-top:8px;" onclick="beginPlayerPayment()">💳 Pay £${Number(state.stake||0)} & Enter</button></div>`;
   }
   if(submitted){
     return `<div class="card" style="text-align:center;"><div class="muted">YOUR NEXT STEP</div><button class="secondary full" style="font-size:18px;margin-top:8px;" onclick="show('scores')">✅ Score In — View Leaderboard</button></div>`;
