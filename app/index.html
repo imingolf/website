@@ -3198,6 +3198,8 @@ function openWinnerPaymentLink(historyIndex,payoutId){
 async function markWinnerPaid(historyIndex,payoutId,allowAwaiting=false){
   if(!isAdmin || !demoCanEdit())return;
   const record=(state.history||[])[Number(historyIndex)];
+  if(!record)return;
+if(!Array.isArray(record.payouts))record.payouts=createWinnerPayouts(record);
   const payout=record?.payouts?.find(p=>p.id===payoutId);
   if(!payout)return;
 const allowed=["ready","bank_details_needed"];
