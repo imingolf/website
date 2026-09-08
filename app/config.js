@@ -93,3 +93,29 @@ setTimeout(function(){
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',startPlayerRemoveObserver);
   else startPlayerRemoveObserver();
 })();
+
+// Pause the 5-second live redraw while an Admin is filling in a round setup form.
+// Normal live sync resumes automatically as soon as the setup form is gone.
+(function installRoundSetupRefreshGuard(attempt){
+  setTimeout(function(){
+    try{
+      if(typeof refresh!=='function'){
+        if(attempt<20)installRoundSetupRefreshGuard(attempt+1);
+        return;
+      }
+      if(refresh.__iigRoundSetupGuard)return;
+      var originalRefresh=refresh;
+      var guarded=async function(){
+        var screen=document.getElementById('screen');
+        if(screen && (
+          screen.querySelector('#firstRoundStake') ||
+          screen.querySelector('#normalSetupStake') ||
+          screen.querySelector('#normalSetupStart')
+        )) return;
+        return originalRefresh.apply(this,arguments);
+      };
+      guarded.__iigRoundSetupGuard=true;
+      refresh=guarded;
+    }catch(e){}
+  }, attempt ? 100 : 0);
+})(0);
