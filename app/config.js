@@ -258,3 +258,28 @@ setTimeout(function(){
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start); else start();
 })();
+
+// Safety check before an admin finalises a round.
+(function installFinishRoundConfirmation(attempt){
+  setTimeout(function(){
+    try{
+      if(typeof finishRound!=='function'){
+        if(attempt<20)installFinishRoundConfirmation(attempt+1);
+        return;
+      }
+      if(finishRound.__iigFinishRoundConfirm)return;
+      var originalFinishRound=finishRound;
+      var wrappedFinishRound=async function(){
+        var ok=await appConfirm(
+          'Finish Round',
+          'Ready to finish this round?\n\nThis will finalise the result and save it to League → Previous rounds. Check all scores are correct before continuing.',
+          'Finish Round'
+        );
+        if(!ok)return;
+        return originalFinishRound.apply(this,arguments);
+      };
+      wrappedFinishRound.__iigFinishRoundConfirm=true;
+      finishRound=wrappedFinishRound;
+    }catch(e){}
+  },attempt?100:0);
+})(0);
