@@ -83,7 +83,6 @@ setTimeout(function(){
   },attempt?100:0);
 })(0);
 
-// Put the Admin indicator inside the green app header to save vertical space.
 (function(){
   function updateAdminHeader(){
     try{
@@ -113,7 +112,6 @@ setTimeout(function(){
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start); else start();
 })();
 
-// Admin-only visual treatment: compact controls/badges use the soft green background.
 (function(){
   function applyAdminGreenHighlights(){
     try{
@@ -145,7 +143,6 @@ setTimeout(function(){
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start); else start();
 })();
 
-// Admin-only bottom navigation highlight: Round, Pay, Scores, League and Players.
 (function(){
   var labels=['ROUND','PAY','SCORES','LEAGUE','PLAYERS'];
   function paintAdminNav(){
@@ -180,7 +177,6 @@ setTimeout(function(){
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start); else start();
 })();
 
-// Approved Admin Mode bottom bar: one continuous pale green bar with all five labels green.
 (function(){
   function installStyle(){
     if(document.getElementById('iig-admin-nav-style'))return;
@@ -206,7 +202,6 @@ setTimeout(function(){
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start); else start();
 })();
 
-// Admin Help: always give the organiser a simple route to contact support.
 (function(){
   function getGroupName(){
     try{
@@ -219,7 +214,6 @@ setTimeout(function(){
     }catch(e){}
     return 'Golf Group';
   }
-
   function contactAdminSupport(){
     var groupName=getGroupName();
     var subject="I'm In Golf - Admin Support - "+groupName;
@@ -227,30 +221,24 @@ setTimeout(function(){
     window.location.href='mailto:hello@imingolf.co.uk?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body);
   }
   window.iigContactAdminSupport=contactAdminSupport;
-
   function addAdminSupport(){
     try{
       var screen=document.getElementById('screen');
       if(!screen)return;
       var adminOn=(typeof isAdmin!=='undefined'&&isAdmin);
-      var helpHeading=Array.from(screen.querySelectorAll('h2')).find(function(h2){
-        return (h2.textContent||'').indexOf('Admin Help')!==-1;
-      });
+      var helpHeading=Array.from(screen.querySelectorAll('h2')).find(function(h2){return (h2.textContent||'').indexOf('Admin Help')!==-1;});
       if(!adminOn||!helpHeading)return;
       if(screen.querySelector('[data-iig-contact-support]'))return;
-
       var card=document.createElement('div');
       card.className='card';
       card.setAttribute('data-iig-contact-support','1');
       card.innerHTML='<div style="text-align:center;"><div style="font-size:26px;">✉️</div><h2 style="margin:4px 0 6px;">Still need help?</h2><div class="muted">Contact the I\'m In Golf support team.</div></div><button class="primary full" type="button" data-iig-contact-support-button>✉️ Contact Support</button>';
       card.querySelector('[data-iig-contact-support-button]').addEventListener('click',contactAdminSupport);
-
       var cards=screen.querySelectorAll(':scope > .card');
       var last=cards.length?cards[cards.length-1]:null;
       if(last)screen.insertBefore(card,last); else screen.appendChild(card);
     }catch(e){}
   }
-
   function start(){
     addAdminSupport();
     var screen=document.getElementById('screen');
@@ -259,22 +247,14 @@ setTimeout(function(){
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start); else start();
 })();
 
-// Safety check before an admin finalises a round.
 (function installFinishRoundConfirmation(attempt){
   setTimeout(function(){
     try{
-      if(typeof finishRound!=='function'){
-        if(attempt<20)installFinishRoundConfirmation(attempt+1);
-        return;
-      }
+      if(typeof finishRound!=='function'){if(attempt<20)installFinishRoundConfirmation(attempt+1);return;}
       if(finishRound.__iigFinishRoundConfirm)return;
       var originalFinishRound=finishRound;
       var wrappedFinishRound=async function(){
-        var ok=await appConfirm(
-          'Finish Round',
-          'Ready to finish this round?\n\nThis will finalise the result and save it to League → Previous rounds. Check all scores are correct before continuing.',
-          'Finish Round'
-        );
+        var ok=await appConfirm('Finish Round','Ready to finish this round?\n\nThis will finalise the result and save it to League → Previous rounds. Check all scores are correct before continuing.','Finish Round');
         if(!ok)return;
         return originalFinishRound.apply(this,arguments);
       };
@@ -284,11 +264,9 @@ setTimeout(function(){
   },attempt?100:0);
 })(0);
 
-// Friendly player feedback after a score is successfully submitted.
 (function(){
   var waitingForScoreSave=false;
   var shownForThisSubmit=false;
-
   function showScoreToast(){
     if(shownForThisSubmit)return;
     shownForThisSubmit=true;
@@ -301,32 +279,21 @@ setTimeout(function(){
     toast.innerHTML='<b>✅ Score’s in!</b><span>Good luck — enjoy the rest of your round. ⛳</span>';
     document.body.appendChild(toast);
     requestAnimationFrame(function(){toast.classList.add('show');});
-    setTimeout(function(){
-      toast.classList.remove('show');
-      setTimeout(function(){if(toast.parentNode)toast.remove();},220);
-    },2800);
+    setTimeout(function(){toast.classList.remove('show');setTimeout(function(){if(toast.parentNode)toast.remove();},220);},2800);
   }
-
   document.addEventListener('click',function(e){
     var btn=e.target&&e.target.closest?e.target.closest('button'):null;
     if(!btn)return;
     var text=(btn.textContent||'').trim().toLowerCase();
-    if(text==='submit score'){
-      waitingForScoreSave=true;
-      shownForThisSubmit=false;
-    }
+    if(text==='submit score'){waitingForScoreSave=true;shownForThisSubmit=false;}
   },true);
-
   function checkForSavedScore(){
     if(!waitingForScoreSave||shownForThisSubmit)return;
     var screen=document.getElementById('screen');
     if(!screen)return;
     var text=(screen.textContent||'').toLowerCase();
-    if(text.indexOf('score submitted')!==-1||text.indexOf('submitted')!==-1){
-      showScoreToast();
-    }
+    if(text.indexOf('score submitted')!==-1||text.indexOf('submitted')!==-1)showScoreToast();
   }
-
   function start(){
     var screen=document.getElementById('screen');
     if(!screen)return;
@@ -334,3 +301,85 @@ setTimeout(function(){
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start); else start();
 })();
+
+// Replace the most common legacy browser prompts with the branded app dialogs.
+(function installBrandedAdminDialogs(attempt){
+  setTimeout(function(){
+    try{
+      if(typeof appPrompt!=='function'||typeof appConfirm!=='function'||typeof state==='undefined'){
+        if(attempt<20)installBrandedAdminDialogs(attempt+1);
+        return;
+      }
+
+      changeGroupName=async function(){
+        if(!isAdmin)return;
+        var current=String(state.groupName||'').trim();
+        var entered=await appPrompt('Change Group Name','What would you like this group to be called?',current||'My Golf Group',{okLabel:'Save Group Name'});
+        if(entered===null)return;
+        var clean=String(entered).trim();
+        if(!clean){showAppToast('Group name needed','Please enter a group name.',3000);return;}
+        var previous=state.groupName;
+        state.groupName=clean;
+        var ok=await save();
+        if(!ok){state.groupName=previous;showAppToast('Not saved','The group name could not be saved. Please try again.',3200);return;}
+        render();
+        showAppToast('✅ Group name changed',clean,3000);
+      };
+
+      editPlayer=async function(i){
+        var p=state.players[i];
+        if(!p)return;
+        var name=await appPrompt('Edit Player','Player name',p.name,{okLabel:'Next'});
+        if(name===null)return;
+        name=String(name).trim();
+        if(!name){showAppToast('Name needed','Please enter the player’s name.',3000);return;}
+        var h=await appPrompt('Edit Player','Golf handicap',p.handicap,{type:'number',inputmode:'decimal',okLabel:'Save Player'});
+        if(h===null)return;
+        var handicap=Number(h);
+        if(!Number.isFinite(handicap)||handicap < -10||handicap > 60){showAppToast('Invalid handicap','Please enter a handicap between -10 and 60.',3200);return;}
+        p.name=name;
+        p.handicap=handicap;
+        render();
+        await save();
+        showAppToast('✅ Player updated',name,2600);
+      };
+
+      adminAddPlayer=async function(){
+        if(!isAdmin||!demoCanEdit())return;
+        var first=await appPrompt('Add Player','First name','',{okLabel:'Next'});
+        if(first===null)return;
+        var surname=await appPrompt('Add Player','Surname','',{okLabel:'Next'});
+        if(surname===null)return;
+        first=String(first).trim(); surname=String(surname).trim();
+        if(!first||!surname){showAppToast('Name needed','Please enter the player’s first name and surname.',3200);return;}
+        var cleanName=(first+' '+surname).trim();
+        if(state.players.some(function(p){return p.name.trim().toLowerCase()===cleanName.toLowerCase();})){showAppToast('Already in the group',cleanName+' is already listed.',3200);return;}
+        var h=await appPrompt('Add Player','Golf handicap','18',{type:'number',inputmode:'decimal',okLabel:'Add Player'});
+        if(h===null)return;
+        var handicap=Number(h);
+        if(!Number.isFinite(handicap)||handicap < -10||handicap > 60){showAppToast('Invalid handicap','Please enter a handicap between -10 and 60.',3200);return;}
+        state.players.push({id:Date.now().toString(36),name:cleanName,handicap:handicap,competition:null,paid:false,stableford:null,netScore:null,noReturn:false,scoreSubmitted:false,wins:0,leaguePoints:0,netWinnings:0});
+        await save();
+        render();
+        showAppToast('✅ Player added',cleanName+' is now in the group.',3000);
+      };
+
+      changeCurrentRoundCompetition=async function(){
+        if(!isAdmin)return;
+        if(!roundOpenNow()){showAppToast('No open round','There is no open round to change.',3000);return;}
+        if(roundLocked()){showAppToast('Competition locked','The competition cannot be changed after scoring has started.',3200);return;}
+        var current=(state.pointsCompetition||'stableford')==='net'?'net':'stableford';
+        var next=current==='stableford'?'net':'stableford';
+        var currentLabel=current==='stableford'?'Stableford':'Net';
+        var nextLabel=next==='stableford'?'Stableford':'Net';
+        var ok=await appConfirm('Change Competition','Change this round from '+currentLabel+' to '+nextLabel+'?\n\nPlayers, payments, course, date and stake will stay unchanged.','Change to '+nextLabel);
+        if(!ok)return;
+        state.pointsCompetition=next;
+        state.players.forEach(function(p){if(p.stableford==null&&p.netScore==null&&p.noReturn!==true)p.competition=next;});
+        await save();
+        showAppToast('✅ Competition changed',nextLabel+' is now selected.',3000);
+        settingsPage();
+      };
+    }catch(e){}
+  },attempt?100:0);
+})(0);
