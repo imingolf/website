@@ -179,3 +179,29 @@ setTimeout(function(){
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start); else start();
 })();
+
+// Approved Admin Mode bottom bar: one continuous pale green bar with all five labels green.
+(function(){
+  function installStyle(){
+    if(document.getElementById('iig-admin-nav-style'))return;
+    var style=document.createElement('style');
+    style.id='iig-admin-nav-style';
+    style.textContent='nav.iig-admin-nav-bar{background:#e3f5e8!important;border-top:1px solid #c6ead1!important;}nav.iig-admin-nav-bar button:not(.hidden){background:transparent!important;color:#147a3d!important;border-radius:0!important;padding:11px 2px!important;font-weight:700!important;}nav.iig-admin-nav-bar button.active{color:#147a3d!important;font-weight:800!important;}';
+    document.head.appendChild(style);
+  }
+  function syncAdminNavBar(){
+    try{
+      installStyle();
+      var nav=document.querySelector('.app > nav')||document.querySelector('nav');
+      if(!nav)return;
+      var adminOn=(typeof isAdmin!=='undefined'&&isAdmin);
+      nav.classList.toggle('iig-admin-nav-bar',adminOn);
+    }catch(e){}
+  }
+  function start(){
+    syncAdminNavBar();
+    new MutationObserver(syncAdminNavBar).observe(document.body,{childList:true,subtree:true});
+    setInterval(syncAdminNavBar,250);
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start); else start();
+})();
