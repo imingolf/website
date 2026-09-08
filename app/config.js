@@ -89,10 +89,7 @@ setTimeout(function(){
     try{
       var header=document.querySelector('.app > header')||document.querySelector('header');
       var screen=document.getElementById('screen');
-      if(screen){
-        var old=screen.querySelector('[data-iig-admin-mode-banner]');
-        if(old)old.remove();
-      }
+      if(screen){var old=screen.querySelector('[data-iig-admin-mode-banner]');if(old)old.remove();}
       if(!header)return;
       var badge=header.querySelector('[data-iig-admin-header]');
       if(typeof isAdmin==='undefined'||!isAdmin){if(badge)badge.remove();return;}
@@ -144,6 +141,41 @@ setTimeout(function(){
     applyAdminGreenHighlights();
     var screen=document.getElementById('screen'); if(!screen)return;
     new MutationObserver(applyAdminGreenHighlights).observe(screen,{childList:true,subtree:true});
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start); else start();
+})();
+
+// Admin-only bottom navigation highlight: Round, Pay, Scores, League and Players.
+(function(){
+  var labels=['ROUND','PAY','SCORES','LEAGUE','PLAYERS'];
+  function paintAdminNav(){
+    try{
+      var adminOn=(typeof isAdmin!=='undefined'&&isAdmin);
+      document.querySelectorAll('[data-iig-admin-nav]').forEach(function(el){
+        if(!adminOn){el.style.background='';el.style.color='';el.style.borderRadius='';el.style.padding='';el.removeAttribute('data-iig-admin-nav');}
+      });
+      if(!adminOn)return;
+      var all=Array.from(document.querySelectorAll('nav *, .nav *, .bottom-nav *, .tabs *, footer *'));
+      all.forEach(function(el){
+        var text=(el.textContent||'').trim().toUpperCase();
+        if(labels.indexOf(text)===-1)return;
+        var target=el;
+        if(el.parentElement){
+          var ptext=(el.parentElement.textContent||'').trim().toUpperCase();
+          if(ptext===text)target=el.parentElement;
+        }
+        target.setAttribute('data-iig-admin-nav','1');
+        target.style.background='#e3f5e8';
+        target.style.color='#147a3d';
+        target.style.borderRadius='12px';
+        target.style.padding='7px 5px';
+      });
+    }catch(e){}
+  }
+  function start(){
+    paintAdminNav();
+    new MutationObserver(paintAdminNav).observe(document.body,{childList:true,subtree:true});
+    setInterval(paintAdminNav,1000);
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start); else start();
 })();
