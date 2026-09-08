@@ -283,3 +283,54 @@ setTimeout(function(){
     }catch(e){}
   },attempt?100:0);
 })(0);
+
+// Friendly player feedback after a score is successfully submitted.
+(function(){
+  var waitingForScoreSave=false;
+  var shownForThisSubmit=false;
+
+  function showScoreToast(){
+    if(shownForThisSubmit)return;
+    shownForThisSubmit=true;
+    waitingForScoreSave=false;
+    var old=document.querySelector('[data-iig-score-toast]');
+    if(old)old.remove();
+    var toast=document.createElement('div');
+    toast.className='app-toast';
+    toast.setAttribute('data-iig-score-toast','1');
+    toast.innerHTML='<b>✅ Score’s in!</b><span>Good luck — enjoy the rest of your round. ⛳</span>';
+    document.body.appendChild(toast);
+    requestAnimationFrame(function(){toast.classList.add('show');});
+    setTimeout(function(){
+      toast.classList.remove('show');
+      setTimeout(function(){if(toast.parentNode)toast.remove();},220);
+    },2800);
+  }
+
+  document.addEventListener('click',function(e){
+    var btn=e.target&&e.target.closest?e.target.closest('button'):null;
+    if(!btn)return;
+    var text=(btn.textContent||'').trim().toLowerCase();
+    if(text==='submit score'){
+      waitingForScoreSave=true;
+      shownForThisSubmit=false;
+    }
+  },true);
+
+  function checkForSavedScore(){
+    if(!waitingForScoreSave||shownForThisSubmit)return;
+    var screen=document.getElementById('screen');
+    if(!screen)return;
+    var text=(screen.textContent||'').toLowerCase();
+    if(text.indexOf('score submitted')!==-1||text.indexOf('submitted')!==-1){
+      showScoreToast();
+    }
+  }
+
+  function start(){
+    var screen=document.getElementById('screen');
+    if(!screen)return;
+    new MutationObserver(checkForSavedScore).observe(screen,{childList:true,subtree:true,characterData:true});
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start); else start();
+})();
