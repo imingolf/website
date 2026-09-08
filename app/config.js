@@ -53,9 +53,8 @@ setTimeout(function(){
   }
 },0);
 
-// The main app already has a safe removePlayer() function that preserves past-round history.
-// Its built-in UI only shows Remove when there are more than two players.
-// Add the same Remove control for Admins in groups of one or two players as well.
+// Keep the existing safe Remove Player action available for Admins even in one- or two-player groups.
+// This observer is deliberately limited to the Players screen; it does not touch the payment wizard.
 (function(){
   function addSmallGroupRemoveButtons(){
     try{
@@ -63,8 +62,7 @@ setTimeout(function(){
       if(!Array.isArray(state.players) || state.players.length>2)return;
       if(typeof removePlayer!=='function')return;
 
-      var rows=document.querySelectorAll('.player');
-      rows.forEach(function(row,index){
+      document.querySelectorAll('#screen .player').forEach(function(row,index){
         var editButton=Array.from(row.querySelectorAll('button')).find(function(btn){
           return btn.textContent.trim()==='Edit';
         });
@@ -78,19 +76,20 @@ setTimeout(function(){
         btn.setAttribute('data-iig-remove-player','1');
         btn.textContent='Remove';
         btn.style.marginLeft='6px';
-        btn.onclick=function(){ removePlayer(index); };
+        btn.addEventListener('click',function(){ removePlayer(index); });
         holder.appendChild(btn);
       });
     }catch(e){}
   }
 
-  if(document.readyState==='loading'){
-    document.addEventListener('DOMContentLoaded',function(){
-      addSmallGroupRemoveButtons();
-      setInterval(addSmallGroupRemoveButtons,700);
-    });
-  }else{
+  function startPlayerRemoveObserver(){
     addSmallGroupRemoveButtons();
-    setInterval(addSmallGroupRemoveButtons,700);
+    var screen=document.getElementById('screen');
+    if(!screen)return;
+    var observer=new MutationObserver(function(){ addSmallGroupRemoveButtons(); });
+    observer.observe(screen,{childList:true,subtree:true});
   }
+
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',startPlayerRemoveObserver);
+  else startPlayerRemoveObserver();
 })();
