@@ -33,7 +33,7 @@ setTimeout(function(){
     PAYMENT_PROVIDERS.starling.hint="1. Open Starling. 2. Look for Request Money or Settle Up. 3. Open your payment/request link and copy or share it. 4. Return to I'm In Golf and paste it below. Can't see those exact words? Look for Request Money, Get paid, Settle Up or Share link.";
     PAYMENT_PROVIDERS.starling.steps=["Open Starling.","Look for Request Money or Settle Up.","Open your payment/request link and copy or share it.","Return to I'm In Golf and paste the link."];
     PAYMENT_PROVIDERS.wise.hint="1. Open Wise. 2. Look for Request, Get paid or Wisetag. 3. Create or open your payment link and copy or share it. 4. Return to I'm In Golf and paste it below. Can't see those exact words? Look for Request, Get paid, Wisetag or Share link.";
-    PAYMENT_PROVIDERS.wise.steps=["Open Wise.","Look for Request, Get paid or Wisetag.","Create or open your payment link and copy or share it.","Return to I'm In Golf and paste the link."];
+    PAYMENT_PROVIDERS.wise.steps=["Open Wise.","Look for Request, Get paid or Wisetag.","Create or open your personal payment link and copy or share it.","Return to I'm In Golf and paste the link."];
     PAYMENT_PROVIDERS.other.label="secure payment";
     PAYMENT_PROVIDERS.other.hint="1. Open your banking or payment app. 2. Look for Request money, Get paid or Payment link. 3. Create or open your personal payment link and copy or share it. 4. Return to I'm In Golf and paste the secure link below. Never paste a password or PIN into I'm In Golf.";
     PAYMENT_PROVIDERS.other.steps=["Open your banking or payment app.","Look for Request money, Get paid or Payment link.","Create or open your personal payment link and copy or share it.","Return to I'm In Golf and paste the secure link. Never enter a password or PIN."];
@@ -302,7 +302,6 @@ setTimeout(function(){
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start); else start();
 })();
 
-// Replace the most common legacy browser prompts with the branded app dialogs.
 (function installBrandedAdminDialogs(attempt){
   setTimeout(function(){
     try{
@@ -310,7 +309,6 @@ setTimeout(function(){
         if(attempt<20)installBrandedAdminDialogs(attempt+1);
         return;
       }
-
       changeGroupName=async function(){
         if(!isAdmin)return;
         var current=String(state.groupName||'').trim();
@@ -325,7 +323,6 @@ setTimeout(function(){
         render();
         showAppToast('✅ Group name changed',clean,3000);
       };
-
       editPlayer=async function(i){
         var p=state.players[i];
         if(!p)return;
@@ -343,7 +340,6 @@ setTimeout(function(){
         await save();
         showAppToast('✅ Player updated',name,2600);
       };
-
       adminAddPlayer=async function(){
         if(!isAdmin||!demoCanEdit())return;
         var first=await appPrompt('Add Player','First name','',{okLabel:'Next'});
@@ -363,7 +359,6 @@ setTimeout(function(){
         render();
         showAppToast('✅ Player added',cleanName+' is now in the group.',3000);
       };
-
       changeCurrentRoundCompetition=async function(){
         if(!isAdmin)return;
         if(!roundOpenNow()){showAppToast('No open round','There is no open round to change.',3000);return;}
@@ -382,4 +377,118 @@ setTimeout(function(){
       };
     }catch(e){}
   },attempt?100:0);
+})(0);
+
+// Complete the browser-dialog cleanup for Owner, payment, prize and destructive admin flows.
+(function installRemainingBrandedDialogs(attempt){
+  setTimeout(function(){
+    try{
+      if(typeof appPrompt!=='function'||typeof appConfirm!=='function'||typeof showAppToast!=='function'){
+        if(attempt<20)installRemainingBrandedDialogs(attempt+1);
+        return;
+      }
+
+      if(typeof ownerLogin==='function')ownerLogin=async function(){
+        if(!isAdmin){showAppToast('Admin access required','Open Admin Mode first.',3000);return;}
+        var entered=await appPrompt('Owner Access',"Enter your private I'm In Golf owner creation code",'',{type:'password',okLabel:'Open Owner Controls'});
+        if(entered===null)return;
+        var clean=String(entered).trim();
+        if(!clean){showAppToast('Code required','Enter the private owner creation code.',3000);return;}
+        ownerCreationCode=clean;isOwner=true;render();
+      };
+
+      if(typeof ownerResetAdminPin==='function')ownerResetAdminPin=async function(){
+        if(!db||!isAdmin||!isOwner||!ownerCreationCode){showAppToast('Owner access required','Open Owner Controls first.',3000);return;}
+        var groupPin=String(ownerEditGroupPin||'');
+        if(!groupPin){showAppToast('Group not found','The group could not be identified.',3000);return;}
+        var first=await appPrompt('Reset Admin PIN','Choose a new 4-digit Admin PIN for group '+groupPin,'',{type:'password',inputmode:'numeric',okLabel:'Next'});
+        if(first===null)return;
+        var clean=String(first).trim();
+        if(!validAdminPin(clean)){showAppToast('4 digits needed','Please choose exactly 4 numbers.',3000);return;}
+        var second=await appPrompt('Confirm Admin PIN','Enter the new 4-digit PIN again','',{type:'password',inputmode:'numeric',okLabel:'Continue'});
+        if(second===null)return;
+        if(String(second).trim()!==clean){showAppToast('PINs do not match','Please try again.',3000);return;}
+        var ok=await appConfirm('Reset Admin PIN','Reset the Admin PIN for group '+groupPin+'?','Reset Admin PIN',true);
+        if(!ok)return;
+        var result=await db.rpc('owner_reset_admin_pin',{p_creation_code:ownerCreationCode,p_group_pin:groupPin,p_new_admin_pin:clean});
+        if(result.error||result.data!==true){showAppToast('PIN not reset',result.error&&result.error.message?result.error.message:'Please try again.',3600);return;}
+        if(groupPin===String(pin)){state.adminPin=clean;state.adminSetupToken='';}
+        showAppToast('✅ Admin PIN reset','Group '+groupPin+' is ready.',3000);
+      };
+
+      if(typeof copyAdminInvite==='function')copyAdminInvite=async function(){
+        if(!lastAdminInvite){showAppToast('No invite yet','Create a new group first.',3000);return;}
+        try{await navigator.clipboard.writeText(lastAdminInvite);showAppToast('✅ Admin invite copied','Paste it into WhatsApp or your message app.',3000);}
+        catch(e){await appPrompt('Copy Admin Invite','Copy the message below.',lastAdminInvite,{okLabel:'Done'});}
+      };
+
+      if(typeof createNewGolfGroup==='function')createNewGolfGroup=async function(){
+        if(!isAdmin||!isOwner||!ownerCreationCode){showAppToast('Owner access required','Open Owner Controls first.',3000);return;}
+        if(!db){showAppToast('No database connection','Please try again when the app is online.',3200);return;}
+        var groupName=await appPrompt('Create New Golf Group','What is the new group called?','',{okLabel:'Create Group'});
+        if(groupName===null)return;
+        var cleanGroupName=String(groupName).trim();
+        if(!cleanGroupName){showAppToast('Group name needed','Please enter a group name.',3000);return;}
+        var newState={groupName:cleanGroupName,course:'',date:'',stake:0,gameType:'money',roundOpen:false,pointsCompetition:'stableford',pointsValue:10,adminPin:'',adminSetupToken:'',players:[],history:[]};
+        var created=await db.rpc('create_golf_group',{p_group_name:cleanGroupName,p_state:newState,p_creation_code:ownerCreationCode});
+        if(created.error){isOwner=false;ownerCreationCode='';render();showAppToast('Owner access not accepted','Check your private owner creation code and try again.',3800);return;}
+        var newPin=String(created.data);
+        var setupToken=crypto.randomUUID?crypto.randomUUID():(Date.now().toString(36)+Math.random().toString(36).slice(2));
+        var createdState=Object.assign({},newState,{adminSetupToken:setupToken});
+        var setup=await db.rpc('save_group_state',{p_pin:newPin,p_state:createdState});
+        if(setup.error){showAppToast('Group created','Admin setup could not be prepared. Please try again before sending the invite.',4200);return;}
+        lastAdminInvite='⛳ I\'m In Golf\n\nYou\'ve been invited to manage '+cleanGroupName+'.\n\nGroup PIN: '+newPin+'\n\nTap below to set up your 4-digit Admin PIN:\nhttps://imingolf.co.uk/app/?pin='+encodeURIComponent(newPin)+'&adminsetup='+encodeURIComponent(setupToken)+'\n\n🔒 Keep this link private.';
+        page='admininvite';adminInvitePage();window.scrollTo(0,0);
+      };
+
+      if(typeof cancelCurrentRound==='function')cancelCurrentRound=async function(){
+        if(!isAdmin){showAppToast('Admin only','Only the Group Admin can cancel the current round.',3200);return;}
+        if(state.trip&&state.trip.active){showAppToast('Trip active','Use Cancel Current Trip instead.',3000);return;}
+        var hasRound=Boolean(String(state.course||'').trim())||Boolean(state.date)||state.players.some(function(p){return p.paid||p.scoreSubmitted||p.stableford!=null||p.netScore!=null||p.noReturn===true||Boolean(p.competition);});
+        if(!hasRound){showAppToast('No current round','There is nothing to cancel.',3000);return;}
+        var ok=await appConfirm('Cancel Current Round','This clears only the current round setup, payments, competition choices and scores.\n\nPlayers, league standings and previous-round history will NOT be deleted.','Cancel Round',true);
+        if(!ok)return;
+        state.course='';state.date='';state.gameType='money';state.pointsCompetition='stableford';state.pointsValue=10;state.roundOpen=false;
+        state.players.forEach(function(p){p.paid=false;p.competition=null;p.stableford=null;p.netScore=null;p.noReturn=false;p.scoreSubmitted=false;});
+        scoreDraftActive=false;
+        if(!await save()){showAppToast('Not cancelled','The current round could not be cancelled. Please try again.',3400);return;}
+        showAppToast('✅ Round cancelled','League and previous-round history were kept.',3200);show('round');
+      };
+
+      if(typeof changePaymentLink==='function'){
+        var originalChangePaymentLink=changePaymentLink;
+        changePaymentLink=async function(){
+          var before=String(state.paymentLink||'');
+          await originalChangePaymentLink.apply(this,arguments);
+          if(before!==String(state.paymentLink||''))showAppToast('✅ Payment method updated','Players will pay you directly.',3000);
+        };
+      }
+
+      if(typeof markWinnerPaid==='function')markWinnerPaid=async function(historyIndex,payoutId,allowAwaiting){
+        if(!isAdmin||!demoCanEdit())return;
+        var record=(state.history||[])[Number(historyIndex)];if(!record)return;
+        if(!Array.isArray(record.payouts))record.payouts=createWinnerPayouts(record);
+        var payout=record.payouts.find(function(p){return p.id===payoutId;});if(!payout)return;
+        var allowed=['ready','bank_details_needed'];if(allowAwaiting)allowed.push('awaiting_details');if(allowed.indexOf(payout.status)===-1)return;
+        var ok=await appConfirm('Confirm Prize Payment','Confirm that £'+moneyText(payout.amount)+' has been sent to '+payout.winnerName+'?','Mark as Paid');
+        if(!ok)return;
+        payout.status='paid';payout.paidAt=new Date().toISOString();
+        if(await save()){showRoundHistory(historyIndex);showAppToast('✅ Prize marked paid','£'+moneyText(payout.amount)+' sent to '+payout.winnerName+'.',3000);}
+      };
+
+      if(typeof deletePastTrip==='function')deletePastTrip=async function(){
+        var pastTrips=state.trip&&state.trip.pastTrips?state.trip.pastTrips:[];
+        if(!pastTrips.length){showAppToast('No past trips','There are no past trips to delete.',3000);return;}
+        var names=pastTrips.map(function(t,i){return (i+1)+'. '+(t.name||'Unnamed Trip');}).join('\n');
+        var answer=await appPrompt('Delete Past Trip','Which trip do you want to delete?\n\n'+names+'\n\nEnter the trip number.','',{type:'number',inputmode:'numeric',okLabel:'Continue'});
+        if(answer===null)return;
+        var index=Number(answer)-1;
+        if(index<0||index>=pastTrips.length){showAppToast('Choose a listed trip','Enter one of the trip numbers shown.',3000);return;}
+        var tripName=pastTrips[index].name||'Trip';
+        var ok=await appConfirm('Delete '+tripName,'This removes only this past Trip.\n\nNormal leagues, players and the current round will not be changed.','Delete Trip',true);
+        if(!ok)return;
+        pastTrips.splice(index,1);state.trip.pastTrips=pastTrips;await save();render();showAppToast('Trip deleted',tripName+' was removed.',3000);
+      };
+    }catch(e){}
+  },attempt?120:0);
 })(0);
