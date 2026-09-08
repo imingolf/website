@@ -205,3 +205,56 @@ setTimeout(function(){
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start); else start();
 })();
+
+// Admin Help: always give the organiser a simple route to contact support.
+(function(){
+  function getGroupName(){
+    try{
+      if(typeof state!=='undefined'&&state){
+        var fromState=state.groupName||state.group_name||state.name;
+        if(fromState&&String(fromState).trim())return String(fromState).trim();
+      }
+      var headerGroup=document.getElementById('headerGroup');
+      if(headerGroup&&headerGroup.textContent.trim())return headerGroup.textContent.trim();
+    }catch(e){}
+    return 'Golf Group';
+  }
+
+  function contactAdminSupport(){
+    var groupName=getGroupName();
+    var subject="I'm In Golf - Admin Support - "+groupName;
+    var body="Hi I'm In Golf,\n\nI need some help with my golf group.\n\nGroup: "+groupName+"\n\nPlease describe the issue below:\n\n";
+    window.location.href='mailto:hello@imingolf.co.uk?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body);
+  }
+  window.iigContactAdminSupport=contactAdminSupport;
+
+  function addAdminSupport(){
+    try{
+      var screen=document.getElementById('screen');
+      if(!screen)return;
+      var adminOn=(typeof isAdmin!=='undefined'&&isAdmin);
+      var helpHeading=Array.from(screen.querySelectorAll('h2')).find(function(h2){
+        return (h2.textContent||'').indexOf('Admin Help')!==-1;
+      });
+      if(!adminOn||!helpHeading)return;
+      if(screen.querySelector('[data-iig-contact-support]'))return;
+
+      var card=document.createElement('div');
+      card.className='card';
+      card.setAttribute('data-iig-contact-support','1');
+      card.innerHTML='<div style="text-align:center;"><div style="font-size:26px;">✉️</div><h2 style="margin:4px 0 6px;">Still need help?</h2><div class="muted">Contact the I\'m In Golf support team.</div></div><button class="primary full" type="button" data-iig-contact-support-button>✉️ Contact Support</button>';
+      card.querySelector('[data-iig-contact-support-button]').addEventListener('click',contactAdminSupport);
+
+      var cards=screen.querySelectorAll(':scope > .card');
+      var last=cards.length?cards[cards.length-1]:null;
+      if(last)screen.insertBefore(card,last); else screen.appendChild(card);
+    }catch(e){}
+  }
+
+  function start(){
+    addAdminSupport();
+    var screen=document.getElementById('screen');
+    if(screen)new MutationObserver(addAdminSupport).observe(screen,{childList:true,subtree:false});
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start); else start();
+})();
