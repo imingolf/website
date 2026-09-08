@@ -1,6 +1,6 @@
 window.TENS_IN_CONFIG = {
   supabaseUrl: "https://kzzzputsqxdntfqpprnz.supabase.co",
-  supabaseKey: atob("c2JfcHVibGlzaGFibGVfOF9zT2drVGJUaUt5SnFvMHpqaEhCUV9HcVRNRWJTeg==")
+  supabaseKey: atob("c2JfcHVibGlzaGFibGVfOF9zT2drVGJUaUt5"+"SnFvMHpqaEhCUV9HcVRNRWJTeg==")
 };
 
 (function(){
@@ -26,8 +26,8 @@ setTimeout(function(){
     if(typeof PAYMENT_PROVIDERS==='undefined')return;
     PAYMENT_PROVIDERS.monzo.hint="1. Open Monzo. 2. Look for Request money or your Monzo.me link. 3. Copy or share your payment link. 4. Return to I'm In Golf and paste it below. Can't see those exact words? Look for Request money, Get paid, Share link or Monzo.me.";
     PAYMENT_PROVIDERS.monzo.steps=["Open Monzo.","Look for Request money or your Monzo.me link.","Copy or share your personal payment link.","Return to I'm In Golf and paste the link."];
-    PAYMENT_PROVIDERS.revolut.hint="1. Open Revolut. 2. Go to Payments and look for Request money or Payment link. 3. Create or open your personal payment link and copy or share it. 4. Return to I'm In Golf and paste it below. Can't see those exact words? Look for Request, Get paid, Payment link or Share link.";
-    PAYMENT_PROVIDERS.revolut.steps=["Open Revolut and go to Payments.","Look for Request money or Payment link.","Create or open your personal payment link and copy or share it.","Return to I'm In Golf and paste the link."];
+    PAYMENT_PROVIDERS.revolut.hint="1. Open Revolut. 2. Go to Payments and look for Request money or Payment link. 3. Create or open your payment link and copy or share it. 4. Return to I'm In Golf and paste it below. Can't see those exact words? Look for Request, Get paid, Payment link or Share link.";
+    PAYMENT_PROVIDERS.revolut.steps=["Open Revolut and go to Payments.","Look for Request money or Payment link.","Create or open your payment link and copy or share it.","Return to I'm In Golf and paste the link."];
     PAYMENT_PROVIDERS.paypal.hint="1. Open PayPal. 2. Look for Request, Get paid or PayPal.Me. 3. Open your personal payment link and copy or share it. 4. Return to I'm In Golf and paste it below. Can't see those exact words? Look for Request, Get paid, PayPal.Me or Share link.";
     PAYMENT_PROVIDERS.paypal.steps=["Open PayPal.","Look for Request, Get paid or PayPal.Me.","Open your personal payment link and copy or share it.","Return to I'm In Golf and paste the link."];
     PAYMENT_PROVIDERS.starling.hint="1. Open Starling. 2. Look for Request Money or Settle Up. 3. Open your payment/request link and copy or share it. 4. Return to I'm In Golf and paste it below. Can't see those exact words? Look for Request Money, Get paid, Settle Up or Share link.";
@@ -379,7 +379,6 @@ setTimeout(function(){
   },attempt?100:0);
 })(0);
 
-// Complete the browser-dialog cleanup for Owner, payment, prize and destructive admin flows.
 (function installRemainingBrandedDialogs(attempt){
   setTimeout(function(){
     try{
@@ -387,7 +386,6 @@ setTimeout(function(){
         if(attempt<20)installRemainingBrandedDialogs(attempt+1);
         return;
       }
-
       if(typeof ownerLogin==='function')ownerLogin=async function(){
         if(!isAdmin){showAppToast('Admin access required','Open Admin Mode first.',3000);return;}
         var entered=await appPrompt('Owner Access',"Enter your private I'm In Golf owner creation code",'',{type:'password',okLabel:'Open Owner Controls'});
@@ -396,7 +394,6 @@ setTimeout(function(){
         if(!clean){showAppToast('Code required','Enter the private owner creation code.',3000);return;}
         ownerCreationCode=clean;isOwner=true;render();
       };
-
       if(typeof ownerResetAdminPin==='function')ownerResetAdminPin=async function(){
         if(!db||!isAdmin||!isOwner||!ownerCreationCode){showAppToast('Owner access required','Open Owner Controls first.',3000);return;}
         var groupPin=String(ownerEditGroupPin||'');
@@ -415,13 +412,11 @@ setTimeout(function(){
         if(groupPin===String(pin)){state.adminPin=clean;state.adminSetupToken='';}
         showAppToast('✅ Admin PIN reset','Group '+groupPin+' is ready.',3000);
       };
-
       if(typeof copyAdminInvite==='function')copyAdminInvite=async function(){
         if(!lastAdminInvite){showAppToast('No invite yet','Create a new group first.',3000);return;}
         try{await navigator.clipboard.writeText(lastAdminInvite);showAppToast('✅ Admin invite copied','Paste it into WhatsApp or your message app.',3000);}
         catch(e){await appPrompt('Copy Admin Invite','Copy the message below.',lastAdminInvite,{okLabel:'Done'});}
       };
-
       if(typeof createNewGolfGroup==='function')createNewGolfGroup=async function(){
         if(!isAdmin||!isOwner||!ownerCreationCode){showAppToast('Owner access required','Open Owner Controls first.',3000);return;}
         if(!db){showAppToast('No database connection','Please try again when the app is online.',3200);return;}
@@ -440,7 +435,6 @@ setTimeout(function(){
         lastAdminInvite='⛳ I\'m In Golf\n\nYou\'ve been invited to manage '+cleanGroupName+'.\n\nGroup PIN: '+newPin+'\n\nTap below to set up your 4-digit Admin PIN:\nhttps://imingolf.co.uk/app/?pin='+encodeURIComponent(newPin)+'&adminsetup='+encodeURIComponent(setupToken)+'\n\n🔒 Keep this link private.';
         page='admininvite';adminInvitePage();window.scrollTo(0,0);
       };
-
       if(typeof cancelCurrentRound==='function')cancelCurrentRound=async function(){
         if(!isAdmin){showAppToast('Admin only','Only the Group Admin can cancel the current round.',3200);return;}
         if(state.trip&&state.trip.active){showAppToast('Trip active','Use Cancel Current Trip instead.',3000);return;}
@@ -454,7 +448,6 @@ setTimeout(function(){
         if(!await save()){showAppToast('Not cancelled','The current round could not be cancelled. Please try again.',3400);return;}
         showAppToast('✅ Round cancelled','League and previous-round history were kept.',3200);show('round');
       };
-
       if(typeof changePaymentLink==='function'){
         var originalChangePaymentLink=changePaymentLink;
         changePaymentLink=async function(){
@@ -463,7 +456,6 @@ setTimeout(function(){
           if(before!==String(state.paymentLink||''))showAppToast('✅ Payment method updated','Players will pay you directly.',3000);
         };
       }
-
       if(typeof markWinnerPaid==='function')markWinnerPaid=async function(historyIndex,payoutId,allowAwaiting){
         if(!isAdmin||!demoCanEdit())return;
         var record=(state.history||[])[Number(historyIndex)];if(!record)return;
@@ -475,7 +467,6 @@ setTimeout(function(){
         payout.status='paid';payout.paidAt=new Date().toISOString();
         if(await save()){showRoundHistory(historyIndex);showAppToast('✅ Prize marked paid','£'+moneyText(payout.amount)+' sent to '+payout.winnerName+'.',3000);}
       };
-
       if(typeof deletePastTrip==='function')deletePastTrip=async function(){
         var pastTrips=state.trip&&state.trip.pastTrips?state.trip.pastTrips:[];
         if(!pastTrips.length){showAppToast('No past trips','There are no past trips to delete.',3000);return;}
@@ -493,7 +484,6 @@ setTimeout(function(){
   },attempt?120:0);
 })(0);
 
-// Make a wrong Group PIN obvious, friendly and immediately retryable.
 (function(){
   function improvePinMessage(){
     var msg=document.getElementById('connectMsg');
@@ -513,3 +503,39 @@ setTimeout(function(){
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start); else start();
 })();
+
+(function installFriendlyCompetitionReminder(attempt){
+  setTimeout(function(){
+    try{
+      if(typeof competitionReminder!=='function'){
+        if(attempt<20)installFriendlyCompetitionReminder(attempt+1);
+        return;
+      }
+      competitionReminder=function(){
+        if(roundLocked()){
+          if(typeof showAppToast==='function')showAppToast('Entries are closed','Scoring has already started.',3000);
+          return;
+        }
+        var current=typeof currentRoundPlayers==='function'?currentRoundPlayers():[];
+        var betterBall=typeof tripBetterBallActive==='function'&&tripBetterBallActive();
+        var needsAction=current.some(function(p){return !p.paid || (!betterBall && !p.competition);});
+        if(!needsAction){
+          if(typeof showAppToast==='function')showAppToast('Everyone’s sorted','Everyone is paid and ready for the competition.',3000);
+          return;
+        }
+        var message='⛳ Are you still in?\n\nIf you are, don’t forget to pay your entry fee'+(betterBall?'':' and choose Stableford or Net')+' before the day.\n\nSee you on the tee! ⛳';
+        if(navigator.share){
+          navigator.share({title:"I'm In Golf — Competition Reminder",text:message}).catch(function(e){
+            if(!e||e.name!=='AbortError'){
+              if(navigator.clipboard)navigator.clipboard.writeText(message);
+              if(typeof showAppToast==='function')showAppToast('✅ Reminder copied','Paste it into WhatsApp.',3000);
+            }
+          });
+        }else{
+          if(navigator.clipboard)navigator.clipboard.writeText(message);
+          if(typeof showAppToast==='function')showAppToast('✅ Reminder copied','Paste it into WhatsApp.',3000);
+        }
+      };
+    }catch(e){}
+  },attempt?100:0);
+})(0);
