@@ -119,3 +119,35 @@ setTimeout(function(){
     }catch(e){}
   }, attempt ? 100 : 0);
 })(0);
+
+// Make Admin mode unmistakable on every Admin screen.
+(function(){
+  function showAdminModeBanner(){
+    try{
+      var screen=document.getElementById('screen');
+      if(!screen)return;
+      var existing=screen.querySelector('[data-iig-admin-mode-banner]');
+      if(typeof isAdmin==='undefined' || !isAdmin){
+        if(existing)existing.remove();
+        return;
+      }
+      if(existing)return;
+      var box=document.createElement('div');
+      box.className='notice';
+      box.setAttribute('data-iig-admin-mode-banner','1');
+      box.innerHTML='<b>🛠️ Admin mode</b><br>You are managing this golf group.';
+      screen.insertBefore(box,screen.firstChild);
+    }catch(e){}
+  }
+
+  function startAdminModeBanner(){
+    showAdminModeBanner();
+    var screen=document.getElementById('screen');
+    if(!screen)return;
+    var observer=new MutationObserver(showAdminModeBanner);
+    observer.observe(screen,{childList:true,subtree:false});
+  }
+
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',startAdminModeBanner);
+  else startAdminModeBanner();
+})();
