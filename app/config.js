@@ -3,16 +3,14 @@ window.TENS_IN_CONFIG = {
   supabaseKey: atob("c2JfcHVibGlzaGFibGVfOF9zT2drVGJUaUt5SnFvMHpqaEhCUV9HcVRNRWJTeg==")
 };
 
-// Presentation-only wording polish for Admin payment setup.
-// Important: do not observe/rewrite the live payment wizard; its own render functions attach button handlers.
 (function(){
   function applyPaymentWording(){
     document.querySelectorAll('.card h2').forEach(function(h2){
-      if(h2.textContent.trim() === '💷 Player payments'){
+      if(h2.textContent.trim()==='💷 Player payments'){
         var card=h2.closest('.card'); if(!card)return;
         h2.textContent='💷 Collect entry fees';
         var notice=card.querySelector('.notice');
-        if(notice) notice.innerHTML='<b>How players pay</b><br>Add a payment link (for example Monzo, Revolut or PayPal). Players tap the link in the app and pay you directly for the round.<br><br><b>I’m In Golf does not receive or hold the money.</b>';
+        if(notice)notice.innerHTML='<b>How players pay</b><br>Add a payment link (for example Monzo, Revolut or PayPal). Players tap the link in the app and pay you directly for the round.<br><br><b>I’m In Golf does not receive or hold the money.</b>';
         card.querySelectorAll('button').forEach(function(btn){
           if(btn.textContent.indexOf('Set Up Player Payments')!==-1)btn.textContent='➕ Set Up Payment Link';
           if(btn.textContent.indexOf('Change Payment Method')!==-1)btn.textContent='✏️ Change Payment Link';
@@ -20,12 +18,9 @@ window.TENS_IN_CONFIG = {
       }
     });
   }
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',applyPaymentWording);
-  else applyPaymentWording();
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',applyPaymentWording); else applyPaymentWording();
 })();
 
-// Provider-specific guidance for the existing payment wizard.
-// This changes only the wording data after the main app has loaded; it does not rewrite the wizard DOM or button handlers.
 setTimeout(function(){
   try{
     if(typeof PAYMENT_PROVIDERS==='undefined')return;
@@ -45,34 +40,32 @@ setTimeout(function(){
   }catch(e){}
 },0);
 
-// Keep the existing safe Remove Player action available for Admins even in one- or two-player groups.
 (function(){
   function addSmallGroupRemoveButtons(){
     try{
-      if(typeof state==='undefined' || typeof isAdmin==='undefined' || !isAdmin)return;
-      if(!Array.isArray(state.players) || state.players.length>2)return;
+      if(typeof state==='undefined'||typeof isAdmin==='undefined'||!isAdmin)return;
+      if(!Array.isArray(state.players)||state.players.length>2)return;
       if(typeof removePlayer!=='function')return;
       document.querySelectorAll('#screen .player').forEach(function(row,index){
         var editButton=Array.from(row.querySelectorAll('button')).find(function(btn){return btn.textContent.trim()==='Edit';});
         if(!editButton)return;
         var holder=editButton.parentElement;
-        if(!holder || holder.querySelector('[data-iig-remove-player]'))return;
+        if(!holder||holder.querySelector('[data-iig-remove-player]'))return;
         var btn=document.createElement('button');
         btn.className='red small'; btn.type='button'; btn.setAttribute('data-iig-remove-player','1'); btn.textContent='Remove'; btn.style.marginLeft='6px';
-        btn.addEventListener('click',function(){ removePlayer(index); });
+        btn.addEventListener('click',function(){removePlayer(index);});
         holder.appendChild(btn);
       });
     }catch(e){}
   }
-  function startPlayerRemoveObserver(){
+  function start(){
     addSmallGroupRemoveButtons();
     var screen=document.getElementById('screen'); if(!screen)return;
     new MutationObserver(addSmallGroupRemoveButtons).observe(screen,{childList:true,subtree:true});
   }
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',startPlayerRemoveObserver); else startPlayerRemoveObserver();
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start); else start();
 })();
 
-// Pause the 5-second live redraw while an Admin is filling in a round setup form.
 (function installRoundSetupRefreshGuard(attempt){
   setTimeout(function(){
     try{
@@ -81,46 +74,64 @@ setTimeout(function(){
       var originalRefresh=refresh;
       var guarded=async function(){
         var screen=document.getElementById('screen');
-        if(screen && (screen.querySelector('#firstRoundStake') || screen.querySelector('#normalSetupStake') || screen.querySelector('#normalSetupStart'))) return;
+        if(screen&&(screen.querySelector('#firstRoundStake')||screen.querySelector('#normalSetupStake')||screen.querySelector('#normalSetupStart')))return;
         return originalRefresh.apply(this,arguments);
       };
-      guarded.__iigRoundSetupGuard=true; refresh=guarded;
+      guarded.__iigRoundSetupGuard=true;
+      refresh=guarded;
     }catch(e){}
-  }, attempt ? 100 : 0);
+  },attempt?100:0);
 })(0);
 
-// Make Admin mode unmistakable on every Admin screen.
+// Put the Admin indicator inside the green app header to save vertical space.
 (function(){
-  function showAdminModeBanner(){
+  function updateAdminHeader(){
     try{
-      var screen=document.getElementById('screen'); if(!screen)return;
-      var existing=screen.querySelector('[data-iig-admin-mode-banner]');
-      if(typeof isAdmin==='undefined' || !isAdmin){if(existing)existing.remove();return;}
-      if(existing)return;
-      var box=document.createElement('div'); box.className='notice'; box.setAttribute('data-iig-admin-mode-banner','1');
-      box.innerHTML='<b>🛠️ Admin mode</b><br>You are managing this golf group.';
-      screen.insertBefore(box,screen.firstChild);
+      var header=document.querySelector('.app > header')||document.querySelector('header');
+      var screen=document.getElementById('screen');
+      if(screen){
+        var old=screen.querySelector('[data-iig-admin-mode-banner]');
+        if(old)old.remove();
+      }
+      if(!header)return;
+      var badge=header.querySelector('[data-iig-admin-header]');
+      if(typeof isAdmin==='undefined'||!isAdmin){if(badge)badge.remove();return;}
+      if(!badge){
+        badge=document.createElement('div');
+        badge.setAttribute('data-iig-admin-header','1');
+        badge.innerHTML='<b>⚙️ Admin mode</b><span>You are managing this golf group.</span>';
+        badge.style.cssText='margin-top:12px;background:#e3f5e8;color:#145f34;border:1px solid #c6ead1;border-radius:12px;padding:9px 11px;display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;font-size:13px;line-height:1.25;';
+        var b=badge.querySelector('b'); if(b)b.style.fontSize='14px';
+        var s=badge.querySelector('span'); if(s)s.style.opacity='.95';
+        header.appendChild(badge);
+      }
     }catch(e){}
   }
-  function startAdminModeBanner(){
-    showAdminModeBanner(); var screen=document.getElementById('screen'); if(!screen)return;
-    new MutationObserver(showAdminModeBanner).observe(screen,{childList:true,subtree:false});
+  function start(){
+    updateAdminHeader();
+    var screen=document.getElementById('screen');
+    if(screen)new MutationObserver(updateAdminHeader).observe(screen,{childList:true,subtree:false});
+    setInterval(updateAdminHeader,1000);
   }
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',startAdminModeBanner); else startAdminModeBanner();
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start); else start();
 })();
 
-// In Admin mode, give the compact round/status controls the same soft green treatment as the existing round badges.
-// Styling only: no button behaviour or payment logic is changed.
+// Admin-only visual treatment: compact controls/badges use the soft green background.
 (function(){
   function applyAdminGreenHighlights(){
     try{
-      if(typeof isAdmin==='undefined' || !isAdmin)return;
       var screen=document.getElementById('screen'); if(!screen)return;
+      var adminOn=(typeof isAdmin!=='undefined'&&isAdmin);
+      screen.querySelectorAll('[data-iig-admin-green]').forEach(function(el){
+        if(!adminOn){el.style.background='';el.style.color='';el.style.borderColor='';el.style.fontWeight='';el.removeAttribute('data-iig-admin-green');}
+      });
+      if(!adminOn)return;
       var wanted=['OPEN','MONEY GAME','POINTS GAME','NET','STABLEFORD','ENTRY','PLAYERS IN','PAID'];
       screen.querySelectorAll('button,.pill,.badge,.chip,span').forEach(function(el){
         var text=(el.textContent||'').trim().toUpperCase();
-        if(!text || text.length>32)return;
+        if(!text||text.length>32)return;
         if(wanted.some(function(word){return text.indexOf(word)!==-1;})){
+          el.setAttribute('data-iig-admin-green','1');
           el.style.background='#e3f5e8';
           el.style.color='#147a3d';
           el.style.borderColor='#c6ead1';
@@ -129,10 +140,10 @@ setTimeout(function(){
       });
     }catch(e){}
   }
-  function startAdminGreenHighlights(){
+  function start(){
     applyAdminGreenHighlights();
     var screen=document.getElementById('screen'); if(!screen)return;
     new MutationObserver(applyAdminGreenHighlights).observe(screen,{childList:true,subtree:true});
   }
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',startAdminGreenHighlights); else startAdminGreenHighlights();
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start); else start();
 })();
