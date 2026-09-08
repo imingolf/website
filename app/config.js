@@ -33,7 +33,7 @@ setTimeout(function(){
     PAYMENT_PROVIDERS.starling.hint="1. Open Starling. 2. Look for Request Money or Settle Up. 3. Open your payment/request link and copy or share it. 4. Return to I'm In Golf and paste it below. Can't see those exact words? Look for Request Money, Get paid, Settle Up or Share link.";
     PAYMENT_PROVIDERS.starling.steps=["Open Starling.","Look for Request Money or Settle Up.","Open your payment/request link and copy or share it.","Return to I'm In Golf and paste the link."];
     PAYMENT_PROVIDERS.wise.hint="1. Open Wise. 2. Look for Request, Get paid or Wisetag. 3. Create or open your payment link and copy or share it. 4. Return to I'm In Golf and paste it below. Can't see those exact words? Look for Request, Get paid, Wisetag or Share link.";
-    PAYMENT_PROVIDERS.wise.steps=["Open Wise.","Look for Request, Get paid or Wisetag.","Create or open your personal payment link and copy or share it.","Return to I'm In Golf and paste the link."];
+    PAYMENT_PROVIDERS.wise.steps=["Open Wise.","Look for Request, Get paid or Wisetag.","Create or open your payment link and copy or share it.","Return to I'm In Golf and paste the link."];
     PAYMENT_PROVIDERS.other.label="secure payment";
     PAYMENT_PROVIDERS.other.hint="1. Open your banking or payment app. 2. Look for Request money, Get paid or Payment link. 3. Create or open your personal payment link and copy or share it. 4. Return to I'm In Golf and paste the secure link below. Never paste a password or PIN into I'm In Golf.";
     PAYMENT_PROVIDERS.other.steps=["Open your banking or payment app.","Look for Request money, Get paid or Payment link.","Create or open your personal payment link and copy or share it.","Return to I'm In Golf and paste the secure link. Never enter a password or PIN."];
@@ -492,3 +492,24 @@ setTimeout(function(){
     }catch(e){}
   },attempt?120:0);
 })(0);
+
+// Make a wrong Group PIN obvious, friendly and immediately retryable.
+(function(){
+  function improvePinMessage(){
+    var msg=document.getElementById('connectMsg');
+    if(!msg)return;
+    var text=(msg.textContent||'').trim().toLowerCase();
+    if(text.indexOf('pin not recognised')===-1 && text.indexOf('pin not recognized')===-1)return;
+    msg.innerHTML='<b>That Group PIN doesn’t look right.</b><br>Please check the 4 digits and try again.';
+    msg.style.cssText='margin-top:12px;padding:12px 14px;border-radius:12px;background:#fff1c7;color:#7a5700;font-size:14px;line-height:1.4;text-align:center;border:1px solid #f1d889;';
+    var input=document.getElementById('pinInput');
+    if(input){input.select();input.focus();}
+  }
+  function start(){
+    var msg=document.getElementById('connectMsg');
+    if(!msg)return;
+    improvePinMessage();
+    new MutationObserver(improvePinMessage).observe(msg,{childList:true,subtree:true,characterData:true});
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start); else start();
+})();
