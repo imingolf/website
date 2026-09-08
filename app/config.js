@@ -52,3 +52,45 @@ setTimeout(function(){
     // Leave the original built-in guidance untouched if the app structure ever changes.
   }
 },0);
+
+// The main app already has a safe removePlayer() function that preserves past-round history.
+// Its built-in UI only shows Remove when there are more than two players.
+// Add the same Remove control for Admins in groups of one or two players as well.
+(function(){
+  function addSmallGroupRemoveButtons(){
+    try{
+      if(typeof state==='undefined' || typeof isAdmin==='undefined' || !isAdmin)return;
+      if(!Array.isArray(state.players) || state.players.length>2)return;
+      if(typeof removePlayer!=='function')return;
+
+      var rows=document.querySelectorAll('.player');
+      rows.forEach(function(row,index){
+        var editButton=Array.from(row.querySelectorAll('button')).find(function(btn){
+          return btn.textContent.trim()==='Edit';
+        });
+        if(!editButton)return;
+        var holder=editButton.parentElement;
+        if(!holder || holder.querySelector('[data-iig-remove-player]'))return;
+
+        var btn=document.createElement('button');
+        btn.className='red small';
+        btn.type='button';
+        btn.setAttribute('data-iig-remove-player','1');
+        btn.textContent='Remove';
+        btn.style.marginLeft='6px';
+        btn.onclick=function(){ removePlayer(index); };
+        holder.appendChild(btn);
+      });
+    }catch(e){}
+  }
+
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',function(){
+      addSmallGroupRemoveButtons();
+      setInterval(addSmallGroupRemoveButtons,700);
+    });
+  }else{
+    addSmallGroupRemoveButtons();
+    setInterval(addSmallGroupRemoveButtons,700);
+  }
+})();
