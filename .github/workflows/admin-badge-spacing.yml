@@ -1,0 +1,33 @@
+name: Admin badge spacing
+on:
+  push:
+    paths:
+      - '.github/workflows/admin-badge-spacing.yml'
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Move Admin Mode badge below logo
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('app/index.html')
+          s=p.read_text()
+          old='.admin-mode-badge{position:absolute;left:50%;bottom:-10px;'
+          new='.admin-mode-badge{position:absolute;left:50%;bottom:-18px;'
+          if old not in s:
+              raise SystemExit('Admin badge rule not found')
+          p.write_text(s.replace(old,new,1))
+          PY
+      - name: Commit app update
+        run: |
+          git config user.name "I'm In Golf"
+          git config user.email "actions@users.noreply.github.com"
+          git add app/index.html
+          git commit -m "Give Admin Mode badge clear space below logo"
+          git push
