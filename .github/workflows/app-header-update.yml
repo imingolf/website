@@ -3,7 +3,7 @@ name: Apply compact app header
 on:
   push:
     paths:
-      - '.github/workflows/app-header-update.yml'
+      - .github/workflows/app-header-update.yml
 
 permissions:
   contents: write
@@ -16,16 +16,16 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Patch app/index.html
-        shell: python
+      - name: Patch app index
         run: |
+          python <<'PY'
           from pathlib import Path
           import re
 
-          path = Path('app/index.html')
-          s = path.read_text(encoding='utf-8')
+          path = Path("app/index.html")
+          s = path.read_text(encoding="utf-8")
 
-          marker = '/* Compact branded app header v1 */'
+          marker = "/* Compact branded app header v1 */"
           if marker not in s:
               css = r'''
 
@@ -41,91 +41,23 @@ header{
   justify-content:center;
   position:relative;
 }
-.app-header-brand{
-  position:relative;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-}
-.app-header-logo{
-  display:block;
-  width:66px;
-  height:66px;
-  object-fit:cover;
-  border-radius:15px;
-  box-shadow:0 2px 8px rgba(0,0,0,.16);
-}
-.admin-mode-badge{
-  position:absolute;
-  left:50%;
-  bottom:-10px;
-  transform:translateX(-50%);
-  white-space:nowrap;
-  background:#c9ed4b;
-  color:#183b23;
-  border:1px solid rgba(24,59,35,.18);
-  border-radius:999px;
-  padding:4px 9px;
-  font-size:11px;
-  line-height:1;
-  font-weight:900;
-  letter-spacing:.02em;
-  box-shadow:0 2px 6px rgba(0,0,0,.12);
-}
-.demo-mode-badge{
-  position:absolute;
-  left:calc(50% + 45px);
-  top:2px;
-  white-space:nowrap;
-  background:#fff1c7;
-  color:#8a6500;
-  border-radius:999px;
-  padding:4px 7px;
-  font-size:10px;
-  line-height:1;
-  font-weight:900;
-}
-.sync-status{
-  position:absolute!important;
-  width:1px!important;
-  height:1px!important;
-  padding:0!important;
-  margin:-1px!important;
-  overflow:hidden!important;
-  clip:rect(0,0,0,0)!important;
-  white-space:nowrap!important;
-  border:0!important;
-}
-body.admin-mode nav{
-  gap:4px;
-  padding-left:6px;
-  padding-right:6px;
-}
-body.admin-mode nav button:not(.hidden){
-  background:#e2f2e6;
-  color:var(--green);
-  border-radius:12px;
-  font-weight:800;
-}
-body.admin-mode nav button.active:not(.hidden){
-  background:#cde8d5;
-  color:#10592f;
-}
-@media (max-width:600px){
-  header{
-    min-height:112px;
-    padding-top:calc(6px + env(safe-area-inset-top));
-    padding-bottom:10px;
-  }
-  .app-header-logo{width:64px;height:64px;border-radius:14px}
-}
+.app-header-brand{position:relative;display:flex;align-items:center;justify-content:center}
+.app-header-logo{display:block;width:66px;height:66px;object-fit:cover;border-radius:15px;box-shadow:0 2px 8px rgba(0,0,0,.16)}
+.admin-mode-badge{position:absolute;left:50%;bottom:-10px;transform:translateX(-50%);white-space:nowrap;background:#c9ed4b;color:#183b23;border:1px solid rgba(24,59,35,.18);border-radius:999px;padding:4px 9px;font-size:11px;line-height:1;font-weight:900;letter-spacing:.02em;box-shadow:0 2px 6px rgba(0,0,0,.12)}
+.demo-mode-badge{position:absolute;left:calc(50% + 45px);top:2px;white-space:nowrap;background:#fff1c7;color:#8a6500;border-radius:999px;padding:4px 7px;font-size:10px;line-height:1;font-weight:900}
+.sync-status{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
+body.admin-mode nav{gap:4px;padding-left:6px;padding-right:6px}
+body.admin-mode nav button:not(.hidden){background:#e2f2e6;color:var(--green);border-radius:12px;font-weight:800}
+body.admin-mode nav button.active:not(.hidden){background:#cde8d5;color:#10592f}
+@media (max-width:600px){header{min-height:112px;padding-top:calc(6px + env(safe-area-inset-top));padding-bottom:10px}.app-header-logo{width:64px;height:64px;border-radius:14px}}
 '''
-              if '</style>' not in s:
-                  raise SystemExit('Could not find </style>')
-              s = s.replace('</style>', css + '\n</style>', 1)
+              if "</style>" not in s:
+                  raise SystemExit("Could not find closing style tag")
+              s = s.replace("</style>", css + "\n</style>", 1)
 
-          header_pattern = re.compile(r'<header>.*?</header>', re.S)
-          new_header = '''<header class="app-header">
+          if 'class="app-header"' not in s:
+              pattern = re.compile(r"<header>.*?</header>", re.S)
+              new_header = '''<header class="app-header">
   <div class="app-header-brand">
     <img src="icon-192.png" alt="I'm In Golf" class="app-header-logo">
     <span id="adminModeBadge" class="admin-mode-badge hidden">ADMIN MODE</span>
@@ -133,12 +65,13 @@ body.admin-mode nav button.active:not(.hidden){
   </div>
   <p id="syncText" class="sync-status" aria-live="polite">Shared golf group</p>
 </header>'''
-          if 'class="app-header"' not in s:
-              s, count = header_pattern.subn(new_header, s, count=1)
+              s, count = pattern.subn(new_header, s, count=1)
               if count != 1:
-                  raise SystemExit(f'Expected one app header, replaced {count}')
+                  raise SystemExit(f"Expected one header, replaced {count}")
 
-          admin_hook = '''function updateAdminUI(){
+          if 'document.body.classList.toggle("admin-mode"' not in s:
+              target = "function updateAdminUI(){\n"
+              hook = '''function updateAdminUI(){
 
   document.body.classList.toggle("admin-mode", !!isAdmin);
   const adminModeBadge=$("adminModeBadge");
@@ -146,15 +79,14 @@ body.admin-mode nav button.active:not(.hidden){
     adminModeBadge.classList.toggle("hidden", !isAdmin);
   }
 '''
-          if 'document.body.classList.toggle("admin-mode"' not in s:
-              target = 'function updateAdminUI(){\n'
               if target not in s:
-                  raise SystemExit('Could not find updateAdminUI()')
-              s = s.replace(target, admin_hook, 1)
+                  raise SystemExit("Could not find updateAdminUI")
+              s = s.replace(target, hook, 1)
 
-          path.write_text(s, encoding='utf-8')
+          path.write_text(s, encoding="utf-8")
+          PY
 
-      - name: Commit app header update
+      - name: Commit app update
         run: |
           if git diff --quiet -- app/index.html; then
             echo "No app changes needed"
