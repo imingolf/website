@@ -5,9 +5,84 @@ on:
     paths:
       - '.github/workflows/app-header-update.yml'
 
+permissions:
+  contents: write
+
 jobs:
-  validate:
+  apply:
     runs-on: ubuntu-latest
     steps:
-      - name: Validate workflow
-        run: echo "workflow ready"
+      - name: Update app header and admin styling
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const path = 'app/index.html';
+            const res = await github.rest.repos.getContent({ owner, repo, path });
+            const file = res.data;
+            let s = Buffer.from(file.content, 'base64').toString('utf8');
+
+            const marker = '/* Compact branded app header v1 */';
+            if (!s.includes(marker)) {
+              const css = `
+
+/* Compact branded app header v1 */
+header{
+  background:linear-gradient(135deg,#10592f,#23864e);
+  color:white;
+  padding:calc(6px + env(safe-area-inset-top)) 18px 10px;
+  min-height:112px;
+  border-radius:0 0 24px 24px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  position:relative;
+}
+.app-header-brand{position:relative;display:flex;align-items:center;justify-content:center}
+.app-header-logo{display:block;width:64px;height:64px;object-fit:cover;border-radius:14px;box-shadow:0 2px 8px rgba(0,0,0,.16)}
+.admin-mode-badge{position:absolute;left:50%;bottom:-10px;transform:translateX(-50%);white-space:nowrap;background:#c9ed4b;color:#183b23;border:1px solid rgba(24,59,35,.18);border-radius:999px;padding:4px 9px;font-size:11px;line-height:1;font-weight:900;letter-spacing:.02em;box-shadow:0 2px 6px rgba(0,0,0,.12)}
+.demo-mode-badge{position:absolute;left:calc(50% + 45px);top:2px;white-space:nowrap;background:#fff1c7;color:#8a6500;border-radius:999px;padding:4px 7px;font-size:10px;line-height:1;font-weight:900}
+.sync-status{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
+[data-iig-admin-header]{display:none!important}
+body.admin-mode nav.iig-admin-nav-bar{background:white!important}
+body.admin-mode nav button:not(.hidden),body.admin-mode nav.iig-admin-nav-bar button:not(.hidden){background:#e2f2e6!important;color:var(--green)!important;border-radius:12px!important;font-weight:800!important;padding:8px 2px!important}
+body.admin-mode nav button.active:not(.hidden),body.admin-mode nav.iig-admin-nav-bar button.active:not(.hidden){background:#cde8d5!important;color:#10592f!important}
+@media (max-width:600px){header{min-height:108px;padding-top:calc(5px + env(safe-area-inset-top));padding-bottom:9px}.app-header-logo{width:62px;height:62px;border-radius:14px}}
+`;
+              s = s.replace('</style>', css + '\n</style>');
+            }
+
+            if (!s.includes('class="app-header"')) {
+              const newHeader = `<header class="app-header">
+  <div class="app-header-brand">
+    <img src="icon-192.png" alt="I'm In Golf" class="app-header-logo">
+    <span id="adminModeBadge" class="admin-mode-badge hidden">ADMIN MODE</span>
+    <span id="demoBadge" class="demo-mode-badge hidden">DEMO</span>
+  </div>
+  <p id="syncText" class="sync-status" aria-live="polite">Shared golf group</p>
+</header>`;
+              const replaced = s.replace(/<header>[\s\S]*?<\/header>/, newHeader);
+              if (replaced === s) throw new Error('App header block not found');
+              s = replaced;
+            }
+
+            if (!s.includes('document.body.classList.toggle("admin-mode"')) {
+              const target = 'function updateAdminUI(){';
+              const hook = `function updateAdminUI(){
+  document.body.classList.toggle("admin-mode", !!isAdmin);
+  const adminModeBadge=$("adminModeBadge");
+  if(adminModeBadge)adminModeBadge.classList.toggle("hidden", !isAdmin);`;
+              if (!s.includes(target)) throw new Error('updateAdminUI function not found');
+              s = s.replace(target, hook);
+            }
+
+            await github.rest.repos.createOrUpdateFileContents({
+              owner,
+              repo,
+              path,
+              message: 'Use compact logo header and clear Admin Mode styling',
+              sha: file.sha,
+              content: Buffer.from(s, 'utf8').toString('base64')
+            });
