@@ -1513,7 +1513,7 @@ $("screen").innerHTML=`
       <div class="notice">
         ${currentRoundPlayers().length>0 && paidCount()===currentRoundPlayers().length
           ? "🔒 Everyone is paid — ready to play."
-          : "Players are marked paid automatically when they return from the payment link."}
+          : "Players confirm they’ve paid when they return from the payment link."}
       </div>
 
       <button class="primary full" onclick="show('pay')">${isAdmin ? "Manage payments" : "View payments"}</button>
@@ -1848,21 +1848,44 @@ const sameRound=
   if(!player || roundLocked()){clearPaymentJourney();return;}
   if(player.paid){clearPaymentJourney();return;}
   paymentReturnBusy=true;
+  const confirmed=await new Promise(resolve=>{
+    const overlay=document.createElement("div");
+    overlay.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.42);z-index:11000;display:flex;align-items:center;justify-content:center;padding:20px;";
+    overlay.innerHTML=`
+      <div class="card" style="width:min(440px,100%);margin:0;padding:24px;border-radius:20px;box-shadow:0 18px 50px rgba(0,0,0,.18);text-align:center;">
+        <div style="font-size:38px;margin-bottom:6px;">💷</div>
+        <h2 style="font-size:22px;margin:0 0 10px;">Have you paid your entry fee?</h2>
+        <div class="notice">Confirm only after you’ve completed the payment in your banking or payment app.</div>
+        <button id="paymentReturnYes" class="primary full">Yes — I’ve paid</button>
+        <button id="paymentReturnNo" class="ghost full">No — not yet</button>
+      </div>`;
+    document.body.appendChild(overlay);
+    const finish=value=>{overlay.remove();resolve(value);};
+    overlay.querySelector("#paymentReturnYes").onclick=()=>finish(true);
+    overlay.querySelector("#paymentReturnNo").onclick=()=>finish(false);
+  });
+
+  if(!confirmed){
+    paymentReturnBusy=false;
+    clearPaymentJourney();
+    render();
+    showAppToast("Not marked paid","You can pay later from Payments.",2800);
+    return;
+  }
+
   player.paid=true;
   player.paymentMarkedAt=new Date().toISOString();
-  player.paymentMarkMethod="payment-link-return";
+  player.paymentMarkMethod="player-confirmed-payment-return";
   const saved=await save();
   paymentReturnBusy=false;
   if(!saved){
-    // Do not lose the return event when the phone briefly has no signal.
-    // Restore shared state locally and retry on focus/online/next page show.
     player.paid=false;
     showAppToast("Payment update waiting","We’ll retry when you’re online.",4200);
     return;
   }
   clearPaymentJourney();
   render();
-  showBigPlayerMessage("✅ YOU’RE IN!","Good luck! ⛳",3000);
+  showBigPlayerMessage("✅ YOU’RE IN!","Payment confirmed — good luck! ⛳",3000);
 }
 window.addEventListener("focus",()=>setTimeout(recognisePaymentReturn,250));
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")setTimeout(recognisePaymentReturn,250);});
