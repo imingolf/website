@@ -1,0 +1,88 @@
+name: Payment return confirmation
+on:
+  push:
+    paths:
+      - '.github/workflows/payment-return-confirm.yml'
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Add player payment confirmation on return
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('app/index.html')
+          s=p.read_text()
+
+          old_notice='Players are marked paid automatically when they return from the payment link.'
+          new_notice="Players confirm they’ve paid when they return from the payment link."
+          if old_notice in s:
+              s=s.replace(old_notice,new_notice,1)
+
+          start='  paymentReturnBusy=true;\n  player.paid=true;'
+          end='  showBigPlayerMessage("✅ YOU’RE IN!","Good luck! ⛳",3000);\n}'
+          a=s.find(start)
+          if a<0:
+              raise SystemExit('Payment return update start not found')
+          b=s.find(end,a)
+          if b<0:
+              raise SystemExit('Payment return update end not found')
+          b += len(end)
+
+          replacement='''  paymentReturnBusy=true;
+  const confirmed=await new Promise(resolve=>{
+    const overlay=document.createElement("div");
+    overlay.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.42);z-index:11000;display:flex;align-items:center;justify-content:center;padding:20px;";
+    overlay.innerHTML=`
+      <div class="card" style="width:min(440px,100%);margin:0;padding:24px;border-radius:20px;box-shadow:0 18px 50px rgba(0,0,0,.18);text-align:center;">
+        <div style="font-size:38px;margin-bottom:6px;">💷</div>
+        <h2 style="font-size:22px;margin:0 0 10px;">Have you paid your entry fee?</h2>
+        <div class="notice">Confirm only after you’ve completed the payment in your banking or payment app.</div>
+        <button id="paymentReturnYes" class="primary full">Yes — I’ve paid</button>
+        <button id="paymentReturnNo" class="ghost full">No — not yet</button>
+      </div>`;
+    document.body.appendChild(overlay);
+    const finish=value=>{overlay.remove();resolve(value);};
+    overlay.querySelector("#paymentReturnYes").onclick=()=>finish(true);
+    overlay.querySelector("#paymentReturnNo").onclick=()=>finish(false);
+  });
+
+  if(!confirmed){
+    paymentReturnBusy=false;
+    clearPaymentJourney();
+    render();
+    showAppToast("Not marked paid","You can pay later from Payments.",2800);
+    return;
+  }
+
+  player.paid=true;
+  player.paymentMarkedAt=new Date().toISOString();
+  player.paymentMarkMethod="player-confirmed-payment-return";
+  const saved=await save();
+  paymentReturnBusy=false;
+  if(!saved){
+    // Keep the saved journey so the player can confirm again when back online.
+    player.paid=false;
+    showAppToast("Payment update waiting","We’ll retry when you’re online.",4200);
+    return;
+  }
+  clearPaymentJourney();
+  render();
+  showBigPlayerMessage("✅ YOU’RE IN!","Payment confirmed — good luck! ⛳",3000);
+}'''
+
+          s=s[:a]+replacement+s[b:]
+          p.write_text(s)
+          PY
+      - name: Commit app update
+        run: |
+          git config user.name "I'm In Golf"
+          git config user.email "actions@users.noreply.github.com"
+          git add app/index.html
+          git commit -m "Ask players to confirm payment on return"
+          git push
