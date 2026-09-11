@@ -679,6 +679,9 @@ if(existing){
 }
 
 startPolling();
+// Banking/payment apps can return by reloading I'm In Golf before the usual
+// focus/pageshow handlers are useful. Re-check once group + player state are loaded.
+setTimeout(recognisePaymentReturn,500);
  }
 async function save(){
 
@@ -1738,7 +1741,9 @@ function beginPlayerPayment(){
     roundDate:String(state.date||""),
     stake:Number(state.stake||0)
   });
-  window.open(link,"_blank");
+  // Keep payment in the same browser journey so returning from the
+  // banking/payment app reliably restores I'm In Golf and its saved payment journey.
+  window.location.assign(link);
 }
 function showAppToast(title,subtitle="",duration=2800){
   document.querySelectorAll(".app-toast").forEach(el=>el.remove());
