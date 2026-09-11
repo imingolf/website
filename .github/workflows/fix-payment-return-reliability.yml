@@ -1,0 +1,45 @@
+name: Fix payment return reliability
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/fix-payment-return-reliability.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch payment return flow
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('app/index.html')
+          s=p.read_text()
+
+          old='''  window.open(link,"_blank");'''
+          new='''  // Leave I\'m In Golf in the same browser journey so returning from the\n  // banking/payment app reliably restores this page and its saved payment journey.\n  window.location.assign(link);'''
+          if old not in s:
+              raise SystemExit('Payment launch line not found')
+          s=s.replace(old,new,1)
+
+          old2=''' startPolling();\n }'''
+          new2=''' startPolling();\n // A banking/payment app may return by reloading I\'m In Golf rather than firing\n // focus/pageshow at the right moment. Re-check once the group and player state\n // are fully loaded so the payment confirmation prompt cannot be missed.\n setTimeout(recognisePaymentReturn,500);\n }'''
+          if old2 not in s:
+              raise SystemExit('connect completion block not found')
+          s=s.replace(old2,new2,1)
+
+          p.write_text(s)
+          PY
+      - name: Commit fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/index.html
+          git diff --cached --quiet && exit 0
+          git commit -m "Make player payment return reliable"
+          git push
