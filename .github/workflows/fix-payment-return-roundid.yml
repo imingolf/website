@@ -1,0 +1,33 @@
+name: Fix payment return for normal rounds
+on:
+  push:
+    paths:
+      - '.github/workflows/fix-payment-return-roundid.yml'
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Allow payment return matching when legacy roundId is missing
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('app/index.html')
+          s=p.read_text()
+          old='''  const sameRoundId=\n  journey.roundId &&\n  state.roundId &&\n  String(journey.roundId)===String(state.roundId);\n\nconst sameRound=\n  sameRoundId &&\n  (!journey.course || String(journey.course)===String(state.course||"")) &&\n  (!journey.roundDate || String(journey.roundDate)===String(state.date||"")) &&\n  (journey.stake==null || Number(journey.stake)===Number(state.stake||0));'''
+          new='''  const hasRoundIds=Boolean(journey.roundId && state.roundId);\n  const sameRoundIdentity=!hasRoundIds || String(journey.roundId)===String(state.roundId);\n\nconst sameRound=\n  sameRoundIdentity &&\n  (!journey.course || String(journey.course)===String(state.course||"")) &&\n  (!journey.roundDate || String(journey.roundDate)===String(state.date||"")) &&\n  (journey.stake==null || Number(journey.stake)===Number(state.stake||0));'''
+          if old not in s:
+              raise SystemExit('Expected payment round-matching block not found')
+          p.write_text(s.replace(old,new,1))
+          PY
+      - name: Commit app fix
+        run: |
+          git config user.name "I'm In Golf"
+          git config user.email "actions@users.noreply.github.com"
+          git add app/index.html
+          git commit -m "Fix payment confirmation return on normal rounds"
+          git push
