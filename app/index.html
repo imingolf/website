@@ -1833,13 +1833,11 @@ async function recognisePaymentReturn(){
   // round. This prevents an old return from marking a later competition paid.
   const journeyAge=Date.now()-Number(journey.startedAt||0);
   const sameGroup=!journey.groupPin || String(journey.groupPin)===String(pin||"");
-  const sameRoundId=
-  journey.roundId &&
-  state.roundId &&
-  String(journey.roundId)===String(state.roundId);
+  const hasRoundIds=Boolean(journey.roundId && state.roundId);
+  const sameRoundIdentity=!hasRoundIds || String(journey.roundId)===String(state.roundId);
 
 const sameRound=
-  sameRoundId &&
+  sameRoundIdentity &&
   (!journey.course || String(journey.course)===String(state.course||"")) &&
   (!journey.roundDate || String(journey.roundDate)===String(state.date||"")) &&
   (journey.stake==null || Number(journey.stake)===Number(state.stake||0));
