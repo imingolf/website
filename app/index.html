@@ -1876,17 +1876,48 @@ const sameRound=
     return;
   }
 
+  // Pause the 5-second background refresh while this payment update is saved.
+  // Otherwise a refresh can replace `state` with the older unpaid copy while
+  // the save is still in flight.
+  const pollingWasActive=Boolean(poller);
+  if(poller){
+    clearInterval(poller);
+    poller=null;
+  }
+
   player.paid=true;
   player.paymentMarkedAt=new Date().toISOString();
   player.paymentMarkMethod="player-confirmed-payment-return";
+
   const saved=await save();
-  paymentReturnBusy=false;
+
   if(!saved){
     player.paid=false;
+    paymentReturnBusy=false;
+    if(pollingWasActive)startPolling();
     showAppToast("Payment update waiting","We’ll retry when you’re online.",4200);
     return;
   }
+
+  // Read the shared state back before declaring success. This makes sure the
+  // Paid flag actually reached Supabase rather than merely succeeding locally.
+  const {data:verifiedState,error:verifyError}=await db.rpc("get_group_state",{p_pin:pin});
+  const verifiedPlayer=!verifyError && verifiedState
+    ? (verifiedState.players||[]).find(p=>p.id===journey.playerId)
+    : null;
+
+  if(!verifiedPlayer?.paid){
+    player.paid=false;
+    paymentReturnBusy=false;
+    if(pollingWasActive)startPolling();
+    showAppToast("Payment not saved","Please return to Payments and try again.",4200);
+    return;
+  }
+
+  state=verifiedState;
   clearPaymentJourney();
+  paymentReturnBusy=false;
+  if(pollingWasActive)startPolling();
   render();
   showBigPlayerMessage("✅ YOU’RE IN!","Payment confirmed — good luck! ⛳",3000);
 }
