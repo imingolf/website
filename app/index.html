@@ -1458,13 +1458,11 @@ $("screen").innerHTML=`
   </div>
 
   ${isAdmin ? `
-  ${String(pin)==="1260" ? `
   <div class="card" style="text-align:center;border:2px solid var(--green);padding:13px;">
     <div style="font-weight:900;font-size:16px;">🔐 MANAGING: ${esc(state.groupName||"My Golf Group")}</div>
     <div style="margin-top:7px;font-weight:800;">⛳ ${esc(state.course||"Course not set")} · ${esc(formatDate(state.date))}</div>
     <div class="muted" style="margin-top:5px;font-weight:800;">${state.gameType==="money"?"💷 Money Game":"🏆 Points Game"} · ${(state.pointsCompetition||state.trip?.competition||"stableford")==="net"?"Net":"Stableford"}</div>
   </div>
-  ` : ``}
   <div class="card">
     <h2>Edit round details</h2>
 
