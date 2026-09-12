@@ -942,7 +942,7 @@ function waitingScreen(){
         ? `<button class="primary full" style="margin-top:18px;" onclick="newRound()">➕ Set Up Next Competition</button>`
         : (adminDeviceRecognised()
             ? `<button class="primary full" style="margin-top:18px;" onclick="openRememberedAdminFromWaiting()">🔐 Admin — Set Up Next Competition</button>`
-            : "")
+            : `<button class="secondary full" style="margin-top:18px;" onclick="adminLogin()">🔐 Admin Login</button>`)
       }
     </div>
     ${first ? "" : `<div class="card"><div class="notice">✅ The last result has been saved in <b>League → Previous rounds</b>.</div></div>`}
@@ -1723,12 +1723,83 @@ function paymentLinkForStake(rawLink,stake){
   // Other payment providers keep using the Admin's saved link as entered.
   return link;
 }
-function beginPlayerPayment(){
+async function beginPlayerPayment(){
   if(!demoCanEdit())return;
   if(!myPlayerId){alert("Please select who you are first.");return;}
   const me=state.players.find(p=>p.id===myPlayerId);
   if(!me)return;
   if(me.paid){alert("You're already marked paid.");return;}
+
+  const organiserSelfEntry=
+    String(pin)==="1260" &&
+    typeof adminDeviceRecognised==="function" &&
+    adminDeviceRecognised();
+
+  if(organiserSelfEntry){
+    const amount=Number(state.stake||0);
+    const ok=await appConfirm(
+      "You're the organiser",
+      "No bank transfer to yourself is needed.\n\nAdd £"+amount+" to this competition pot?",
+      "Add £"+amount+" to pot"
+    );
+    if(!ok)return;
+
+    const pollingWasActive=Boolean(poller);
+    if(poller){
+      clearInterval(poller);
+      poller=null;
+    }
+
+    const oldPaid=me.paid;
+    const oldMarkedAt=me.paymentMarkedAt;
+    const oldMethod=me.paymentMarkMethod;
+
+    me.paid=true;
+    me.paymentMarkedAt=new Date().toISOString();
+    me.paymentMarkMethod="admin-self-entry";
+
+    const saved=await save();
+
+    if(!saved){
+      me.paid=oldPaid;
+      me.paymentMarkedAt=oldMarkedAt;
+      me.paymentMarkMethod=oldMethod;
+      if(pollingWasActive)startPolling();
+      render();
+      showAppToast("Entry not saved","Please try again.",4200);
+      return;
+    }
+
+    const {data:verifiedState,error:verifyError}=await db.rpc(
+      "get_group_state",
+      {p_pin:pin}
+    );
+
+    const verifiedPlayer=!verifyError && verifiedState
+      ? (verifiedState.players||[]).find(p=>p.id===me.id)
+      : null;
+
+    if(!verifiedPlayer?.paid){
+      me.paid=oldPaid;
+      me.paymentMarkedAt=oldMarkedAt;
+      me.paymentMarkMethod=oldMethod;
+      if(pollingWasActive)startPolling();
+      render();
+      showAppToast("Entry not saved","Please try again.",4200);
+      return;
+    }
+
+    state=verifiedState;
+    if(pollingWasActive)startPolling();
+    render();
+    showBigPlayerMessage(
+      "✅ YOU'RE IN!",
+      "£"+amount+" added to the competition pot. ⛳",
+      3000
+    );
+    return;
+  }
+
   const savedLink=String(state.paymentLink||"").trim();
   if(!savedLink){alert("Your Group Admin hasn't added a payment link yet.");return;}
   const link=paymentLinkForStake(savedLink,state.stake);
@@ -1741,10 +1812,9 @@ function beginPlayerPayment(){
     roundDate:String(state.date||""),
     stake:Number(state.stake||0)
   });
-  // Keep payment in the same browser journey so returning from the
-  // banking/payment app reliably restores I'm In Golf and its saved payment journey.
   window.location.assign(link);
 }
+
 function showAppToast(title,subtitle="",duration=2800){
   document.querySelectorAll(".app-toast").forEach(el=>el.remove());
   const toast=document.createElement("div");
