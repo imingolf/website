@@ -1746,9 +1746,11 @@ function beginPlayerPayment(){
     roundDate:String(state.date||""),
     stake:Number(state.stake||0)
   });
-  // Keep payment in the same browser journey so returning from the
-  // banking/payment app reliably restores I'm In Golf and its saved payment journey.
-  window.location.assign(link);
+  // Open payment separately so I'm In Golf stays available and
+  // can reliably recognise the player when they return.
+  const paymentWindow=window.open(link,"_blank","noopener");
+  if(!paymentWindow)window.location.assign(link);
+  else showAppToast("Payment opened","Complete the payment, then return to I’m In Golf.",3600);
 }
 function showAppToast(title,subtitle="",duration=2800){
   document.querySelectorAll(".app-toast").forEach(el=>el.remove());
@@ -1890,14 +1892,31 @@ const sameRound=
     poller=null;
   }
 
-  player.paid=true;
-  player.paymentMarkedAt=new Date().toISOString();
-  player.paymentMarkMethod="player-confirmed-payment-return";
+  const {data:latestState,error:latestError}=await db.rpc("get_group_state",{p_pin:pin});
+  if(latestError || !latestState){
+    paymentReturnBusy=false;
+    if(pollingWasActive)startPolling();
+    showAppToast("Payment update waiting","Couldn’t refresh the latest group state. Please try again.",4200);
+    return;
+  }
+
+  const latestPlayer=(latestState.players||[]).find(p=>p.id===journey.playerId);
+  if(!latestPlayer){
+    paymentReturnBusy=false;
+    if(pollingWasActive)startPolling();
+    showAppToast("Payment not saved","Player could not be found. Please try again.",4200);
+    return;
+  }
+
+  state=latestState;
+  latestPlayer.paid=true;
+  latestPlayer.paymentMarkedAt=new Date().toISOString();
+  latestPlayer.paymentMarkMethod="player-confirmed-payment-return";
 
   const saved=await save();
 
   if(!saved){
-    player.paid=false;
+    latestPlayer.paid=false;
     paymentReturnBusy=false;
     if(pollingWasActive)startPolling();
     showAppToast("Payment update waiting","We’ll retry when you’re online.",4200);
@@ -1912,7 +1931,7 @@ const sameRound=
     : null;
 
   if(!verifiedPlayer?.paid){
-    player.paid=false;
+    latestPlayer.paid=false;
     paymentReturnBusy=false;
     if(pollingWasActive)startPolling();
     showAppToast("Payment not saved","Please return to Payments and try again.",4200);
