@@ -1492,6 +1492,13 @@ $("screen").innerHTML=`
     <div class="card" style="text-align:center;">
       <div class="muted" style="font-weight:800;letter-spacing:.4px;">💰 CURRENT POT</div>
       <div class="big" style="font-size:36px;margin:4px 0 2px;">£${pot()}</div>
+      ${state.splitPrizes ? `
+        <div style="margin-top:10px;font-weight:800;">
+          🥇 1st ${Number(pot()) > Number(state.secondPrize||0) + Number(state.thirdPrize||0) ? `£${Number(pot()) - Number(state.secondPrize||0) - Number(state.thirdPrize||0)} · ` : ``}CLEANS UP THE POT 🏆
+          <br><span style="display:inline-block;margin-top:6px;">🥈 2nd £${Number(state.secondPrize||0)} &nbsp;·&nbsp; 🥉 3rd £${Number(state.thirdPrize||0)}</span>
+        </div>
+        <div class="muted" style="margin-top:5px;">Winner takes everything left after 2nd &amp; 3rd prizes.</div>
+      ` : ``}
     </div>
   ` : ``}
 
@@ -1626,7 +1633,21 @@ function pay(){
    }</div>
    <div class="big">£${pot()}</div>
    <div class="muted"><b>Current pot</b></div>
-   <div class="muted" style="margin-top:6px;">Full pot if everyone enters: £${potentialPot()} • Entry: £${state.stake}</div>
+
+   ${state.splitPrizes ? `
+     <div style="margin-top:12px;font-weight:800;">
+       🥇 1st ${Number(pot()) > Number(state.secondPrize||0) + Number(state.thirdPrize||0)
+         ? `£${Number(pot()) - Number(state.secondPrize||0) - Number(state.thirdPrize||0)} · `
+         : ``}CLEANS UP THE POT 🏆
+       <br><span style="display:inline-block;margin-top:6px;">
+         🥈 2nd £${Number(state.secondPrize||0)}
+         &nbsp;·&nbsp;
+         🥉 3rd £${Number(state.thirdPrize||0)}
+       </span>
+     </div>
+   ` : ``}
+
+   <div class="muted" style="margin-top:8px;">Full pot if everyone enters: £${potentialPot()} • Entry: £${state.stake}</div>
  </div>
 
  <div class="card">
@@ -2840,6 +2861,19 @@ if(isTrip){
   // 💷 MONEY GAME
   // =====================================
 
+  console.log("FINISH DEBUG", {
+    gameType: state.gameType,
+    pointsCompetition: state.pointsCompetition,
+    stake: state.stake,
+    players: currentRoundPlayers().map(p=>({
+      name:p.name,
+      paid:p.paid,
+      stableford:p.stableford,
+      netScore:p.netScore,
+      submitted:p.scoreSubmitted
+    }))
+  });
+
   const moneyEligible=p=>Number(state.stake||0)>0 ? p.paid : true;
   const stablefordPlayers=currentRoundPlayers().filter(
     p=>moneyEligible(p) && pointsComp==="stableford" && p.stableford!=null
@@ -2890,7 +2924,7 @@ if(isTrip){
 
   let stablefordSplit=false;
 
-  if(stablefordWinners.length>1){
+  if(!state.splitPrizes && stablefordWinners.length>1){
     const resolution=await resolveMoneyTie(
       stablefordWinners,
       "Stableford",
@@ -2908,7 +2942,7 @@ if(isTrip){
 
   let netSplit=false;
 
-  if(netWinners.length>1){
+  if(!state.splitPrizes && netWinners.length>1){
     const resolution=await resolveMoneyTie(
       netWinners,
       "Net",
@@ -2923,6 +2957,47 @@ if(isTrip){
     netSplit=resolution.split;
   }
 
+// 🥇🥈🥉 Money Game prize places
+let moneyPrizePlaces=[];
+
+if(state.splitPrizes){
+  const competition=pointsComp==="net" ? "Net" : "Stableford";
+  const rankedPlayers=pointsComp==="net" ? [...netPlayers] : [...stablefordPlayers];
+  let remaining=[...rankedPlayers];
+
+  for(let place=0; place<3 && remaining.length; place++){
+    const bestScore=pointsComp==="net"
+      ? Math.min(...remaining.map(p=>Number(p.netScore)))
+      : Math.max(...remaining.map(p=>Number(p.stableford)));
+
+    const tied=remaining.filter(p=>
+      pointsComp==="net"
+        ? Number(p.netScore)===bestScore
+        : Number(p.stableford)===bestScore
+    );
+
+    let selected=tied[0];
+
+    if(tied.length>1){
+      selected=await chooseCountbackWinner(
+        tied,
+        competition,
+        pointsComp==="net" ? bestScore : bestScore + " points",
+        ["1st","2nd","3rd"][place]
+      );
+      if(!selected)return;
+    }
+
+    moneyPrizePlaces.push({
+      position:place+1,
+      name:selected.name,
+      playerId:selected.id || null,
+      score:bestScore
+    });
+
+    remaining=remaining.filter(p=>p!==selected);
+  }
+}
 const winners=[
   ...stablefordWinners.map(p=>p.name),
   ...netWinners.map(p=>p.name)
@@ -3017,6 +3092,11 @@ const record={
     stake:state.stake,
 
     gameType:"money",
+    pointsCompetition:pointsComp,
+    splitPrizes:Boolean(state.splitPrizes),
+    secondPrize:Number(state.secondPrize||0),
+    thirdPrize:Number(state.thirdPrize||0),
+    prizePlaces:state.splitPrizes ? moneyPrizePlaces : [],
 
     stablefordPot:stablefordPot(),
     netPot:netPot(),
@@ -3113,6 +3193,43 @@ function moneyText(value){
 function createWinnerPayouts(record){
   if(!record || record.gameType!=="money")return [];
   const payouts=[];
+
+  // 1st / 2nd / 3rd Money Game payouts
+  if(record.splitPrizes && Array.isArray(record.prizePlaces) && record.prizePlaces.length){
+    const competition=record.pointsCompetition==="net" ? "net" : "stableford";
+    const pot=Number(competition==="net" ? record.netPot||0 : record.stablefordPot||0);
+    const amounts=[
+      Math.max(0,pot-Number(record.secondPrize||0)-Number(record.thirdPrize||0)),
+      Number(record.secondPrize||0),
+      Number(record.thirdPrize||0)
+    ];
+
+    record.prizePlaces.slice(0,3).forEach((place,index)=>{
+      const amount=Number(amounts[index]||0);
+      if(!place?.name || amount<=0)return;
+
+      const savedPlayer=(record.players||[]).find(
+        p=>String(p.name)===String(place.name)
+      );
+
+      payouts.push({
+        id:`${competition}-place-${index+1}-${String(place.name).toLowerCase().replace(/[^a-z0-9]+/g,"-")}`,
+        competition,
+        position:index+1,
+        winnerName:place.name,
+        winnerPlayerId:place.playerId || savedPlayer?.id || null,
+        amount:Number(amount.toFixed(2)),
+        status:"awaiting_details",
+        paymentProvider:"",
+        paymentLink:"",
+        claimedAt:null,
+        paidAt:null
+      });
+    });
+
+    return payouts;
+  }
+
   const add=(competition,names,pot)=>{
     const winners=Array.isArray(names)?names.filter(Boolean):[];
     if(!winners.length || Number(pot||0)<=0)return;
@@ -3383,6 +3500,13 @@ function countbackOrderedFinalStandings(record){
 function finalStandingPosition(record,sorted,index){
   const p=sorted[index];
   if(!p || p.noReturn===true)return "—";
+
+  // Split-prize Money Games have already resolved prize-place ties by countback.
+  // Show a clean 1, 2, 3, 4... final leaderboard.
+  if(record?.gameType==="money" && record?.splitPrizes){
+    return String(index+1);
+  }
+
   const declared=(record?.pointsResults||[]).find(r=>r.name===p.name);
   if(declared?.position!=null)return String(declared.position);
 
@@ -3501,23 +3625,40 @@ function showRoundHistory(historyIndex){
       <div class="card">
         <h2>🏆 Result</h2>
 
-        ${h.stablefordWinnerNames?.length ? `
-          <div class="notice" style="margin-bottom:10px;">
-            <b>Stableford winner${h.stablefordWinnerNames.length>1 ? "s" : ""}</b><br>
-            ${h.stablefordWinnerNames.map(esc).join(", ")}
-            ${h.stablefordPot!=null ? `<br><span class="money">Pot £${Number(h.stablefordPot||0)}</span>` : ""}
-            ${h.stablefordWinnerNames.length>1 ? `<br><span class="muted">Split equally • £${(Number(h.stablefordPot||0)/h.stablefordWinnerNames.length).toFixed(2).replace(/\.00$/,"")} each</span>` : ""}
-            ${h.stablefordCountback ? `<br><span class="muted">Won on countback — Admin declared</span>` : ""}
-          </div>` : ""}
+        ${h.splitPrizes && Array.isArray(h.prizePlaces) && h.prizePlaces.length ? `
+          ${h.prizePlaces.map((place,i)=>{
+            const pot=Number(h.pointsCompetition==="net" ? h.netPot||0 : h.stablefordPot||0);
+            const amounts=[
+              Math.max(0,pot-Number(h.secondPrize||0)-Number(h.thirdPrize||0)),
+              Number(h.secondPrize||0),
+              Number(h.thirdPrize||0)
+            ];
+            const medals=["🥇","🥈","🥉"];
+            return `<div class="player row">
+              <span style="font-size:24px;margin-right:10px;">${medals[i]||""}</span>
+              <div style="flex:1;"><b>${esc(place.name)}</b></div>
+              <span class="money">£${moneyText(amounts[i]||0)}</span>
+            </div>`;
+          }).join("")}
+        ` : `
+          ${h.stablefordWinnerNames?.length ? `
+            <div class="notice" style="margin-bottom:10px;">
+              <b>Stableford winner${h.stablefordWinnerNames.length>1 ? "s" : ""}</b><br>
+              ${h.stablefordWinnerNames.map(esc).join(", ")}
+              ${h.stablefordPot!=null ? `<br><span class="money">Pot £${Number(h.stablefordPot||0)}</span>` : ""}
+              ${h.stablefordWinnerNames.length>1 ? `<br><span class="muted">Split equally • £${(Number(h.stablefordPot||0)/h.stablefordWinnerNames.length).toFixed(2).replace(/\.00$/,"")} each</span>` : ""}
+              ${h.stablefordCountback ? `<br><span class="muted">Won on countback — Admin declared</span>` : ""}
+            </div>` : ""}
 
-        ${h.netWinnerNames?.length ? `
-          <div class="notice">
-            <b>Net winner${h.netWinnerNames.length>1 ? "s" : ""}</b><br>
-            ${h.netWinnerNames.map(esc).join(", ")}
-            ${h.netPot!=null ? `<br><span class="money">Pot £${Number(h.netPot||0)}</span>` : ""}
-            ${h.netWinnerNames.length>1 ? `<br><span class="muted">Split equally • £${(Number(h.netPot||0)/h.netWinnerNames.length).toFixed(2).replace(/\.00$/,"")} each</span>` : ""}
-            ${h.netCountback ? `<br><span class="muted">Won on countback — Admin declared</span>` : ""}
-          </div>` : ""}
+          ${h.netWinnerNames?.length ? `
+            <div class="notice">
+              <b>Net winner${h.netWinnerNames.length>1 ? "s" : ""}</b><br>
+              ${h.netWinnerNames.map(esc).join(", ")}
+              ${h.netPot!=null ? `<br><span class="money">Pot £${Number(h.netPot||0)}</span>` : ""}
+              ${h.netWinnerNames.length>1 ? `<br><span class="muted">Split equally • £${(Number(h.netPot||0)/h.netWinnerNames.length).toFixed(2).replace(/\.00$/,"")} each</span>` : ""}
+              ${h.netCountback ? `<br><span class="muted">Won on countback — Admin declared</span>` : ""}
+            </div>` : ""}
+        `}
       </div>
     ` : `
       <div class="card">
@@ -3692,6 +3833,33 @@ function showWinnerScreen(record){
   const netEach=netNames.length ? netPotValue/netNames.length : 0;
   const historyIndex=(state.history||[]).indexOf(record);
 
+  const prizePlaces=Array.isArray(record.prizePlaces) ? record.prizePlaces : [];
+  const finalPot=record.pointsCompetition==="net" ? netPotValue : stablefordPotValue;
+  const firstPrize=Math.max(0,finalPot-Number(record.secondPrize||0)-Number(record.thirdPrize||0));
+  const prizeAmounts=[
+    firstPrize,
+    Number(record.secondPrize||0),
+    Number(record.thirdPrize||0)
+  ];
+  const prizeMedals=["🥇","🥈","🥉"];
+
+  const prizeResultsHtml=record.splitPrizes && prizePlaces.length ? `
+    <div class="card">
+      <h2 style="text-align:center;">🏆 Prize results</h2>
+      ${prizePlaces.map((place,i)=>`
+        <div class="player row">
+          <span style="font-size:26px;margin-right:10px;">${prizeMedals[i]||""}</span>
+          <div style="flex:1;">
+            <b>${esc(place.name)}</b>
+            <div class="muted">${i===0?"1st":i===1?"2nd":"3rd"} place</div>
+          </div>
+          <span class="money">£${moneyText(prizeAmounts[i])}</span>
+        </div>
+      `).join("")}
+    </div>
+  ` : "";
+
+
 
   $("screen").innerHTML=`
     <div class="card" style="text-align:center;">
@@ -3708,6 +3876,8 @@ function showWinnerScreen(record){
     </div>
 
     ${historyIndex>=0 ? payoutCardHtml(record,historyIndex) : ""}
+
+    ${prizeResultsHtml}
 
     ${stablefordWinner ? `
       <div class="card" style="text-align:center;">
@@ -3726,7 +3896,7 @@ function showWinnerScreen(record){
         </div>
 
         <div class="money">
-          ${stablefordNames.length>1 ? `Split pot • £${stablefordEach.toFixed(2).replace(/\.00$/,"")} each` : `Wins £${stablefordPotValue}`}
+          ${record.splitPrizes && prizeAmounts.length ? `Wins £${moneyText(prizeAmounts[0])}` : (stablefordNames.length>1 ? `Split pot • £${stablefordEach.toFixed(2).replace(/\.00$/,"")} each` : `Wins £${stablefordPotValue}`)}
         </div>
 
         ${record.stablefordCountback ? `
@@ -3754,7 +3924,7 @@ function showWinnerScreen(record){
         </div>
 
         <div class="money">
-          ${netNames.length>1 ? `Split pot • £${netEach.toFixed(2).replace(/\.00$/,"")} each` : `Wins £${netPotValue}`}
+          ${record.splitPrizes && prizeAmounts.length ? `Wins £${moneyText(prizeAmounts[0])}` : (netNames.length>1 ? `Split pot • £${netEach.toFixed(2).replace(/\.00$/,"")} each` : `Wins £${netPotValue}`)}
         </div>
 
         ${record.netCountback ? `
@@ -3854,22 +4024,46 @@ async function shareWinnerImage(){
         (competition==="stableford" && record.stablefordCountback) ||
         (record.gameType==="points" && record.pointsResults?.[0]?.countback)
       );
-      roundedRect(ctx,68,395,944,decidedOnCountback?170:132,24,white,line);
-      ctx.textAlign="left";ctx.fillStyle=green;ctx.font='800 18px Arial';
-      ctx.fillText("WINNER",108,430);
-      ctx.fillStyle=dark;ctx.font=`900 ${fitText(ctx,winner,355,35,22,"900")}px Arial`;ctx.fillText(winner,108,473);
+      if(record.gameType==="money" && record.splitPrizes && Array.isArray(record.prizePlaces) && record.prizePlaces.length){
+        const sharePot=Number(competition==="net" ? record.netPot||0 : record.stablefordPot||0);
+        const shareAmounts=[
+          Math.max(0,sharePot-Number(record.secondPrize||0)-Number(record.thirdPrize||0)),
+          Number(record.secondPrize||0),
+          Number(record.thirdPrize||0)
+        ];
+        const shareMedals=["🥇","🥈","🥉"];
 
-      ctx.fillStyle=green;ctx.font='800 18px Arial';ctx.fillText("SCORE",540,430);
-      ctx.fillStyle=dark;ctx.font='900 34px Arial';ctx.fillText(winnerScore,540,473);
+        roundedRect(ctx,68,395,944,190,24,white,line);
+        ctx.textAlign="left";ctx.fillStyle=green;ctx.font='900 21px Arial';
+        ctx.fillText("🏆 PRIZE RESULTS",108,430);
 
-      ctx.fillStyle=green;ctx.font='800 18px Arial';ctx.fillText(record.gameType==="points" ? ((state.trip?.active||state.trip?.completed) ? (tripPointsEnabled()?"TRIP PTS":"RESULT") : "LEAGUE") : "WON",795,430);
-      ctx.fillStyle=dark;ctx.font=`900 ${fitText(ctx,winnerValue,190,32,19,"900")}px Arial`;ctx.fillText(winnerValue,795,473);
+        record.prizePlaces.slice(0,3).forEach((place,i)=>{
+          const y=470+(i*42);
+          ctx.fillStyle=dark;ctx.font='800 24px Arial';ctx.textAlign="left";
+          ctx.fillText(`${shareMedals[i]}  ${place.name}`,108,y);
+          ctx.fillStyle=green;ctx.font='900 25px Arial';ctx.textAlign="right";
+          ctx.fillText(`£${moneyText(shareAmounts[i])}`,950,y);
+        });
 
-      if(decidedOnCountback){
-        ctx.fillStyle=green;ctx.font='800 19px Arial';ctx.textAlign="left";
-        ctx.fillText("🏆 Winner on countback — decided by Admin",108,530);
+        tableTop=650;
+      }else{
+        roundedRect(ctx,68,395,944,decidedOnCountback?170:132,24,white,line);
+        ctx.textAlign="left";ctx.fillStyle=green;ctx.font='800 18px Arial';
+        ctx.fillText("WINNER",108,430);
+        ctx.fillStyle=dark;ctx.font=`900 ${fitText(ctx,winner,355,35,22,"900")}px Arial`;ctx.fillText(winner,108,473);
+
+        ctx.fillStyle=green;ctx.font='800 18px Arial';ctx.fillText("SCORE",540,430);
+        ctx.fillStyle=dark;ctx.font='900 34px Arial';ctx.fillText(winnerScore,540,473);
+
+        ctx.fillStyle=green;ctx.font='800 18px Arial';ctx.fillText(record.gameType==="points" ? ((state.trip?.active||state.trip?.completed) ? (tripPointsEnabled()?"TRIP PTS":"RESULT") : "LEAGUE") : "WON",795,430);
+        ctx.fillStyle=dark;ctx.font=`900 ${fitText(ctx,winnerValue,190,32,19,"900")}px Arial`;ctx.fillText(winnerValue,795,473);
+
+        if(decidedOnCountback){
+          ctx.fillStyle=green;ctx.font='800 19px Arial';ctx.textAlign="left";
+          ctx.fillText("🏆 Winner on countback — decided by Admin",108,530);
+        }
+        tableTop=decidedOnCountback?628:590;
       }
-      tableTop=decidedOnCountback?628:590;
     }else{
       centreText(ctx,"FINAL STANDINGS — CONTINUED",430,28,"900",green);
       tableTop=490;
@@ -3910,7 +4104,12 @@ async function shareWinnerImage(){
     ctx.strokeStyle=green;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(68,1223);ctx.lineTo(1012,1223);ctx.stroke();
     const footerWinner=winner.length>25 ? winner.slice(0,23)+"…" : winner;
     ctx.textAlign="center";ctx.fillStyle=green;ctx.font='900 21px Arial';
-    ctx.fillText(`🎉 WELL PLAYED!   |   🏆 WINNER: ${footerWinner}   |   NEXT COMP COMING SOON ⛳`,540,1274);
+    ctx.fillText(
+  record.gameType==="money" && record.splitPrizes
+    ? `🎉 WELL PLAYED!   |   🏆 PRIZES PAID 1ST • 2ND • 3RD   |   NEXT COMP COMING SOON ⛳`
+    : `🎉 WELL PLAYED!   |   🏆 WINNER: ${footerWinner}   |   NEXT COMP COMING SOON ⛳`,
+  540,1274
+);
 
     return canvas;
   }
@@ -6485,7 +6684,23 @@ function normalRoundSetup(selectedType, selectedCompetition){
           </div>
         ` : `
           <label style="display:block;margin:0 0 6px;">Stake per player (£)</label>
-          <input id="normalSetupStake" type="number" min="0" step="0.01" value="" placeholder="Enter stake" style="width:100%;margin-bottom:16px;">
+          <input id="normalSetupStake" type="text" inputmode="numeric" pattern="[0-9]*" oninput="this.value=this.value.replace(/[^0-9]/g,'')" value="" placeholder="Enter stake" style="width:100%;margin-bottom:16px;">
+
+          <div class="notice" style="margin-bottom:16px;">
+            <div style="font-weight:800;margin-bottom:10px;">💷 Prize payout</div>
+            <label style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+              <input id="normalSetupSplitPrizes" type="checkbox" style="width:auto;margin:0;">
+              Pay 1st / 2nd / 3rd
+            </label>
+            <div id="normalSetupPrizeAmounts" style="display:none;">
+              <div style="margin-bottom:12px;"><b>🥇 1st prize</b> — remainder of pot</div>
+              <label style="display:block;margin:8px 0 4px;">🥈 2nd prize (£)</label>
+              <input id="normalSetupSecondPrize" type="text" inputmode="numeric" pattern="[0-9]*" oninput="this.value=this.value.replace(/[^0-9]/g,'')" value="" placeholder="Enter amount">
+              <label style="display:block;margin:8px 0 4px;">🥉 3rd prize (£)</label>
+              <input id="normalSetupThirdPrize" type="text" inputmode="numeric" pattern="[0-9]*" oninput="this.value=this.value.replace(/[^0-9]/g,'')" value="" placeholder="Enter amount">
+            </div>
+            <div class="muted" style="margin-top:8px;">Leave off for winner takes all.</div>
+          </div>
         `}
 
         <div id="normalSetupError" class="notice warning" style="display:none;margin-bottom:12px;"></div>
@@ -6496,6 +6711,15 @@ function normalRoundSetup(selectedType, selectedCompetition){
     const course=overlay.querySelector('#normalSetupCourse');
     const date=overlay.querySelector('#normalSetupDate');
     const stake=overlay.querySelector('#normalSetupStake');
+    const splitPrizes=overlay.querySelector('#normalSetupSplitPrizes');
+    const prizeAmounts=overlay.querySelector('#normalSetupPrizeAmounts');
+    const secondPrize=overlay.querySelector('#normalSetupSecondPrize');
+    const thirdPrize=overlay.querySelector('#normalSetupThirdPrize');
+    if(splitPrizes){
+      splitPrizes.onchange=()=>{
+        prizeAmounts.style.display=splitPrizes.checked?'block':'none';
+      };
+    }
     const err=overlay.querySelector('#normalSetupError');
     const finish=value=>{ overlay.remove(); resolve(value); };
     overlay.querySelector('#normalSetupCancel').onclick=()=>finish(null);
@@ -6503,12 +6727,18 @@ function normalRoundSetup(selectedType, selectedCompetition){
       const c=course.value.trim();
       const d=date.value;
       const st=isPoints ? Number(state.stake||0) : Number(stake?.value||0);
+      const split=!isPoints && !!splitPrizes?.checked;
+      const p2=split ? Number(secondPrize?.value||0) : 0;
+      const p3=split ? Number(thirdPrize?.value||0) : 0;
       let msg="";
       if(!c) msg="Please enter the course.";
       else if(!d) msg="Please choose the date.";
       else if(!isPoints && (!Number.isFinite(st) || st<0)) msg="Please enter a valid stake.";
+      else if(!isPoints && !Number.isInteger(st)) msg="Please enter the stake as a whole £ amount.";
+      else if(split && (![p2,p3].every(Number.isFinite) || [p2,p3].some(v=>v<0))) msg="Please enter valid prize amounts.";
+      else if(split && ![p2,p3].every(Number.isInteger)) msg="Please enter 2nd and 3rd prizes as whole £ amounts.";
       if(msg){ err.textContent=msg; err.style.display='block'; return; }
-      finish({course:c,date:d,stake:st});
+      finish({course:c,date:d,stake:st,splitPrizes:split,secondPrize:p2,thirdPrize:p3});
     };
     overlay.addEventListener('click',e=>{ if(e.target===overlay) finish(null); });
     setTimeout(()=>course.focus(),50);
@@ -6845,6 +7075,10 @@ async function newRound(){
   state.pointsCompetition=selectedCompetition;
   state.pointsValue=10;
   state.stake=selectedType==='money'?Number(setup.stake||0):0;
+  state.splitPrizes=selectedType==='money' && !!setup.splitPrizes;
+  state.firstPrize=0; // calculated from final pot
+  state.secondPrize=state.splitPrizes ? Number(setup.secondPrize||0) : 0;
+  state.thirdPrize=state.splitPrizes ? Number(setup.thirdPrize||0) : 0;
   state.players.forEach(p=>{
     p.paid=false;p.stableford=null;p.netScore=null;p.noReturn=false;p.scoreSubmitted=false;p.competition=null;
   });
