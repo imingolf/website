@@ -2584,20 +2584,6 @@ $("screen").innerHTML=`
 
   ${playerNextActionHtml()}
 
-  ${myPlayerId ? `
-    <div class="card" style="text-align:center;">
-      <div style="font-size:34px;">🤝</div>
-      <div class="muted">SIDE GAME</div>
-      <h2 style="margin:5px 0 7px;">Challenge your mates</h2>
-      <div style="font-weight:600;color:#40564a;line-height:1.4;">
-        One score. Challenge anyone in your group. We’ll keep track of who owes who.
-      </div>
-      <button class="primary full" style="margin-top:14px;" onclick="sideGameHome()">
-        🤝 Open Side Game
-      </button>
-    </div>
-  ` : ""}
-
   ${state.trip?.active ? `
     <div class="card" style="text-align:center;">
       <div style="font-size:28px;">✈️</div>
@@ -2756,6 +2742,20 @@ $("screen").innerHTML=`
       </div>
     </div>
   `}
+
+  ${myPlayerId ? `
+    <div class="card" style="text-align:center;">
+      <div style="font-size:34px;">🤝</div>
+      <div class="muted">SIDE GAME</div>
+      <h2 style="margin:5px 0 7px;">Challenge your mates</h2>
+      <div style="font-weight:600;color:#40564a;line-height:1.4;">
+        One score. Challenge anyone in your group. We’ll keep track of who owes who.
+      </div>
+      <button class="primary full" style="margin-top:14px;" onclick="sideGameHome()">
+        🤝 Open Side Game
+      </button>
+    </div>
+  ` : ""}
 
   <div class="card">
     <button class="secondary full" onclick="shareApp()">📤 Share I'm In Golf</button>
