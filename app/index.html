@@ -1464,6 +1464,7 @@ function sideGameChoosePlayer(){
     </div>
 
     <button class="secondary full" onclick="sideGameHome()">← Back to Side Game</button>
+    <div style="height:100px;"></div>
   `;
 
   window.scrollTo(0,0);
@@ -1512,7 +1513,7 @@ function sideGamePickPlayer(playerId){
   window.scrollTo(0,0);
 }
 
-function sideGameAgreedInPerson(playerId){
+function sideGameAgreedInPerson(playerId,mode="in_person"){
   sideGameOpen=true;
 
   const me=state.players.find(p=>p.id===myPlayerId);
@@ -1532,17 +1533,25 @@ function sideGameAgreedInPerson(playerId){
   }
 
   const today=new Date().toLocaleDateString("en-CA");
-  const todaysExistingBet=existingBets.find(b=>b.date===today && b.status==="active");
+  ensureSideGameState();
 
-  const savedFormat=todaysExistingBet?.format ||
+  const todaysExistingBet=state.sideGame.bets.find(b=>
+    b.date===today &&
+    (b.status==="active" || b.status==="resolved") &&
+    (b.player1Id===myPlayerId || b.player2Id===myPlayerId)
+  );
+
+  const rememberedFormat=
     localStorage.getItem("iig_sidegame_format_"+myPlayerId) || "";
+
+  const savedFormat=todaysExistingBet?.format || rememberedFormat;
 
   const formatLocked=Boolean(todaysExistingBet);
 
   $("screen").innerHTML=`
     <div class="card" style="text-align:center;">
       <div style="font-size:42px;">🤝</div>
-      <div class="muted">AGREED IN PERSON</div>
+      <div class="muted">${mode==="challenge" ? "SEND CHALLENGE" : "AGREED IN PERSON"}</div>
       <h2 style="margin:6px 0;">${esc(me.name)} vs ${esc(player.name)}</h2>
     </div>
 
@@ -1597,9 +1606,11 @@ function sideGameAgreedInPerson(playerId){
         id="sideGameConfirm"
         class="primary full"
         style="margin-top:18px;"
-        onclick="sideGameConfirmBet('${escAttr(player.id)}')"
+        onclick="${mode==="challenge"
+          ? `sideGameSendChallenge('${escAttr(player.id)}')`
+          : `sideGameConfirmBet('${escAttr(player.id)}')`}"
         ${savedFormat ? "" : "disabled"}>
-        🤝 Confirm Bet
+        ${mode==="challenge" ? "📲 Send Challenge" : "🤝 Confirm Bet"}
       </button>
     </div>
 
@@ -1725,9 +1736,138 @@ function sideGameConfirmBet(playerId){
 }
 
 function sideGameSendChallenge(playerId){
+  const stakeInput=$("sideGameStake");
+
+  if(!stakeInput){
+    sideGameAgreedInPerson(playerId,"challenge");
+    return;
+  }
+
+  ensureSideGameState();
+
   const player=state.players.find(p=>p.id===playerId);
-  if(!player)return;
-  alert(`Next: send a challenge to ${player.name}.`);
+  const me=state.players.find(p=>p.id===myPlayerId);
+  if(!player || !me)return;
+
+  const stake=Number(stakeInput.value||0);
+  const format=localStorage.getItem("iig_sidegame_format_"+myPlayerId)||"";
+
+  if(!(stake>0)){
+    alert("Enter the bet amount first.");
+    return;
+  }
+
+  if(!format){
+    alert("Choose Stableford or Net first.");
+    return;
+  }
+
+  const today=new Date().toLocaleDateString("en-CA");
+
+  const duplicate=state.sideGame.bets.some(b=>
+    b.date===today &&
+    (b.status==="pending" || b.status==="active") &&
+    (
+      (b.player1Id===myPlayerId && b.player2Id===playerId) ||
+      (b.player1Id===playerId && b.player2Id===myPlayerId)
+    )
+  );
+
+  if(duplicate){
+    alert(`You already have a Side Game with ${player.name} today.`);
+    return;
+  }
+
+  state.sideGame.bets.push({
+    id:"sg_shared_"+Date.now(),
+    player1Id:me.id,
+    player1Name:me.name,
+    player2Id:player.id,
+    player2Name:player.name,
+    stake:stake,
+    format:format,
+    date:today,
+    status:"pending",
+    setup:"challenge",
+    createdAt:new Date().toISOString()
+  });
+
+  localStorage.setItem("iig_sidegame_stake_"+myPlayerId,String(stake));
+  localStorage.setItem("iig_sidegame_format_"+myPlayerId,format);
+
+  save();
+  sideGameHome();
+
+  alert(`Challenge sent to ${player.name}.`);
+}
+
+function sideGameAcceptChallenge(betId){
+  ensureSideGameState();
+
+  const bet=state.sideGame.bets.find(b=>
+    b.id===betId &&
+    b.status==="pending" &&
+    b.setup==="challenge" &&
+    b.player2Id===myPlayerId
+  );
+
+  if(!bet){
+    alert("This challenge is no longer waiting for you.");
+    sideGameHome();
+    return;
+  }
+
+  const today=new Date().toLocaleDateString("en-CA");
+
+  const todaysExistingBet=state.sideGame.bets.find(b=>
+    b.id!==bet.id &&
+    b.date===today &&
+    (b.status==="active" || b.status==="resolved") &&
+    (b.player1Id===myPlayerId || b.player2Id===myPlayerId)
+  );
+
+  if(todaysExistingBet && todaysExistingBet.format!==bet.format){
+    const todaysFormat=todaysExistingBet.format==="net" ? "Net" : "Stableford";
+    const challengeFormat=bet.format==="net" ? "Net" : "Stableford";
+
+    alert(
+      `You can't accept this ${challengeFormat} challenge because your Side Games today are already using ${todaysFormat}.`
+    );
+    return;
+  }
+
+  bet.status="active";
+  bet.acceptedAt=new Date().toISOString();
+
+  save();
+  sideGameHome();
+
+  alert(`Challenge with ${bet.player1Name} accepted.`);
+}
+
+function sideGameDeclineChallenge(betId){
+  ensureSideGameState();
+
+  const bet=state.sideGame.bets.find(b=>
+    b.id===betId &&
+    b.status==="pending" &&
+    b.setup==="challenge" &&
+    b.player2Id===myPlayerId
+  );
+
+  if(!bet){
+    alert("This challenge is no longer waiting for you.");
+    sideGameHome();
+    return;
+  }
+
+  bet.status="declined";
+  bet.declinedAt=new Date().toISOString();
+
+  save();
+  sideGameHome();
+
+  alert(`Challenge from ${bet.player1Name} declined.`);
 }
 
 function sideGameResolveBetsForToday(){
@@ -1776,7 +1916,7 @@ function sideGameResolveBetsForToday(){
   });
 }
 
-function sideGameSaveScore(format){
+async function sideGameSaveScore(format){
   const input=$("sideGameScore");
   const score=Number(input?.value);
 
@@ -1812,7 +1952,14 @@ function sideGameSaveScore(format){
   }
 
   sideGameResolveBetsForToday();
-  save();
+
+  const ok=await save();
+
+  if(!ok){
+    alert("Your Side Game score could not be saved. Please try again.");
+    return;
+  }
+
   sideGameHome();
 }
 
@@ -2040,7 +2187,21 @@ function sideGameHome(){
           x.creditorId===myPlayerId
         );
 
-        if(!todaysBets.length){
+        const incomingChallenges=state.sideGame.bets.filter(b=>
+          b.date===today &&
+          b.status==="pending" &&
+          b.setup==="challenge" &&
+          b.player2Id===myPlayerId
+        );
+
+        const outgoingChallenges=state.sideGame.bets.filter(b=>
+          b.date===today &&
+          b.status==="pending" &&
+          b.setup==="challenge" &&
+          b.player1Id===myPlayerId
+        );
+
+        if(!todaysBets.length && !incomingChallenges.length && !outgoingChallenges.length){
           return `
             <div class="muted">YOUR SIDE GAME</div>
             <h2 style="margin:5px 0;">No active bets yet</h2>
@@ -2051,6 +2212,48 @@ function sideGameHome(){
         }
 
         return `
+          ${outgoingChallenges.length ? `
+            <div class="notice" style="margin-bottom:14px;">
+              <div class="muted" style="text-align:center;">📲 CHALLENGE SENT</div>
+
+              ${outgoingChallenges.map(b=>`
+                <div style="font-size:20px;font-weight:900;text-align:center;margin-top:8px;">
+                  Waiting for ${esc(b.player2Name)} to accept
+                </div>
+
+                <div style="font-weight:700;text-align:center;margin-top:5px;color:#40564a;">
+                  £${Number(b.stake)} · ${b.format==="net" ? "Net" : "Stableford"}
+                </div>
+              `).join("")}
+            </div>
+          ` : ""}
+
+          ${incomingChallenges.length ? `
+            <div class="notice" style="margin-bottom:14px;">
+              <div class="muted" style="text-align:center;">📲 SIDE GAME CHALLENGE</div>
+
+              ${incomingChallenges.map(b=>`
+                <div style="font-size:20px;font-weight:900;text-align:center;margin-top:8px;">
+                  ${esc(b.player1Name)} has challenged you
+                </div>
+
+                <div style="font-weight:700;text-align:center;margin-top:5px;color:#40564a;">
+                  £${Number(b.stake)} · ${b.format==="net" ? "Net" : "Stableford"}
+                </div>
+
+                <button class="primary full" style="margin-top:12px;"
+                  onclick="sideGameAcceptChallenge('${b.id}')">
+                  ✓ Accept
+                </button>
+
+                <button class="secondary full" style="margin-top:8px;"
+                  onclick="sideGameDeclineChallenge('${b.id}')">
+                  Decline
+                </button>
+              `).join("")}
+            </div>
+          ` : ""}
+
           ${savedScore ? `
             <div class="notice" style="text-align:center;margin-bottom:14px;">
               <div class="muted">TODAY'S SCORE</div>
@@ -2101,6 +2304,10 @@ function sideGameHome(){
               `).join("")}
             </div>
           ` : ""}
+
+          <button class="secondary full" style="margin-bottom:18px;" onclick="sideGameStatement()">
+            📊 My Side Game Statement
+          </button>
 
           <div class="muted">TODAY'S BETS</div>
           ${todaysBets.map(b=>{
@@ -2178,8 +2385,149 @@ function sideGameHome(){
   window.scrollTo(0,0);
 }
 
+
+function sideGameStatement(){
+  sideGameOpen=true;
+  ensureSideGameState();
+
+  const balances={};
+  const names={};
+
+  const addBalance=(playerId,playerName,amount)=>{
+    if(!playerId || playerId===myPlayerId)return;
+    balances[playerId]=(balances[playerId]||0)+amount;
+    names[playerId]=playerName;
+  };
+
+  state.sideGame.bets
+    .filter(b=>b.status==="resolved")
+    .forEach(b=>{
+      const amount=Number(b.amount||0);
+      if(!amount || !b.winnerId || !b.loserId)return;
+
+      if(b.winnerId===myPlayerId){
+        const otherId=b.loserId;
+        const otherName=b.player1Id===otherId ? b.player1Name : b.player2Name;
+        addBalance(otherId,otherName,amount);
+      }else if(b.loserId===myPlayerId){
+        const otherId=b.winnerId;
+        const otherName=b.player1Id===otherId ? b.player1Name : b.player2Name;
+        addBalance(otherId,otherName,-amount);
+      }
+    });
+
+  state.sideGame.settlements
+    .filter(x=>x.status==="confirmed")
+    .forEach(x=>{
+      const amount=Number(x.amount||0);
+
+      if(x.debtorId===myPlayerId){
+        addBalance(x.creditorId,x.creditorName,amount);
+      }else if(x.creditorId===myPlayerId){
+        addBalance(x.debtorId,x.debtorName,-amount);
+      }
+    });
+
+  const owed=[];
+  const owe=[];
+
+  Object.entries(balances).forEach(([playerId,balance])=>{
+    if(balance>0) owed.push({playerId,name:names[playerId],amount:balance});
+    if(balance<0) owe.push({playerId,name:names[playerId],amount:Math.abs(balance)});
+  });
+
+  const totalOwed=owed.reduce((sum,x)=>sum+x.amount,0);
+  const totalOwe=owe.reduce((sum,x)=>sum+x.amount,0);
+  const net=totalOwed-totalOwe;
+
+  const activity=[];
+
+  state.sideGame.bets
+    .filter(b=>
+      b.status==="resolved" &&
+      (b.player1Id===myPlayerId || b.player2Id===myPlayerId)
+    )
+    .forEach(b=>{
+      const otherName=b.player1Id===myPlayerId ? b.player2Name : b.player1Name;
+      let text=`${otherName} · Draw £0`;
+
+      if(b.winnerId===myPlayerId) text=`${otherName} · Won +£${Number(b.amount||0)}`;
+      if(b.loserId===myPlayerId) text=`${otherName} · Lost -£${Number(b.amount||0)}`;
+
+      activity.push({
+        date:b.resolvedAt || b.createdAt || "",
+        text
+      });
+    });
+
+  state.sideGame.settlements
+    .filter(x=>
+      x.status==="confirmed" &&
+      (x.debtorId===myPlayerId || x.creditorId===myPlayerId)
+    )
+    .forEach(x=>{
+      const otherName=x.debtorId===myPlayerId ? x.creditorName : x.debtorName;
+      activity.push({
+        date:x.confirmedAt || x.createdAt || "",
+        text:`${otherName} · £${Number(x.amount||0)} settled ✓`
+      });
+    });
+
+  activity.sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+
+  $("screen").innerHTML=`
+    <div class="card">
+      <div style="text-align:center;font-size:34px;">📊</div>
+      <h2 style="text-align:center;margin:4px 0;">SIDE GAME STATEMENT</h2>
+      <div class="muted" style="text-align:center;margin-bottom:18px;">${esc(state.players.find(p=>p.id===myPlayerId)?.name||"")}</div>
+
+      <div class="notice" style="margin-bottom:14px;">
+        <div class="muted">YOU ARE OWED</div>
+        ${owed.length
+          ? owed.map(x=>`<div style="font-weight:900;margin-top:8px;">${esc(x.name)} — £${x.amount}</div>`).join("")
+          : `<div style="margin-top:8px;">Nothing outstanding</div>`
+        }
+        <div style="font-weight:900;margin-top:10px;">Total owed to you £${totalOwed}</div>
+      </div>
+
+      <div class="notice" style="margin-bottom:14px;">
+        <div class="muted">YOU OWE</div>
+        ${owe.length
+          ? owe.map(x=>`<div style="font-weight:900;margin-top:8px;">${esc(x.name)} — £${x.amount}</div>`).join("")
+          : `<div style="margin-top:8px;">Nothing outstanding</div>`
+        }
+        <div style="font-weight:900;margin-top:10px;">Total you owe £${totalOwe}</div>
+      </div>
+
+      <div class="notice" style="text-align:center;margin-bottom:14px;">
+        <div class="muted">NET POSITION</div>
+        <div style="font-size:24px;font-weight:900;margin-top:6px;">
+          ${net>0 ? "+" : net<0 ? "-" : ""}£${Math.abs(net)}
+        </div>
+      </div>
+
+      <div class="muted">RECENT ACTIVITY</div>
+      ${activity.length
+        ? activity.slice(0,20).map(x=>`
+            <div class="notice" style="margin-top:8px;">
+              ${esc(x.text)}
+            </div>
+          `).join("")
+        : `<div class="notice" style="margin-top:8px;">No Side Game activity yet.</div>`
+      }
+
+      <button class="secondary full" style="margin-top:14px;" onclick="sideGameHome()">
+        ← Back to Side Game
+      </button>
+
+      <div style="height:100px;"></div>
+    </div>
+  `;
+
+  window.scrollTo(0,0);
+}
+
 function round(){
-  console.log("ROUND STATE CHECK", {roundOpen:state.roundOpen, course:state.course, date:state.date, players:state.players?.length, history:state.history?.length, isAdmin:isAdmin});
 
   if(state.trip?.completed){
     showTripSummary();
@@ -2208,7 +2556,6 @@ function round(){
           <div style="margin-top:10px;"><span class="pill paid">${planned.gameType==="points" ? "🏆 POINTS GAME" : "💷 MONEY GAME"}</span></div>
           <div class="notice" style="margin-top:12px;"><b>Competition: ${planned.format==="betterball"?"🤝 Better Ball Stableford":planned.format==="pairsaggregate"?`➕ Pairs Aggregate ${state.trip.competition==="net"?"Net":"Stableford"}`:(state.trip.competition==="net" ? "⛳ Net" : "🏆 Stableford")}</b>${planned.gameType==="money" ? `<br>Stake: £${Number(planned.stake||0)}` : (planned.format!=="individual"?`<br>Team round • builds Team-event standings`:`<br>Trip points: 10 / 6 / 3`)}</div>
         </div>` : ""}
-      <div class="card" style="text-align:center;">
         <div style="font-weight:800;margin-bottom:10px;">Round ${nextNo-1} is complete.</div>
         ${isAdmin ? `<button class="primary full" onclick="nextTripRound()">✈️ Start Round ${nextNo}</button>` : `<div class="notice">Waiting for the Group Admin to start Round ${nextNo}.</div>`}
       </div>`;
@@ -2285,7 +2632,6 @@ $("screen").innerHTML=`
             ${tripTeamRoundActive() ? `🤝 ${esc(tripFormatLabel().toUpperCase())}` : (state.gameType==="points" ? "🏆 POINTS GAME" : (Number(state.stake||0)>0 ? "💷 MONEY GAME" : "⛳ NO STAKE"))}
           </span>
           <span class="pill" style="background:#edf5ef;color:var(--green);">
-            ${tripTeamRoundActive()?`🤝 ${esc(tripFormatLabel())} ${(state.pointsCompetition||"stableford")==="net"?"Net":"Stableford"}`:((state.pointsCompetition||state.trip?.competition||"stableford")==="net" ? "⛳ Net" : "🏆 Stableford")}
           </span>
           ${state.gameType==="money" && Number(state.stake||0)>0 ? `
             <span class="pill" style="background:#edf5ef;color:var(--green);">£${state.stake} entry</span>
@@ -3701,10 +4047,6 @@ places.forEach((place,i)=>{
         name:p.name,
         handicap:p.handicap,
         competition:pointsComp,
-        stableford:p.stableford,
-        netScore:p.netScore,
-      noReturn:Boolean(p.noReturn),
-      scoreSubmitted:Boolean(p.scoreSubmitted)
       }))
     };
 if(isTrip){
@@ -3763,19 +4105,6 @@ if(isTrip){
   // =====================================
   // 💷 MONEY GAME
   // =====================================
-
-  console.log("FINISH DEBUG", {
-    gameType: state.gameType,
-    pointsCompetition: state.pointsCompetition,
-    stake: state.stake,
-    players: currentRoundPlayers().map(p=>({
-      name:p.name,
-      paid:p.paid,
-      stableford:p.stableford,
-      netScore:p.netScore,
-      submitted:p.scoreSubmitted
-    }))
-  });
 
   const moneyEligible=p=>Number(state.stake||0)>0 ? p.paid : true;
   const stablefordPlayers=currentRoundPlayers().filter(
@@ -4029,10 +4358,6 @@ const record={
       name:p.name,
       handicap:p.handicap,
       competition:p.competition || null,
-      stableford:p.stableford,
-      netScore:p.netScore,
-      noReturn:Boolean(p.noReturn),
-      scoreSubmitted:Boolean(p.scoreSubmitted)
     }))
   };
 
@@ -4704,7 +5029,6 @@ function showWinnerScreen(record){
   // 💷 MONEY GAME RESULT
   // =====================================
 
-  const stablefordNames=record.stablefordWinnerNames||[];
   const netNames=record.netWinnerNames||[];
 
   const stablefordWinner=stablefordNames.join(" & ");
@@ -8445,10 +8769,6 @@ if(backup){
     handicap:p.handicap,
     paid:p.paid,
     competition:p.competition,
-    stableford:p.stableford,
-    netScore:p.netScore,
-    wins:p.wins,
-    leaguePoints:p.leaguePoints,
     netWinnings:p.netWinnings
   }));
 }
