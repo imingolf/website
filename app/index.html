@@ -998,7 +998,6 @@ function waitingScreen(){
       ${myPlayerId && state.players.some(p=>p.id===myPlayerId) ? `<div class="notice" style="margin-top:0;">👤 You: <b>${esc(state.players.find(p=>p.id===myPlayerId)?.name||"")}</b></div>` : ""}
       ${notificationCardHtml()}
       ${prizeNextActionHtml()}
-      ${sideGameEntranceHtml()}
       <div class="card" style="text-align:center;padding:28px 18px;">
         <div style="font-size:46px;">⛳</div>
         <div class="muted">FIRST ROUND</div>
@@ -1007,7 +1006,8 @@ function waitingScreen(){
           Choose your game and add the details for your first competition.
         </div>
         <button class="primary full" style="margin-top:18px;" onclick="newRound()">➕ Start First Competition</button>
-      </div>`;
+      </div>
+      ${sideGameEntranceHtml()}`;
     return;
   }
 
@@ -1015,7 +1015,6 @@ function waitingScreen(){
     ${myPlayerId && state.players.some(p=>p.id===myPlayerId) ? `<div class="notice" style="margin-top:0;">👤 You: <b>${esc(state.players.find(p=>p.id===myPlayerId)?.name||"")}</b></div>` : ""}
     ${notificationCardHtml()}
     ${prizeNextActionHtml()}
-    ${sideGameEntranceHtml()}
     <div class="card" style="text-align:center;padding:28px 18px;">
       <div style="font-size:46px;">⛳</div>
       <div class="muted">${first ? "NEXT ROUND" : "NEXT COMPETITION"}</div>
@@ -1028,6 +1027,7 @@ function waitingScreen(){
             : "")
       }
     </div>
+    ${sideGameEntranceHtml()}
     ${first ? "" : `<div class="card"><div class="notice">✅ The last result has been saved in <b>League → Previous rounds</b>.</div></div>`}
   `;
 }
