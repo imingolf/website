@@ -23,7 +23,7 @@ values (
   '{
     "course":"Hazel Grove Golf Club",
     "date":"Saturday",
-    "stake":20,
+    "stake":0,
     "players":[
       {"id":"ga","name":"Greg A","handicap":11,"paid":false,"score":null,"wins":0,"netWinnings":0},
       {"id":"gr","name":"Greg R","handicap":14,"paid":false,"score":null,"wins":0,"netWinnings":0},

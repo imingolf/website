@@ -221,7 +221,7 @@ body.admin-mode nav button.active:not(.hidden),body.admin-mode nav.iig-admin-nav
 <header class="app-header">
   <div class="app-header-brand">
     <img src="icon-192.png" alt="I'm In Golf" class="app-header-logo">
-    <span id="adminModeBadge" class="admin-mode-badge hidden">ADMIN MODE</span>
+    <span id="adminModeBadge" class="admin-mode-badge hidden" onclick="show('settings');window.scrollTo(0,0)" style="cursor:pointer;">⚙️ ADMIN SETTINGS</span>
     <span id="demoBadge" class="demo-mode-badge hidden">DEMO</span>
   </div>
   <p id="syncText" class="sync-status" aria-live="polite">Shared golf group</p>
@@ -784,6 +784,15 @@ function roundOpenNow(){
   if(state.roundOpen===false)return false;
   if(state.roundOpen===true)return true;
 
+  // A brand-new group may not yet have the roundOpen flag.
+  // Blank course/date + no history means no competition has been created.
+  if(
+    state.roundOpen==null &&
+    (state.history||[]).length===0 &&
+    !String(state.course||"").trim() &&
+    !String(state.date||"").trim()
+  )return false;
+
   // Backward-compatible check for groups that completed a round before
   // the roundOpen flag existed. If the latest saved round matches the
   // current round and all entries have already been reset, treat it as closed.
@@ -823,10 +832,19 @@ async function setupFirstRound(){
   const competition=String($("firstRoundCompetition")?.value||"stableford");
   const rawStake=String($("firstRoundStake")?.value||"").trim();
   const stake=rawStake==="" ? 0 : Number(rawStake);
+  const splitPrizes=Boolean($("firstRoundSplitPrizes")?.checked);
+  const rawSecond=String($("firstRoundSecondPrize")?.value||"").trim();
+  const rawThird=String($("firstRoundThirdPrize")?.value||"").trim();
+  const secondPrize=rawSecond==="" ? 0 : Number(rawSecond);
+  const thirdPrize=rawThird==="" ? 0 : Number(rawThird);
 
   if(!course){ alert("Please enter the course."); $("firstRoundCourse")?.focus(); return; }
   if(!date){ alert("Please choose the date."); $("firstRoundDate")?.focus(); return; }
   if(!Number.isFinite(stake) || stake<0){ alert("Please enter a valid stake, or leave it blank for no money game."); return; }
+  if(splitPrizes && (!Number.isInteger(secondPrize) || !Number.isInteger(thirdPrize) || secondPrize<0 || thirdPrize<0)){
+    alert("Please enter 2nd and 3rd prizes as whole £ amounts.");
+    return;
+  }
   if(stake>0 && !String(state.paymentLink||"").trim()){
     alert("Please add your payment link in Admin / Settings before starting a money round.");
     return;
@@ -837,6 +855,10 @@ async function setupFirstRound(){
   state.stake=stake;
   state.gameType="money";
   state.pointsCompetition=competition==="net" ? "net" : "stableford";
+  state.splitPrizes=splitPrizes;
+  state.firstPrize=0;
+  state.secondPrize=splitPrizes ? secondPrize : 0;
+  state.thirdPrize=splitPrizes ? thirdPrize : 0;
   state.roundOpen=true;
   state.players.forEach(p=>{
     p.paid=false; p.competition=null; p.stableford=null; p.netScore=null;
@@ -908,23 +930,14 @@ function waitingScreen(){
       ${myPlayerId && state.players.some(p=>p.id===myPlayerId) ? `<div class="notice" style="margin-top:0;">👤 You: <b>${esc(state.players.find(p=>p.id===myPlayerId)?.name||"")}</b></div>` : ""}
       ${notificationCardHtml()}
       ${prizeNextActionHtml()}
-      <div class="card">
-        <div style="font-size:38px;text-align:center;">⛳</div>
-        <h2 style="text-align:center;margin-bottom:6px;">Set up your first round</h2>
-        <div class="muted" style="text-align:center;margin-bottom:20px;">Add the details for your first game.</div>
-        <label class="muted">Course</label>
-        <input id="firstRoundCourse" autocomplete="off" placeholder="e.g. Hazel Grove Golf Club">
-        <label class="muted">Date</label>
-        <input id="firstRoundDate" type="date">
-        <label class="muted"><b>Competition</b></label>
-        <input id="firstRoundCompetition" type="hidden" value="stableford">
-        <div class="comp-choice">
-          <button id="firstCompStableford" type="button" class="selected" onclick="setFirstRoundCompetition('stableford')">🏆 Stableford</button>
-          <button id="firstCompNet" type="button" onclick="setFirstRoundCompetition('net')">⛳ Net</button>
+      <div class="card" style="text-align:center;padding:28px 18px;">
+        <div style="font-size:46px;">⛳</div>
+        <div class="muted">FIRST ROUND</div>
+        <h2 style="font-size:28px;margin:8px 0;">Set up your first round</h2>
+        <div style="font-size:17px;line-height:1.45;font-weight:600;color:#40564a;margin-top:12px;">
+          Choose your game and add the details for your first competition.
         </div>
-        <label class="muted">Stake per player (£) <span style="font-weight:400;">— optional</span></label>
-        <input id="firstRoundStake" type="number" min="0" step="0.01" placeholder="Enter stake">
-        <button class="primary full" style="margin-top:18px;" onclick="setupFirstRound()">⛳ Set Up Round</button>
+        <button class="primary full" style="margin-top:18px;" onclick="newRound()">➕ Start First Competition</button>
       </div>`;
     return;
   }
@@ -1352,6 +1365,7 @@ function playerNextActionHtml(){
 }
 
 function round(){
+  console.log("ROUND STATE CHECK", {roundOpen:state.roundOpen, course:state.course, date:state.date, players:state.players?.length, history:state.history?.length, isAdmin:isAdmin});
 
   if(state.trip?.completed){
     showTripSummary();
@@ -1664,8 +1678,12 @@ function pay(){
            </div>
 
            ${isAdmin
-             ? `<button class="${p.paid?'secondary':'primary'} small" onclick="togglePaid(${i})">${p.paid?'✓ Paid':'Mark paid'}</button>`
-             : `<span class="pill ${p.paid?'paid':'pending'}">${p.paid?'✓ Paid':'Not paid'}</span>`
+             ? (Number(state.stake||0)<=0
+                ? `<span class="pill paid">No payment required</span>`
+                : `<button class="${p.paid?'secondary':'primary'} small" onclick="togglePaid(${i})">${p.paid?'✓ Paid':'Mark paid'}</button>`)
+             : (Number(state.stake||0)<=0
+                ? `<span class="pill paid">No payment required</span>`
+                : `<span class="pill ${p.paid?'paid':'pending'}">${p.paid?'✓ Paid':'Not paid'}</span>`)
            }
          </div>
        </div>
@@ -1686,13 +1704,15 @@ function pay(){
    }
  </div>
 
- ${!isAdmin && !(me && me.paid) ? `
+ ${!isAdmin && Number(state.stake||0)>0 && !(me && me.paid) ? `
    <div class="pay-screen-spacer"></div>
    <div class="pay-sticky">
      ${pin==="2026"
        ? `<button class="secondary full" onclick="alert('👀 Demo Mode\n\nPayments are disabled in the demo.')">🔒 Demo — Payments Disabled</button>`
        : (String(state.paymentLink||"").trim()
-           ? `<button class="primary full" onclick="beginPlayerPayment()">💳 Pay £${Number(state.stake||0)} & Enter</button>`
+           ? (adminDeviceRecognised()
+              ? `<button class="primary full" onclick="adminSelfEnter()">🔑 Enter & Mark Myself Paid</button>`
+              : `<button class="primary full" onclick="beginPlayerPayment()">💳 Pay £${Number(state.stake||0)} & Enter</button>`)
            : `<button class="secondary full" disabled>Payment link not set up — ask your Group Admin</button>`)
      }
    </div>
@@ -1749,6 +1769,61 @@ function paymentLinkForStake(rawLink,stake){
   // Other payment providers keep using the Admin's saved link as entered.
   return link;
 }
+async function adminSelfEnter(){
+  if(!demoCanEdit())return;
+  if(!myPlayerId){alert("Please select who you are first.");return;}
+  if(roundLocked()){alert("🔒 Entries are closed — scoring has started.");return;}
+
+  const player=state.players.find(p=>p.id===myPlayerId);
+  if(!player)return;
+  if(player.paid){alert("You're already marked paid.");return;}
+
+  const confirmed=await appConfirm(
+    "Enter yourself?",
+    `You are the Group Admin and a player in this competition.\n\nMark your £${Number(state.stake||0)} entry as paid without opening your own payment link?`,
+    "Enter & Mark Paid"
+  );
+  if(!confirmed)return;
+
+  const {data:latestState,error}=await db.rpc("get_group_state",{p_pin:pin});
+  if(error || !latestState){
+    showAppToast("Entry not saved","Couldn’t refresh the group. Please try again.",4000);
+    return;
+  }
+
+  const latestPlayer=(latestState.players||[]).find(p=>p.id===myPlayerId);
+  if(!latestPlayer){
+    showAppToast("Entry not saved","Player could not be found.",4000);
+    return;
+  }
+
+  state=latestState;
+  latestPlayer.paid=true;
+  latestPlayer.paymentMarkedAt=new Date().toISOString();
+  latestPlayer.paymentMarkMethod="admin-self-entry";
+
+  const saved=await save();
+  if(!saved){
+    latestPlayer.paid=false;
+    showAppToast("Entry not saved","Please try again.",4000);
+    return;
+  }
+
+  const {data:verifiedState,error:verifyError}=await db.rpc("get_group_state",{p_pin:pin});
+  const verifiedPlayer=!verifyError && verifiedState
+    ? (verifiedState.players||[]).find(p=>p.id===myPlayerId)
+    : null;
+
+  if(!verifiedPlayer?.paid){
+    showAppToast("Entry not saved","Please try again.",4000);
+    return;
+  }
+
+  state=verifiedState;
+  render();
+  showBigPlayerMessage("✅ YOU’RE IN!","Admin entry confirmed — good luck! ⛳",3000);
+}
+
 function beginPlayerPayment(){
   if(!demoCanEdit())return;
   if(!myPlayerId){alert("Please select who you are first.");return;}
