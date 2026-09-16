@@ -5471,6 +5471,91 @@ async function changeCurrentRoundCompetition(){
   settingsPage();
 }
 
+async function changeCurrentPrizePayout(){
+  if(!isAdmin)return;
+
+  if(!roundOpenNow()){
+    alert("There is no current competition to change.");
+    return;
+  }
+
+  if(roundLocked()){
+    alert("Prize payout cannot be changed after scoring has started.");
+    return;
+  }
+
+  if(state.gameType!=="money"){
+    alert("Prize payout is only available for Money Games.");
+    return;
+  }
+
+  const currentlySplit=!!state.splitPrizes;
+
+  if(currentlySplit){
+    const confirmed=await appConfirm(
+      "Change prize payout?",
+      "Change this competition back to Winner Takes All?\n\nPlayers, payments and the current pot will stay unchanged.",
+      "Winner Takes All"
+    );
+    if(!confirmed)return;
+
+    state.splitPrizes=false;
+    state.firstPrize=0;
+    state.secondPrize=0;
+    state.thirdPrize=0;
+
+    const saved=await save();
+    if(!saved){
+      showAppToast("Change not saved","Please try again.",4000);
+      return;
+    }
+
+    alert("✅ Prize payout changed to Winner Takes All.");
+    settingsPage();
+    return;
+  }
+
+  const secondRaw=prompt("2nd prize (£)\n\nEnter a whole-pound amount:", "20");
+  if(secondRaw===null)return;
+
+  const thirdRaw=prompt("3rd prize (£)\n\nEnter a whole-pound amount:", "10");
+  if(thirdRaw===null)return;
+
+  const secondPrize=Number(secondRaw);
+  const thirdPrize=Number(thirdRaw);
+
+  if(
+    !Number.isInteger(secondPrize) ||
+    !Number.isInteger(thirdPrize) ||
+    secondPrize<0 ||
+    thirdPrize<0
+  ){
+    alert("Please enter whole-pound amounts only.");
+    return;
+  }
+
+  const confirmed=await appConfirm(
+    "Change prize payout?",
+    `Change this competition to 1st / 2nd / 3rd?\n\n2nd: £${secondPrize}\n3rd: £${thirdPrize}\n1st: remainder of the pot\n\nPlayers, payments and the current pot will stay unchanged.`,
+    "Use 1st / 2nd / 3rd"
+  );
+  if(!confirmed)return;
+
+  state.splitPrizes=true;
+  state.firstPrize=0;
+  state.secondPrize=secondPrize;
+  state.thirdPrize=thirdPrize;
+
+  const saved=await save();
+  if(!saved){
+    showAppToast("Change not saved","Please try again.",4000);
+    return;
+  }
+
+  alert("✅ Prize payout changed to 1st / 2nd / 3rd.");
+  settingsPage();
+}
+
 function settingsPage(){
  if(!isAdmin){adminLogin();return}
  $("screen").innerHTML=`<div class="card"><h2>⚙️ Admin / Settings</h2>
@@ -5505,6 +5590,19 @@ function settingsPage(){
     <button class="secondary full" onclick="changeCurrentRoundCompetition()">
       🔄 Change to ${state.pointsCompetition==="net" ? "Stableford" : "Net"}
     </button>
+
+    ${state.gameType==="money" ? `
+      <div class="notice" style="margin-top:12px;">
+        <div class="muted">PRIZE PAYOUT</div>
+        <b>${state.splitPrizes
+          ? `🥇 1st — remainder · 🥈 2nd £${Number(state.secondPrize||0)} · 🥉 3rd £${Number(state.thirdPrize||0)}`
+          : "🏆 Winner Takes All"}</b>
+      </div>
+
+      <button class="secondary full" onclick="changeCurrentPrizePayout()">
+        🔄 ${state.splitPrizes ? "Change to Winner Takes All" : "Change to 1st / 2nd / 3rd"}
+      </button>
+    ` : ""}
   ` : ""}
 ` : ""}
 ${state.trip?.active && Number(state.trip.currentRound)>1 ? `
