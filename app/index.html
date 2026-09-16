@@ -90,7 +90,30 @@ header{
 }
 .app-header-brand{position:relative;display:flex;align-items:center;justify-content:center}
 .app-header-logo{display:block;width:64px;height:64px;object-fit:cover;border-radius:14px;box-shadow:0 2px 8px rgba(0,0,0,.16)}
-.admin-mode-badge{position:absolute;left:50%;bottom:-18px;transform:translateX(-50%);white-space:nowrap;background:#c9ed4b;color:#183b23;border:1px solid rgba(24,59,35,.18);border-radius:999px;padding:4px 9px;font-size:11px;line-height:1;font-weight:900;letter-spacing:.02em;box-shadow:0 2px 6px rgba(0,0,0,.12)}
+.admin-mode-badge{
+  position:relative;
+  left:auto;
+  bottom:auto;
+  transform:none;
+  width:64px;
+  height:64px;
+  box-sizing:border-box;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  text-align:center;
+  white-space:normal;
+  background:#c9ed4b;
+  color:#183b23;
+  border:1px solid rgba(24,59,35,.18);
+  border-radius:14px;
+  padding:6px 4px;
+  font-size:10px;
+  line-height:1.05;
+  font-weight:900;
+  letter-spacing:.02em;
+  box-shadow:0 2px 8px rgba(0,0,0,.16);
+}
 .demo-mode-badge{position:absolute;left:calc(50% + 45px);top:2px;white-space:nowrap;background:#fff1c7;color:#8a6500;border-radius:999px;padding:4px 7px;font-size:10px;line-height:1;font-weight:900}
 .sync-status{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
 [data-iig-admin-header]{display:none!important}
@@ -220,8 +243,8 @@ body.admin-mode nav button.active:not(.hidden),body.admin-mode nav.iig-admin-nav
 <div class="app">
 <header class="app-header">
   <div class="app-header-brand">
-    <img src="icon-192.png" alt="I'm In Golf" class="app-header-logo">
-    <span id="adminModeBadge" class="admin-mode-badge hidden" onclick="show('settings');window.scrollTo(0,0)" style="cursor:pointer;">⚙️ ADMIN SETTINGS</span>
+    <img id="mainHeaderLogo" src="icon-192.png" alt="I'm In Golf" class="app-header-logo">
+    <span id="adminModeBadge" class="admin-mode-badge hidden" onclick="show('settings');window.scrollTo(0,0)" style="cursor:pointer;"><span style="display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;"><span style="font-size:20px;line-height:1;margin-bottom:3px;">⚙️</span><span>ADMIN<br>SETTINGS</span></span></span>
     <span id="demoBadge" class="demo-mode-badge hidden">DEMO</span>
   </div>
   <p id="syncText" class="sync-status" aria-live="polite">Shared golf group</p>
@@ -5162,7 +5185,10 @@ let lastAdminInvite="";
 function updateAdminUI(){
   document.body.classList.toggle("admin-mode", !!isAdmin);
   const adminModeBadge=$("adminModeBadge");
+  const mainHeaderLogo=$("mainHeaderLogo");
+
   if(adminModeBadge)adminModeBadge.classList.toggle("hidden", !isAdmin);
+  if(mainHeaderLogo)mainHeaderLogo.classList.toggle("hidden", !!isAdmin);
 
   const settingsButton=$("nsettings");
   const payButton=$("npay");
