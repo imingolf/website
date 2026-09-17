@@ -818,6 +818,8 @@ function startPolling(){
 }
 function show(p){
   scoreDraftActive=false;
+  sideGameOpen=false;
+  sideGameHomeOpen=false;
   page=p;
   document.querySelectorAll("nav button").forEach(b=>b.classList.remove("active"));
   $("n"+p)?.classList.add("active");
