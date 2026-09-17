@@ -789,10 +789,30 @@ if(!error && data){
 let scoreDraftActive=false;
 let sideGameOpen=false;
 
+async function refreshSideGameLive(){
+  if(!db || !sideGameOpen || !sideGameHomeOpen)return;
+  const {data,error}=await db.rpc("get_group_state",{p_pin:pin});
+  if(error || !data)return;
+
+  state=data;
+  ensureDemoMoneyHistory();
+
+  // Stay inside Side Game, but redraw it with the latest shared state.
+  sideGameHome();
+  $("syncText").textContent=
+    demoReadOnly() ? "Demo • read only" : "Shared • synced";
+}
+
 function startPolling(){
   clearInterval(poller);
   poller=setInterval(()=>{
-    if(sideGameOpen)return;
+    if(sideGameOpen){
+      if(!sideGameHomeOpen)return;
+      const editing=document.activeElement &&
+        document.activeElement.tagName==="INPUT";
+      if(!editing) refreshSideGameLive();
+      return;
+    }
     refresh();
   },5000);
 }
@@ -1435,6 +1455,7 @@ function playerNextActionHtml(){
 }
 
 function sideGameChoosePlayer(){
+  sideGameHomeOpen=false;
   sideGameOpen=true;
   if(!myPlayerId){
     alert("Please select who you are first.");
@@ -1471,6 +1492,7 @@ function sideGameChoosePlayer(){
 }
 
 function sideGamePickPlayer(playerId){
+  sideGameHomeOpen=false;
   sideGameOpen=true;
 
   const me=state.players.find(p=>p.id===myPlayerId);
@@ -1514,6 +1536,7 @@ function sideGamePickPlayer(playerId){
 }
 
 function sideGameAgreedInPerson(playerId,mode="in_person"){
+  sideGameHomeOpen=false;
   sideGameOpen=true;
 
   const me=state.players.find(p=>p.id===myPlayerId);
@@ -1964,6 +1987,7 @@ async function sideGameSaveScore(format){
 }
 
 function sideGameScoreEntry(){
+  sideGameHomeOpen=false;
   sideGameOpen=true;
 
   ensureSideGameState();
@@ -2084,6 +2108,7 @@ function sideGameConfirmSettlement(settlementId){
 
 function sideGameHome(){
   sideGameOpen=true;
+  sideGameHomeOpen=true;
 
   const hadActiveCompletedBet=state.sideGame?.bets?.some(b=>{
     if(b.status!=="active")return false;
@@ -2387,6 +2412,7 @@ function sideGameHome(){
 
 
 function sideGameStatement(){
+  sideGameHomeOpen=false;
   sideGameOpen=true;
   ensureSideGameState();
 
