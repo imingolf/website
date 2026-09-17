@@ -794,11 +794,19 @@ async function refreshSideGameLive(){
   const {data,error}=await db.rpc("get_group_state",{p_pin:pin});
   if(error || !data)return;
 
+  const oldSideGame=JSON.stringify(state.sideGame || {});
+  const newSideGame=JSON.stringify(data.sideGame || {});
+
   state=data;
   ensureDemoMoneyHistory();
 
-  // Stay inside Side Game, but redraw it with the latest shared state.
-  sideGameHome();
+  // Only redraw Side Game when its shared data has actually changed.
+  // This prevents the 5-second sync from making the screen jump.
+  if(oldSideGame!==newSideGame){
+    const savedScrollY=window.scrollY;
+    sideGameHome();
+    window.scrollTo(0,savedScrollY);
+  }
   $("syncText").textContent=
     demoReadOnly() ? "Demo • read only" : "Shared • synced";
 }
