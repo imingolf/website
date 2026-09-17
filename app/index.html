@@ -1510,6 +1510,23 @@ function sideGamePickPlayer(playerId){
 
   if(!me || !player)return;
 
+  ensureSideGameState();
+  const today=new Date().toLocaleDateString("en-CA");
+  const existingBet=state.sideGame.bets.find(b=>
+    b.date===today &&
+    (b.status==="pending" || b.status==="active") &&
+    (
+      (b.player1Id===myPlayerId && b.player2Id===playerId) ||
+      (b.player1Id===playerId && b.player2Id===myPlayerId)
+    )
+  );
+
+  if(existingBet){
+    alert(`You already have a Side Game with ${player.name}. Finish your current game before starting another one.`);
+    sideGameHome();
+    return;
+  }
+
   $("screen").innerHTML=`
     <div class="card" style="text-align:center;">
       <div style="font-size:42px;">🤝</div>
