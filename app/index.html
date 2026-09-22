@@ -118,8 +118,8 @@ header{
 .sync-status{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
 [data-iig-admin-header]{display:none!important}
 body.admin-mode nav.iig-admin-nav-bar{background:white!important}
-body.admin-mode nav button:not(.hidden),body.admin-mode nav.iig-admin-nav-bar button:not(.hidden){background:#e2f2e6!important;color:var(--green)!important;border-radius:12px!important;font-weight:800!important;padding:8px 2px!important}
-body.admin-mode nav button.active:not(.hidden),body.admin-mode nav.iig-admin-nav-bar button.active:not(.hidden){background:#cde8d5!important;color:#10592f!important}
+body.admin-mode nav button:not(.hidden),body.admin-mode nav.iig-admin-nav-bar button:not(.hidden){background:#2f7d4d!important;color:#ffffff!important;border:1px solid #24663e!important;border-radius:12px!important;font-weight:900!important;padding:8px 2px!important}
+body.admin-mode nav button.active:not(.hidden),body.admin-mode nav.iig-admin-nav-bar button.active:not(.hidden){background:#155c34!important;color:#ffffff!important;border-color:#155c34!important}
 @media (max-width:600px){header{min-height:108px;padding-top:calc(5px + env(safe-area-inset-top));padding-bottom:9px}.app-header-logo{width:62px;height:62px;border-radius:14px}}
 
 </style>
@@ -844,7 +844,21 @@ function show(p){
   sideGameHomeOpen=false;
   page=p;
   document.querySelectorAll("nav button").forEach(b=>b.classList.remove("active"));
-  $("n"+p)?.classList.add("active");
+
+  const navButton=$("n"+p);
+  navButton?.classList.add("active");
+
+  if(navButton){
+    navButton.animate(
+      [
+        {transform:"scale(1)"},
+        {transform:"scale(0.88)"},
+        {transform:"scale(1)"}
+      ],
+      {duration:220,easing:"ease-out"}
+    );
+  }
+
   render();
 }
 function render(){
@@ -1035,7 +1049,27 @@ function sideGameEntranceHtml(){
   `;
 }
 
-function waitingScreen(){
+function waitingScreen(section="round"){
+  const playerWaitingFeedback = !isAdmin ? {
+    round: {
+      icon:"⛳",
+      label:"ROUND",
+      title:"No round open yet",
+      message:"Your Group Admin will set up the next competition."
+    },
+    pay: {
+      icon:"💷",
+      label:"PAY",
+      title:"Nothing to pay right now",
+      message:"Payment will become available when the next competition is set up."
+    },
+    scores: {
+      icon:"🏌️",
+      label:"SCORES",
+      title:"No score to enter yet",
+      message:"Score entry will become available when the next competition is ready."
+    }
+  }[section] : null;
   const first=firstRoundNotYetCreated();
   if(first && isAdmin){
     $("screen").innerHTML=`
@@ -1060,10 +1094,10 @@ function waitingScreen(){
     ${notificationCardHtml()}
     ${prizeNextActionHtml()}
     <div class="card" style="text-align:center;padding:28px 18px;">
-      <div style="font-size:46px;">⛳</div>
-      <div class="muted">${first ? "NEXT ROUND" : "NEXT COMPETITION"}</div>
-      <h2 style="font-size:28px;margin:8px 0;">${isAdmin ? "Ready for the next one?" : (first ? "Your first round is coming soon" : "Coming soon…")}</h2>
-      <div style="font-size:17px;line-height:1.45;font-weight:600;color:#40564a;margin-top:12px;">${isAdmin ? "Set up your group's next competition." : (first ? "Your Group Admin hasn't set up the first round yet." : "Your Group Admin will set up the next competition.")}</div>
+      <div style="font-size:46px;">${playerWaitingFeedback?.icon || "⛳"}</div>
+      <div class="muted">${playerWaitingFeedback?.label || (first ? "NEXT ROUND" : "NEXT COMPETITION")}</div>
+      <h2 style="font-size:28px;margin:8px 0;">${playerWaitingFeedback?.title || (isAdmin ? "Ready for the next one?" : (first ? "Your first round is coming soon" : "Coming soon…"))}</h2>
+      <div style="font-size:17px;line-height:1.45;font-weight:600;color:#40564a;margin-top:12px;">${playerWaitingFeedback?.message || (isAdmin ? "Set up your group's next competition." : (first ? "Your Group Admin hasn't set up the first round yet." : "Your Group Admin will set up the next competition."))}</div>
       ${isAdmin
         ? `<button class="primary full" style="margin-top:18px;" onclick="newRound()">➕ Set Up Next Competition</button>`
         : (adminDeviceRecognised()
@@ -2634,7 +2668,7 @@ function round(){
   }
 
   if(waitingForNextCompetition()){
-    waitingScreen();
+    waitingScreen("round");
     return;
   }
 
@@ -2858,7 +2892,7 @@ Group PIN: ${pin}`;
 function pay(){
 
  if(waitingForNextCompetition()){
-   waitingScreen();
+   waitingScreen("pay");
    return;
  }
 
@@ -3377,7 +3411,7 @@ async function editTripTeamScore(teamId){
 function scores(){
 
   if(waitingForNextCompetition()){
-    waitingScreen();
+    waitingScreen("scores");
     return;
   }
   if(tripTeamRoundActive()){
