@@ -263,12 +263,20 @@ body.admin-mode nav button.active:not(.hidden),body.admin-mode nav.iig-admin-nav
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="./config.js"></script>
 <script>
-let db=null, pin="", page="round", poller=null;
+let db=null, pin="", page="round", poller=null, groupPlanType="";
 let leagueView="points";
 let selectedPastTripIndex=0;
 
 function demoReadOnly(){
   return pin==="2026";
+}
+
+function iigFreePlan(){
+  return groupPlanType==="free";
+}
+
+function iigPlusPlan(){
+  return ["plus","complimentary","internal","paid"].includes(groupPlanType);
 }
 function demoCanEdit(){
   if(demoReadOnly()){
@@ -560,6 +568,8 @@ async function connect(){
 
  const access=Array.isArray(accessRows) ? accessRows[0] : accessRows;
 
+ groupPlanType=String(access?.plan_type||"").toLowerCase();
+
  if(!access){
    $("connectMsg").textContent="PIN not recognised.";
    return;
@@ -573,34 +583,18 @@ async function connect(){
    document.querySelector("nav").style.display="none";
    $("syncText").textContent="Group access unavailable";
 
-   if(access.access_reason==="trial_expired"){
-     $("screen").innerHTML=`
-       <div class="card" style="text-align:center;margin-top:18px;">
-         <div style="font-size:42px;margin-bottom:8px;">⏳</div>
-         <h2>Your free trial has ended</h2>
-         <p class="muted">${esc(access.group_name||"This group")}'s free trial has finished.</p>
-         <div class="notice">
-           <b>Continue with I'm In Golf for £29.99 per year.</b><br>
-           Annual subscription payment will be available here soon.
-         </div>
-         <button class="secondary full" onclick="location.reload()">
-           ← Use a different Group PIN
-         </button>
-       </div>`;
-   }else{
-     $("screen").innerHTML=`
-       <div class="card" style="text-align:center;margin-top:18px;">
-         <div style="font-size:42px;margin-bottom:8px;">🔒</div>
-         <h2>Group access suspended</h2>
-         <p class="muted">${esc(access.group_name||"This group")} is currently suspended.</p>
-         <div class="notice warning">
-           Please contact the I'm In Golf administrator if you believe this is a mistake.
-         </div>
-         <button class="secondary full" onclick="location.reload()">
-           ← Use a different Group PIN
-         </button>
-       </div>`;
-   }
+   $("screen").innerHTML=`
+     <div class="card" style="text-align:center;margin-top:18px;">
+       <div style="font-size:42px;margin-bottom:8px;">🔒</div>
+       <h2>Group access suspended</h2>
+       <p class="muted">${esc(access.group_name||"This group")} is currently suspended.</p>
+       <div class="notice warning">
+         Please contact the I'm In Golf administrator if you believe this is a mistake.
+       </div>
+       <button class="secondary full" onclick="location.reload()">
+         ← Use a different Group PIN
+       </button>
+     </div>`;
    return;
  }
 
@@ -721,12 +715,18 @@ function ensureSideGameState(){
   if(!Array.isArray(state.sideGame.settlements))state.sideGame.settlements=[];
 }
 
+let saveActive=false;
+let stateSaveVersion=0;
+
 async function save(){
 
   if(!db)return;
+  saveActive=true;
+  stateSaveVersion++;
 
   if(demoReadOnly()){
     $("syncText").textContent="Demo • read only";
+    saveActive=false;
     return false;
   }
 
@@ -743,9 +743,12 @@ async function save(){
   $("syncText").textContent=
     error ? "Couldn't sync" : "Shared • synced";
 
+  saveActive=false;
   return !error;
 }
 async function refresh(){
+ if(finishRoundActive)return;
+ if(saveActive)return;
  if(!db)return;
 
  // Side Game is a player-controlled screen.
@@ -765,7 +768,12 @@ async function refresh(){
 
  if(editing)return;
 
+ const refreshVersion=stateSaveVersion;
  const {data,error}=await db.rpc("get_group_state",{p_pin:pin});
+
+ // Ignore an old refresh if a save happened while it was waiting.
+ if(refreshVersion!==stateSaveVersion)return;
+ if(saveActive)return;
 if(!error && data){
   state=data;
   ensureDemoMoneyHistory();
@@ -786,12 +794,18 @@ if(!error && data){
 }
 
  }
+let finishRoundActive=false;
 let scoreDraftActive=false;
 let sideGameOpen=false;
 
 async function refreshSideGameLive(){
   if(!db || !sideGameOpen || !sideGameHomeOpen)return;
+  const refreshVersion=stateSaveVersion;
   const {data,error}=await db.rpc("get_group_state",{p_pin:pin});
+
+  // Ignore an old refresh if a save happened while it was waiting.
+  if(refreshVersion!==stateSaveVersion)return;
+  if(saveActive)return;
   if(error || !data)return;
 
   const oldSideGame=JSON.stringify(state.sideGame || {});
@@ -1014,8 +1028,8 @@ function sideGameEntranceHtml(){
       <div style="font-weight:600;color:#40564a;line-height:1.4;">
         One score. Challenge anyone in your group. We’ll keep track of who owes who.
       </div>
-      <button class="primary full" style="margin-top:14px;" onclick="sideGameHome()">
-        🤝 Open Side Game
+      <button class="primary full" style="margin-top:14px;" onclick="iigFreePlan() ? showIigPlusUpgrade('sidegame') : sideGameHome()">
+        ${iigFreePlan() ? "🔒 Side Game — I’m In Golf+" : "🤝 Open Side Game"}
       </button>
     </div>
   `;
@@ -1274,16 +1288,15 @@ function showTripSummary(){
       return;
     }
 
-    const stableNames=Array.isArray(r.stablefordWinnerNames) ? r.stablefordWinnerNames : [];
-    const netNames=Array.isArray(r.netWinnerNames) ? r.netWinnerNames : [];
-    const stableShare=stableNames.length ? Number(r.stablefordPot||0)/stableNames.length : 0;
-    const netShare=netNames.length ? Number(r.netPot||0)/netNames.length : 0;
+    const payouts=winnerPayouts(r);
 
-    stableNames.forEach(name=>{
-      tripMoney[name]=(tripMoney[name]||0)+stableShare;
-    });
-    netNames.forEach(name=>{
-      tripMoney[name]=(tripMoney[name]||0)+netShare;
+    payouts.forEach(payout=>{
+      const name=String(payout.winnerName||"").trim();
+      const amount=Number(payout.amount||0);
+
+      if(name && amount>0){
+        tripMoney[name]=(tripMoney[name]||0)+amount;
+      }
     });
   });
 
@@ -1461,6 +1474,10 @@ function playerNextActionHtml(){
   if(moneyGame && me.paid){
     return "";
   }
+  if(moneyGame && !me.paid && roundLocked()){
+    return `<div class="card" style="text-align:center;"><div class="muted">CURRENT ROUND</div><button class="secondary full" style="font-size:18px;margin-top:8px;" disabled>🔒 Entries Closed — Scoring Has Started</button></div>`;
+  }
+
   return `<div class="card" style="text-align:center;"><div class="muted">YOUR NEXT STEP</div><button class="secondary full" style="font-size:18px;margin-top:8px;" disabled>✅ You’re In — Good Luck! ⛳</button></div>`;
 }
 
@@ -2804,8 +2821,8 @@ $("screen").innerHTML=`
       <div style="font-weight:600;color:#40564a;line-height:1.4;">
         One score. Challenge anyone in your group. We’ll keep track of who owes who.
       </div>
-      <button class="primary full" style="margin-top:14px;" onclick="sideGameHome()">
-        🤝 Open Side Game
+      <button class="primary full" style="margin-top:14px;" onclick="iigFreePlan() ? showIigPlusUpgrade('sidegame') : sideGameHome()">
+        ${iigFreePlan() ? "🔒 Side Game — I’m In Golf+" : "🤝 Open Side Game"}
       </button>
     </div>
   ` : ""}
@@ -3051,7 +3068,13 @@ async function adminSelfEnter(){
   showBigPlayerMessage("✅ YOU’RE IN!","Admin entry confirmed — good luck! ⛳",3000);
 }
 
+let paymentLaunchBusy=false;
+
 function beginPlayerPayment(){
+  console.count("IIG PAYMENT BUTTON FIRED");
+  if(paymentLaunchBusy)return;
+  paymentLaunchBusy=true;
+  setTimeout(()=>{ paymentLaunchBusy=false; },2000);
   if(!demoCanEdit())return;
   if(!myPlayerId){alert("Please select who you are first.");return;}
   const me=state.players.find(p=>p.id===myPlayerId);
@@ -3178,7 +3201,7 @@ const sameRound=
   (journey.stake==null || Number(journey.stake)===Number(state.stake||0));
   if(journeyAge>48*60*60*1000 || !sameGroup || !sameRound){clearPaymentJourney();return;}
   const player=state.players.find(p=>p.id===journey.playerId);
-  if(!player || roundLocked()){clearPaymentJourney();return;}
+  if(!player){clearPaymentJourney();return;}
   if(player.paid){clearPaymentJourney();return;}
   paymentReturnBusy=true;
   const confirmed=await new Promise(resolve=>{
@@ -3279,17 +3302,14 @@ async function togglePaid(i){
 
   const p=state.players[i];
 
- if(!isAdmin && p.id!==myPlayerId){
-   alert("You can only change your own payment.");
-   return;
- }
-
- if(roundLocked()){
-   alert("🔒 Entries are closed — scoring has started.");
+ if(!isAdmin){
+   alert("Only the Group Admin can change payment status.");
    return;
  }
 
  p.paid=!p.paid;
+ p.paymentMarkedAt=p.paid ? new Date().toISOString() : null;
+ p.paymentMarkMethod=p.paid ? "admin-confirmed" : null;
  render();
  await save();
 }
@@ -3612,6 +3632,27 @@ function scores(){
 }
 
 
+async function savePlayerPatch(playerId,patch){
+  if(!db)return false;
+
+  const {data:latestState,error}=await db.rpc(
+    "get_group_state",
+    {p_pin:pin}
+  );
+
+  if(error || !latestState)return false;
+
+  const latestPlayer=(latestState.players||[]).find(p=>p.id===playerId);
+  if(!latestPlayer)return false;
+
+  Object.assign(latestPlayer,patch);
+
+  state=latestState;
+  render();
+
+  return await save();
+}
+
 async function setCompetition(i,type){
 if(!demoCanEdit())return;
   const p=state.players[i];
@@ -3636,7 +3677,7 @@ if(!demoCanEdit())return;
   p.competition=type;
 
   render();
-  await save();
+  await savePlayerPatch(p.id,{competition:type});
 }
 async function submitPlayerScore(i,type){
   if(!demoCanEdit())return;
@@ -3679,7 +3720,12 @@ async function submitPlayerScore(i,type){
   scoreDraftActive=false;
 
   render();
-  const saved=await save();
+  const saved=await savePlayerPatch(p.id,{
+    stableford:p.stableford,
+    netScore:p.netScore,
+    noReturn:false,
+    scoreSubmitted:true
+  });
   if(saved && !isAdmin)showBigPlayerMessage("✅ SCORE IN!","You’re all done.",3000);
 }
 
@@ -3711,7 +3757,12 @@ async function submitNoReturn(i){
   scoreDraftActive=false;
 
   render();
-  const saved=await save();
+  const saved=await savePlayerPatch(p.id,{
+    stableford:null,
+    netScore:null,
+    noReturn:true,
+    scoreSubmitted:true
+  });
   if(saved && !isAdmin)showBigPlayerMessage("✅ SCORE IN!","NR recorded — you’re all done.",3000);
 }
 
@@ -3847,6 +3898,7 @@ function showTripBetterBallResult(record){
 }
 
 async function finishRound(){
+
 
   const isPointsGame=state.gameType==="points";
   const pointsComp=state.pointsCompetition || "stableford";
@@ -4099,6 +4151,9 @@ places.forEach((place,i)=>{
       players:state.players.map(p=>({
         name:p.name,
         handicap:p.handicap,
+        stableford:p.stableford,
+        netScore:p.netScore,
+        noReturn:Boolean(p.noReturn),
         competition:pointsComp,
       }))
     };
@@ -4145,7 +4200,13 @@ if(isTrip){
     setTripChampion();
   }
 }
-        await save();
+        finishRoundActive=true;
+        const finishSaved=await save();
+        finishRoundActive=false;
+        if(!finishSaved){
+          alert("The finished round could not be saved. Please check your connection and try again.");
+          return;
+        }
     if(isTrip && state.trip?.completed){
       showTripSummary();
     }else{
@@ -4408,6 +4469,9 @@ const record={
 
     players:state.players.map(p=>({
       id:p.id,
+      stableford:p.stableford,
+      netScore:p.netScore,
+      noReturn:Boolean(p.noReturn),
       name:p.name,
       handicap:p.handicap,
       competition:p.competition || null,
@@ -4459,7 +4523,14 @@ if(isTrip){
     setTripChampion();
   }
 }
-  await save();
+  finishRoundActive=true;
+  const moneyFinishSaved=await save();
+  finishRoundActive=false;
+  if(!moneyFinishSaved){
+    alert("The finished round could not be saved. Please check your connection and try again.");
+    return;
+  }
+
   if(isTrip && state.trip?.completed){
     showTripSummary();
   }else{
@@ -4747,7 +4818,8 @@ function countbackWinnerName(record){
 function countbackOrderedFinalStandings(record){
   const sorted=sortedFinalStandings(record);
   const countbackWinner=countbackWinnerName(record);
-  const placeOrder=new Map((record?.pointsResults||[]).map((r,i)=>[String(r.name||""),i]));
+  const declaredPlaces=(record?.pointsResults?.length ? record.pointsResults : (record?.prizePlaces||[]));
+  const placeOrder=new Map(declaredPlaces.map((r,i)=>[resultNameKey(r.name),i]));
   if(!countbackWinner && !placeOrder.size)return sorted;
 
   return sorted.slice().sort((a,b)=>{
@@ -4772,8 +4844,8 @@ function countbackOrderedFinalStandings(record){
       if(bIsWinner && !aIsWinner)return 1;
     }
 
-    const ai=placeOrder.has(a.name)?placeOrder.get(a.name):9999;
-    const bi=placeOrder.has(b.name)?placeOrder.get(b.name):9999;
+    const ai=placeOrder.has(resultNameKey(a.name))?placeOrder.get(resultNameKey(a.name)):9999;
+    const bi=placeOrder.has(resultNameKey(b.name))?placeOrder.get(resultNameKey(b.name)):9999;
     if(ai!==bi)return ai-bi;
     return String(a.name||"").localeCompare(String(b.name||""));
   });
@@ -5082,6 +5154,7 @@ function showWinnerScreen(record){
   // 💷 MONEY GAME RESULT
   // =====================================
 
+  const stablefordNames=record.stablefordWinnerNames||[];
   const netNames=record.netWinnerNames||[];
 
   const stablefordWinner=stablefordNames.join(" & ");
@@ -6261,6 +6334,10 @@ function playerJoinForm(){
 }
 async function addPlayer(){
   if(!demoCanEdit())return;
+  if(iigFreePlan() && state.players.length>=10){
+    showIigPlusUpgrade("playerlimit");
+    return;
+  }
   const currentMember=state.players.find(p=>p.id===myPlayerId);
   if(currentMember){alert("✅ You're already a member of this group as " + currentMember.name + ".");return;}
   const details=await playerJoinForm(); if(!details)return;
@@ -6274,6 +6351,10 @@ async function addPlayer(){
 
 async function adminAddPlayer(){
   if(!isAdmin || !demoCanEdit())return;
+  if(iigFreePlan() && state.players.length>=10){
+    showIigPlusUpgrade("playerlimit");
+    return;
+  }
 
   const firstName=prompt("Player first name:");
   if(firstName===null)return;
@@ -6743,18 +6824,49 @@ function settingsPage(){
  $("screen").innerHTML=`<div class="card"><h2>⚙️ Admin / Settings</h2>
  <div class="muted">Shared controls for your golf group.</div>
  <button class="primary full" onclick="returnToPlayerView()">👤 Return to Player View</button>
- <div class="notice" style="margin-top:12px;">
-   <div class="muted">GROUP NAME</div>
-   <b>${esc(state.groupName||"My Golf Group")}</b>
+ <div class="notice" style="margin-top:12px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
+   <div>
+     <div class="muted">GROUP NAME</div>
+     <b>${esc(state.groupName||"My Golf Group")}</b>
+   </div>
+   <button class="secondary" style="margin:0;width:auto;padding:9px 12px;" onclick="changeGroupName()">✏️ Change</button>
  </div>
- <button class="secondary full" onclick="changeGroupName()">✏️ Change Group Name</button>
+
+ ${iigFreePlan() ? `
+ <div class="notice" style="margin-top:12px;padding:14px;border:1px solid rgba(25,120,60,.25);">
+   <div class="muted">YOUR PLAN</div>
+   <b style="font-size:18px;">I’m In Golf Free</b>
+   <div class="muted" style="margin-top:3px;">Up to 10 players · Money Game · Points Game</div>
+
+   <div style="border-top:1px solid rgba(0,0,0,.10);margin:12px 0;"></div>
+
+   <b>⭐ I’m In Golf+</b>
+   <div class="muted" style="margin-top:3px;">
+     Unlimited players · Trip Mode · Side Game<br>
+     Plus all new premium features as they’re released
+   </div>
+
+   <button class="primary full" style="margin-bottom:0;" onclick="showIigPlusUpgrade()">
+     Upgrade — £29.99/year
+   </button>
+ </div>
+ ` : `
+ <div class="notice" style="margin-top:12px;">
+   <div class="muted">YOUR PLAN</div>
+   <b>⭐ I’m In Golf+</b><br>
+   <span class="muted">Unlimited players · All game modes · New premium features</span>
+ </div>
+ `}
+
  <button class="primary full" onclick="openAdminHelp()">❓ Admin Help</button>
  </div>
  <div class="card">
    <h2>💷 Player payments</h2>
-   <div class="notice"><b>Payments go directly to you.</b><br>I'm In Golf does not receive, hold or manage your group's money.</div>
-   <div class="muted">PAYMENT METHOD</div>
-   <b>${state.paymentLink ? `${esc(paymentProviderLabel(state.paymentProvider||detectPaymentProvider(state.paymentLink)))} — Link ready` : "Not set up"}</b>
+   <div class="notice">
+     <div class="muted">PAYMENT METHOD</div>
+     <b>${state.paymentLink ? `${esc(paymentProviderLabel(state.paymentProvider||detectPaymentProvider(state.paymentLink)))} — Link ready` : "Not set up"}</b>
+     <div class="muted" style="margin-top:5px;">Players pay directly to you. I’m In Golf never holds the money.</div>
+   </div>
    <button class="secondary full" onclick="changePaymentLink()">${state.paymentLink ? "✏️ Change Payment Method" : "➕ Set Up Player Payments"}</button>
  </div>
  <div class="card"><h2>Round controls</h2>
@@ -6825,8 +6937,8 @@ ${state.trip?.completed ? `
     Share this only with your golf group.
   </div>
 
-  <button class="ghost full" onclick="copyInvite()">
-    Copy invite message
+  <button class="secondary full" onclick="copyInvite()">
+    📋 Copy invite message
   </button>
   <button class="secondary full" onclick="changeAdminPin()">
     🔐 Change Admin PIN
@@ -7015,21 +7127,9 @@ async function manageGroupsPage(){
     </div>
 
     ${groups.length ? groups.map(g=>{
-      const plan=String(g.plan_type||"trial");
+      const plan=String(g.plan_type||"free");
       const status=String(g.status||"active");
-      const paid=String(g.paid_status||"unpaid");
-      let trialText="";
-
-      if(plan==="trial" && g.trial_expiry_date){
-        const today=new Date(); today.setHours(0,0,0,0);
-        const expiry=new Date(String(g.trial_expiry_date)+"T00:00:00");
-        const days=Math.ceil((expiry-today)/86400000);
-        trialText=days<0
-          ? `Trial expired ${Math.abs(days)} day${Math.abs(days)===1?"":"s"} ago`
-          : days===0 ? "Trial expires today"
-          : `${days} day${days===1?"":"s"} remaining`;
-      }
-
+      const paid=String(g.paid_status||"not_applicable");
       return `
         <div class="card">
           <div class="row">
@@ -7042,7 +7142,7 @@ async function manageGroupsPage(){
           </div>
 
           <div class="player row">
-            <div><div class="muted">Plan</div><b>${plan==="internal"?"Internal":plan==="complimentary"?"Complimentary":plan==="trial"?"Free Trial":esc(plan)}</b></div>
+            <div><div class="muted">Plan</div><b>${plan==="internal"?"Internal":plan==="complimentary"?"Complimentary Plus":["plus","paid"].includes(plan)?"I’m In Golf+":"I’m In Golf Free"}</b></div>
             <div style="text-align:right;"><div class="muted">Payment</div><b>${paid==="not_applicable"?"N/A":esc(paid)}</b></div>
           </div>
 
@@ -7053,12 +7153,6 @@ async function manageGroupsPage(){
             </div>
           ` : ""}
           ${g.created_at?`<div class="muted">Created: ${esc(formatOwnerDate(g.created_at))}</div>`:""}
-          ${plan==="trial" && g.trial_expiry_date
-            ? `<div class="muted">Trial expiry: ${esc(formatOwnerDate(g.trial_expiry_date))}</div>`
-            : plan==="paid" && g.renewal_date
-              ? `<div class="muted">Renewal date: ${esc(formatOwnerDate(g.renewal_date))}</div>`
-              : ""}
-          ${trialText?`<div class="notice ${trialText.startsWith("Trial expired")?"warning":""}">${esc(trialText)}</div>`:""}
 
           <button class="secondary full" onclick="openEditGroup('${escAttr(g.group_pin||"")}')">
             ✏️ Edit Group
@@ -7199,14 +7293,12 @@ function editGroupPage(){
 
       <label class="muted">Plan</label>
       <select id="ownerPlanType" ${protectedGroup?"disabled":""} style="width:100%;padding:11px;border:1px solid var(--line);border-radius:10px;font-size:16px;background:white;margin:5px 0 11px;">
-        <option value="trial" ${String(g.plan_type)==="trial"?"selected":""}>Free Trial</option>
-        <option value="paid" ${String(g.plan_type)==="paid"?"selected":""}>Paid</option>
-        <option value="complimentary" ${String(g.plan_type)==="complimentary"?"selected":""}>Complimentary</option>
+        <option value="free" ${String(g.plan_type)==="free"?"selected":""}>I’m In Golf Free</option>
+        <option value="plus" ${["plus","paid"].includes(String(g.plan_type))?"selected":""}>I’m In Golf+</option>
+        <option value="complimentary" ${String(g.plan_type)==="complimentary"?"selected":""}>Complimentary Plus</option>
         <option value="internal" ${String(g.plan_type)==="internal"?"selected":""}>Internal</option>
       </select>
 
-      <label class="muted">Trial expiry date</label>
-      <input id="ownerTrialExpiry" type="date" value="${escAttr(ownerDateInput(g.trial_expiry_date))}">
 
       <label class="muted">Payment status</label>
       <select id="ownerPaidStatus" style="width:100%;padding:11px;border:1px solid var(--line);border-radius:10px;font-size:16px;background:white;margin:5px 0 11px;">
@@ -7304,7 +7396,7 @@ async function saveOwnerGroupEdit(){
     p_admin_name:$("ownerAdminName").value.trim(),
     p_admin_contact:$("ownerAdminContact").value.trim(),
     p_plan_type:protectedGroup ? "internal" : $("ownerPlanType").value,
-    p_trial_expiry_date:$("ownerTrialExpiry").value || null,
+    p_trial_expiry_date:null,
     p_paid_status:$("ownerPaidStatus").value,
     p_renewal_date:$("ownerRenewalDate").value || null,
     p_status:protectedGroup ? "active" : $("ownerGroupStatus").value,
@@ -7970,6 +8062,50 @@ async function cancelCurrentRound(){
   show("round");
 }
 
+function showIigPlusUpgrade(reason="feature"){
+  const plus=document.createElement("div");
+  plus.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.48);z-index:10001;display:flex;align-items:center;justify-content:center;padding:20px;";
+  plus.innerHTML=`
+    <div class="card" style="width:min(430px,100%);margin:0;padding:26px;border-radius:20px;text-align:center;">
+      <div style="font-size:42px;margin-bottom:6px;">🔒</div>
+      <h2 style="margin:0 0 8px;">Unlock I’m In Golf+</h2>
+      <div class="muted" style="margin-bottom:18px;">Unlock everything for your whole golf group.</div>
+      <div class="notice" style="text-align:left;line-height:1.8;margin-bottom:18px;">
+        ✓ Unlimited players<br>
+        ✓ Trip Mode<br>
+        ✓ Side Game<br>
+        ✓ New premium features as they’re released
+      </div>
+      <div style="font-size:25px;font-weight:800;">£29.99 <span style="font-size:14px;font-weight:500;">/ year</span></div>
+      <div class="muted" style="margin:4px 0 18px;">One subscription covers the whole group.</div>
+      ${isAdmin
+        ? `<button id="plusUpgrade" class="primary full">Upgrade to I’m In Golf+</button>`
+        : `<div class="notice" style="margin-bottom:10px;"><strong>${
+          reason==="playerlimit"
+            ? "This group has reached its 10-player Free limit."
+            : reason==="sidegame"
+              ? "Side Game is included with I’m In Golf+."
+              : reason==="trip"
+                ? "Trip Mode is included with I’m In Golf+."
+                : "This feature is included with I’m In Golf+."
+        }</strong><br>Ask your Group Admin to upgrade to I’m In Golf+.</div>`
+      }
+      <button id="plusNotNow" class="secondary full" style="margin-top:10px;">Not now</button>
+    </div>`;
+  document.body.appendChild(plus);
+  const upgradeBtn=plus.querySelector("#plusUpgrade");
+  if(upgradeBtn){
+    upgradeBtn.onclick=()=>{
+      if(window.IigPurchase){
+        window.IigPurchase.postMessage("purchaseIigPlus");
+      }else{
+        alert("I’m In Golf+ purchasing is available in the iPhone app.");
+      }
+    };
+  }
+  plus.querySelector("#plusNotNow").onclick=()=>plus.remove();
+}
+
 function chooseNewRoundGameType(){
   return new Promise(resolve=>{
     const overlay=document.createElement("div");
@@ -7991,8 +8127,8 @@ function chooseNewRoundGameType(){
         </button>
 
         <button id="newRoundTrip" class="primary" style="width:100%;padding:15px 16px;margin:0 0 12px;text-align:left;">
-          <span style="display:block;font-size:17px;font-weight:800;">✈️ Trip Mode</span>
-          <span style="display:block;font-size:13px;font-weight:500;margin-top:3px;">Multiple rounds across a golf trip.</span>
+          <span style="display:block;font-size:17px;font-weight:800;">${iigFreePlan() ? "🔒 Trip Mode — I’m In Golf+" : "✈️ Trip Mode"}</span>
+          <span style="display:block;font-size:13px;font-weight:500;margin-top:3px;">${iigFreePlan() ? "Multiple rounds across a golf trip • Included with I’m In Golf+" : "Multiple rounds across a golf trip."}</span>
         </button>
 
         <button id="newRoundCancel" class="secondary" style="width:100%;">Cancel</button>
@@ -8002,7 +8138,13 @@ function chooseNewRoundGameType(){
     const finish=value=>{ overlay.remove(); resolve(value); };
     overlay.querySelector("#newRoundMoney").onclick=()=>finish("1");
     overlay.querySelector("#newRoundPoints").onclick=()=>finish("2");
-    overlay.querySelector("#newRoundTrip").onclick=()=>finish("3");
+    overlay.querySelector("#newRoundTrip").onclick=()=>{
+      if(iigFreePlan()){
+        showIigPlusUpgrade("trip");
+        return;
+      }
+      finish("3");
+    };
     overlay.querySelector("#newRoundCancel").onclick=()=>finish(null);
     overlay.addEventListener("click",e=>{ if(e.target===overlay) finish(null); });
   });
@@ -8189,6 +8331,9 @@ function tripSetupScreen(){
         drafts[i].course=card.querySelector('[data-course]')?.value||'';
         drafts[i].date=card.querySelector('[data-date]')?.value||'';
         drafts[i].stake=Number(card.querySelector('[data-stake]')?.value||0);
+        drafts[i].splitPrizes=Boolean(card.querySelector('[data-split-prizes]')?.checked);
+        drafts[i].secondPrize=Number(card.querySelector('[data-second-prize]')?.value||0);
+        drafts[i].thirdPrize=Number(card.querySelector('[data-third-prize]')?.value||0);
         drafts[i].gameType=card.dataset.gameType||'money';
         drafts[i].format=card.dataset.format||'individual';
       });
@@ -8226,12 +8371,33 @@ function tripSetupScreen(){
           <div data-comp-label style="margin-bottom:10px;"><b>Competition:</b> ${card.dataset.format==='betterball'?'🤝 Better Ball Stableford':card.dataset.format==='pairsaggregate'?`➕ Pairs Aggregate ${tripCompetition==='net'?'Net':'Stableford'}`:(tripCompetition==='net'?'⛳ Net':'🏆 Stableford')}</div>
           <div data-stake-wrap style="${card.dataset.gameType==='money'?'':'display:none;'}">
             <label style="display:block;margin:0 0 5px;">Stake per player (£)</label>
-            <input data-stake type="number" min="0" step="0.01" value="${d.stake==='' ? '' : (Number.isFinite(Number(d.stake)) ? Number(d.stake) : '')}" placeholder="Enter stake" style="width:100%;">
+            <input data-stake type="number" min="0" step="0.01" value="${d.stake==='' ? '' : (Number.isFinite(Number(d.stake)) ? Number(d.stake) : '')}" placeholder="Enter stake" style="width:100%;margin-bottom:10px;">
+
+            <label style="display:flex;align-items:center;gap:10px;margin:8px 0;">
+              <input data-split-prizes type="checkbox" ${d.splitPrizes?'checked':''} style="width:22px;height:22px;margin:0;">
+              <span><b>Pay 1st / 2nd / 3rd</b></span>
+            </label>
+
+            <div data-prize-amounts style="${d.splitPrizes?'':'display:none;'}">
+              <div class="muted" style="margin-bottom:8px;">1st place gets the remainder of the pot.</div>
+              <label style="display:block;margin:0 0 5px;">2nd prize (£)</label>
+              <input data-second-prize type="number" min="0" step="1" value="${Number(d.secondPrize||0)}" style="width:100%;margin-bottom:10px;">
+              <label style="display:block;margin:0 0 5px;">3rd prize (£)</label>
+              <input data-third-prize type="number" min="0" step="1" value="${Number(d.thirdPrize||0)}" style="width:100%;">
+            </div>
           </div>`;
         wrap.appendChild(card);
         const money=card.querySelector('[data-money]');
         const points=card.querySelector('[data-points]');
         const stakeWrap=card.querySelector('[data-stake-wrap]');
+        const splitPrizes=card.querySelector('[data-split-prizes]');
+        const prizeAmounts=card.querySelector('[data-prize-amounts]');
+        if(splitPrizes){
+          splitPrizes.onchange=()=>{
+            drafts[i].splitPrizes=splitPrizes.checked;
+            prizeAmounts.style.display=splitPrizes.checked?'':'none';
+          };
+        }
         const individual=card.querySelector('[data-individual]');
         const betterball=card.querySelector('[data-betterball]');
         const pairsaggregate=card.querySelector('[data-pairsaggregate]');
@@ -8287,10 +8453,21 @@ function tripSetupScreen(){
           const gameType=card?.dataset.gameType||'money';
           const format=card?.dataset.format||'individual';
           const stake=gameType==='money'?Number(card?.querySelector('[data-stake]')?.value||0):0;
+          const splitPrizes=gameType==='money' && Boolean(card?.querySelector('[data-split-prizes]')?.checked);
+          const secondPrize=splitPrizes?Number(card?.querySelector('[data-second-prize]')?.value||0):0;
+          const thirdPrize=splitPrizes?Number(card?.querySelector('[data-third-prize]')?.value||0):0;
           if(!course){ msg=`Please enter the course for Round ${i+1}.`; break; }
           if(!date){ msg=`Please choose the date for Round ${i+1}.`; break; }
           if(gameType==='money' && (!Number.isFinite(stake)||stake<0)){ msg=`Please enter a valid stake for Round ${i+1}.`; break; }
-          rounds.push({course,date,gameType,competition:format==='betterball'?'stableford':tripCompetition,format,stake});
+          if(splitPrizes && (!Number.isInteger(secondPrize)||!Number.isInteger(thirdPrize)||secondPrize<0||thirdPrize<0)){
+            msg=`Please enter valid whole-pound 2nd and 3rd prizes for Round ${i+1}.`;
+            break;
+          }
+          rounds.push({
+            course,date,gameType,
+            competition:format==='betterball'?'stableford':tripCompetition,
+            format,stake,splitPrizes,secondPrize,thirdPrize
+          });
         }
       }
       if(msg){ err.textContent=msg; err.style.display='block'; return; }
@@ -8409,6 +8586,10 @@ async function newRound(){
         date:state.date,
         stake:state.stake,
         gameType:state.gameType,
+        splitPrizes:Boolean(state.splitPrizes),
+        firstPrize:Number(state.firstPrize||0),
+        secondPrize:Number(state.secondPrize||0),
+        thirdPrize:Number(state.thirdPrize||0),
         pointsCompetition:state.pointsCompetition,
         pointsValue:state.pointsValue,
         roundOpen:roundOpenNow(),
@@ -8430,6 +8611,10 @@ async function newRound(){
     state.date=first.date;
     state.gameType=first.gameType;
     state.stake=first.gameType==='money'?Number(first.stake||0):0;
+    state.splitPrizes=first.gameType==='money' && Boolean(first.splitPrizes);
+    state.firstPrize=0;
+    state.secondPrize=state.splitPrizes ? Number(first.secondPrize||0) : 0;
+    state.thirdPrize=state.splitPrizes ? Number(first.thirdPrize||0) : 0;
     state.pointsCompetition=setup.competition;
     if(first.format==="betterball")state.pointsCompetition="stableford";
     state.pointsValue=10;
@@ -8485,6 +8670,10 @@ async function nextTripRound(){
     state.date=plannedRound.date || "";
     state.gameType=plannedRound.gameType || "money";
     state.stake=state.gameType==="money" ? Number(plannedRound.stake||0) : 0;
+    state.splitPrizes=state.gameType==="money" && Boolean(plannedRound.splitPrizes);
+    state.firstPrize=0;
+    state.secondPrize=state.splitPrizes ? Number(plannedRound.secondPrize||0) : 0;
+    state.thirdPrize=state.splitPrizes ? Number(plannedRound.thirdPrize||0) : 0;
     state.trip.currentFormat=plannedRound.format||"individual";
     state.trip.currentPlayingIds=[...daySetup.playingIds];
     state.trip.currentGroups=daySetup.groups.map(g=>[...g]);
@@ -8609,6 +8798,10 @@ if(tripDate===null)return;
   state.date=tripDate.trim();
 
   state.gameType=selectedType;
+  state.splitPrizes=false;
+  state.firstPrize=0;
+  state.secondPrize=0;
+  state.thirdPrize=0;
 
   state.trip.competition=selectedCompetition;
   state.trip.tripPointsValue=tripPointsValue;
@@ -8813,6 +9006,10 @@ if(backup){
   state.date=backup.date;
   state.stake=backup.stake;
   state.gameType=backup.gameType;
+  state.splitPrizes=Boolean(backup.splitPrizes);
+  state.firstPrize=Number(backup.firstPrize||0);
+  state.secondPrize=Number(backup.secondPrize||0);
+  state.thirdPrize=Number(backup.thirdPrize||0);
   state.pointsCompetition=backup.pointsCompetition;
   state.pointsValue=backup.pointsValue;
 
