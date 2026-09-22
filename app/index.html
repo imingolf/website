@@ -1478,6 +1478,47 @@ function showTripSummary(){
   window.scrollTo(0,0);
 }
 
+async function enterNormalPointsGame(){
+  if(demoReadOnly())return;
+  if(state.trip?.active)return;
+  if(state.gameType!=="points")return;
+  if(roundLocked()){
+    alert("Entries are closed because scoring has started.");
+    return;
+  }
+  if(!myPlayerId){
+    alert("Please select who you are first.");
+    return;
+  }
+
+  const {data:latestState,error}=await db.rpc("get_group_state",{p_pin:pin});
+  if(error || !latestState){
+    showAppToast("Entry not saved","Couldn’t refresh the group. Please try again.",4000);
+    return;
+  }
+
+  const player=latestState.players?.find(p=>p.id===myPlayerId);
+  if(!player)return;
+
+  player.playingThisRound=true;
+  state=latestState;
+  await save();
+
+  const {data:verifiedState,error:verifyError}=await db.rpc("get_group_state",{p_pin:pin});
+  const verifiedPlayer=!verifyError && verifiedState
+    ? (verifiedState.players||[]).find(p=>p.id===myPlayerId)
+    : null;
+
+  if(!verifiedPlayer?.playingThisRound){
+    alert("We couldn't confirm your entry. Please try again.");
+    return;
+  }
+
+  state=verifiedState;
+  render();
+  showBigPlayerMessage("✅ YOU’RE IN!","Good luck! ⛳",3000);
+}
+
 function playerNextActionHtml(){
   if(isAdmin || demoReadOnly() || !myPlayerId)return "";
   const me=state.players.find(p=>p.id===myPlayerId);
@@ -1495,6 +1536,15 @@ function playerNextActionHtml(){
   const submitted=me.scoreSubmitted===true ||
     (comp==="net" ? me.noReturn===true || me.netScore!=null : me.stableford!=null);
   const moneyGame=state.gameType==="money" && Number(state.stake||0)>0;
+  const normalPointsGame=state.gameType==="points" && !state.trip?.active;
+
+  if(normalPointsGame && !me.playingThisRound && !roundLocked()){
+    return `<div class="card" style="text-align:center;"><div class="muted">YOUR NEXT STEP</div><button class="primary full" style="font-size:18px;margin-top:8px;" onclick="enterNormalPointsGame()">🏆 I’m Playing</button></div>`;
+  }
+
+  if(normalPointsGame && !me.playingThisRound && roundLocked()){
+    return `<div class="card" style="text-align:center;"><div class="muted">CURRENT ROUND</div><button class="secondary full" style="font-size:18px;margin-top:8px;" disabled>🔒 Entries Closed — Scoring Has Started</button></div>`;
+  }
 
   if(moneyGame && !me.paid && !roundLocked()){
     return `<div class="card" style="text-align:center;"><div class="muted">YOUR NEXT STEP</div><button class="primary full" style="font-size:18px;margin-top:8px;" onclick="beginPlayerPayment()">💳 Pay £${Number(state.stake||0)} & Enter</button></div>`;
@@ -2714,7 +2764,14 @@ $("screen").innerHTML=`
         <div class="muted" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
           <span>${esc(formatDate(state.date))}</span>
           <span>•</span>
-          <span style="display:inline-flex;align-items:center;padding:4px 9px;border-radius:999px;background:#e5f5e9;color:var(--green);font-weight:900;">👥 ${state.gameType==="money" && Number(state.stake||0)>0 ? paidCount() : currentRoundPlayers().length} PLAYERS IN</span>
+          <span style="display:inline-flex;align-items:center;padding:4px 9px;border-radius:999px;background:#e5f5e9;color:var(--green);font-weight:900;">👥 ${(()=>{
+  const n=state.gameType==="money" && Number(state.stake||0)>0
+    ? paidCount()
+    : (state.gameType==="points" && !state.trip?.active
+        ? currentRoundPlayers().filter(p=>p.playingThisRound===true).length
+        : currentRoundPlayers().length);
+  return `${n} ${n===1?"PLAYER":"PLAYERS"} IN`;
+})()}</span>
         </div>
 
         <div style="margin-top:8px;display:flex;gap:7px;flex-wrap:wrap;">
@@ -2817,7 +2874,13 @@ $("screen").innerHTML=`
 
       <div class="notice">
         <b>${tripTeamRoundActive()?"One final pair score":(state.pointsCompetition==="stableford" ? "🏆 Stableford" : "⛳ Net")}</b><br>
-        ${tripBetterBallActive()?"Use the better score on every hole and enter the pair total.":tripPairsAggregateActive()?"Add both partners’ final scores and enter the combined total.":"Everyone plays the same competition."}
+        ${tripBetterBallActive()
+  ?"Use the better score on every hole and enter the pair total."
+  :tripPairsAggregateActive()
+    ?"Add both partners’ final scores and enter the combined total."
+    :(state.trip?.active
+      ?"Everyone plays the same competition."
+      :"Tap I’m Playing to enter this competition.")}
       </div>
 
       ${tripTeamRoundActive()?"":`<div class="player row">
@@ -3431,9 +3494,12 @@ function scores(){
   };
 
   const roundPlayers=currentRoundPlayers();
-  const eligiblePlayers=isPointsGame
-    ? [...roundPlayers]
-    : (Number(state.stake||0)>0 ? roundPlayers.filter(p=>p.paid) : [...roundPlayers]);
+  const normalPointsGame=isPointsGame && !state.trip?.active;
+  const eligiblePlayers=normalPointsGame
+    ? roundPlayers.filter(p=>p.playingThisRound===true)
+    : isPointsGame
+      ? [...roundPlayers]
+      : (Number(state.stake||0)>0 ? roundPlayers.filter(p=>p.paid) : [...roundPlayers]);
 
   const stillToEnter=eligiblePlayers.filter(p=>{
     const type=pointsComp;
@@ -3446,10 +3512,14 @@ function scores(){
   // Keep scoring simple for ordinary players: they only need their own score card.
   // Admin still sees and can manage the full field.
   const scorePlayers=isAdmin
-    ? sortedPlayers
+    ? (normalPointsGame
+        ? sortedPlayers.filter(p=>p.playingThisRound===true)
+        : sortedPlayers)
     : sortedPlayers.filter(p=>
         p.id===myPlayerId &&
-        (!roundLocked() || eligiblePlayers.some(ep=>ep.id===p.id))
+        (normalPointsGame
+          ? eligiblePlayers.some(ep=>ep.id===p.id)
+          : (!roundLocked() || eligiblePlayers.some(ep=>ep.id===p.id)))
       );
 
   const stablefordRanked=[...roundPlayers]
@@ -3720,6 +3790,11 @@ async function submitPlayerScore(i,type){
   const p=state.players[i];
   if(!p)return;
   if(!isAdmin && p.id!==myPlayerId)return;
+
+  if(!isAdmin && state.gameType==="points" && !state.trip?.active && p.playingThisRound!==true){
+    alert("Tap I’m Playing before entering your score.");
+    return;
+  }
 
   if(state.gameType==="money" && Number(state.stake||0)>0 && !p.paid){
     alert("Pay before entering a score.");
@@ -8681,6 +8756,7 @@ async function newRound(){
   state.thirdPrize=state.splitPrizes ? Number(setup.thirdPrize||0) : 0;
   state.players.forEach(p=>{
     p.paid=false;p.stableford=null;p.netScore=null;p.noReturn=false;p.scoreSubmitted=false;p.competition=null;
+    p.playingThisRound=false;
   });
   await save();
   show('round');
