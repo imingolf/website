@@ -4018,6 +4018,20 @@ async function finishRound(){
     return;
   }
 
+  // Normal rounds: refresh from Supabase before finalising so the
+  // Admin cannot finish using a stale copy while a player is submitting.
+  if(!isTrip && db){
+    const {data:latestState,error:latestError}=await db.rpc(
+      "get_group_state",
+      {p_pin:pin}
+    );
+    if(latestError || !latestState){
+      alert("Could not refresh the latest scores. Please check your connection and try Finish Round again.");
+      return;
+    }
+    state=latestState;
+  }
+
   async function chooseCountbackWinner(players,competition,score,position){
     const names=players.map((p,i)=>`${i+1}. ${p.name}`).join("\n");
 
@@ -4130,6 +4144,16 @@ async function finishRound(){
   // =====================================
 
   if(isPointsGame){
+
+    if(!isTrip){
+      const enteredPlayers=state.players.filter(p=>p.playingThisRound===true);
+      const waitingPlayers=enteredPlayers.filter(p=>p.scoreSubmitted!==true);
+
+      if(waitingPlayers.length){
+        alert("The round cannot finish yet. Waiting for: " + waitingPlayers.map(p=>p.name).join(", "));
+        return;
+      }
+    }
 
     const scoredPlayers=currentRoundPlayers().filter(p=>
       pointsComp==="stableford"
