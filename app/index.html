@@ -3265,6 +3265,9 @@ function appPrompt(title,message="",initial="",options={}){
       </div>`;
     document.body.appendChild(overlay);
     const input=overlay.querySelector("#appPromptInput");
+    if(options.handicap){
+      input.addEventListener("input",()=>{input.value=limitHandicapText(input.value);});
+    }
     const finish=value=>{overlay.remove();resolve(value);};
     overlay.querySelector("#appPromptOk").onclick=()=>finish(input.value);
     overlay.querySelector("#appPromptCancel").onclick=()=>finish(null);
@@ -3812,6 +3815,16 @@ function validIndividualScore(raw,type){
 }
 function validGolfHandicap(raw){
   return /^-?[0-9]{1,2}(?:\.[0-9])?$/.test(raw) && Number(raw)>=-10 && Number(raw)<=60;
+}
+function limitHandicapText(value){
+  const raw=String(value);
+  const sign=raw.startsWith("-") ? "-" : "";
+  const digits=raw.slice(sign.length).replace(/[^0-9.]/g,"");
+  const dot=digits.indexOf(".");
+  const whole=(dot<0?digits:digits.slice(0,dot)).replace(/\D/g,"").slice(0,2);
+  if(dot<0)return sign+whole;
+  const decimal=digits.slice(dot+1).replace(/\D/g,"").slice(0,1);
+  return sign+(whole||"0")+"."+decimal;
 }
 async function submitPlayerScore(i,type){
   if(!demoCanEdit())return;
@@ -6455,7 +6468,7 @@ async function changeMyHandicap(i){
 
  if(p.id!==myPlayerId && !isAdmin)return;
 
- const h=await appPrompt("Change Handicap","Enter the new golf handicap.",p.handicap,{type:"text",inputmode:"decimal",maxlength:5,okLabel:"Save Handicap"});
+ const h=await appPrompt("Change Handicap","Enter the new golf handicap.",p.handicap,{type:"text",inputmode:"decimal",maxlength:5,handicap:true,okLabel:"Save Handicap"});
  if(h===null)return;
 
  const handicapText=String(h).trim();
@@ -6484,6 +6497,8 @@ function playerJoinForm(){
     </div>`;
     document.body.appendChild(overlay);
     const msg=overlay.querySelector("#joinMsg");
+    const handicapInput=overlay.querySelector("#joinHandicap");
+    handicapInput.addEventListener("input",()=>{handicapInput.value=limitHandicapText(handicapInput.value);});
     overlay.querySelector("#joinCancel").onclick=()=>{overlay.remove();resolve(null)};
     overlay.querySelector("#joinSubmit").onclick=()=>{
       const first=overlay.querySelector("#joinFirst").value.trim();
