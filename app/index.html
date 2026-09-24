@@ -122,7 +122,22 @@ body.admin-mode nav button:not(.hidden),body.admin-mode nav.iig-admin-nav-bar bu
 body.admin-mode nav button.active:not(.hidden),body.admin-mode nav.iig-admin-nav-bar button.active:not(.hidden){background:#155c34!important;color:#ffffff!important;border-color:#155c34!important}
 @media (max-width:600px){header{min-height:108px;padding-top:calc(5px + env(safe-area-inset-top));padding-bottom:9px}.app-header-logo{width:62px;height:62px;border-radius:14px}}
 
+/* Installed iPhone views can draw behind the native status bar while scrolling. */
+html.iig-ios-fullscreen .app{padding-top:max(54px, env(safe-area-inset-top))}
+html.iig-ios-fullscreen header{padding-top:6px}
+html.iig-ios-fullscreen body::before{
+  content:"";position:fixed;top:0;left:0;right:0;
+  height:max(54px, env(safe-area-inset-top));
+  background:var(--bg);z-index:25;pointer-events:none;
+}
+
 </style>
+<script>
+if(/iPhone|iPod/.test(navigator.userAgent) &&
+   (navigator.standalone===true || matchMedia("(display-mode: standalone)").matches || !/Safari\//.test(navigator.userAgent))){
+  document.documentElement.classList.add("iig-ios-fullscreen");
+}
+</script>
 </head>
 <body>
 
