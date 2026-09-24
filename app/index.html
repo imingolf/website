@@ -1061,7 +1061,7 @@ function sideGameEntranceHtml(){
       <h2 style="margin:5px 0 7px;">SIDE GAME</h2>
       <h2 style="margin:5px 0 7px;">Challenge your mates</h2>
       <div style="font-weight:600;color:#40564a;line-height:1.4;">
-        Playing in the group comp? Have a friendly side bet with a mate in your group. Agree a stake, enter your scores, and we’ll keep track of who owes who.
+        Playing in the group comp? Start a friendly Side Game with a mate in your group. Agree an amount, enter your scores, and we’ll keep track of the result.
       </div>
       <button class="primary full" style="margin-top:14px;" onclick="iigFreePlan() ? showIigPlusUpgrade('sidegame') : sideGameHome()">
         ${iigFreePlan() ? "🔒 Side Game — I’m In Golf+" : "🤝 Open Side Game"}
@@ -1664,7 +1664,7 @@ function sideGamePickPlayer(playerId){
       </button>
 
       <div class="muted" style="margin:6px 4px 16px;">
-        You've already agreed the bet.
+        You've already agreed this Side Game.
       </div>
 
       <button class="secondary full" onclick="sideGameSendChallenge('${escAttr(player.id)}')">
@@ -1771,7 +1771,7 @@ function sideGameAgreedInPerson(playerId,mode="in_person"){
       <div class="muted" style="margin-top:10px;">
         ${formatLocked
           ? `Today's Side Games use <b>${savedFormat==="net" ? "Net" : "Stableford"}</b>, so you'll only need to enter one score.`
-          : "Your first bet today sets the scoring for your Side Games today."}
+          : "Your first Side Game today sets the scoring format for your Side Games today."}
       </div>
 
       <button
@@ -1782,7 +1782,7 @@ function sideGameAgreedInPerson(playerId,mode="in_person"){
           ? `sideGameSendChallenge('${escAttr(player.id)}')`
           : `sideGameConfirmBet('${escAttr(player.id)}')`}"
         ${savedFormat ? "" : "disabled"}>
-        ${mode==="challenge" ? "📲 Send Challenge" : "🤝 Confirm Bet"}
+        ${mode==="challenge" ? "📲 Send Challenge" : "🤝 Confirm Side Game"}
       </button>
     </div>
 
@@ -1827,7 +1827,7 @@ function sideGameConfirmBet(playerId){
   if(!me || !player)return;
 
   if(!(stake>0)){
-    alert("Enter the bet amount first.");
+    alert("Enter the Side Game amount first.");
     return;
   }
 
@@ -1925,7 +1925,7 @@ function sideGameSendChallenge(playerId){
   const format=localStorage.getItem("iig_sidegame_format_"+myPlayerId)||"";
 
   if(!(stake>0)){
-    alert("Enter the bet amount first.");
+    alert("Enter the Side Game amount first.");
     return;
   }
 
@@ -2150,7 +2150,7 @@ function sideGameScoreEntry(){
   );
 
   if(!todaysBets.length){
-    alert("You don't have any Side Game bets today.");
+    alert("You don't have any Side Games today.");
     sideGameHome();
     return;
   }
@@ -2378,9 +2378,9 @@ function sideGameHome(){
         if(!todaysBets.length && !incomingChallenges.length && !outgoingChallenges.length){
           return `
             <div class="muted">YOUR SIDE GAME</div>
-            <h2 style="margin:5px 0;">No active bets yet</h2>
+            <h2 style="margin:5px 0;">No active Side Games yet</h2>
             <div style="color:#40564a;line-height:1.45;">
-              Side Game is always open. Start a bet whenever you're playing.
+              Side Game is always open. Start a Side Game whenever you're playing.
             </div>
           `;
         }
@@ -2483,7 +2483,7 @@ function sideGameHome(){
             📊 My Side Game Statement
           </button>
 
-          <div class="muted">TODAY'S BETS</div>
+          <div class="muted">TODAY'S SIDE GAMES</div>
           ${todaysBets.map(b=>{
             const myScore=state.sideGame.scores.find(x=>
               x.playerId===myPlayerId &&
@@ -2935,7 +2935,7 @@ $("screen").innerHTML=`
       <h2 style="margin:5px 0 7px;">SIDE GAME</h2>
       <h2 style="margin:5px 0 7px;">Challenge your mates</h2>
       <div style="font-weight:600;color:#40564a;line-height:1.4;">
-        Playing in the group comp? Have a friendly side bet with a mate in your group. Agree a stake, enter your scores, and we’ll keep track of who owes who.
+        Playing in the group comp? Start a friendly Side Game with a mate in your group. Agree an amount, enter your scores, and we’ll keep track of the result.
       </div>
       <button class="primary full" style="margin-top:14px;" onclick="iigFreePlan() ? showIigPlusUpgrade('sidegame') : sideGameHome()">
         ${iigFreePlan() ? "🔒 Side Game — I’m In Golf+" : "🤝 Open Side Game"}
