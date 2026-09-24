@@ -2786,8 +2786,6 @@ $("screen").innerHTML=`
           <span class="pill paid">
             ${tripTeamRoundActive() ? `🤝 ${esc(tripFormatLabel().toUpperCase())}` : (state.gameType==="points" ? "🏆 POINTS GAME" : (Number(state.stake||0)>0 ? "💷 MONEY GAME" : "⛳ NO STAKE"))}
           </span>
-          <span class="pill" style="background:#edf5ef;color:var(--green);">
-          </span>
           ${state.gameType==="money" && Number(state.stake||0)>0 ? `
             <span class="pill" style="background:#edf5ef;color:var(--green);">£${state.stake} entry</span>
           ` : ``}
