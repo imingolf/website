@@ -984,6 +984,7 @@ async function setupFirstRound(){
   state.secondPrize=splitPrizes ? secondPrize : 0;
   state.thirdPrize=splitPrizes ? thirdPrize : 0;
   state.roundOpen=true;
+  state.roundId=createRoundId();
   state.players.forEach(p=>{
     p.paid=false; p.competition=null; p.stableford=null; p.netScore=null;
     p.noReturn=false; p.scoreSubmitted=false;
@@ -3095,6 +3096,9 @@ function clearPaymentJourney(){
   try{sessionStorage.removeItem(paymentReturnKey());}catch(e){}
   try{localStorage.removeItem(paymentReturnKey());}catch(e){}
 }
+function createRoundId(){
+  return globalThis.crypto?.randomUUID?.() || "round-"+Date.now()+"-"+Math.random().toString(36).slice(2);
+}
 function paymentLinkForStake(rawLink,stake){
   const link=String(rawLink||"").trim();
   const amount=Number(stake||0);
@@ -3304,8 +3308,10 @@ async function recognisePaymentReturn(){
   // round. This prevents an old return from marking a later competition paid.
   const journeyAge=Date.now()-Number(journey.startedAt||0);
   const sameGroup=!journey.groupPin || String(journey.groupPin)===String(pin||"");
-  const hasRoundIds=Boolean(journey.roundId && state.roundId);
-  const sameRoundIdentity=!hasRoundIds || String(journey.roundId)===String(state.roundId);
+  // Older rounds may have no ID. Once a round has one, an untagged return
+  // cannot safely claim payment for it, even when course/date/stake repeat.
+  const sameRoundIdentity=!state.roundId ||
+    (Boolean(journey.roundId) && String(journey.roundId)===String(state.roundId));
 
 const sameRound=
   sameRoundIdentity &&
@@ -8764,9 +8770,7 @@ async function newRound(){
       pastTrips:state.trip?.pastTrips||[]
     };
     state.roundOpen=true;
-    state.roundId=crypto.randomUUID
-  ? crypto.randomUUID()
-  : "round-"+Date.now()+"-"+Math.random().toString(36).slice(2);
+    state.roundId=createRoundId();
     state.course=first.course;
     state.date=first.date;
     state.gameType=first.gameType;
@@ -8795,6 +8799,7 @@ async function newRound(){
 
   if(state.trip) state.trip.active=false;
   state.roundOpen=true;
+  state.roundId=createRoundId();
   state.course=setup.course;
   state.date=setup.date;
   state.gameType=selectedType;
@@ -8827,6 +8832,7 @@ async function nextTripRound(){
     const daySetup=await tripRoundDaySetup(roundNumber,plannedRound.format||"individual",state.trip.playerIds||state.players.map(p=>p.id));
     if(!daySetup)return;
     state.roundOpen=true;
+    state.roundId=createRoundId();
     state.course=plannedRound.course || "";
     state.date=plannedRound.date || "";
     state.gameType=plannedRound.gameType || "money";
@@ -8955,6 +8961,7 @@ if(tripDate===null)return;
   state.trip.active=true;
   state.trip.completed=false;
   state.roundOpen=true;
+  state.roundId=createRoundId();
   state.course=tripCourse.trim();
   state.date=tripDate.trim();
 
