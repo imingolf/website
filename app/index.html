@@ -731,114 +731,105 @@ function ensureSideGameState(){
 }
 
 let saveActive=false;
+let savePending=0;
+let saveQueue=Promise.resolve();
 let stateSaveVersion=0;
+let refreshRequestVersion=0;
 
 async function save(){
-
-  if(!db)return;
-  saveActive=true;
-  stateSaveVersion++;
-
+  if(!db)return false;
   if(demoReadOnly()){
     $("syncText").textContent="Demo • read only";
-    saveActive=false;
     return false;
   }
-
+  state.lastActivityAt=new Date().toISOString();
+  const savedState=JSON.parse(JSON.stringify(state));
+  const savedPin=pin;
+  const savedDb=db;
+  stateSaveVersion++;
+  savePending++;
+  saveActive=true;
   $("syncText").textContent="Saving…";
 
-  // Persist meaningful group activity for the Owner Dashboard.
-  state.lastActivityAt=new Date().toISOString();
-
-  const {data,error}=await db.rpc(
-    "save_group_state",
-    {p_pin:pin,p_state:state}
-  );
-
-  $("syncText").textContent=
-    error ? "Couldn't sync" : "Shared • synced";
-
-  saveActive=false;
-  return !error;
+  // Send this phone's snapshots in order, keeping refresh blocked until all finish.
+  const request=saveQueue.then(async()=>{
+    let ok=false;
+    try{
+      const {data,error}=await savedDb.rpc("save_group_state",{p_pin:savedPin,p_state:savedState});
+      ok=!error && data!==false;
+      return ok;
+    }catch(error){
+      return false;
+    }finally{
+      savePending--;
+      saveActive=savePending>0;
+      if(pin===savedPin){
+        $("syncText").textContent=saveActive ? "Saving…" : (ok ? "Shared • synced" : "Couldn't sync");
+      }
+    }
+  });
+  saveQueue=request.catch(()=>false);
+  return request;
 }
+
+function refreshBlocked(){
+  if(finishRoundActive || normalFinishInProgress || saveActive || scoreDraftActive)return true;
+  const tag=document.activeElement?.tagName;
+  return ["INPUT","TEXTAREA","SELECT"].includes(tag) ||
+    Boolean(document.querySelector("#appPromptInput, #appConfirmYes, #paymentReturnYes"));
+}
+
 async function refresh(){
- if(finishRoundActive)return;
- if(saveActive)return;
- if(!db)return;
-
- // Side Game is a player-controlled screen.
- // Background syncing must never kick the player out.
- if(sideGameOpen)return;
-
- // Never redraw while someone is typing a score draft.
- // This prevents the 5-second sync from wiping or replacing an unsent score.
- if(scoreDraftActive)return;
-
- // Keep Owner utility screens on display.
- // Do not let the 5-second background sync redraw them while they are open.
- if(page==="settings" || page==="admininvite" || page==="managegroups" || page==="editgroup" || page==="adminhelp")return;
-
- const editing=document.activeElement &&
-   document.activeElement.tagName==="INPUT";
-
- if(editing)return;
-
- const refreshVersion=stateSaveVersion;
- const {data,error}=await db.rpc("get_group_state",{p_pin:pin});
-
- // Ignore an old refresh if a save happened while it was waiting.
- if(refreshVersion!==stateSaveVersion)return;
- if(saveActive)return;
-if(!error && data){
-  state=data;
-  ensureDemoMoneyHistory();
-
-  // Only redraw the app if this phone's saved player still exists
-  // in the current group. This prevents "Find my name" from being
-  // replaced by the join screen every 5 seconds when a stale player
-  // ID is stored from another group.
-  const currentPlayerExists=
-    myPlayerId && state.players.some(p=>p.id===myPlayerId);
-
-  if(currentPlayerExists){
-    render();
+  if(!db || sideGameOpen || refreshBlocked())return;
+  if(["settings","admininvite","managegroups","editgroup","adminhelp"].includes(page))return;
+  const refreshVersion=stateSaveVersion;
+  const requestVersion=++refreshRequestVersion;
+  const requestPin=pin;
+  const requestPage=page;
+  try{
+    const {data,error}=await db.rpc("get_group_state",{p_pin:requestPin});
+    // Recheck after the network wait: the player may have started typing or moved on.
+    if(requestVersion!==refreshRequestVersion || refreshVersion!==stateSaveVersion)return;
+    if(pin!==requestPin || page!==requestPage || sideGameOpen || refreshBlocked())return;
+    if(error || !data)return;
+    state=data;
+    ensureDemoMoneyHistory();
+    const currentPlayerExists=myPlayerId && state.players.some(p=>p.id===myPlayerId);
+    if(currentPlayerExists)render();
+    $("syncText").textContent=demoReadOnly() ? "Demo • read only" : "Shared • synced";
+  }catch(error){
+    // Keep the current screen and let the next polling interval retry.
   }
-
-  $("syncText").textContent=
-  demoReadOnly() ? "Demo • read only" : "Shared • synced";
 }
-
- }
 let finishRoundActive=false;
 let normalFinishInProgress=false;
 let scoreDraftActive=false;
 let sideGameOpen=false;
 
 async function refreshSideGameLive(){
-  if(!db || !sideGameOpen || !sideGameHomeOpen)return;
+  if(!db || !sideGameOpen || !sideGameHomeOpen || refreshBlocked())return;
   const refreshVersion=stateSaveVersion;
-  const {data,error}=await db.rpc("get_group_state",{p_pin:pin});
-
-  // Ignore an old refresh if a save happened while it was waiting.
-  if(refreshVersion!==stateSaveVersion)return;
-  if(saveActive)return;
-  if(error || !data)return;
-
-  const oldSideGame=JSON.stringify(state.sideGame || {});
-  const newSideGame=JSON.stringify(data.sideGame || {});
-
-  state=data;
-  ensureDemoMoneyHistory();
-
-  // Only redraw Side Game when its shared data has actually changed.
-  // This prevents the 5-second sync from making the screen jump.
-  if(oldSideGame!==newSideGame){
-    const savedScrollY=window.scrollY;
-    sideGameHome();
-    window.scrollTo(0,savedScrollY);
+  const requestVersion=++refreshRequestVersion;
+  const requestPin=pin;
+  const requestPage=page;
+  try{
+    const {data,error}=await db.rpc("get_group_state",{p_pin:requestPin});
+    if(requestVersion!==refreshRequestVersion || refreshVersion!==stateSaveVersion)return;
+    if(pin!==requestPin || page!==requestPage || !sideGameOpen || !sideGameHomeOpen || refreshBlocked())return;
+    if(error || !data)return;
+    const oldSideGame=JSON.stringify(state.sideGame || {});
+    const newSideGame=JSON.stringify(data.sideGame || {});
+    state=data;
+    ensureDemoMoneyHistory();
+    if(oldSideGame!==newSideGame){
+      const savedScrollY=window.scrollY;
+      sideGameHome();
+      window.scrollTo(0,savedScrollY);
+    }
+    $("syncText").textContent=demoReadOnly() ? "Demo • read only" : "Shared • synced";
+  }catch(error){
+    // Preserve the player's screen while offline.
   }
-  $("syncText").textContent=
-    demoReadOnly() ? "Demo • read only" : "Shared • synced";
 }
 
 function startPolling(){
@@ -4050,6 +4041,22 @@ function showTripBetterBallResult(record){
 }
 
 async function finishRound(){
+  if(finishRoundActive)return;
+  finishRoundActive=true;
+  try{
+    if(saveActive){
+      showAppToast("Saving changes", "Please wait for syncing to finish, then try again.", 3000);
+      return;
+    }
+    return await finishRoundImpl();
+  }finally{
+    finishRoundActive=false;
+    normalFinishInProgress=false;
+    if(page==="scores")scores();
+  }
+}
+
+async function finishRoundImpl(){
 
 
   const isPointsGame=state.gameType==="points";
@@ -4376,9 +4383,7 @@ if(isTrip){
     setTripChampion();
   }
 }
-        finishRoundActive=true;
         const finishSaved=await save();
-        finishRoundActive=false;
         if(!finishSaved){
           alert("The finished round could not be saved. Please check your connection and try again.");
           return;
@@ -4508,6 +4513,17 @@ if(state.splitPrizes){
         ["1st","2nd","3rd"][place]
       );
       if(!selected)return;
+    }
+
+    // The declared first place must also drive the winner heading and win count.
+    if(place===0){
+      if(pointsComp==="net"){
+        netWinners=[selected];
+        netCountback=tied.length>1;
+      }else{
+        stablefordWinners=[selected];
+        stablefordCountback=tied.length>1;
+      }
     }
 
     moneyPrizePlaces.push({
@@ -4699,9 +4715,7 @@ if(isTrip){
     setTripChampion();
   }
 }
-  finishRoundActive=true;
   const moneyFinishSaved=await save();
-  finishRoundActive=false;
   if(!moneyFinishSaved){
     alert("The finished round could not be saved. Please check your connection and try again.");
     return;
