@@ -131,6 +131,19 @@ html.iig-ios-fullscreen body::before{
   background:var(--bg);z-index:25;pointer-events:none;
 }
 
+
+/* Light green buttons in player mode */
+body:not(.admin-mode) nav { gap: 5px; }
+body:not(.admin-mode) nav button:not(.hidden) {
+  background: #d9efdf; color: #174b2b; border: 1px solid #b8d9c1;
+  border-radius: 12px; font-weight: 800; padding: 8px 2px;
+}
+body:not(.admin-mode) nav button.active:not(.hidden) {
+  background: #acd6b8; border-color: #70ac83; color: #103d22;
+}
+body:not(.admin-mode) nav button:not(.hidden):active {
+  background: #91c7a0; border-color: #579568;
+}
 </style>
 <script>
 if(/iPhone|iPod/.test(navigator.userAgent) &&
