@@ -6,12 +6,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <title>I'm In Golf</title>
 <style>
 :root{--bg:#f4f6f3;--card:#fff;--ink:#17231b;--muted:#68736c;--green:#176b3a;--green2:#23864e;--line:#dce3dd;--amber:#8a6500;--amberbg:#fff1c7;--red:#a83b34;--redbg:#fbe4e1}
 *{box-sizing:border-box} body{margin:0;background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--ink)}
-.app{max-width:520px;margin:auto;min-height:100vh;padding-bottom:76px}
+.app{max-width:520px;margin:auto;min-height:100vh;padding-bottom:calc(120px + env(safe-area-inset-bottom))}
 header{background:linear-gradient(135deg,#10592f,#23864e);color:white;padding:calc(24px + env(safe-area-inset-top)) 18px 20px;border-radius:0 0 24px 24px}
 header h1{margin:0;font-size:30px} header p{margin:5px 0 0;opacity:.85}
 main{padding:14px}.card{background:white;border:1px solid var(--line);border-radius:18px;padding:16px;margin-bottom:13px;box-shadow:0 2px 8px rgba(0,0,0,.03)}
@@ -122,7 +122,22 @@ body.admin-mode nav button:not(.hidden),body.admin-mode nav.iig-admin-nav-bar bu
 body.admin-mode nav button.active:not(.hidden),body.admin-mode nav.iig-admin-nav-bar button.active:not(.hidden){background:#155c34!important;color:#ffffff!important;border-color:#155c34!important}
 @media (max-width:600px){header{min-height:108px;padding-top:calc(5px + env(safe-area-inset-top));padding-bottom:9px}.app-header-logo{width:62px;height:62px;border-radius:14px}}
 
+/* Installed iPhone views can draw behind the native status bar while scrolling. */
+html.iig-ios-fullscreen .app{padding-top:max(54px, env(safe-area-inset-top))}
+html.iig-ios-fullscreen header{padding-top:6px}
+html.iig-ios-fullscreen body::before{
+  content:"";position:fixed;top:0;left:0;right:0;
+  height:max(54px, env(safe-area-inset-top));
+  background:var(--bg);z-index:25;pointer-events:none;
+}
+
 </style>
+<script>
+if(/iPhone|iPod/.test(navigator.userAgent) &&
+   (navigator.standalone===true || matchMedia("(display-mode: standalone)").matches || !/Safari\//.test(navigator.userAgent))){
+  document.documentElement.classList.add("iig-ios-fullscreen");
+}
+</script>
 </head>
 <body>
 
@@ -3240,7 +3255,7 @@ function appPrompt(title,message="",initial="",options={}){
       <div class="card" style="width:min(440px,100%);margin:0;padding:24px;border-radius:20px;box-shadow:0 18px 50px rgba(0,0,0,.18);">
         <h2 style="font-size:22px;margin:0 0 8px;text-align:center;">${esc(title)}</h2>
         ${message ? `<div class="muted" style="text-align:center;margin-bottom:14px;white-space:pre-line;">${esc(message)}</div>` : ""}
-        <input id="appPromptInput" type="${escAttr(inputType)}" ${inputMode?`inputmode="${escAttr(inputMode)}"`:""} placeholder="${escAttr(placeholder)}" value="${escAttr(String(initial??""))}">
+        <input id="appPromptInput" type="${escAttr(inputType)}" ${inputMode?`inputmode="${escAttr(inputMode)}"`:""} ${options.maxlength?`maxlength="${Number(options.maxlength)}"`:""} placeholder="${escAttr(placeholder)}" value="${escAttr(String(initial??""))}">
         <button id="appPromptOk" class="primary full">${esc(options.okLabel||"Continue")}</button>
         <button id="appPromptCancel" class="ghost full">Cancel</button>
       </div>`;
@@ -3629,8 +3644,10 @@ function scores(){
                 </label>
                 <input
                   id="scoreInput_${i}"
-                  type="number"
+                  type="text"
                   inputmode="numeric"
+                  maxlength="${type==="stableford" ? 2 : 3}"
+                  pattern="${type==="stableford" ? "[0-9]{1,2}" : "[0-9]{1,3}"}"
                   placeholder="${type==="stableford" ? "Points" : "Net"}"
                   oninput="scoreDraftActive=true">
 
@@ -3784,6 +3801,12 @@ if(!demoCanEdit())return;
   render();
   await savePlayerPatch(p.id,{competition:type});
 }
+function validIndividualScore(raw,type){
+  return type==="stableford" ? /^[0-9]{1,2}$/.test(raw) : /^[0-9]{1,3}$/.test(raw);
+}
+function validGolfHandicap(raw){
+  return /^-?[0-9]{1,2}(?:\.[0-9])?$/.test(raw) && Number(raw)>=-10 && Number(raw)<=60;
+}
 async function submitPlayerScore(i,type){
   if(!demoCanEdit())return;
   type=state.pointsCompetition||type||"stableford";
@@ -3806,8 +3829,8 @@ async function submitPlayerScore(i,type){
   const raw=String(input?.value||"").trim();
   const value=Number(raw);
 
-  if(!raw || !Number.isFinite(value) || value<0){
-    alert("Please enter a valid score.");
+  if(!validIndividualScore(raw,type)){
+    alert(type==="stableford" ? "Enter Stableford points using up to 2 digits." : "Enter a Net score using up to 3 digits.");
     return;
   }
 
@@ -3912,8 +3935,8 @@ async function adminEditSubmittedScore(i,type){
   }
 
   const value=Number(clean);
-  if(clean==="" || !Number.isFinite(value) || value<0){
-    alert("Please enter a valid score" + (type==="net" ? " or NR." : "."));
+  if(!validIndividualScore(clean,type)){
+    alert(type==="stableford" ? "Enter Stableford points using up to 2 digits." : "Enter a Net score using up to 3 digits, or NR.");
     return;
   }
 
@@ -6426,12 +6449,13 @@ async function changeMyHandicap(i){
 
  if(p.id!==myPlayerId && !isAdmin)return;
 
- const h=await appPrompt("Change Handicap","Enter the new golf handicap.",p.handicap,{type:"number",inputmode:"decimal",okLabel:"Save Handicap"});
+ const h=await appPrompt("Change Handicap","Enter the new golf handicap.",p.handicap,{type:"text",inputmode:"decimal",maxlength:5,okLabel:"Save Handicap"});
  if(h===null)return;
 
- const newHandicap=Number(h);
-if(!Number.isFinite(newHandicap) || newHandicap < -10 || newHandicap > 60){
-  alert("Please enter a valid handicap between -10 and 60.");
+ const handicapText=String(h).trim();
+ const newHandicap=Number(handicapText);
+if(!validGolfHandicap(handicapText)){
+  alert("Enter a handicap between -10 and 60, with up to 1 decimal place.");
   return;
 }
 p.handicap=newHandicap;
@@ -6448,7 +6472,7 @@ function playerJoinForm(){
       <div class="muted" style="margin-bottom:16px;">Enter your name and golf handicap.</div>
       <label><b>First name</b></label><input id="joinFirst" autocomplete="given-name">
       <label><b>Surname</b></label><input id="joinSurname" autocomplete="family-name">
-      <label><b>Golf handicap</b></label><input id="joinHandicap" type="number" step="0.1" min="-10" max="60" value="18">
+      <label><b>Golf handicap</b></label><input id="joinHandicap" type="text" inputmode="decimal" maxlength="5" value="18">
       <div id="joinMsg" class="muted" style="min-height:18px;color:var(--red);"></div>
       <button class="primary full" id="joinSubmit">Join Group</button><button class="ghost full" id="joinCancel">Cancel</button>
     </div>`;
@@ -6458,9 +6482,10 @@ function playerJoinForm(){
     overlay.querySelector("#joinSubmit").onclick=()=>{
       const first=overlay.querySelector("#joinFirst").value.trim();
       const surname=overlay.querySelector("#joinSurname").value.trim();
-      const handicap=Number(overlay.querySelector("#joinHandicap").value);
+      const handicapText=overlay.querySelector("#joinHandicap").value.trim();
+      const handicap=Number(handicapText);
       if(!first||!surname){msg.textContent="Please enter your first name and surname.";return}
-      if(!Number.isFinite(handicap)||handicap < -10||handicap > 60){msg.textContent="Please enter a valid handicap between -10 and 60.";return}
+      if(!validGolfHandicap(handicapText)){msg.textContent="Enter a handicap between -10 and 60, with up to 1 decimal place.";return}
       overlay.remove();resolve({first,surname,handicap});
     };
     setTimeout(()=>overlay.querySelector("#joinFirst").focus(),50);
@@ -6511,9 +6536,10 @@ async function adminAddPlayer(){
   const h=prompt("Handicap","18");
   if(h===null)return;
 
-  const handicap=Number(h);
-  if(!Number.isFinite(handicap) || handicap < -10 || handicap > 60){
-    alert("Please enter a valid handicap between -10 and 60.");
+  const handicapText=String(h).trim();
+  const handicap=Number(handicapText);
+  if(!validGolfHandicap(handicapText)){
+    alert("Enter a handicap between -10 and 60, with up to 1 decimal place.");
     return;
   }
 
@@ -6537,7 +6563,7 @@ async function adminAddPlayer(){
   alert("✅ " + cleanName + " added to the group.");
 }
 
-async function editPlayer(i){const p=state.players[i];const name=prompt("Player name",p.name);if(!name)return;const h=prompt("Handicap",p.handicap);p.name=name.trim();p.handicap=Number(h)||0;render();await save()}
+async function editPlayer(i){const p=state.players[i];const name=prompt("Player name",p.name);if(!name)return;const h=prompt("Handicap",p.handicap);if(h===null)return;const handicapText=String(h).trim();if(!validGolfHandicap(handicapText)){alert("Enter a handicap between -10 and 60, with up to 1 decimal place.");return}p.name=name.trim();p.handicap=Number(handicapText);render();await save()}
 async function removePlayer(i){const p=state.players[i];if(!p)return;if(!await appConfirm("Remove Player","Remove "+p.name+" from this group? Their past round history will stay saved.","Remove Player",true))return;state.players.splice(i,1);render();await save()}
 
 
