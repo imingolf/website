@@ -4210,12 +4210,20 @@ async function finishRoundImpl(){
     );
 
     if(!scoredPlayers.length){
-      alert(
-        pointsComp==="stableford"
-          ? "Enter at least one Stableford score first."
-          : "Enter at least one Net score first."
-      );
-      return;
+      const enteredPlayers=state.players.filter(p=>p.playingThisRound===true);
+      const allNoReturn=
+        pointsComp==="net" &&
+        enteredPlayers.length>0 &&
+        enteredPlayers.every(p=>p.noReturn===true);
+
+      if(!allNoReturn){
+        alert(
+          pointsComp==="stableford"
+            ? "Enter at least one Stableford score first."
+            : "Enter at least one Net score first."
+        );
+        return;
+      }
     }
 
     let remaining=[...scoredPlayers];
