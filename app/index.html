@@ -1568,7 +1568,7 @@ function playerNextActionHtml(){
   }
 
   if(moneyGame && !me.paid && !roundLocked()){
-    return `<div class="card" style="text-align:center;"><div class="muted">YOUR NEXT STEP</div><button class="primary full" style="font-size:18px;margin-top:8px;" onclick="beginPlayerPayment()">💳 Pay £${Number(state.stake||0)} & Enter</button></div>`;
+    return `<div class="card" style="text-align:center;"><div class="muted">YOUR NEXT STEP</div><button class="primary full" style="font-size:18px;margin-top:8px;" onclick="beginPlayerPayment()">💳 Pay £${Number(state.stake||0)} & Join</button></div>`;
   }
   if(submitted){
     return `<div class="card" style="text-align:center;"><div class="muted">YOUR NEXT STEP</div><button class="secondary full" style="font-size:18px;margin-top:8px;" onclick="show('scores')">✅ Score In — View Leaderboard</button></div>`;
@@ -2844,7 +2844,7 @@ $("screen").innerHTML=`
 
   ${state.gameType==="money" && Number(state.stake||0)>0 ? `
     <div class="card" style="text-align:center;">
-      <div class="muted" style="font-weight:800;letter-spacing:.4px;">💰 CURRENT POT</div>
+      <div class="muted" style="font-weight:800;letter-spacing:.4px;">💰 CURRENT TOTAL</div>
       <div class="big" style="font-size:36px;margin:4px 0 2px;">£${pot()}</div>
       ${state.splitPrizes ? `
         <div style="margin-top:10px;font-weight:800;">
@@ -2867,7 +2867,7 @@ $("screen").innerHTML=`
     </div>
   ` : state.gameType==="money" && Number(state.stake||0)>0 ? `
     <div class="card">
-      <h2>💷 Pay Before Play</h2>
+      <h2>💷 Payment</h2>
 
       <div class="row">
         <div>
@@ -3000,7 +3000,7 @@ function pay(){
 
  $("screen").innerHTML=`
  <div class="card">
-   <h2>💷 ${isAdmin ? "Manage Payments" : (me?.paid ? "Payments" : "Pay & Enter")}</h2>
+   <h2>💷 ${isAdmin ? "Manage Payments" : (me?.paid ? "Payments" : "Pay & Join")}</h2>
    <div class="notice">${isAdmin
      ? "<b>Players pay you directly.</b><br>I'm In Golf does not receive, hold or manage your group's money."
      : "<b>Pay your Group Admin directly.</b><br>I'm In Golf does not receive or hold your money."
@@ -3072,7 +3072,7 @@ function pay(){
        : (String(state.paymentLink||"").trim()
            ? (adminDeviceRecognised()
               ? `<button class="primary full" onclick="adminSelfEnter()">🔑 Enter & Mark Myself Paid</button>`
-              : `<button class="primary full" onclick="beginPlayerPayment()">💳 Pay £${Number(state.stake||0)} & Enter</button>`)
+              : `<button class="primary full" onclick="beginPlayerPayment()">💳 Pay £${Number(state.stake||0)} & Join</button>`)
            : `<button class="secondary full" disabled>Payment link not set up — ask your Group Admin</button>`)
      }
    </div>
@@ -7212,7 +7212,7 @@ function adminHelpTopicContent(topic){
   const topics={
     setup:`<h2>⛳ Set up the next competition</h2><div class="notice"><b>1.</b> Go to <b>Round</b>.<br><br><b>2.</b> A remembered Admin can tap <b>Admin — Set Up Next Competition</b>. On a new device, use <b>Players → Admin Login</b> and enter the 4-digit Admin PIN.<br><br><b>3.</b> Choose Group Game, Points Game or Trip Mode.<br><br><b>4.</b> Enter the course, date and choose <b>Stableford or Net</b> for everyone.<br><br><b>5.</b> For a Group Game, set the entry fee and payment amount.</div><div class="notice warning">Once the first score is submitted, entries close automatically.</div>`,
     players:`<h2>👥 Add or edit players</h2><div class="notice">Go to <b>Players</b>.<br><br>Players can join themselves, or the Admin can manage names and handicaps while Admin is unlocked.<br><br>A player can use <b>Change who I am</b> if the wrong name is selected on their phone.</div>`,
-    payments:`<h2>💷 Payments</h2><div class="notice"><b>What is a payment link?</b><br><br>It is your personal web address that lets players pay money directly to your chosen account. You copy it from your banking or payment app and paste it into I’m In Golf once.</div><div class="notice"><b>Set yours up:</b><br><br><b>1.</b> Go to <b>Admin / Settings → Set Up Player Payments</b>.<br><br><b>2.</b> Choose Monzo, Revolut, PayPal, Starling, Wise or Other secure link.<br><br><b>3.</b> Follow the instructions shown for that provider.<br><br><b>4.</b> Paste the link, test it and save.</div><div class="notice">In a Group Game, players tap <b>Pay & Enter</b> and use the Group Admin’s payment link to pay the Group Admin directly.<br><br>I’m In Golf records the payment status. Once scoring starts, entries close.</div><div class="muted">Payments go directly to the Group Admin. I’m In Golf does not receive, verify or hold the money.</div>`,
+    payments:`<h2>💷 Payments</h2><div class="notice"><b>What is a payment link?</b><br><br>It is your personal web address that lets players pay money directly to your chosen account. You copy it from your banking or payment app and paste it into I’m In Golf once.</div><div class="notice"><b>Set yours up:</b><br><br><b>1.</b> Go to <b>Admin / Settings → Set Up Player Payments</b>.<br><br><b>2.</b> Choose Monzo, Revolut, PayPal, Starling, Wise or Other secure link.<br><br><b>3.</b> Follow the instructions shown for that provider.<br><br><b>4.</b> Paste the link, test it and save.</div><div class="notice">In a Group Game, players tap <b>Pay & Join</b> and use the Group Admin’s payment link to pay the Group Admin directly.<br><br>I’m In Golf records the payment status. Once scoring starts, entries close.</div><div class="muted">Payments go directly to the Group Admin. I’m In Golf does not receive, verify or hold the money.</div>`,
     scoring:`<h2>🏌️ Scores</h2><div class="notice">Players enter their own score and tap <b>Submit My Score</b>.<br><br>The app asks <b>Are you sure?</b> before saving.<br><br>Once submitted, the player's score is locked.</div><div class="notice">Admin can use <b>Correct score</b> if a genuine mistake needs fixing.</div>`,
     nr:`<h2>NR — No Return</h2><div class="notice">In a <b>Net</b> competition, a player who does not return a score should tap <b>NR — No Return</b>.<br><br>NR counts as submitted, removes the player from <b>Still to enter</b>, and the player cannot win the Net competition.</div>`,
     waiting:`<h2>⏳ Still to enter</h2><div class="notice">Once scoring starts, the Scores screen shows the names of everyone who still needs to submit.<br><br>For a Group Game, the Scores screen includes players who entered before scoring started.<br><br>The list updates automatically as scores or NR results are submitted.</div>`,
@@ -8086,7 +8086,7 @@ function organiserPaymentSetup(groupName,options={}){
         <div class="notice" style="font-size:16px;line-height:1.5;">
           ${item.steps.map((instruction,index)=>`<b>${index+1}.</b> ${esc(instruction)}${index<item.steps.length-1?"<br><br>":""}`).join("")}
         </div>
-        <div class="notice"><b>You only do this once.</b><br>After it is saved, players simply tap <b>Pay & Enter</b>.</div>
+        <div class="notice"><b>You only do this once.</b><br>After it is saved, players simply tap <b>Pay & Join</b>.</div>
         <button class="primary full" id="backFromPaymentHelp">Got it — return to setup</button>
         <button class="ghost full" id="closeSetupPayment">${closeLabel}</button>`;
       card.querySelector("#backFromPaymentHelp").onclick=renderPaste;
@@ -8100,7 +8100,7 @@ function organiserPaymentSetup(groupName,options={}){
           <div class="muted">FOR</div><b>${esc(groupName)}</b><br><br>
           <div class="muted">PAYMENT LINK</div><span style="word-break:break-all;">${esc(link)}</span>
         </div>
-        <div class="notice"><b>Players keep it simple:</b><br>They tap <b>Pay & Enter</b>, pay you directly, then return to I'm In Golf.</div>
+        <div class="notice"><b>Players keep it simple:</b><br>They tap <b>Pay & Join</b>, pay you directly, then return to I'm In Golf.</div>
         <button class="secondary full" id="testSetupPayment">↗ Test my payment link</button>
         <button class="primary full" id="saveSetupPayment">✓ Save payment method</button>
         <button class="ghost full" id="backSetupPayment">← Back</button>
