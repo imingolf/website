@@ -3596,7 +3596,7 @@ function scores(){
             <b>${isAdmin ? "CURRENT COMPETITION — " : ""}${pointsComp==="stableford" ? "🏆 STABLEFORD" : "⛳ NET"}</b><br>
             ${isAdmin ? "Enter or correct player scores below." : "Your Group Admin chose the competition for everyone."}
           </div>
-          ${Number(state.stake||0)>0 ? `<div class="notice">💷 Only paid players are eligible to win the pot.</div>` : ""}
+          ${Number(state.stake||0)>0 ? `<div class="notice">💷 Only players marked as paid are included in the final result.</div>` : ""}
         `}
 
         ${eligiblePlayers.length ? `
@@ -4047,7 +4047,7 @@ function showTripBetterBallResult(record){
   const winnerText=(record.winnerNames||[]).join(" & ");
   const each=(record.winnerPlayerNames||[]).length?Number(record.teamPot||0)/(record.winnerPlayerNames||[]).length:0;
   page="winner";
-  $("screen").innerHTML=`<div class="card" style="text-align:center;"><div style="font-size:54px;">🏆</div><div class="muted">${esc(tripFormatLabel(record.tripFormat).toUpperCase())} RESULT</div><h2 style="font-size:25px;margin:7px 0;">${esc(winnerText)}</h2><div class="big">${Number(results[0]?.score||0)} ${record.pointsCompetition==="net"?"combined net":"pts"}</div>${Number(record.teamPot||0)>0?`<div class="notice" style="margin-top:12px;">💷 £${Number(record.teamPot).toFixed(2).replace(/\.00$/,"")} pot • £${each.toFixed(2).replace(/\.00$/,"")} per winning player</div>`:""}<div class="notice">Team-event points added • Individual standings unchanged</div></div><div class="card"><h2>📊 Pair standings</h2>${results.map((r,i)=>`<div class="player row"><span class="pos">${i+1}</span><div style="flex:1"><b>${esc(r.name)}</b></div><span class="money">${r.score}</span></div>`).join("")}</div><div class="card">${state.trip?.active&&state.roundOpen===false?`<div class="notice"><b>Round ${Number(state.trip.currentRound)-1} complete!</b><br>Next: Round ${state.trip.currentRound} of ${state.trip.totalRounds}.</div>${isAdmin?`<button class="primary full" onclick="nextTripRound()">✈️ Move on to Round ${state.trip.currentRound}</button>`:`<div class="notice">Waiting for the Group Admin to start the next round.</div>`}`:`<button class="secondary full" onclick="show('round')">Continue</button>`}</div>`;
+  $("screen").innerHTML=`<div class="card" style="text-align:center;"><div style="font-size:54px;">🏆</div><div class="muted">${esc(tripFormatLabel(record.tripFormat).toUpperCase())} RESULT</div><h2 style="font-size:25px;margin:7px 0;">${esc(winnerText)}</h2><div class="big">${Number(results[0]?.score||0)} ${record.pointsCompetition==="net"?"combined net":"pts"}</div>${Number(record.teamPot||0)>0?`<div class="notice" style="margin-top:12px;">💷 £${Number(record.teamPot).toFixed(2).replace(/\.00$/,"")} total • £${each.toFixed(2).replace(/\.00$/,"")} per player</div>`:""}<div class="notice">Team-event points added • Individual standings unchanged</div></div><div class="card"><h2>📊 Pair standings</h2>${results.map((r,i)=>`<div class="player row"><span class="pos">${i+1}</span><div style="flex:1"><b>${esc(r.name)}</b></div><span class="money">${r.score}</span></div>`).join("")}</div><div class="card">${state.trip?.active&&state.roundOpen===false?`<div class="notice"><b>Round ${Number(state.trip.currentRound)-1} complete!</b><br>Next: Round ${state.trip.currentRound} of ${state.trip.totalRounds}.</div>${isAdmin?`<button class="primary full" onclick="nextTripRound()">✈️ Move on to Round ${state.trip.currentRound}</button>`:`<div class="notice">Waiting for the Group Admin to start the next round.</div>`}`:`<button class="secondary full" onclick="show('round')">Continue</button>`}</div>`;
   window.scrollTo(0,0);
 }
 
@@ -5786,7 +5786,7 @@ async function shareTripSummary(){
 
   y+=75;c.fillStyle=green;c.fillRect(55,y,970,115);
   const total=Object.values(money).reduce((a,b)=>a+Number(b||0),0);
-  c.fillStyle="#fff";c.textAlign="center";c.font="700 23px Arial";c.fillText("TOTAL TRIP PRIZE MONEY",W/2,y+40);
+  c.fillStyle="#fff";c.textAlign="center";c.font="700 23px Arial";c.fillText("TOTAL TRIP PAYMENTS",W/2,y+40);
   c.font="800 42px Arial";c.fillText("£"+total.toFixed(2).replace(/\.00$/,""),W/2,y+88);
   y+=160;c.fillStyle=grey;c.font="700 20px Arial";c.fillText("Thanks for playing — I'm In Golf",W/2,y);
 
