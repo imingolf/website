@@ -970,7 +970,7 @@ async function setupFirstRound(){
   if(!date){ alert("Please choose the date."); $("firstRoundDate")?.focus(); return; }
   if(!Number.isFinite(stake) || stake<0){ alert("Please enter a valid entry amount, or leave it blank for no Group Game."); return; }
   if(splitPrizes && (!Number.isInteger(secondPrize) || !Number.isInteger(thirdPrize) || secondPrize<0 || thirdPrize<0)){
-    alert("Please enter 2nd and 3rd prizes as whole £ amounts.");
+    alert("Please enter 2nd and 3rd payments as whole £ amounts.");
     return;
   }
   if(stake>0 && !String(state.paymentLink||"").trim()){
@@ -2848,10 +2848,10 @@ $("screen").innerHTML=`
       <div class="big" style="font-size:36px;margin:4px 0 2px;">£${pot()}</div>
       ${state.splitPrizes ? `
         <div style="margin-top:10px;font-weight:800;">
-          🥇 1st ${Number(pot()) > Number(state.secondPrize||0) + Number(state.thirdPrize||0) ? `£${Number(pot()) - Number(state.secondPrize||0) - Number(state.thirdPrize||0)} · ` : ``}CLEANS UP THE POT 🏆
+          🥇 1st ${Number(pot()) > Number(state.secondPrize||0) + Number(state.thirdPrize||0) ? `£${Number(pot()) - Number(state.secondPrize||0) - Number(state.thirdPrize||0)} · ` : ``}RECEIVES THE REMAINING AMOUNT 🏆
           <br><span style="display:inline-block;margin-top:6px;">🥈 2nd £${Number(state.secondPrize||0)} &nbsp;·&nbsp; 🥉 3rd £${Number(state.thirdPrize||0)}</span>
         </div>
-        <div class="muted" style="margin-top:5px;">Winner takes everything left after 2nd &amp; 3rd prizes.</div>
+        <div class="muted" style="margin-top:5px;">1st receives the remaining amount after 2nd &amp; 3rd payments.</div>
       ` : ``}
     </div>
   ` : ``}
@@ -3012,7 +3012,7 @@ function pay(){
      <div style="margin-top:12px;font-weight:800;">
        🥇 1st ${Number(pot()) > Number(state.secondPrize||0) + Number(state.thirdPrize||0)
          ? `£${Number(pot()) - Number(state.secondPrize||0) - Number(state.thirdPrize||0)} · `
-         : ``}CLEANS UP THE POT 🏆
+         : ``}RECEIVES THE REMAINING AMOUNT 🏆
        <br><span style="display:inline-block;margin-top:6px;">
          🥈 2nd £${Number(state.secondPrize||0)}
          &nbsp;·&nbsp;
@@ -4847,12 +4847,12 @@ function prizeNextActionHtml(){
   const p=action.payout;
   const amount=moneyText(p.amount);
   const open=`showRoundHistory(${Number(action.historyIndex)})`;
-  if(isAdmin && p.status==="ready")return `<div class="card" style="border:2px solid var(--green);text-align:center;"><div style="font-size:34px;">💷</div><div class="muted">PRIZE PAYMENT READY</div><h2 style="font-size:23px;margin:6px 0;">${esc(p.winnerName)} has submitted payment details</h2><button class="primary full" onclick="${open}">Pay ${esc(p.winnerName)} £${amount}</button></div>`;
-  if(isAdmin && p.status==="bank_details_needed")return `<div class="card" style="border:2px solid var(--green);text-align:center;"><div style="font-size:34px;">🏦</div><div class="muted">PRIZE PAYMENT READY</div><h2 style="font-size:23px;margin:6px 0;">${esc(p.winnerName)} needs a private bank transfer</h2><button class="primary full" onclick="${open}">View £${amount} Payment</button></div>`;
-  if(isAdmin)return `<div class="card" style="text-align:center;"><div style="font-size:30px;">⏳</div><div class="muted">PRIZE PAYMENT</div><h2 style="font-size:21px;margin:6px 0;">£${amount} awaiting ${esc(p.winnerName)}'s payment details</h2><button class="secondary full" onclick="${open}">View Prize Status</button></div>`;
-  if(p.status==="awaiting_details")return `<div class="card" style="border:2px solid var(--green);text-align:center;"><div style="font-size:38px;">🏆</div><div class="muted">YOU WON</div><h2 style="font-size:24px;margin:6px 0;">Your £${amount} prize is ready</h2><button class="primary full" onclick="${open}">Claim My £${amount} Prize</button></div>`;
-  if(p.status==="ready")return `<div class="card" style="text-align:center;"><div style="font-size:30px;">✅</div><h2 style="font-size:21px;margin:6px 0;">Your payment details have been sent</h2><div class="muted">Your Group Admin can now pay your £${amount} prize.</div><button class="secondary full" onclick="${open}">View Prize Status</button></div>`;
-  return `<div class="card" style="text-align:center;"><div style="font-size:30px;">✅</div><h2 style="font-size:21px;margin:6px 0;">Private bank transfer selected</h2><div class="muted">Contact your Group Admin privately and send them your bank details. Never enter your bank details into I'm In Golf.</div><button class="secondary full" onclick="${open}">View Prize Status</button></div>`;
+  if(isAdmin && p.status==="ready")return `<div class="card" style="border:2px solid var(--green);text-align:center;"><div style="font-size:34px;">💷</div><div class="muted">RESULT PAYMENT READY</div><h2 style="font-size:23px;margin:6px 0;">${esc(p.winnerName)} has submitted payment details</h2><button class="primary full" onclick="${open}">Pay ${esc(p.winnerName)} £${amount}</button></div>`;
+  if(isAdmin && p.status==="bank_details_needed")return `<div class="card" style="border:2px solid var(--green);text-align:center;"><div style="font-size:34px;">🏦</div><div class="muted">RESULT PAYMENT READY</div><h2 style="font-size:23px;margin:6px 0;">${esc(p.winnerName)} needs a private bank transfer</h2><button class="primary full" onclick="${open}">View £${amount} Payment</button></div>`;
+  if(isAdmin)return `<div class="card" style="text-align:center;"><div style="font-size:30px;">⏳</div><div class="muted">RESULT PAYMENT</div><h2 style="font-size:21px;margin:6px 0;">£${amount} awaiting ${esc(p.winnerName)}'s payment details</h2><button class="secondary full" onclick="${open}">View Payment Status</button></div>`;
+  if(p.status==="awaiting_details")return `<div class="card" style="border:2px solid var(--green);text-align:center;"><div style="font-size:38px;">🏆</div><div class="muted">RESULT CONFIRMED</div><h2 style="font-size:24px;margin:6px 0;">Your £${amount} payment is ready</h2><button class="primary full" onclick="${open}">Set Up My £${amount} Payment</button></div>`;
+  if(p.status==="ready")return `<div class="card" style="text-align:center;"><div style="font-size:30px;">✅</div><h2 style="font-size:21px;margin:6px 0;">Your payment details have been sent</h2><div class="muted">Your Group Admin can now send your £${amount} payment.</div><button class="secondary full" onclick="${open}">View Payment Status</button></div>`;
+  return `<div class="card" style="text-align:center;"><div style="font-size:30px;">✅</div><h2 style="font-size:21px;margin:6px 0;">Private bank transfer selected</h2><div class="muted">Contact your Group Admin privately and send them your bank details. Never enter your bank details into I'm In Golf.</div><button class="secondary full" onclick="${open}">View Payment Status</button></div>`;
 }
 
 function showPrizeStatusAlert(){
@@ -4867,9 +4867,9 @@ function showPrizeStatusAlert(){
   if(localStorage.getItem(key)==="shown")return;
   localStorage.setItem(key,"shown");
   if(isAdmin){
-    showAppToast("💷 Prize payment ready",`${p.winnerName}'s £${moneyText(p.amount)} payment action is at the top of the Round tab.`,5200);
+    showAppToast("💷 Result payment ready",`${p.winnerName}'s £${moneyText(p.amount)} payment action is at the top of the Round tab.`,5200);
   }else{
-    showAppToast("🏆 You won £"+moneyText(p.amount),"Claim your prize at the top of the Round tab.",5200);
+    showAppToast("🏆 Result confirmed — £"+moneyText(p.amount),"Set up your payment at the top of the Round tab.",5200);
   }
 }
 
@@ -4894,7 +4894,7 @@ function chooseWinnerPayoutMethod(winnerName,amount){
     const methods=["monzo","revolut","paypal","starling","wise"];
     overlay.innerHTML=`<div class="card" style="width:min(470px,100%);margin:auto;padding:24px;border-radius:20px;box-shadow:0 18px 50px rgba(0,0,0,.18);">
       <div style="font-size:40px;text-align:center;">💷</div>
-      <h2 style="text-align:center;margin:7px 0;">Claim your £${moneyText(amount)} prize</h2>
+      <h2 style="text-align:center;margin:7px 0;">Set up your £${moneyText(amount)} payment</h2>
       <div class="muted" style="text-align:center;margin-bottom:18px;">${esc(winnerName)}, how would you like your Group Admin to pay you?</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
         ${methods.map(key=>{const item=PAYMENT_PROVIDERS[key];return `<button type="button" class="secondary" data-payout-method="${key}" style="min-height:68px;font-size:16px;"><span style="font-size:21px;">${item.icon}</span><br>${esc(item.label)}</button>`}).join("")}
@@ -4916,16 +4916,16 @@ function payoutCardHtml(record,historyIndex){
   if(!payouts.length)return "";
   const visible=isAdmin ? payouts : payouts.filter(currentPlayerMatchesPayout);
   if(!visible.length)return "";
-  return `<div class="card"><h2>💷 Prize payment</h2>${visible.map(p=>{
+  return `<div class="card"><h2>💷 Result payment</h2>${visible.map(p=>{
     const key=escAttr(p.id);
     const amount=moneyText(p.amount);
     if(p.status==="paid")return `<div class="notice"><b>✅ £${amount} paid to ${esc(p.winnerName)}</b><br><span class="muted">Paid ${esc(formatDate(String(p.paidAt||"").slice(0,10)))}</span></div>`;
-    if(isAdmin && p.status==="ready")return `<div class="notice"><b>Payment details received from ${esc(p.winnerName)}</b><br>Prize: £${amount} via ${esc(p.paymentProvider)}</div><button class="primary full" onclick="openWinnerPaymentLink(${Number(historyIndex)},'${key}')">Pay ${esc(p.winnerName)} £${amount}</button><button class="secondary full" onclick="markWinnerPaid(${Number(historyIndex)},'${key}')">✅ Mark £${amount} as paid</button>`;
+    if(isAdmin && p.status==="ready")return `<div class="notice"><b>Payment details received from ${esc(p.winnerName)}</b><br>Payment: £${amount} via ${esc(p.paymentProvider)}</div><button class="primary full" onclick="openWinnerPaymentLink(${Number(historyIndex)},'${key}')">Pay ${esc(p.winnerName)} £${amount}</button><button class="secondary full" onclick="markWinnerPaid(${Number(historyIndex)},'${key}')">✅ Mark £${amount} as paid</button>`;
     if(isAdmin && p.status==="bank_details_needed")return `<div class="notice warning"><b>${esc(p.winnerName)} needs a private bank transfer</b><br>They have been asked to contact you privately with their bank details. Do not enter those details into I'm In Golf.</div><button class="secondary full" onclick="markWinnerPaid(${Number(historyIndex)},'${key}')">✅ Mark £${amount} as paid</button>`;
-    if(isAdmin)return `<div class="notice"><b>£${amount} owed to ${esc(p.winnerName)}</b><br>Waiting for the winner to choose Monzo, Revolut, PayPal, Starling, Wise or a private bank transfer.</div><button class="secondary full" onclick="markWinnerPaid(${Number(historyIndex)},'${key}',true)">✅ Mark £${amount} as paid</button>`;
-    if(p.status==="ready")return `<div class="notice"><b>✅ Payment details sent</b><br>Your Group Admin can now pay your £${amount} prize.</div>`;
+    if(isAdmin)return `<div class="notice"><b>£${amount} owed to ${esc(p.winnerName)}</b><br>Waiting for the player to choose Monzo, Revolut, PayPal, Starling, Wise or a private bank transfer.</div><button class="secondary full" onclick="markWinnerPaid(${Number(historyIndex)},'${key}',true)">✅ Mark £${amount} as paid</button>`;
+    if(p.status==="ready")return `<div class="notice"><b>✅ Payment details sent</b><br>Your Group Admin can now send your £${amount} payment.</div>`;
     if(p.status==="bank_details_needed")return `<div class="notice"><b>✅ Private bank transfer selected</b><br>Contact your Group Admin privately and send them your bank details. Never enter your bank details into I'm In Golf.</div>`;
-    return `<div class="notice"><b>Congratulations ${esc(p.winnerName)} — you won £${amount}</b><br>Add a payment link only when you have won. We do not ask every player for payment details.</div><button class="primary full" onclick="claimWinnerPrize(${Number(historyIndex)},'${key}')">Claim your £${amount} prize</button>`;
+    return `<div class="notice"><b>Result confirmed for ${esc(p.winnerName)} — £${amount} payment</b><br>Add a payment link only when a result payment is due. We do not ask every player for payment details.</div><button class="primary full" onclick="claimWinnerPrize(${Number(historyIndex)},'${key}')">Set up your £${amount} payment</button>`;
   }).join("")}</div>`;
 }
 
@@ -4935,7 +4935,7 @@ async function claimWinnerPrize(historyIndex,payoutId){
   if(!record)return;
   if(!Array.isArray(record.payouts))record.payouts=createWinnerPayouts(record);
   const payout=record.payouts.find(p=>p.id===payoutId);
-  if(!payout || !currentPlayerMatchesPayout(payout)){alert("This prize can only be claimed by the declared winner.");return;}
+  if(!payout || !currentPlayerMatchesPayout(payout)){alert("This payment can only be set up by the named player.");return;}
   const method=await chooseWinnerPayoutMethod(payout.winnerName,payout.amount);
   if(method===null)return;
   if(method==="bank_transfer"){
@@ -5407,7 +5407,7 @@ function showWinnerScreen(record){
 
   const prizeResultsHtml=record.splitPrizes && prizePlaces.length ? `
     <div class="card">
-      <h2 style="text-align:center;">🏆 Prize results</h2>
+      <h2 style="text-align:center;">🏆 Result payments</h2>
       ${prizePlaces.map((place,i)=>`
         <div class="player row">
           <span style="font-size:26px;margin-right:10px;">${prizeMedals[i]||""}</span>
@@ -5458,7 +5458,7 @@ function showWinnerScreen(record){
         </div>
 
         <div class="money">
-          ${record.splitPrizes && prizeAmounts.length ? `Wins £${moneyText(prizeAmounts[0])}` : (stablefordNames.length>1 ? `Split pot • £${stablefordEach.toFixed(2).replace(/\.00$/,"")} each` : `Wins £${stablefordPotValue}`)}
+          ${record.splitPrizes && prizeAmounts.length ? `Wins £${moneyText(prizeAmounts[0])}` : (stablefordNames.length>1 ? `£${stablefordEach.toFixed(2).replace(/\.00$/,"")} each` : `Wins £${stablefordPotValue}`)}
         </div>
 
         ${record.stablefordCountback ? `
@@ -5486,7 +5486,7 @@ function showWinnerScreen(record){
         </div>
 
         <div class="money">
-          ${record.splitPrizes && prizeAmounts.length ? `Wins £${moneyText(prizeAmounts[0])}` : (netNames.length>1 ? `Split pot • £${netEach.toFixed(2).replace(/\.00$/,"")} each` : `Wins £${netPotValue}`)}
+          ${record.splitPrizes && prizeAmounts.length ? `Wins £${moneyText(prizeAmounts[0])}` : (netNames.length>1 ? `£${netEach.toFixed(2).replace(/\.00$/,"")} each` : `Wins £${netPotValue}`)}
         </div>
 
         ${record.netCountback ? `
@@ -5597,7 +5597,7 @@ async function shareWinnerImage(){
 
         roundedRect(ctx,68,395,944,190,24,white,line);
         ctx.textAlign="left";ctx.fillStyle=green;ctx.font='900 21px Arial';
-        ctx.fillText("🏆 PRIZE RESULTS",108,430);
+        ctx.fillText("🏆 RESULT PAYMENTS",108,430);
 
         record.prizePlaces.slice(0,3).forEach((place,i)=>{
           const y=470+(i*42);
@@ -5668,7 +5668,7 @@ async function shareWinnerImage(){
     ctx.textAlign="center";ctx.fillStyle=green;ctx.font='900 21px Arial';
     ctx.fillText(
   record.gameType==="money" && record.splitPrizes
-    ? `🎉 WELL PLAYED!   |   🏆 PRIZES PAID 1ST • 2ND • 3RD   |   NEXT COMP COMING SOON ⛳`
+    ? `🎉 WELL PLAYED!   |   💷 PAYMENTS 1ST • 2ND • 3RD   |   NEXT COMP COMING SOON ⛳`
     : `🎉 WELL PLAYED!   |   🏆 WINNER: ${footerWinner}   |   NEXT COMP COMING SOON ⛳`,
   540,1274
 );
@@ -6957,12 +6957,12 @@ async function changeCurrentPrizePayout(){
   }
 
   if(roundLocked()){
-    alert("Prize payout cannot be changed after scoring has started.");
+    alert("Payment split cannot be changed after scoring has started.");
     return;
   }
 
   if(state.gameType!=="money"){
-    alert("Prize payout is only available for Group Games.");
+    alert("Payment split is only available for Group Games.");
     return;
   }
 
@@ -6970,9 +6970,9 @@ async function changeCurrentPrizePayout(){
 
   if(currentlySplit){
     const confirmed=await appConfirm(
-      "Change prize payout?",
-      "Change this competition back to Winner Takes All?\n\nPlayers, payments and the current pot will stay unchanged.",
-      "Winner Takes All"
+      "Change payment split?",
+      "Change this competition back to a single result payment?\n\nPlayers, payments and the current total will stay unchanged.",
+      "Single Result Payment"
     );
     if(!confirmed)return;
 
@@ -6987,15 +6987,15 @@ async function changeCurrentPrizePayout(){
       return;
     }
 
-    alert("✅ Prize payout changed to Winner Takes All.");
+    alert("✅ Payment split changed to a single result payment.");
     settingsPage();
     return;
   }
 
-  const secondRaw=prompt("2nd prize (£)\n\nEnter a whole-pound amount:", "20");
+  const secondRaw=prompt("2nd payment (£)\n\nEnter a whole-pound amount:", "20");
   if(secondRaw===null)return;
 
-  const thirdRaw=prompt("3rd prize (£)\n\nEnter a whole-pound amount:", "10");
+  const thirdRaw=prompt("3rd payment (£)\n\nEnter a whole-pound amount:", "10");
   if(thirdRaw===null)return;
 
   const secondPrize=Number(secondRaw);
@@ -7012,8 +7012,8 @@ async function changeCurrentPrizePayout(){
   }
 
   const confirmed=await appConfirm(
-    "Change prize payout?",
-    `Change this competition to 1st / 2nd / 3rd?\n\n2nd: £${secondPrize}\n3rd: £${thirdPrize}\n1st: remainder of the pot\n\nPlayers, payments and the current pot will stay unchanged.`,
+    "Change payment split?",
+    `Change this competition to 1st / 2nd / 3rd?\n\n2nd: £${secondPrize}\n3rd: £${thirdPrize}\n1st: remaining amount\n\nPlayers, payments and the current total will stay unchanged.`,
     "Use 1st / 2nd / 3rd"
   );
   if(!confirmed)return;
@@ -7029,7 +7029,7 @@ async function changeCurrentPrizePayout(){
     return;
   }
 
-  alert("✅ Prize payout changed to 1st / 2nd / 3rd.");
+  alert("✅ Payment split changed to 1st / 2nd / 3rd.");
   settingsPage();
 }
 
@@ -7101,14 +7101,14 @@ function settingsPage(){
 
     ${state.gameType==="money" ? `
       <div class="notice" style="margin-top:12px;">
-        <div class="muted">PRIZE PAYOUT</div>
+        <div class="muted">PAYMENT SPLIT</div>
         <b>${state.splitPrizes
-          ? `🥇 1st — remainder · 🥈 2nd £${Number(state.secondPrize||0)} · 🥉 3rd £${Number(state.thirdPrize||0)}`
-          : "🏆 Winner Takes All"}</b>
+          ? `🥇 1st — remaining amount · 🥈 2nd £${Number(state.secondPrize||0)} · 🥉 3rd £${Number(state.thirdPrize||0)}`
+          : "🏆 Single Result Payment"}</b>
       </div>
 
       <button class="secondary full" onclick="changeCurrentPrizePayout()">
-        🔄 ${state.splitPrizes ? "Change to Winner Takes All" : "Change to 1st / 2nd / 3rd"}
+        🔄 ${state.splitPrizes ? "Change to Single Result Payment" : "Change to 1st / 2nd / 3rd"}
       </button>
     ` : ""}
   ` : ""}
@@ -8332,7 +8332,7 @@ function chooseNewRoundGameType(){
 
         <button id="newRoundMoney" class="primary" style="width:100%;padding:15px 16px;margin:0 0 10px;text-align:left;">
           <span style="display:block;font-size:17px;font-weight:800;">💷 Group Game</span>
-          <span style="display:block;font-size:13px;font-weight:500;margin-top:3px;">Players pay an entry fee and play for the pot.</span>
+          <span style="display:block;font-size:13px;font-weight:500;margin-top:3px;">Players pay the Group Admin directly and play the competition.</span>
         </button>
 
         <button id="newRoundPoints" class="primary" style="width:100%;padding:15px 16px;margin:0 0 10px;text-align:left;">
@@ -8424,19 +8424,19 @@ function normalRoundSetup(selectedType, selectedCompetition){
           <input id="normalSetupStake" type="text" inputmode="numeric" pattern="[0-9]*" oninput="this.value=this.value.replace(/[^0-9]/g,'')" value="" placeholder="Enter amount" style="width:100%;margin-bottom:16px;">
 
           <div class="notice" style="margin-bottom:16px;">
-            <div style="font-weight:800;margin-bottom:10px;">💷 Prize payout</div>
+            <div style="font-weight:800;margin-bottom:10px;">💷 Payment split</div>
             <label style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
               <input id="normalSetupSplitPrizes" type="checkbox" style="width:auto;margin:0;">
               Pay 1st / 2nd / 3rd
             </label>
             <div id="normalSetupPrizeAmounts" style="display:none;">
-              <div style="margin-bottom:12px;"><b>🥇 1st prize</b> — remainder of pot</div>
-              <label style="display:block;margin:8px 0 4px;">🥈 2nd prize (£)</label>
+              <div style="margin-bottom:12px;"><b>🥇 1st payment</b> — remaining amount</div>
+              <label style="display:block;margin:8px 0 4px;">🥈 2nd payment (£)</label>
               <input id="normalSetupSecondPrize" type="text" inputmode="numeric" pattern="[0-9]*" oninput="this.value=this.value.replace(/[^0-9]/g,'')" value="" placeholder="Enter amount">
-              <label style="display:block;margin:8px 0 4px;">🥉 3rd prize (£)</label>
+              <label style="display:block;margin:8px 0 4px;">🥉 3rd payment (£)</label>
               <input id="normalSetupThirdPrize" type="text" inputmode="numeric" pattern="[0-9]*" oninput="this.value=this.value.replace(/[^0-9]/g,'')" value="" placeholder="Enter amount">
             </div>
-            <div class="muted" style="margin-top:8px;">Leave off for winner takes all.</div>
+            <div class="muted" style="margin-top:8px;">Leave off for a single result payment.</div>
           </div>
         `}
 
@@ -8472,8 +8472,8 @@ function normalRoundSetup(selectedType, selectedCompetition){
       else if(!d) msg="Please choose the date.";
       else if(!isPoints && (!Number.isFinite(st) || st<0)) msg="Please enter a valid entry amount.";
       else if(!isPoints && !Number.isInteger(st)) msg="Please enter the entry amount as a whole £ amount.";
-      else if(split && (![p2,p3].every(Number.isFinite) || [p2,p3].some(v=>v<0))) msg="Please enter valid prize amounts.";
-      else if(split && ![p2,p3].every(Number.isInteger)) msg="Please enter 2nd and 3rd prizes as whole £ amounts.";
+      else if(split && (![p2,p3].every(Number.isFinite) || [p2,p3].some(v=>v<0))) msg="Please enter valid payment amounts.";
+      else if(split && ![p2,p3].every(Number.isInteger)) msg="Please enter 2nd and 3rd payments as whole £ amounts.";
       if(msg){ err.textContent=msg; err.style.display='block'; return; }
       finish({course:c,date:d,stake:st,splitPrizes:split,secondPrize:p2,thirdPrize:p3});
     };
@@ -8593,10 +8593,10 @@ function tripSetupScreen(){
             </label>
 
             <div data-prize-amounts style="${d.splitPrizes?'':'display:none;'}">
-              <div class="muted" style="margin-bottom:8px;">1st place gets the remainder of the pot.</div>
-              <label style="display:block;margin:0 0 5px;">2nd prize (£)</label>
+              <div class="muted" style="margin-bottom:8px;">1st place receives the remaining amount.</div>
+              <label style="display:block;margin:0 0 5px;">2nd payment (£)</label>
               <input data-second-prize type="number" min="0" step="1" value="${Number(d.secondPrize||0)}" style="width:100%;margin-bottom:10px;">
-              <label style="display:block;margin:0 0 5px;">3rd prize (£)</label>
+              <label style="display:block;margin:0 0 5px;">3rd payment (£)</label>
               <input data-third-prize type="number" min="0" step="1" value="${Number(d.thirdPrize||0)}" style="width:100%;">
             </div>
           </div>`;
@@ -8674,7 +8674,7 @@ function tripSetupScreen(){
           if(!date){ msg=`Please choose the date for Round ${i+1}.`; break; }
           if(gameType==='money' && (!Number.isFinite(stake)||stake<0)){ msg=`Please enter a valid entry amount for Round ${i+1}.`; break; }
           if(splitPrizes && (!Number.isInteger(secondPrize)||!Number.isInteger(thirdPrize)||secondPrize<0||thirdPrize<0)){
-            msg=`Please enter valid whole-pound 2nd and 3rd prizes for Round ${i+1}.`;
+            msg=`Please enter valid whole-pound 2nd and 3rd payments for Round ${i+1}.`;
             break;
           }
           rounds.push({
