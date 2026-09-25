@@ -353,7 +353,7 @@ function ensureDemoMoneyHistory(){
   state.history.push({
     demoMoneyExample:true,
     date:"2026-08-15",
-    course:"Sunningdale — Demo Money Game",
+    course:"Sunningdale — Demo Group Game",
     stake:5,
     gameType:"money",
     stablefordPot:players.length*5,
@@ -968,13 +968,13 @@ async function setupFirstRound(){
 
   if(!course){ alert("Please enter the course."); $("firstRoundCourse")?.focus(); return; }
   if(!date){ alert("Please choose the date."); $("firstRoundDate")?.focus(); return; }
-  if(!Number.isFinite(stake) || stake<0){ alert("Please enter a valid stake, or leave it blank for no money game."); return; }
+  if(!Number.isFinite(stake) || stake<0){ alert("Please enter a valid entry amount, or leave it blank for no Group Game."); return; }
   if(splitPrizes && (!Number.isInteger(secondPrize) || !Number.isInteger(thirdPrize) || secondPrize<0 || thirdPrize<0)){
     alert("Please enter 2nd and 3rd prizes as whole £ amounts.");
     return;
   }
   if(stake>0 && !String(state.paymentLink||"").trim()){
-    alert("Please add your payment link in Admin / Settings before starting a money round.");
+    alert("Please add your payment link in Admin / Settings before starting a Group Game.");
     return;
   }
 
@@ -1405,7 +1405,7 @@ function showTripSummary(){
       ${rounds.length ? rounds.map((r,i)=>{
         const w=tripRoundWinner(r);
         const isTeam=r.tripFormat==="betterball" || r.tripFormat==="pairsaggregate";
-        const gameLabel=isTeam ? `🤝 ${tripFormatLabel(r.tripFormat)}` : (r.gameType==="points" ? "✈️ Trip Round" : "💷 Money Game");
+        const gameLabel=isTeam ? `🤝 ${tripFormatLabel(r.tripFormat)}` : (r.gameType==="points" ? "✈️ Trip Round" : "💷 Group Game");
         const compLabel=isTeam ? "Team-event points" : r.gameType==="points"
           ? (r.pointsCompetition==="net" ? "Net" : "Stableford")
           : (trip.competition==="net" ? "Net" : "Stableford");
@@ -2728,8 +2728,8 @@ function round(){
           <div class="muted">NEXT ROUND</div>
           <h2>${esc(planned.course||"Round "+nextNo)}</h2>
           <div class="muted">${planned.date ? esc(formatDate(planned.date)) : ""}</div>
-          <div style="margin-top:10px;"><span class="pill paid">${planned.gameType==="points" ? "🏆 POINTS GAME" : "💷 MONEY GAME"}</span></div>
-          <div class="notice" style="margin-top:12px;"><b>Competition: ${planned.format==="betterball"?"🤝 Better Ball Stableford":planned.format==="pairsaggregate"?`➕ Pairs Aggregate ${state.trip.competition==="net"?"Net":"Stableford"}`:(state.trip.competition==="net" ? "⛳ Net" : "🏆 Stableford")}</b>${planned.gameType==="money" ? `<br>Stake: £${Number(planned.stake||0)}` : (planned.format!=="individual"?`<br>Team round • builds Team-event standings`:`<br>Trip points: 10 / 6 / 3`)}</div>
+          <div style="margin-top:10px;"><span class="pill paid">${planned.gameType==="points" ? "🏆 POINTS GAME" : "💷 GROUP GAME"}</span></div>
+          <div class="notice" style="margin-top:12px;"><b>Competition: ${planned.format==="betterball"?"🤝 Better Ball Stableford":planned.format==="pairsaggregate"?`➕ Pairs Aggregate ${state.trip.competition==="net"?"Net":"Stableford"}`:(state.trip.competition==="net" ? "⛳ Net" : "🏆 Stableford")}</b>${planned.gameType==="money" ? `<br>Entry amount: £${Number(planned.stake||0)}` : (planned.format!=="individual"?`<br>Team round • builds Team-event standings`:`<br>Trip points: 10 / 6 / 3`)}</div>
         </div>` : ""}
         <div style="font-weight:800;margin-bottom:10px;">Round ${nextNo-1} is complete.</div>
         ${isAdmin ? `<button class="primary full" onclick="nextTripRound()">✈️ Start Round ${nextNo}</button>` : `<div class="notice">Waiting for the Group Admin to start Round ${nextNo}.</div>`}
@@ -2797,7 +2797,7 @@ $("screen").innerHTML=`
 
         <div style="margin-top:8px;display:flex;gap:7px;flex-wrap:wrap;">
           <span class="pill paid">
-            ${tripTeamRoundActive() ? `🤝 ${esc(tripFormatLabel().toUpperCase())}` : (state.gameType==="points" ? "🏆 POINTS GAME" : (Number(state.stake||0)>0 ? "💷 MONEY GAME" : "⛳ NO STAKE"))}
+            ${tripTeamRoundActive() ? `🤝 ${esc(tripFormatLabel().toUpperCase())}` : (state.gameType==="points" ? "🏆 POINTS GAME" : (Number(state.stake||0)>0 ? "💷 GROUP GAME" : "⛳ NO STAKE"))}
           </span>
           ${state.gameType==="money" && Number(state.stake||0)>0 ? `
             <span class="pill" style="background:#edf5ef;color:var(--green);">£${state.stake} entry</span>
@@ -2815,7 +2815,7 @@ $("screen").innerHTML=`
   <div class="card" style="text-align:center;border:2px solid var(--green);padding:13px;">
     <div style="font-weight:900;font-size:16px;">🔐 MANAGING: ${esc(state.groupName||"My Golf Group")}</div>
     <div style="margin-top:7px;font-weight:800;">⛳ ${esc(state.course||"Course not set")} · ${esc(formatDate(state.date))}</div>
-    <div class="muted" style="margin-top:5px;font-weight:800;">${state.gameType==="money"?"💷 Money Game":"🏆 Points Game"} · ${(state.pointsCompetition||state.trip?.competition||"stableford")==="net"?"Net":"Stableford"}</div>
+    <div class="muted" style="margin-top:5px;font-weight:800;">${state.gameType==="money"?"💷 Group Game":"🏆 Points Game"} · ${(state.pointsCompetition||state.trip?.competition||"stableford")==="net"?"Net":"Stableford"}</div>
   </div>
   <div class="card">
     <h2>Edit round details</h2>
@@ -2830,7 +2830,7 @@ $("screen").innerHTML=`
         <div class="notice"><b>Competition: ${tripTeamRoundActive()?`🤝 ${esc(tripFormatLabel())}`:(state.pointsCompetition==="stableford" ? "🏆 Stableford" : "⛳ Net")}</b></div>
 
         ${state.gameType==="money" ? `
-          <label class="muted">Stake per player (£)</label>
+          <label class="muted">Entry amount per player (£)</label>
           <input type="number" min="0" step="1" value="${Number(state.stake||0)>0 ? state.stake : ""}" placeholder="No stake" onchange="state.stake=this.value==='' ? 0 : +this.value;save();render()">
         ` : `
           <div class="notice">
@@ -5177,7 +5177,7 @@ function showRoundHistory(historyIndex){
       <div class="muted">
         ${h.date ? esc(formatDate(h.date)) : ""}
         ${h.date ? " • " : ""}
-        ${isPoints ? "🏆 Points Game" : "💷 Money Game"}
+        ${isPoints ? "🏆 Points Game" : "💷 Group Game"}
       </div>
     </div>
 
@@ -5576,7 +5576,7 @@ async function shareWinnerImage(){
     const course=String(record.course||"Completed Round").toUpperCase();
     centreText(ctx,course,322,fitText(ctx,course,920,38,22,"900"),"900",dark);
 
-    const gameLabel=(state.trip?.active||state.trip?.completed) ? "Trip Round" : (record.gameType==="points" ? "Points Game" : "Money Game");
+    const gameLabel=(state.trip?.active||state.trip?.completed) ? "Trip Round" : (record.gameType==="points" ? "Points Game" : "Group Game");
     centreText(ctx,`${state.groupName||"I’m In Golf"}  •  ${gameLabel}  •  ${competition==="net"?"Net":"Stableford"}`,360,22,"700",muted);
 
     let tableTop;
@@ -6123,7 +6123,7 @@ ${tripSorted.map((p,i)=>{
               •
               ${h.gameType==="points"
                 ? "🏆 Points Game"
-                : "💷 Money Game"}
+                : "💷 Group Game"}
             </div>
 
             ${h.gameType==="points" ? `
@@ -6962,7 +6962,7 @@ async function changeCurrentPrizePayout(){
   }
 
   if(state.gameType!=="money"){
-    alert("Prize payout is only available for Money Games.");
+    alert("Prize payout is only available for Group Games.");
     return;
   }
 
@@ -7050,7 +7050,7 @@ function settingsPage(){
  <div class="notice" style="margin-top:12px;padding:14px;border:1px solid rgba(25,120,60,.25);">
    <div class="muted">YOUR PLAN</div>
    <b style="font-size:18px;">I’m In Golf Free</b>
-   <div class="muted" style="margin-top:3px;">Up to 10 players · Money Game · Points Game</div>
+   <div class="muted" style="margin-top:3px;">Up to 10 players · Group Game · Points Game</div>
 
    <div style="border-top:1px solid rgba(0,0,0,.10);margin:12px 0;"></div>
 
@@ -7210,12 +7210,12 @@ function adminHelpBack(){
 
 function adminHelpTopicContent(topic){
   const topics={
-    setup:`<h2>⛳ Set up the next competition</h2><div class="notice"><b>1.</b> Go to <b>Round</b>.<br><br><b>2.</b> A remembered Admin can tap <b>Admin — Set Up Next Competition</b>. On a new device, use <b>Players → Admin Login</b> and enter the 4-digit Admin PIN.<br><br><b>3.</b> Choose Money Game, Points Game or Trip Mode.<br><br><b>4.</b> Enter the course, date and choose <b>Stableford or Net</b> for everyone.<br><br><b>5.</b> For a Money Game, set the entry fee and make sure players pay before scoring starts.</div><div class="notice warning">Once the first score is submitted, entries close automatically.</div>`,
+    setup:`<h2>⛳ Set up the next competition</h2><div class="notice"><b>1.</b> Go to <b>Round</b>.<br><br><b>2.</b> A remembered Admin can tap <b>Admin — Set Up Next Competition</b>. On a new device, use <b>Players → Admin Login</b> and enter the 4-digit Admin PIN.<br><br><b>3.</b> Choose Group Game, Points Game or Trip Mode.<br><br><b>4.</b> Enter the course, date and choose <b>Stableford or Net</b> for everyone.<br><br><b>5.</b> For a Group Game, set the entry fee and payment amount.</div><div class="notice warning">Once the first score is submitted, entries close automatically.</div>`,
     players:`<h2>👥 Add or edit players</h2><div class="notice">Go to <b>Players</b>.<br><br>Players can join themselves, or the Admin can manage names and handicaps while Admin is unlocked.<br><br>A player can use <b>Change who I am</b> if the wrong name is selected on their phone.</div>`,
-    payments:`<h2>💷 Payments</h2><div class="notice"><b>What is a payment link?</b><br><br>It is your personal web address that lets players pay money directly to your chosen account. You copy it from your banking or payment app and paste it into I’m In Golf once.</div><div class="notice"><b>Set yours up:</b><br><br><b>1.</b> Go to <b>Admin / Settings → Set Up Player Payments</b>.<br><br><b>2.</b> Choose Monzo, Revolut, PayPal, Starling, Wise or Other secure link.<br><br><b>3.</b> Follow the instructions shown for that provider.<br><br><b>4.</b> Paste the link, test it and save.</div><div class="notice">In a Money Game, players tap <b>Pay & Enter</b>. When they return to I’m In Golf after opening the payment link, the app marks them paid.<br><br>Only paid players are entered in the pot and can submit a score. Once scoring starts, entries close.</div><div class="muted">Payments go directly to the Group Admin. I’m In Golf does not receive, verify or hold the money.</div>`,
+    payments:`<h2>💷 Payments</h2><div class="notice"><b>What is a payment link?</b><br><br>It is your personal web address that lets players pay money directly to your chosen account. You copy it from your banking or payment app and paste it into I’m In Golf once.</div><div class="notice"><b>Set yours up:</b><br><br><b>1.</b> Go to <b>Admin / Settings → Set Up Player Payments</b>.<br><br><b>2.</b> Choose Monzo, Revolut, PayPal, Starling, Wise or Other secure link.<br><br><b>3.</b> Follow the instructions shown for that provider.<br><br><b>4.</b> Paste the link, test it and save.</div><div class="notice">In a Group Game, players tap <b>Pay & Enter</b> and use the Group Admin’s payment link to pay the Group Admin directly.<br><br>I’m In Golf records the payment status. Once scoring starts, entries close.</div><div class="muted">Payments go directly to the Group Admin. I’m In Golf does not receive, verify or hold the money.</div>`,
     scoring:`<h2>🏌️ Scores</h2><div class="notice">Players enter their own score and tap <b>Submit My Score</b>.<br><br>The app asks <b>Are you sure?</b> before saving.<br><br>Once submitted, the player's score is locked.</div><div class="notice">Admin can use <b>Correct score</b> if a genuine mistake needs fixing.</div>`,
     nr:`<h2>NR — No Return</h2><div class="notice">In a <b>Net</b> competition, a player who does not return a score should tap <b>NR — No Return</b>.<br><br>NR counts as submitted, removes the player from <b>Still to enter</b>, and the player cannot win the Net competition.</div>`,
-    waiting:`<h2>⏳ Still to enter</h2><div class="notice">Once scoring starts, the Scores screen shows the names of everyone who still needs to submit.<br><br>For a Money Game, only players who were paid and entered before scoring started are included.<br><br>The list updates automatically as scores or NR results are submitted.</div>`,
+    waiting:`<h2>⏳ Still to enter</h2><div class="notice">Once scoring starts, the Scores screen shows the names of everyone who still needs to submit.<br><br>For a Group Game, the Scores screen includes players who entered before scoring started.<br><br>The list updates automatically as scores or NR results are submitted.</div>`,
     finish:`<h2>🏁 Finish a round</h2><div class="notice">When every entered player has submitted a score or valid NR, Admin will see <b>Finish Round</b> at the bottom of Scores.<br><br>Check the leaderboard, tap the button and confirm the result.<br><br>The winner and <b>full final standings</b> are saved in <b>League → Previous rounds</b> and can be shared as an I’m In Golf results image.</div><div class="notice">After a normal round finishes, players see <b>Next Competition — Coming soon…</b>. A remembered Admin can tap <b>Admin — Set Up Next Competition</b>. On a new device, use <b>Players → Admin Login</b>.</div>`,
     points:`<h2>🏆 Points Games</h2><div class="notice">Everyone plays the same competition — Stableford or Net.<br><br>There is no payment step.<br><br>Players enter their score in the normal Scores screen and the top three receive league points based on the value chosen when the round is set up.</div>`,
     trip:`<h2>✈️ Trip Mode</h2><div class="notice">Choose <b>Trip Mode</b>, enter the trip name, choose the Trip players and plan each round.<br><br>Rounds can be <b>Individual</b>, <b>Better Ball</b> or <b>Pairs Aggregate</b>. Before each round, mark anyone <b>Not Playing Today</b>, then use <b>Randomise Fourballs</b> or <b>Pick Fourballs Myself</b>.</div><div class="notice"><b>Pairs rounds:</b> either partner enters the pair’s one final score. Better Ball uses the pair’s final Better Ball Stableford total. Pairs Aggregate combines both partners’ final scores. These rounds build the separate <b>Team-event standings</b>.</div><div class="notice"><b>Individual rounds</b> build the Individual Trip Championship standings. After the final round, the Trip Summary shows daily winners, Individual and Team-event standings, any Trip money summary and the Trip champion. The organiser then taps <b>Save Trip & Return to Normal Golf</b>.</div>`,
@@ -8331,7 +8331,7 @@ function chooseNewRoundGameType(){
         <p class="muted" style="margin:0 0 20px;text-align:center;">What type of game are you playing?</p>
 
         <button id="newRoundMoney" class="primary" style="width:100%;padding:15px 16px;margin:0 0 10px;text-align:left;">
-          <span style="display:block;font-size:17px;font-weight:800;">💷 Money Game</span>
+          <span style="display:block;font-size:17px;font-weight:800;">💷 Group Game</span>
           <span style="display:block;font-size:13px;font-weight:500;margin-top:3px;">Players pay an entry fee and play for the pot.</span>
         </button>
 
@@ -8402,7 +8402,7 @@ function normalRoundSetup(selectedType, selectedCompetition){
     overlay.innerHTML=`
       <div class="card" style="width:min(500px,100%);margin:auto;padding:24px;border-radius:20px;box-shadow:0 18px 50px rgba(0,0,0,.18);">
         <div style="font-size:34px;text-align:center;margin-bottom:6px;">${isPoints ? "🏆" : "💷"}</div>
-        <h2 style="margin:0 0 6px;text-align:center;">Set up ${isPoints ? "Points Game" : "Money Game"}</h2>
+        <h2 style="margin:0 0 6px;text-align:center;">Set up ${isPoints ? "Points Game" : "Group Game"}</h2>
         <p class="muted" style="margin:0 0 18px;text-align:center;">Add the round details, then start the game.</p>
 
         <label style="display:block;margin:0 0 6px;">Course</label>
@@ -8420,8 +8420,8 @@ function normalRoundSetup(selectedType, selectedCompetition){
             🥇 1st — 10 pts&nbsp;&nbsp; 🥈 2nd — 6 pts&nbsp;&nbsp; 🥉 3rd — 3 pts
           </div>
         ` : `
-          <label style="display:block;margin:0 0 6px;">Stake per player (£)</label>
-          <input id="normalSetupStake" type="text" inputmode="numeric" pattern="[0-9]*" oninput="this.value=this.value.replace(/[^0-9]/g,'')" value="" placeholder="Enter stake" style="width:100%;margin-bottom:16px;">
+          <label style="display:block;margin:0 0 6px;">Entry amount per player (£)</label>
+          <input id="normalSetupStake" type="text" inputmode="numeric" pattern="[0-9]*" oninput="this.value=this.value.replace(/[^0-9]/g,'')" value="" placeholder="Enter amount" style="width:100%;margin-bottom:16px;">
 
           <div class="notice" style="margin-bottom:16px;">
             <div style="font-weight:800;margin-bottom:10px;">💷 Prize payout</div>
@@ -8470,8 +8470,8 @@ function normalRoundSetup(selectedType, selectedCompetition){
       let msg="";
       if(!c) msg="Please enter the course.";
       else if(!d) msg="Please choose the date.";
-      else if(!isPoints && (!Number.isFinite(st) || st<0)) msg="Please enter a valid stake.";
-      else if(!isPoints && !Number.isInteger(st)) msg="Please enter the stake as a whole £ amount.";
+      else if(!isPoints && (!Number.isFinite(st) || st<0)) msg="Please enter a valid entry amount.";
+      else if(!isPoints && !Number.isInteger(st)) msg="Please enter the entry amount as a whole £ amount.";
       else if(split && (![p2,p3].every(Number.isFinite) || [p2,p3].some(v=>v<0))) msg="Please enter valid prize amounts.";
       else if(split && ![p2,p3].every(Number.isInteger)) msg="Please enter 2nd and 3rd prizes as whole £ amounts.";
       if(msg){ err.textContent=msg; err.style.display='block'; return; }
@@ -8579,13 +8579,13 @@ function tripSetupScreen(){
           </div>
           <div style="font-weight:700;margin-bottom:6px;">Game</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
-            <button type="button" data-money class="${card.dataset.gameType==='money'?'primary':'secondary'}">💷 Money Game</button>
+            <button type="button" data-money class="${card.dataset.gameType==='money'?'primary':'secondary'}">💷 Group Game</button>
             <button type="button" data-points class="${card.dataset.gameType==='points'?'primary':'secondary'}">⛳ No Money</button>
           </div>
           <div data-comp-label style="margin-bottom:10px;"><b>Competition:</b> ${card.dataset.format==='betterball'?'🤝 Better Ball Stableford':card.dataset.format==='pairsaggregate'?`➕ Pairs Aggregate ${tripCompetition==='net'?'Net':'Stableford'}`:(tripCompetition==='net'?'⛳ Net':'🏆 Stableford')}</div>
           <div data-stake-wrap style="${card.dataset.gameType==='money'?'':'display:none;'}">
-            <label style="display:block;margin:0 0 5px;">Stake per player (£)</label>
-            <input data-stake type="number" min="0" step="0.01" value="${d.stake==='' ? '' : (Number.isFinite(Number(d.stake)) ? Number(d.stake) : '')}" placeholder="Enter stake" style="width:100%;margin-bottom:10px;">
+            <label style="display:block;margin:0 0 5px;">Entry amount per player (£)</label>
+            <input data-stake type="number" min="0" step="0.01" value="${d.stake==='' ? '' : (Number.isFinite(Number(d.stake)) ? Number(d.stake) : '')}" placeholder="Enter amount" style="width:100%;margin-bottom:10px;">
 
             <label style="display:flex;align-items:center;gap:10px;margin:8px 0;">
               <input data-split-prizes type="checkbox" ${d.splitPrizes?'checked':''} style="width:22px;height:22px;margin:0;">
@@ -8672,7 +8672,7 @@ function tripSetupScreen(){
           const thirdPrize=splitPrizes?Number(card?.querySelector('[data-third-prize]')?.value||0):0;
           if(!course){ msg=`Please enter the course for Round ${i+1}.`; break; }
           if(!date){ msg=`Please choose the date for Round ${i+1}.`; break; }
-          if(gameType==='money' && (!Number.isFinite(stake)||stake<0)){ msg=`Please enter a valid stake for Round ${i+1}.`; break; }
+          if(gameType==='money' && (!Number.isFinite(stake)||stake<0)){ msg=`Please enter a valid entry amount for Round ${i+1}.`; break; }
           if(splitPrizes && (!Number.isInteger(secondPrize)||!Number.isInteger(thirdPrize)||secondPrize<0||thirdPrize<0)){
             msg=`Please enter valid whole-pound 2nd and 3rd prizes for Round ${i+1}.`;
             break;
@@ -8933,7 +8933,7 @@ if(tripDate===null)return;
     "✈️ " + state.trip.name +
     "\nRound " + roundNumber + " of " + state.trip.totalRounds +
     "\n\nChoose Game Type:\n\n" +
-    "1. 💷 Money Game\n" +
+    "1. 💷 Group Game\n" +
     "2. 🏆 Points Game\n\n" +
     "Enter 1 or 2"
   );
@@ -8941,7 +8941,7 @@ if(tripDate===null)return;
   if(game===null)return;
 
   if(game!=="1" && game!=="2"){
-    alert("Please enter 1 for Money Game or 2 for Points Game.");
+    alert("Please enter 1 for Group Game or 2 for Points Game.");
     return;
   }
 
@@ -8993,7 +8993,7 @@ if(tripDate===null)return;
     "\n\n" +
     (selectedType==="points"
       ? "🏆 Points Game"
-      : "💷 Money Game") +
+      : "💷 Group Game") +
     "\n" +
     (selectedCompetition==="stableford"
       ? "🏆 Stableford"
