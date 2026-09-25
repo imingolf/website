@@ -8427,7 +8427,7 @@ function normalRoundSetup(selectedType, selectedCompetition){
             <div style="font-weight:800;margin-bottom:10px;">💷 Payment split</div>
             <label style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
               <input id="normalSetupSplitPrizes" type="checkbox" style="width:auto;margin:0;">
-              Pay 1st / 2nd / 3rd
+              Split payment between 1st / 2nd / 3rd
             </label>
             <div id="normalSetupPrizeAmounts" style="display:none;">
               <div style="margin-bottom:12px;"><b>🥇 1st payment</b> — remaining amount</div>
@@ -8589,7 +8589,7 @@ function tripSetupScreen(){
 
             <label style="display:flex;align-items:center;gap:10px;margin:8px 0;">
               <input data-split-prizes type="checkbox" ${d.splitPrizes?'checked':''} style="width:22px;height:22px;margin:0;">
-              <span><b>Pay 1st / 2nd / 3rd</b></span>
+              <span><b>Split payment between 1st / 2nd / 3rd</b></span>
             </label>
 
             <div data-prize-amounts style="${d.splitPrizes?'':'display:none;'}">
