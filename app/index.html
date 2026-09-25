@@ -8311,7 +8311,7 @@ function showIigPlusUpgrade(reason="feature"){
   if(upgradeBtn){
     upgradeBtn.onclick=()=>{
       if(window.IigPurchase){
-        window.IigPurchase.postMessage("purchaseIigPlus:" + state.groupPin);
+        window.IigPurchase.postMessage("purchaseIigPlus:" + pin);
       }else{
         alert("I’m In Golf+ purchasing is available in the iPhone app.");
       }
