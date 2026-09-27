@@ -1018,6 +1018,7 @@ function base64UrlToUint8Array(value){
 }
 function notificationCardHtml(){
   if(!notificationsAvailableForGroup() || !myPlayerId)return "";
+  if(window.IigPurchase && typeof window.IigPurchase.postMessage==="function")return `<div class="card"><b>🔔 Competition updates</b><div class="muted" style="margin-top:6px;">Notifications aren’t available in this version of the app. Open the app to check competition updates.</div></div>`;
   if(!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window))return `<div class="card"><b>🔔 Competition updates</b><div class="muted" style="margin-top:6px;">Notifications are not supported by this browser.</div></div>`;
   if(Notification.permission==="denied")return `<div class="card"><b>🔕 Notifications are blocked</b><div class="muted" style="margin-top:6px;">Allow notifications for I’m In Golf in your phone or browser settings.</div></div>`;
   if(notificationDeviceEnabled() && Notification.permission==="granted")return `<div class="card"><div class="row"><div><b>🔔 Competition updates are on</b><div class="muted" style="margin-top:4px;">This phone will receive friendly reminders for your golf group.</div></div><button class="secondary small" onclick="disableIigNotifications()">Turn off</button></div></div>`;
@@ -3703,7 +3704,7 @@ function scores(){
                 <b>${esc(p.name)}</b>
                 ${!isPointsGame ? `
                   <div class="muted">
-                    ${p.paid ? "✓ Paid • Eligible" : "⚠️ Unpaid • Not eligible"}
+                    ${Number(state.stake||0)<=0 ? "✓ No payment required • Eligible" : p.paid ? "✓ Paid • Eligible" : "⚠️ Unpaid • Not eligible"}
                   </div>
                 ` : ""}
               </div>
@@ -3727,7 +3728,7 @@ function scores(){
                 <b>${esc(p.name)}</b>
                 ${!isPointsGame ? `
                   <div class="muted">
-                    ${p.paid ? "✓ Paid • Eligible" : "⚠️ Unpaid • Not eligible"}
+                    ${Number(state.stake||0)<=0 ? "✓ No payment required • Eligible" : p.paid ? "✓ Paid • Eligible" : "⚠️ Unpaid • Not eligible"}
                   </div>
                 ` : ""}
               </div>
