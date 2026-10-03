@@ -101,4 +101,32 @@ test('Finishing individual Money rounds preserves split prizes in normal and Tri
     assert.equal(shown.id,record.id);assert.equal(saved.roundOpen,false);
   }
 });
+test('League credits all three prizes from saved Stableford and Net rounds',()=>{
+  for(const competition of ['stableford','net']){
+    const c=context();
+    const players=['Ian Ruby','Wayne Kenny','Michael Holmes','Alex Corder'].map(name=>({name,stableford:38,netScore:70}));
+    const round={gameType:'money',pointsCompetition:competition,splitPrizes:true,
+      secondPrize:20,thirdPrize:10,stablefordPot:competition==='stableford'?140:0,
+      netPot:competition==='net'?140:0,prizePlaces:players.slice(0,3),players,
+      winners:['Ian Ruby'],stablefordWinnerNames:competition==='stableford'?['Ian Ruby']:[],
+      netWinnerNames:competition==='net'?['Ian Ruby']:[]};
+    const earlier={players,winners:['Alex Corder'],stablefordWinnerNames:['Alex Corder'],stablefordPot:140};
+    c.state={players,history:[round,earlier]};
+    const before=JSON.stringify(c.state);
+    vm.runInContext(extract('league').replace('  const moneySorted=',
+      '  globalThis.leagueTotals={moneyWon,moneyWins,moneyPlayed}; return; const moneySorted='),c);
+    c.league();
+    const {moneyWon,moneyWins,moneyPlayed}=c.leagueTotals;
+    assert.deepEqual(players.map(p=>moneyWon(p.name)),[110,20,10,140]);
+    assert.deepEqual(players.map(p=>moneyWins(p.name)),[1,0,0,1]);
+    assert.equal(moneyPlayed('Wayne Kenny'),2);
+    assert.equal(JSON.stringify(c.state),before);
+    // Repeated renders must not add winnings again.
+    c.league();assert.equal(c.leagueTotals.moneyWon('Ian Ruby'),110);
+    // Existing tied winner splits and points-round exclusion remain unchanged.
+    c.state.history=[{stablefordPot:100,stablefordWinnerNames:['Ian Ruby','Wayne Kenny']},
+      {gameType:'points',stablefordPot:999,stablefordWinnerNames:['Ian Ruby']}];
+    assert.equal(moneyWon('Ian Ruby'),50);assert.equal(moneyWon('Wayne Kenny'),50);
+  }
+});
 (async()=>{let failed=0;for(const [name,run] of tests){try{await run();console.log('PASS '+name);}catch(e){failed++;console.log('FAIL '+name+': '+e.message.split('\n')[0]);}}if(failed)process.exitCode=1;})();
