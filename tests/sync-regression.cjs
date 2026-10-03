@@ -129,4 +129,20 @@ test('League credits all three prizes from saved Stableford and Net rounds',()=>
     assert.equal(moneyWon('Ian Ruby'),50);assert.equal(moneyWon('Wayne Kenny'),50);
   }
 });
+test('Live individual standings label tied scores and skip occupied places',()=>{
+  const c=context();
+  c.waitingForNextCompetition=()=>false;c.currentRoundPlayers=()=>[];
+  c.roundLocked=()=>false;
+  vm.runInContext(extract('scores').replace('  $("screen").innerHTML=',
+    '  globalThis.liveRankLabel=rankLabel; return; $("screen").innerHTML='),c);
+  c.scores();
+  for(const scores of [[42,40,38,38,35],[65,67,70,70,72]]){
+    const rows=scores.map(score=>({score}));
+    assert.deepEqual(rows.map((_,i)=>c.liveRankLabel(rows,i,p=>p.score)),['1','2','T3','T3','5']);
+  }
+  const tied=[{score:38},{score:'38'},{score:35}];
+  assert.deepEqual(tied.map((_,i)=>c.liveRankLabel(tied,i,p=>p.score)),['T1','T1','3']);
+  assert.ok(source.includes('rankLabel(stablefordRanked,i,x=>x.stableford)'));
+  assert.ok(source.includes('rankLabel(netRanked,i,x=>x.netScore)'));
+});
 (async()=>{let failed=0;for(const [name,run] of tests){try{await run();console.log('PASS '+name);}catch(e){failed++;console.log('FAIL '+name+': '+e.message.split('\n')[0]);}}if(failed)process.exitCode=1;})();
