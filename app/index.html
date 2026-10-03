@@ -5862,6 +5862,14 @@ const moneyWon=(playerName)=>{
 
     if(h.gameType==="points")return total;
 
+    // Use the same place allocations as the round payouts, including old rounds.
+    // Return here so the first-place player is not also credited the full pot.
+    if(h.splitPrizes && Array.isArray(h.prizePlaces) && h.prizePlaces.length){
+      return total+createWinnerPayouts({...h,gameType:"money"})
+        .filter(p=>p.winnerName===playerName)
+        .reduce((sum,p)=>sum+Number(p.amount||0),0);
+    }
+
     let won=0;
 
     const sfNames=h.stablefordWinnerNames||[];
