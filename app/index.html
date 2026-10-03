@@ -2091,12 +2091,13 @@ function sideGameResolveBetsForToday(){
 
 async function sideGameSaveScore(format){
   const input=$("sideGameScore");
-  const score=Number(input?.value);
+  const raw=String(input?.value??"").trim();
 
-  if(!input || input.value==="" || !Number.isFinite(score) || score<0){
-    alert("Please enter your score.");
+  if(!input || !validIndividualScore(raw,format)){
+    alert(format==="net" ? "Enter a Net score using up to 3 digits." : "Enter Stableford points using up to 2 digits.");
     return;
   }
+  const score=Number(raw);
 
   const today=new Date().toLocaleDateString("en-CA");
 
@@ -2175,10 +2176,10 @@ function sideGameScoreEntry(){
 
       <input
         id="sideGameScore"
-        type="number"
-        min="0"
-        step="1"
+        type="text"
         inputmode="numeric"
+        maxlength="${format==="net" ? 3 : 2}"
+        pattern="${format==="net" ? "[0-9]{1,3}" : "[0-9]{1,2}"}"
         placeholder="${format==="net" ? "e.g. 72" : "e.g. 36"}"
         style="font-size:28px;font-weight:800;text-align:center;"
       >
