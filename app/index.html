@@ -2257,6 +2257,33 @@ function sideGameConfirmSettlement(settlementId){
   alert(`Settlement with ${settlement.debtorName} confirmed.`);
 }
 
+function sideGameSettlementActionHtml(otherPlayerId,amount){
+  const pending=state.sideGame.settlements.find(x=>
+    x.status==="pending" && x.debtorId===myPlayerId && x.creditorId===otherPlayerId
+  );
+  if(pending)return `<div class="muted" style="margin-top:10px;">Payment of £${Number(pending.amount)} awaiting confirmation</div>`;
+  return `<button class="primary full" style="margin-top:10px;"
+    onclick="sideGameRequestSettlement(${escAttr(JSON.stringify(otherPlayerId))}, ${Number(amount)})">
+    ✓ I've paid £${Number(amount)}
+  </button>`;
+}
+
+function sideGameSettlementConfirmationsHtml(){
+  const pending=state.sideGame.settlements.filter(x=>
+    x.status==="pending" && x.creditorId===myPlayerId
+  );
+  if(!pending.length)return "";
+  return `<div class="notice" style="margin-bottom:14px;">
+    <div class="muted">PAYMENT TO CONFIRM</div>
+    ${pending.map(x=>`<div style="font-weight:900;margin-top:8px;">
+      ${esc(x.debtorName)} says they have paid £${Number(x.amount)}
+    </div>
+    <button class="primary full" onclick="sideGameConfirmSettlement(${escAttr(JSON.stringify(x.id))})">
+      ✓ Confirm received £${Number(x.amount)}
+    </button>`).join("")}
+  </div>`;
+}
+
 function sideGameHome(){
   sideGameOpen=true;
   sideGameHomeOpen=true;
@@ -2358,11 +2385,6 @@ function sideGameHome(){
         const playerBalances=Object.values(balancesByPlayer)
           .filter(x=>x.balance!==0);
 
-        const pendingSettlements=state.sideGame.settlements.filter(x=>
-          x.status==="pending" &&
-          x.creditorId===myPlayerId
-        );
-
         const incomingChallenges=state.sideGame.bets.filter(b=>
           b.date===today &&
           b.status==="pending" &&
@@ -2377,17 +2399,14 @@ function sideGameHome(){
           b.player1Id===myPlayerId
         );
 
-        if(!todaysBets.length && !incomingChallenges.length && !outgoingChallenges.length){
-          return `
-            <div class="muted">YOUR SIDE GAME</div>
-            <h2 style="margin:5px 0;">No active Side Games yet</h2>
-            <div style="color:#40564a;line-height:1.45;">
-              Side Game is always open. Start a Side Game whenever you're playing.
-            </div>
-          `;
-        }
-
         return `
+          ${!todaysBets.length && !incomingChallenges.length && !outgoingChallenges.length ? `
+            <div class="muted">YOUR SIDE GAME</div>
+            <h2 style="margin:5px 0;">No Side Games today</h2>
+            <div style="color:#40564a;line-height:1.45;margin-bottom:14px;">
+              Start a Side Game whenever you're playing. Previous balances stay outstanding until settlement is confirmed.
+            </div>
+          ` : ""}
           ${outgoingChallenges.length ? `
             <div class="notice" style="margin-bottom:14px;">
               <div class="muted" style="text-align:center;">📲 CHALLENGE SENT</div>
@@ -2442,22 +2461,7 @@ function sideGameHome(){
             </div>
           ` : ""}
 
-          ${pendingSettlements.length ? `
-            <div class="notice" style="margin-bottom:14px;">
-              <div class="muted" style="text-align:center;">SETTLEMENT TO CONFIRM</div>
-
-              ${pendingSettlements.map(x=>`
-                <div style="font-size:20px;font-weight:900;text-align:center;margin-top:8px;">
-                  ${esc(x.debtorName)} says they have settled £${Number(x.amount)}
-                </div>
-
-                <button class="primary full" style="margin-top:10px;"
-                  onclick="sideGameConfirmSettlement('${x.id}')">
-                  ✓ Confirm settlement
-                </button>
-              `).join("")}
-            </div>
-          ` : ""}
+          ${sideGameSettlementConfirmationsHtml()}
 
           ${playerBalances.length ? `
             <div class="notice" style="margin-bottom:14px;">
@@ -2471,17 +2475,12 @@ function sideGameHome(){
                   }
                 </div>
 
-                ${x.balance<0 ? `
-                  <button class="primary full" style="margin-top:10px;"
-                    onclick="sideGameRequestSettlement('${x.playerId}', ${Math.abs(x.balance)})">
-                    ✓ Settled £${Math.abs(x.balance)}
-                  </button>
-                ` : ""}
+                ${x.balance<0 ? sideGameSettlementActionHtml(x.playerId,Math.abs(x.balance)) : ""}
               `).join("")}
             </div>
           ` : ""}
 
-          <div class="muted">TODAY'S SIDE GAMES</div>
+          ${todaysBets.length ? '<div class="muted">TODAY\'S SIDE GAMES</div>' : ""}
           ${todaysBets.map(b=>{
             const myScore=state.sideGame.scores.find(x=>
               x.playerId===myPlayerId &&
@@ -2670,11 +2669,13 @@ function sideGameStatement(){
       <div class="notice" style="margin-bottom:14px;">
         <div class="muted">YOU OWE</div>
         ${owe.length
-          ? owe.map(x=>`<div style="font-weight:900;margin-top:8px;">${esc(x.name)} — £${x.amount}</div>`).join("")
+          ? owe.map(x=>`<div style="font-weight:900;margin-top:8px;">${esc(x.name)} — £${x.amount}</div>${sideGameSettlementActionHtml(x.playerId,x.amount)}`).join("")
           : `<div style="margin-top:8px;">Nothing outstanding</div>`
         }
         <div style="font-weight:900;margin-top:10px;">Total you owe £${totalOwe}</div>
       </div>
+
+      ${sideGameSettlementConfirmationsHtml()}
 
       <div class="notice" style="text-align:center;margin-bottom:14px;">
         <div class="muted">NET POSITION</div>
