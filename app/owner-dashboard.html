@@ -199,6 +199,8 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
   function planBadge(g){
     if(TEST_PINS.has(String(g.group_pin)))return `<span class="badge test">TEST</span>`;
     const p=String(g.plan_type||"trial");
+    if(p==="free")return `<span class="badge trial">I’m In Golf Free</span>`;
+    if(p==="plus")return `<span class="badge paid">I’m In Golf+</span>`;
     if(p==="paid")return `<span class="badge paid">Paid</span>`;
     if(p==="complimentary")return `<span class="badge paid">Complimentary</span>`;
     if(p==="internal")return `<span class="badge internal">Internal</span>`;
@@ -371,7 +373,7 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
         <div class="detail-row"><span>Scores submitted</span><b>${done} / ${total}</b></div>
         <div class="progress"><span style="width:${pct}%"></span></div>
         <div class="detail-row"><span>Rounds completed</span><b>${completedRoundCount(s)}</b></div>
-        <div class="detail-row"><span>Plan</span><b>${String(g.plan_type||"trial")==="trial"?"Free Trial":String(g.plan_type||"").replace(/^./,c=>c.toUpperCase())}</b></div>
+        <div class="detail-row"><span>Plan</span><b>${String(g.plan_type)==="free"?"I’m In Golf Free":String(g.plan_type)==="plus"?"I’m In Golf+":String(g.plan_type||"trial")==="trial"?"Free Trial":String(g.plan_type||"").replace(/^./,c=>c.toUpperCase())}</b></div>
         <div class="detail-row"><span>Trial / renewal</span><b>${esc(trialText(g))}</b></div>
         <div class="detail-row"><span>Last activity</span><b>${esc(activityText(pin))}</b></div>
       </div>
@@ -415,7 +417,7 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
       <label>Group name</label><input id="mGroupName" value="${esc(displayGroupName(g,states.get(String(g.group_pin||""))))}" maxlength="80">
       <label>Admin / customer name</label><input id="mAdminName" value="${esc(g.admin_name||"")}">
       <label>Contact</label><input id="mContact" value="${esc(g.admin_contact||"")}">
-      <label>Plan</label><select id="mPlan" ${protectedGroup?"disabled":""}><option value="trial">Free Trial</option><option value="paid">Paid</option><option value="complimentary">Complimentary</option><option value="internal">Internal</option></select>
+      <label>Plan</label><select id="mPlan" ${protectedGroup?"disabled":""}><option value="free">I’m In Golf Free</option><option value="trial">Free Trial</option><option value="plus">I’m In Golf+</option><option value="paid">Paid</option><option value="complimentary">Complimentary</option><option value="internal">Internal</option></select>
       <label>Trial expiry</label><input id="mTrial" type="date" value="${esc(dateOnly(g.trial_expiry_date))}">
       <label>Payment status</label><select id="mPaid"><option value="unpaid">Unpaid</option><option value="paid">Paid</option><option value="not_applicable">N/A</option></select>
       <label>Renewal date</label><input id="mRenew" type="date" value="${esc(dateOnly(g.renewal_date))}">
@@ -423,11 +425,14 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
       <label>Notes</label><textarea id="mNotes">${esc(g.notes||"")}</textarea>
       <div class="modal-actions"><button class="ghost" id="mCancel">Cancel</button><button class="primary" id="mSave">💾 Save Changes</button></div>`);
     $("mPlan").value=protectedGroup?"internal":String(g.plan_type||"trial");$("mPaid").value=String(g.paid_status||"unpaid");$("mStatus").value=protectedGroup?"active":String(g.status||"active");
+    const syncTrialInput=()=>{$("mTrial").disabled=$("mPlan").value==="free";};
+    $("mPlan").onchange=syncTrialInput;
+    syncTrialInput();
     $("mCancel").onclick=closeModal;
     $("mSave").onclick=async()=>{
       const newGroupName=$("mGroupName").value.trim();
       if(!newGroupName){alert("Please enter a group name.");return}
-      const args={p_creation_code:ownerCode,p_group_pin:String(g.group_pin),p_admin_name:$("mAdminName").value.trim(),p_admin_contact:$("mContact").value.trim(),p_plan_type:protectedGroup?"internal":$("mPlan").value,p_trial_expiry_date:$("mTrial").value||null,p_paid_status:$("mPaid").value,p_renewal_date:$("mRenew").value||null,p_status:protectedGroup?"active":$("mStatus").value,p_notes:$("mNotes").value.trim()};
+      const args={p_creation_code:ownerCode,p_group_pin:String(g.group_pin),p_admin_name:$("mAdminName").value.trim(),p_admin_contact:$("mContact").value.trim(),p_plan_type:protectedGroup?"internal":$("mPlan").value,p_trial_expiry_date:$("mPlan").value==="free"?null:($("mTrial").value||null),p_paid_status:$("mPaid").value,p_renewal_date:$("mRenew").value||null,p_status:protectedGroup?"active":$("mStatus").value,p_notes:$("mNotes").value.trim()};
       $("mSave").disabled=true;$("mSave").textContent="Saving…";
       const {error}=await db.rpc("owner_update_group",args);
       if(error){alert("Could not save changes.\n\n"+(error.message||"Please try again."));$("mSave").disabled=false;$("mSave").textContent="💾 Save Changes";return}
