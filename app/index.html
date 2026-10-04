@@ -2481,10 +2481,6 @@ function sideGameHome(){
             </div>
           ` : ""}
 
-          <button class="secondary full" style="margin-bottom:18px;" onclick="sideGameStatement()">
-            📊 My Side Game Statement
-          </button>
-
           <div class="muted">TODAY'S SIDE GAMES</div>
           ${todaysBets.map(b=>{
             const myScore=state.sideGame.scores.find(x=>
@@ -2549,6 +2545,10 @@ function sideGameHome(){
           </button>
         ` : "";
       })()}
+
+      <button class="secondary full" onclick="sideGameStatement()">
+        📊 My Side Game Statement
+      </button>
 
       <button class="secondary full" style="margin-top:10px;" onclick="sideGameChoosePlayer()">
         ➕ Challenge another player
