@@ -7049,6 +7049,7 @@ function settingsPage(){
  $("screen").innerHTML=`<div class="card"><h2>⚙️ Admin / Settings</h2>
  <div class="muted">Shared controls for your golf group.</div>
  <button class="primary full" onclick="returnToPlayerView()">👤 Return to Player View</button>
+ ${String(pin).trim()==="9736" && isAdmin ? `<div class="notice" style="margin-top:12px;padding:14px;border:1px solid #b8d8c3;background:#edf8f0;"><b>⛳ Society Mode — Showcase Demo</b><div class="muted" style="margin:5px 0 10px;">Explore the Society Mode concept. Example data only; not connected to live bookings.</div><button class="primary full" onclick="window.open('society.html','_blank','noopener,noreferrer')">Open Society Mode (Demo) ↗</button></div>` : ""}
  <div class="notice" style="margin-top:12px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
    <div>
      <div class="muted">GROUP NAME</div>
