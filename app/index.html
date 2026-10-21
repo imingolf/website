@@ -1025,7 +1025,7 @@ function base64UrlToUint8Array(value){
 }
 function notificationCardHtml(){
   if(!notificationsAvailableForGroup() || !myPlayerId)return "";
-  if(window.IigPurchase && typeof window.IigPurchase.postMessage==="function")return `<div class="card"><b>🔔 Competition updates</b><div class="muted" style="margin-top:6px;">Notifications aren’t available in this version of the app. Open the app to check competition updates.</div></div>`;
+  if(window.IigPurchase && typeof window.IigPurchase.postMessage==="function")return "";
   if(!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window))return `<div class="card"><b>🔔 Competition updates</b><div class="muted" style="margin-top:6px;">Notifications are not supported by this browser.</div></div>`;
   if(Notification.permission==="denied")return `<div class="card"><b>🔕 Notifications are blocked</b><div class="muted" style="margin-top:6px;">Allow notifications for I’m In Golf in your phone or browser settings.</div></div>`;
   if(notificationDeviceEnabled() && Notification.permission==="granted")return `<div class="card"><div class="row"><div><b>🔔 Competition updates are on</b><div class="muted" style="margin-top:4px;">This phone will receive friendly reminders for your golf group.</div></div><button class="secondary small" onclick="disableIigNotifications()">Turn off</button></div></div>`;
@@ -1576,7 +1576,7 @@ function playerNextActionHtml(){
   }
 
   if(moneyGame && !me.paid && !roundLocked()){
-    return `<div class="card" style="text-align:center;"><div class="muted">YOUR NEXT STEP</div><button class="primary full" style="font-size:18px;margin-top:8px;" onclick="beginPlayerPayment()">💳 Pay £${Number(state.stake||0)} & Join</button></div>`;
+    return `<div class="card" style="text-align:center;"><div class="muted">YOUR NEXT STEP</div><button class="primary full" style="font-size:18px;margin-top:8px;" onclick="beginPlayerPayment()">💳 Pay £${Number(state.stake||0)} & Join</button><div class="muted" style="font-size:13px;margin-top:12px;line-height:1.5;">After paying in your banking app, return to I’m In Golf using the small back link at the top of your screen, or reopen I’m In Golf. Then confirm whether you paid.</div></div>`;
   }
   if(submitted){
     return `<div class="card" style="text-align:center;"><div class="muted">YOUR NEXT STEP</div><button class="secondary full" style="font-size:18px;margin-top:8px;" onclick="show('scores')">✅ Score In — View Leaderboard</button></div>`;
@@ -3082,7 +3082,7 @@ function pay(){
        : (String(state.paymentLink||"").trim()
            ? (adminDeviceRecognised()
               ? `<button class="primary full" onclick="adminSelfEnter()">🔑 Enter & Mark Myself Paid</button>`
-              : `<button class="primary full" onclick="beginPlayerPayment()">💳 Pay £${Number(state.stake||0)} & Join</button>`)
+              : `<div><button class="primary full" onclick="beginPlayerPayment()">💳 Pay £${Number(state.stake||0)} & Join</button><div class="muted" style="font-size:13px;margin-top:10px;line-height:1.5;text-align:center;">After paying, return to I’m In Golf using the small back link at the top of your iPhone, or reopen the app. Then confirm whether you paid.</div></div>`)
            : `<button class="secondary full" disabled>Payment link not set up — ask your Group Admin</button>`)
      }
    </div>
