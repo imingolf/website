@@ -444,6 +444,13 @@ function iosShareIcon(){
 }
 
 function showInstallHelp(playerName){
+  // The native app and installed web app already have a launcher icon.
+  const alreadyInstalled=!!window.IigPurchase || navigator.standalone===true ||
+    !!window.matchMedia?.("(display-mode: standalone)")?.matches;
+  if(alreadyInstalled){
+    finishInstallHelp();
+    return;
+  }
   page="installhelp";
   clearInterval(poller);
   poller=null;
