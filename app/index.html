@@ -321,6 +321,7 @@ if(/iPhone|iPod/.test(navigator.userAgent) &&
   <section id="welcomeStart" class="welcome-panel hidden" aria-labelledby="welcomeStartTitle">
    <button type="button" class="welcome-back" onclick="showWelcomePanel('home')">← Back</button>
    <h1 id="welcomeStartTitle" tabindex="-1">Get your mates in.</h1>
+   <div id="selfServicePreviewLink" class="welcome-note hidden"><b>Try the new self-service setup</b><p>A design preview: no real account or group will be created.</p><a class="welcome-email" href="group-setup-preview.html">Try creating your group →</a></div>
    <p>Give your friends or society one place to organise competitions, follow results and plan golf trips.</p>
    <ol class="welcome-steps"><li><b>Tell us about your group</b><span>Email us your name and the group name you’d like.</span></li><li><b>We’ll help you get set up</b><span>We’ll explain the setup and any plan options before you decide.</span></li><li><b>Invite your golfers</b><span>Once your group is ready, share its PIN with your players.</span></li></ol>
    <a class="welcome-email" href="mailto:hello@imingolf.co.uk?subject=Start%20my%20golf%20group&amp;body=Hello%2C%20I%27d%20like%20to%20start%20a%20golf%20group.%0A%0AMy%20name%3A%20%0AGroup%20name%3A%20%0AApproximate%20number%20of%20golfers%3A%20">Request my group by email →</a>
@@ -338,6 +339,7 @@ if(/iPhone|iPod/.test(navigator.userAgent) &&
  </div>
 </div>
 <script>
+if(/^deploy-preview-\d+--super-quokka-51747d\.netlify\.app$/.test(location.hostname)){document.getElementById('selfServicePreviewLink').classList.remove('hidden');}
 function showWelcomePanel(panel, moveFocus=true){
  const names={home:'welcomeHome',join:'welcomeJoin',start:'welcomeStart',how:'welcomeHow'};
  Object.entries(names).forEach(([key,id])=>document.getElementById(id).classList.toggle('hidden',key!==panel));
