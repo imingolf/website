@@ -11,7 +11,7 @@
   if (playerMode && (!/^\d{4}$/.test(invitePin || '') || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(inviteToken || ''))) {
     message('Open the complete invitation link from your organiser.'); return;
   }
-  let playerGroup = null;
+  let playerGroup = null, lastValidScore = '';
   const base = 'https://nyavvwrsrxqfyhiygkgw.supabase.co';
   const key = 'sb_publishable_fDGji75-j3GP5VeAAIAdZg_f9TNmtWL';
   // Session credentials remain in memory only. Reloading requires a new email code.
@@ -213,7 +213,9 @@
     $('scoreSection').hidden = !['stableford','net'].includes(format);
     $('scoreForm').hidden = submitted || !me.playingThisRound || data.state.roundOpen !== true;
     $('scoreLabel').textContent = format === 'net' ? 'Your final Net score' : 'Your final Stableford points';
-    $('finalScore').max = format === 'net' ? '999' : '99';
+    $('finalScore').maxLength = format === 'net' ? 3 : 2;
+    $('finalScore').pattern = format === 'net' ? '[0-9]{1,3}' : '[0-9]{1,2}';
+    lastValidScore = '';
     $('finalScore').value = '';
     $('scoreStatus').textContent = submitted ? 'Your recorded total: ' + (me[field] == null ? 'Result recorded' : me[field])
       : data.state.roundOpen !== true ? 'Scoring is closed.' : !me.playingThisRound ? 'Mark yourself as playing before submitting a score.' : 'Ready for your final total.';
@@ -237,6 +239,12 @@
       await loadPlayer();
     } catch (error) { throw new Error(error.message + ' Reload group to check your attendance before trying again.'); }
   }
+  $('finalScore').oninput = () => {
+    const input = $('finalScore');
+    const valid = playerGroup?.state.pointsCompetition === 'net' ? /^[0-9]{0,3}$/ : /^[0-9]{0,2}$/;
+    if (valid.test(input.value)) lastValidScore = input.value;
+    else input.value = lastValidScore;
+  };
   $('scoreForm').onsubmit = event => { event.preventDefault(); action(async () => {
     if (!playerGroup || $('scoreForm').hidden) throw new Error('Reload group before submitting your score.');
     const raw = $('finalScore').value.trim(), score = Number(raw), format = playerGroup.state.pointsCompetition;

@@ -50,6 +50,9 @@ function setup(host='deploy-preview-6--super-quokka-51747d.netlify.app',player=f
  p.responses.push({data:playing});await p.click('reloadPlayer');assert.equal(p.el('withdraw').hidden,false);
  p.responses.push({data:5},{data:member});await p.click('withdraw');assert.equal(p.calls.at(-2).body.p_attending,false);assert.equal(p.el('attend').hidden,false);
  p.responses.push({data:playing});await p.click('reloadPlayer');
+ assert.equal(p.el('finalScore').maxLength,3);
+ p.el('finalScore').value='123';p.el('finalScore').oninput();p.el('finalScore').value='1234';p.el('finalScore').oninput();assert.equal(p.el('finalScore').value,'123');
+ p.el('finalScore').value='1e2';p.el('finalScore').oninput();assert.equal(p.el('finalScore').value,'123');
  p.el('finalScore').value='1000';count=p.calls.length;await p.submit('scoreForm');assert.equal(p.calls.length,count);
  p.el('finalScore').value='36';p.context.window.confirm=()=>false;await p.submit('scoreForm');assert.equal(p.calls.length,count);
  p.context.window.confirm=()=>true;
@@ -58,6 +61,9 @@ function setup(host='deploy-preview-6--super-quokka-51747d.netlify.app',player=f
  p.responses.push({data:playing});await p.click('reloadPlayer');p.el('finalScore').value='70';
  p.responses.push({ok:false,data:{message:'Group changed; reload before submitting'}});await p.submit('scoreForm');assert.equal(p.el('scoreForm').hidden,true);assert.match(p.el('message').textContent,/Reload group/);
  count=p.calls.length;await p.submit('scoreForm');assert.equal(p.calls.length,count);
+ p.responses.push({data:{...playing,state:{...playing.state,pointsCompetition:'stableford'}}});await p.click('reloadPlayer');assert.equal(p.el('finalScore').maxLength,2);
+ p.el('finalScore').value='36';p.el('finalScore').oninput();p.el('finalScore').value='360';p.el('finalScore').oninput();assert.equal(p.el('finalScore').value,'36');
+ p.el('finalScore').value='3.6';p.el('finalScore').oninput();assert.equal(p.el('finalScore').value,'36');
  assert.ok(p.calls.every(c=>!c.url.includes('iig_save_owned_group')&&!c.url.includes('iig_create_owned_group')));
  assert.ok(t.calls.every(x=>x.url.startsWith('https://nyavvwrsrxqfyhiygkgw.supabase.co/')));
  console.log('PASS: production host blocked; OTP send/expiry/verification; authenticated RPC; tester gate; retry ID reuse; existing-group reconciliation; test-only requests; competition validation, preservation, save/readback, stale-write lockout, uncertain readback active-round guard, opening entries, invitation validation, player joining, attendance and stale attendance lockout. No emails sent.');
