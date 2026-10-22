@@ -8,7 +8,7 @@
   const base = 'https://nyavvwrsrxqfyhiygkgw.supabase.co';
   const key = 'sb_publishable_fDGji75-j3GP5VeAAIAdZg_f9TNmtWL';
   // Session credentials remain in memory only. Reloading requires a new email code.
-  let session = null, email = '', busy = false, resendAt = 0;
+  let ownedGroup = null, session = null, email = '', busy = false, resendAt = 0;
   const lock = value => {
     busy = value;
     document.querySelectorAll('button').forEach(button => { button.disabled = value; });
@@ -43,12 +43,29 @@
     if (!data || !/^\d{4}$/.test(data.group_pin)) throw new Error('Unexpected group response. Use Check for my test group before retrying.');
     $('pin').textContent = data.group_pin;
     $('groupForm').hidden = true; $('approval').hidden = true; $('result').hidden = false;
-    message('Your test group has been saved.');
+    ownedGroup = null;
+    $('competitionForm').hidden = true;
+    $('reloadCompetition').hidden = true;
+    $('competitionSummary').textContent = 'Check for your test group to load competition setup.';
+    if (data.state && Array.isArray(data.state.players) && Array.isArray(data.state.history) && Number.isSafeInteger(data.revision)) {
+      ownedGroup = data;
+      $('course').value = data.state.course || '';
+      $('competitionDate').value = data.state.date || '';
+      $('format').value = data.state.pointsCompetition === 'net' ? 'net' : 'stableford';
+      // This first-competition UI must not repurpose an active or previously played group.
+      const editable = data.state.roundOpen === false && data.state.players.length === 0 && data.state.history.length === 0;
+      $('competitionForm').hidden = !editable;
+      $('reloadCompetition').hidden = false;
+      $('competitionSummary').textContent = editable
+        ? (data.state.course && data.state.date ? 'Saved draft: ' + data.state.course + ' · ' + data.state.date + ' · ' + ($('format').value === 'net' ? 'Net' : 'Stableford') : 'Your group is ready. Add your first competition below.')
+        : 'This group already has activity. First-competition setup is unavailable.';
+    }
+    message('Your test group has been loaded.');
   }
   async function checkGroup() {
     const data = await request('/rest/v1/rpc/iig_get_owned_group', {}, true);
     if (data) showGroup(data);
-    else { $('result').hidden = true; $('groupForm').hidden = false; message('Email verified. Enter your name and test group name.'); }
+    else { ownedGroup = null; $('result').hidden = true; $('groupForm').hidden = false; message('Email verified. Enter your name and test group name.'); }
   }
   async function sendCode() {
     if (Date.now() < resendAt) throw new Error('Please wait a minute before requesting another code.');
@@ -92,10 +109,39 @@
       try {
         const data = await request('/rest/v1/rpc/iig_create_owned_group', { p_name: name, p_organiser_name: organiser, p_request_id: pending.request }, true);
         showGroup(data);
+        await checkGroup();
       } catch (error) {
         if (error.message.includes('Registration is not open yet')) { $('approval').hidden = false; message('Your test account needs to be enabled before creating a group.'); }
         else throw error;
       }
+    });
+  };
+  $('reloadCompetition').onclick = () => action(checkGroup);
+  $('competitionForm').onsubmit = event => {
+    event.preventDefault(); action(async () => {
+      if (!ownedGroup || $('competitionForm').hidden) throw new Error('Load your test group before setting up a competition.');
+      const course = $('course').value.trim(), date = $('competitionDate').value, format = $('format').value;
+      const parsed = new Date(date + 'T12:00:00Z');
+      if (!course || course.length > 120) throw new Error('Enter a course name of up to 120 characters.');
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date) throw new Error('Choose a valid competition date.');
+      const today = new Date();
+      const localToday = [today.getFullYear(), String(today.getMonth()+1).padStart(2,'0'), String(today.getDate()).padStart(2,'0')].join('-');
+      if (date < localToday) throw new Error('Choose today or a future date.');
+      if (!['stableford', 'net'].includes(format)) throw new Error('Choose Stableford or Net.');
+      const state = { ...ownedGroup.state, course, date, pointsCompetition: format };
+      try {
+        await request('/rest/v1/rpc/iig_save_owned_group', { p_pin: ownedGroup.group_pin, p_state: state, p_revision: ownedGroup.revision }, true);
+      } catch (error) {
+        // Never automatically retry a whole-state write or overwrite newer server data.
+        ownedGroup = null;
+        $('competitionForm').hidden = true;
+        throw new Error(error.message + ' Use Reload saved competition to check what is stored before editing again.');
+      }
+      ownedGroup = null;
+      $('competitionForm').hidden = true;
+      try { await checkGroup(); }
+      catch (_) { throw new Error('Save accepted, but the saved details could not be loaded. Use Reload saved competition to check them.'); }
+      message('Competition draft saved and checked. Entries are not open yet.');
     });
   };
   $('signout').onclick = () => action(async () => {

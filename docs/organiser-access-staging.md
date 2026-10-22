@@ -46,10 +46,16 @@ For the owner: switch the Supabase project selector to **Im In Golf Test**, open
 
 ## Organiser test page (22 October)
 
-`app/organiser-test.html` and `app/organiser-test.js` provide an isolated email OTP and group-creation client for `https://nyavvwrsrxqfyhiygkgw.supabase.co`. The owner supplied the exact URL and publishable key; Auth settings returned HTTP 200 with email enabled and confirmation required. The owner configured staging SMTP and both OTP email templates. Actual email delivery and real JWT integration still need the manual test.
+`app/organiser-test.html` and `app/organiser-test.js` provide an isolated email OTP and group-creation client for `https://nyavvwrsrxqfyhiygkgw.supabase.co`. The owner supplied the exact URL and publishable key; Auth settings returned HTTP 200 with email enabled and confirmation required. The owner configured staging SMTP and both OTP email templates. The owner subsequently received an OTP, verified their email, observed the registration gate, allowlisted their verified account and created test group 5021. A later screenshot showed the same group after the requested return-login check; the sign-out itself was not directly observed.
 
 The page operates only on deploy-preview-6--super-quokka-51747d.netlify.app or localhost. This hostname check prevents accidental live use; server ownership and the tester allowlist enforce security. No production config is imported. Credentials are held in memory only; reload requires a new code. There is no automatic refresh or cross-tab login. Only retry metadata is stored in sessionStorage. The page rechecks the owned group before creation and reuses a request UUID on retry. It renders server text with textContent.
 
 Run `node tests/organiser-test.cjs` from the repo root for mocked browser/API behavior tests (no emails): host restriction, expired OTP, verification, bearer-authenticated RPC, allowlist denial, retry reuse, existing-group reconciliation and staging-only requests. These are not real-browser, SMTP or hosted JWT tests.
 
-Manual next step: request a code on the preview, verify it, attempt a test group. If the account is not allowlisted, the page displays its UUID. A trusted operator must enable that verified UUID in the test database before creation can succeed. No invitation or live gameplay link is offered. Existing live-group security weaknesses and other release blockers above remain.
+Manual next step: save a first-competition draft, then reload it and confirm the same course, date and format. No invitation or live gameplay link is offered. Existing live-group security weaknesses and other release blockers above remain.
+
+## First competition draft
+
+The test organiser page now supports course, date and Stableford/Net selection for an empty, closed group with no history. It preserves all other state fields and saves through the authenticated owner RPC using the loaded revision. It reads back after save. Failed/uncertain writes disable editing until the user explicitly reloads; no stale whole-state write is automatically retried. These form restrictions are client guardrails, not new server validation. The owner RPC remains a broad owner-only API.
+
+Entries stay closed; no invitations or push sending are implemented by this change. No database migration is required. Mocked client tests cover invalid dates, preserving other fields, successful readback, revision conflicts, failed readback and active-round blocking. Hosted draft saving and physical-device layout still need user testing.
