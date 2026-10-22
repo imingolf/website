@@ -2,7 +2,7 @@
 (() => {
  'use strict';
  if(location.hostname!=='deploy-preview-6--super-quokka-51747d.netlify.app' && !['localhost','127.0.0.1'].includes(location.hostname))return;
- let active=null, epoch=0, revision=0, blocked=false, queue=Promise.resolve(), pending=0;
+ let active=null, epoch=0, revision=0, blocked=false, queue=Promise.resolve(), pending=0, readSequence=0, manualLoading=false;
  const originals={save,refresh,refreshSideGameLive,render,adminLogout,returnToPlayerView,copyInvite,changeAdminPin};
  const clone=value=>JSON.parse(JSON.stringify(value));
  const valid=g=>g && /^\d{4}$/.test(g.group_pin) && Number.isSafeInteger(g.revision) && Array.isArray(g.state?.players) && Array.isArray(g.state?.history);
@@ -12,7 +12,7 @@
   let node=document.getElementById('secureOrganiserBanner');
   if(!node){
    node=document.createElement('div');node.id='secureOrganiserBanner';node.className='notice';
-   node.innerHTML='<b>Test group · signed-in organiser</b><p id="secureOrganiserStatus" role="status" aria-live="polite"></p><button id="secureOrganiserReload" class="secondary">Reload saved group</button> <button id="secureOrganiserSignout" class="ghost">Sign out</button>';
+   node.innerHTML='<b>Test group · signed-in organiser</b><p id="secureOrganiserStatus" role="status" aria-live="polite"></p><button type="button" id="secureOrganiserReload" class="secondary">Reload saved group</button> <button type="button" id="secureOrganiserSignout" class="ghost">Sign out</button>';
    document.getElementById('screen').before(node);
    node.querySelector('#secureOrganiserReload').onclick=()=>reload(true);
    node.querySelector('#secureOrganiserSignout').onclick=()=>{if(pending){status('Wait for saving to finish.');return;}active?.signout();};
@@ -23,16 +23,32 @@
   revision=g.revision;state=clone(g.state);active.group=g;
  }
  async function reload(manual=false){
-  if(!active)return;
-  if(pending || (!manual && (blocked || refreshBlocked())))return;
-  if(manual && (scoreDraftActive || document.querySelector('#appPromptInput,#appConfirmYes'))) {status('Finish or cancel your current entry before reloading.');return;}
-  const current=active, version=stateSaveVersion, e=epoch;
+  if(!active || manualLoading)return;
+  if(!manual && (pending || blocked || refreshBlocked()))return;
+  if(manual && (scoreDraftActive || document.querySelector('#appPromptInput,#appConfirmYes,#normalSetupCourse'))) {status('Finish or cancel your current entry before reloading.');return;}
+  const current=active,e=epoch,sequence=++readSequence;
+  const button=document.getElementById('secureOrganiserReload');
+  if(manual){manualLoading=true;if(button){button.disabled=true;button.textContent='Reloading…';}status(pending?'Finishing your save, then reloading…':'Loading your saved group…');}
   try{
+   // A tap during a save must wait for it, rather than silently doing nothing.
+   if(manual && pending)await queue;
+   if(e!==epoch)return;
+   if(pending){if(manual)status('Another save is in progress. Tap Reload saved group once it finishes.');return;}
+   const version=stateSaveVersion;
    const g=await current.request('/rest/v1/rpc/iig_get_owned_group',{},true);
-   if(e!==epoch || pending || stateSaveVersion!==version || (!manual && refreshBlocked()))return;
-   apply(g);blocked=false;render();status('Saved group loaded.');
-  }catch(error){if(e===epoch){blocked=true;status(error.message+' Use Reload saved group before making more changes.');}}
+   if(e!==epoch || sequence!==readSequence)return;
+   if(pending || stateSaveVersion!==version){if(manual)status('Your group changed while loading. Tap Reload saved group again.');return;}
+   if(!manual && refreshBlocked())return;
+   apply(g);blocked=false;render();
+   if(manual){
+    const details=g.state.course ? g.state.course+' · '+(g.state.date||'Date not set') : 'No competition has been saved yet.';
+    status('Reloaded at '+new Date().toLocaleTimeString('en-GB')+' — '+details);
+    document.getElementById('syncText').textContent='Test group • saved details checked';
+   }
+  }catch(error){if(e===epoch && sequence===readSequence){blocked=true;status(error.message+' Use Reload saved group before making more changes.');}}
+  finally{if(manual){manualLoading=false;if(button){button.disabled=false;button.textContent='Reload saved group';}}}
  }
+
  window.iigSecureOrganiser={
   open(group,request,signout,plan){
    if(!valid(group))throw Error('Group details are incomplete. Tap Check my group.');
