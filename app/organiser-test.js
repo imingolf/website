@@ -186,7 +186,7 @@
     } catch (error) { throw new Error(error.message + ' Reload saved competition before trying again.'); }
   });
   async function loadPlayer() {
-    playerGroup = null; $('playerResult').hidden = true; $('joinForm').hidden = true;
+    playerGroup = null; $('scoreForm').hidden = true; $('playerResult').hidden = true; $('joinForm').hidden = true;
     let data;
     try { data = await request('/rest/v1/rpc/iig_get_player_group',{p_pin:invitePin},true); }
     catch (error) {
@@ -207,6 +207,18 @@
     $('attend').hidden = closed || me.playingThisRound === true;
     $('withdraw').hidden = closed || me.playingThisRound !== true;
     $('playerList').textContent = 'Playing: ' + (data.state.players.filter(p => p.playingThisRound).map(p => p.name).join(', ') || 'Nobody yet');
+    const format = data.state.pointsCompetition;
+    const field = format === 'net' ? 'netScore' : 'stableford';
+    const submitted = me.scoreSubmitted === true || me.stableford != null || me.netScore != null;
+    $('scoreSection').hidden = !['stableford','net'].includes(format);
+    $('scoreForm').hidden = submitted || !me.playingThisRound || data.state.roundOpen !== true;
+    $('scoreLabel').textContent = format === 'net' ? 'Your final Net score' : 'Your final Stableford points';
+    $('finalScore').max = format === 'net' ? '999' : '99';
+    $('finalScore').value = '';
+    $('scoreStatus').textContent = submitted ? 'Your recorded total: ' + (me[field] == null ? 'Result recorded' : me[field])
+      : data.state.roundOpen !== true ? 'Scoring is closed.' : !me.playingThisRound ? 'Mark yourself as playing before submitting a score.' : 'Ready for your final total.';
+    const scores = data.state.players.filter(p => p[field] != null).slice().sort((a,b) => format === 'net' ? a[field]-b[field] : b[field]-a[field]);
+    $('scoreList').textContent = scores.map(p => p.name + ': ' + p[field]).join(' · ') || 'No scores submitted yet.';
     message(closed ? 'Attendance changes are closed.' : 'Your test group is loaded.');
   }
   $('reloadPlayer').onclick = () => action(loadPlayer);
@@ -225,6 +237,22 @@
       await loadPlayer();
     } catch (error) { throw new Error(error.message + ' Reload group to check your attendance before trying again.'); }
   }
+  $('scoreForm').onsubmit = event => { event.preventDefault(); action(async () => {
+    if (!playerGroup || $('scoreForm').hidden) throw new Error('Reload group before submitting your score.');
+    const raw = $('finalScore').value.trim(), score = Number(raw), format = playerGroup.state.pointsCompetition;
+    if (!/^\d{1,3}$/.test(raw) || !Number.isInteger(score) || score < 0 || score > (format === 'net' ? 999 : 99)) throw new Error(format === 'net' ? 'Enter a whole Net score from 0 to 999.' : 'Enter whole Stableford points from 0 to 99.');
+    if (!window.confirm('Submit ' + score + (format === 'net' ? ' Net' : ' Stableford points') + '? Check this is your final total.')) { message('Score not submitted. You can change it below.'); return; }
+    const revision = playerGroup.revision;
+    playerGroup = null; $('scoreForm').hidden = true; $('attend').hidden = true; $('withdraw').hidden = true;
+    try {
+      await request('/rest/v1/rpc/iig_submit_my_score',{p_pin:invitePin,p_score:score,p_format:format,p_revision:revision},true);
+      await loadPlayer();
+      message('Final score saved and checked.');
+    } catch (error) {
+      if (error.code === 'PGRST202') throw new Error('Score entry needs the test database update. Your score has not been submitted.');
+      throw new Error(error.message + ' Reload group to check whether your score was saved before trying again.');
+    }
+  }); };
   $('attend').onclick = () => action(() => attendance(true));
   $('withdraw').onclick = () => action(() => attendance(false));
   $('signout').onclick = () => action(async () => {
