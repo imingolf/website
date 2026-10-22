@@ -12,9 +12,9 @@ For groups in the new owner registry, the two old state RPCs fail closed. Existi
 
 ## Local evidence
 
-Run `npm ci --prefix security-tests`, then `node security-tests/access.test.mjs` from the repository root. PGlite runs the migration and role-based calls against PostgreSQL with synthetic Supabase Auth and group-schema fixtures. The suite currently passes 51 checks covering verification, tester allowlisting, banned accounts, idempotency, cross-group access, legacy bypass prevention for owned groups, stale revisions, member isolation, private field projection, suspended groups, defaults, trigger execution, unique PINs and unchanged legacy group behavior.
+Run `npm ci --prefix security-tests`, then `node security-tests/access.test.mjs` from the repository root. PGlite runs the migration and role-based calls against PostgreSQL with synthetic Supabase Auth and reconstructed group tables, using the supplied live access-status and notification function bodies. The suite currently passes 62 checks covering verification, tester allowlisting, banned accounts, idempotency, cross-group access, legacy bypass prevention for owned groups, stale revisions, member isolation, private field projection, suspended groups, defaults, trigger execution, unique PINs and unchanged legacy group behavior.
 
-This is not hosted Supabase testing. The access-status function and notifications are fixtures; it does not validate the real notification trigger bodies, JWT issuance, real multi-connection locking, delivery or native wrapper behavior. A system PostgreSQL installation was unavailable; PGlite was used instead. No production database calls or email sends were made.
+This is not hosted Supabase testing. The supplied notification functions are now exercised for competition creation, first-entry deduplication, reminder scheduling at 18:00 Europe/London, round-close cancellation, changed-course cancellation and disabled notifications. Tests do not validate JWT issuance, real multi-connection locking, actual delivery or native wrapper behavior. A system PostgreSQL installation was unavailable; PGlite was used instead. No production database calls or email sends were made.
 
 ## Hosted test environment needed next
 
@@ -34,3 +34,11 @@ The proposed player identity uses Supabase anonymous sign-in (an internal device
 6. Test on physical iPhone and a new-person walkthrough before enabling public registration or merging as finished onboarding.
 
 No live migration, account creation, invitation or public release is part of this change.
+
+## Empty test project setup (22 October update)
+
+The owner created **Im In Golf Test**, distinct from the production project, with Data API enabled, automatic table exposure disabled and automatic RLS enabled. The empty-project installation script is `supabase/staging/setup-test-project.sql`. It combines the reconstructed three-table baseline, supplied access/notification rules and staged access migration in one transaction. It refuses to run if any target table or the private schema already exists; do not remove that guard to rerun it. It installs no notification sender, subscriptions, scheduled jobs or emails and creates no groups or Auth accounts. It does not recreate the whole production database or migrate existing data.
+
+`node security-tests/setup-bundle.test.mjs` verifies the complete deliverable installs on an empty PostgreSQL database, enables private-table RLS, creates no groups/events and refuses reapplication. `node security-tests/access.test.mjs` passes 62 checks. Production is unchanged. Hosted test installation still awaits the owner's SQL Editor run.
+
+For the owner: switch the Supabase project selector to **Im In Golf Test**, open SQL Editor → New query, paste the complete setup-test-project.sql and run once. Expected final result: **Test database setup complete**, **groups = 0**. A SQL Editor warning about privilege revocation is expected because the script explicitly restricts table/function access. If an error occurs, share the error text; do not rerun individual fragments.
