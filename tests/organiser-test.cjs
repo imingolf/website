@@ -2,12 +2,12 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
 const source=fs.readFileSync('app/organiser-test.js','utf8');
 function setup(host='deploy-preview-6--super-quokka-51747d.netlify.app',player=false,hash='#pin=1234&invite=11111111-1111-1111-1111-111111111111'){
  const els={},calls=[],responses=[],storage=new Map();let i=0;
- const el=id=>els[id]||(els[id]={hidden:true,value:'',textContent:'',disabled:false,focus(){}});
+ const el=id=>els[id]||(els[id]={hidden:true,value:'',textContent:'',disabled:false,focus(){},select(){this.selected=true;},setSelectionRange(){}});
  const context={document:{getElementById:el,querySelectorAll:()=>[]},location:{hostname:host,origin:'https://'+host,pathname:player?'/app/player-test.html':'/app/organiser-test.html',hash,reload(){}},URLSearchParams,encodeURIComponent,sessionStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v)},crypto:{randomUUID:()=>`request-${++i}`},Date,AbortController,setTimeout:()=>1,clearTimeout(){},fetch:async(url,opts)=>{calls.push({url,opts,body:JSON.parse(opts.body)});const next=responses.shift();if(!next)throw new Error('Unexpected request');return {ok:next.ok!==false,json:async()=>next.data};}};
  vm.runInNewContext(source,context);
  async function submit(id){el(id).onsubmit({preventDefault(){}});for(let j=0;j<30;j++)await Promise.resolve();}
  async function click(id){el(id).onclick();for(let j=0;j<40;j++)await Promise.resolve();}
- return {el,calls,responses,submit,click};
+ return {el,calls,responses,submit,click,context};
 }
 (async()=>{
  const blocked=setup('imingolf.co.uk');assert.match(blocked.el('message').textContent,/only available/);assert.equal(blocked.calls.length,0);
@@ -33,6 +33,10 @@ function setup(host='deploy-preview-6--super-quokka-51747d.netlify.app',player=f
  t.responses.push({data:saved});await t.click('reloadCompetition');
  const opened={...saved,invite_token:'11111111-1111-1111-1111-111111111111',revision:2,state:{...saved.state,roundOpen:true}};
  t.responses.push({data:2},{data:opened});await t.click('openEntries');assert.equal(t.calls.at(-2).body.p_state.roundOpen,true);assert.equal(t.calls.at(-2).body.p_state.custom,'preserve');assert.match(t.el('inviteLink').value,/player-test.html#pin=1234&invite=/);
+ assert.equal(t.el('openInvite').href,t.el('inviteLink').value);
+ t.context.navigator={clipboard:{writeText:async()=>{throw new Error('Denied');}}};await t.click('copyInvite');assert.equal(t.el('inviteLink').selected,true);assert.match(t.el('copyStatus').textContent,/Command\+C/);
+ let copied='';t.context.navigator.clipboard.writeText=async value=>{copied=value;};await t.click('copyInvite');assert.equal(copied,t.el('inviteLink').value);assert.match(t.el('copyStatus').textContent,/link copied/);
+ t.context.navigator={};await t.click('copyInvite');assert.match(t.el('copyStatus').textContent,/Command\+C/);
  const invalid=setup(undefined,true,'');assert.equal(invalid.calls.length,0);assert.match(invalid.el('message').textContent,/complete invitation/);
  const p=setup(undefined,true);p.el('code').value='123456';
  p.responses.push({data:{access_token:'player-token',expires_in:3600,user:{id:'player-user',email:'player@example.test'}}},{ok:false,data:{code:'42501',message:'Group membership required'}});await p.submit('codeForm');assert.equal(p.el('joinForm').hidden,false);assert.ok(!p.calls.some(c=>c.url.includes('iig_get_owned_group')));

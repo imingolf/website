@@ -71,6 +71,9 @@
       $('inviteLink').value = data.state.roundOpen === true && data.invite_token
         ? location.origin + '/app/player-test.html#pin=' + encodeURIComponent(data.group_pin) + '&invite=' + encodeURIComponent(data.invite_token) : '';
       $('copyInvite').hidden = !$('inviteLink').value;
+      $('openInvite').hidden = !$('inviteLink').value;
+      $('openInvite').href = $('inviteLink').value;
+      $('copyStatus').textContent = '';
       $('competitionSummary').textContent = editable
         ? (data.state.course && data.state.date ? 'Saved draft: ' + data.state.course + ' · ' + data.state.date + ' · ' + ($('format').value === 'net' ? 'Net' : 'Stableford') : 'Your group is ready. Add your first competition below.')
         : 'This group already has activity. First-competition setup is unavailable.';
@@ -160,11 +163,18 @@
       message('Competition draft saved and checked. Entries are not open yet.');
     });
   };
-  $('copyInvite').onclick = () => action(async () => {
-    if (!$('inviteLink').value) throw new Error('Open entries and reload your group first.');
-    try { await navigator.clipboard.writeText($('inviteLink').value); message('Invitation link copied. Share it with your test player.'); }
-    catch (_) { $('inviteLink').focus(); $('inviteLink').select(); message('Select and copy the invitation link above.'); }
-  });
+  $('copyInvite').onclick = async () => {
+    const input = $('inviteLink'), status = $('copyStatus');
+    if (!input.value) { status.textContent = 'Open entries and reload your group first.'; return; }
+    input.focus(); input.select(); input.setSelectionRange(0, input.value.length);
+    // Keep manual instructions beside the button even when clipboard permission hangs.
+    status.textContent = 'Link selected. Press Command+C on Mac or Ctrl+C on Windows, or touch and hold the link and choose Copy. You can also open the invitation below.';
+    try {
+      if (!navigator.clipboard || !navigator.clipboard.writeText) return;
+      await navigator.clipboard.writeText(input.value);
+      status.textContent = 'Invitation link copied. Paste it into a new tab or share it with your test player.';
+    } catch (_) { /* The selected link and visible manual instructions remain available. */ }
+  };
   $('openEntries').onclick = () => action(async () => {
     if (!ownedGroup || $('openEntries').hidden || !ownedGroup.state.course || !ownedGroup.state.date) throw new Error('Reload your saved competition first.');
     const group = ownedGroup;
