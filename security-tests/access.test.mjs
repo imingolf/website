@@ -1,0 +1,241 @@
+import { PGlite } from '@electric-sql/pglite';
+import { readFileSync } from 'node:fs';
+import assert from 'node:assert/strict';
+const db = new PGlite();
+await db.exec(`
+create role anon; create role authenticated;
+create schema auth;
+create table auth.users(id uuid primary key,email text,email_confirmed_at timestamptz,is_anonymous boolean default false,banned_until timestamptz);
+create function auth.uid() returns uuid language sql as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
+grant usage on schema public,auth to anon,authenticated;
+grant execute on function auth.uid() to anon,authenticated;
+`);
+await db.exec(readFileSync(new URL('../supabase/staging/empty-test-schema.sql',import.meta.url),'utf8'));
+await db.exec(`
+create table public.test_trigger_log(event text);
+create function public.test_notify() returns trigger language plpgsql as $$begin insert into public.test_trigger_log values(TG_OP); return new; end$$;
+create trigger test_insert after insert on public.tens_in_groups for each row execute function public.test_notify();
+create trigger test_update after update of state on public.tens_in_groups for each row execute function public.test_notify();
+insert into public.tens_in_groups(group_pin,group_name,state) values
+ ('1010','Existing one','{"players":[],"history":[],"adminPin":"fixture-only"}'),
+ ('1260','Existing two','{"players":[],"history":[]}');
+`);
+await db.exec(readFileSync(new URL('../supabase/staging/organiser-access.sql',import.meta.url),'utf8'));
+await db.exec(readFileSync(new URL('../supabase/staging/player-scores.sql',import.meta.url),'utf8'));
+const ids=Array.from({length:7},(_,i)=>`00000000-0000-4000-8000-${String(i+1).padStart(12,'0')}`);
+const [owner,other,unverified,player,player2,notAllowed,banned]=ids;
+for (const id of ids) await db.query(`insert into auth.users(id,email,email_confirmed_at,is_anonymous,banned_until)
+ values($1,$2,$3,$4,$5)`,[id,id+'@example.test',id===unverified||id===player||id===player2?null:new Date(),id===player||id===player2,id===banned?new Date(Date.now()+86400000):null]);
+for(const id of [owner,other,unverified,player,banned]) await db.query('insert into iig_private.setup_testers values($1)',[id]);
+let checks=0;
+async function as(id,sql,params=[]){
+ await db.exec('begin');
+ try {
+  await db.query("select set_config('request.jwt.claim.sub',$1,true)",[id||'']);
+  await db.exec(`set local role ${id?'authenticated':'anon'}`);
+  const result=await db.query(sql,params);
+  await db.exec('commit'); return result.rows;
+ } catch(e){await db.exec('rollback');throw e;}
+}
+async function denied(id,sql,params=[],pattern=/required|denied|not open|already has|invalid|changed|closed|unavailable|secure group/i){
+ await assert.rejects(()=>as(id,sql,params),pattern);checks++;
+}
+const create='select public.iig_create_owned_group($1,$2,$3) as result';
+const req='11111111-1111-4111-8111-111111111111';
+for(const id of [null,unverified,player,notAllowed,banned]) await denied(id,create,['Test','Alex',req]);
+await denied(owner,create,[' ','Alex',req],/Enter a group name/);
+const group=(await as(owner,create,['Test','Alex',req]))[0].result;
+assert.deepEqual((await as(owner,create,['Test','Alex',req]))[0].result,group);checks++;
+await denied(owner,create,['Different','Alex',req]);
+await denied(owner,create,['Test','Alex','22222222-2222-4222-8222-222222222222']);
+const group2=(await as(other,create,['Other','Sam',req]))[0].result;
+assert.notEqual(group.group_pin,group2.group_pin);checks++;
+let owned=(await as(owner,'select public.iig_get_owned_group() as result'))[0].result;
+assert.equal(owned.group_pin,group.group_pin);assert(!('adminPin' in owned.state));checks++;
+const metadata=(await db.query('select * from public.tens_in_groups where id=$1',[group.group_id])).rows[0];
+assert.equal(metadata.plan_type,'trial');assert.equal(metadata.paid_status,'unpaid');assert.equal(metadata.admin_contact,owner+'@example.test');checks++;
+assert.equal((await db.query("select count(*)::int as n from public.test_trigger_log where event='INSERT'")).rows[0].n,4);checks++;
+for(const id of [null,owner,other,player]) {
+ await denied(id,'select public.get_group_state($1)',[group.group_pin]);
+ await denied(id,'select public.save_group_state($1,$2)',[group.group_pin,{}]);
+}
+await denied(player,'select * from iig_private.group_owners');
+await denied(owner,'select * from iig_private.setup_testers');
+await denied(owner,'select * from public.tens_in_groups');
+await denied(null,'select public.iig_get_owned_group()');
+const save='select public.iig_save_owned_group($1,$2,$3) as revision';
+const openState={...owned.state,roundOpen:true};
+await denied(other,save,[group.group_pin,openState,0]);
+await denied(player,save,[group.group_pin,openState,0]);
+await denied(owner,save,[group.group_pin,{...openState,adminPin:'1234'},0]);
+await denied(owner,save,[group.group_pin,openState,null]);
+assert.equal((await as(owner,save,[group.group_pin,openState,0]))[0].revision,1);checks++;
+await denied(owner,save,[group.group_pin,openState,0]);
+const join='select public.iig_join_owned_group($1,$2,$3,$4) as player_id';
+await denied(null,join,[group.group_pin,owned.invite_token,'Player',11]);
+await denied(player,join,[group.group_pin,req,'Player',11]);
+await denied(player,join,[group.group_pin,owned.invite_token,'Player',11.55]);
+const pid=(await as(player,join,[group.group_pin,owned.invite_token,'Player',11]))[0].player_id;
+assert.equal((await as(player,join,[group.group_pin,owned.invite_token,'Player',11]))[0].player_id,pid);checks++;
+const pid2=(await as(player2,join,[group.group_pin,owned.invite_token,'Player 2',12]))[0].player_id;
+assert.notEqual(pid,pid2);checks++;
+await denied(other,'select public.iig_get_player_group($1)',[group.group_pin]);
+await denied(player,'select public.iig_get_player_group($1)',[group2.group_pin]);
+let view=(await as(player,'select public.iig_get_player_group($1) as result',[group.group_pin]))[0].result;
+assert.equal(view.player_id,pid);assert.equal(view.state.players.length,2);assert(!JSON.stringify(view).includes(owned.invite_token));checks++;
+const attend='select public.iig_set_my_attendance($1,$2,$3) as revision';
+await denied(player,attend,[group2.group_pin,true,view.revision]);
+assert.equal((await as(player,attend,[group.group_pin,true,view.revision]))[0].revision,view.revision+1);checks++;
+await denied(player2,attend,[group.group_pin,true,view.revision]);
+view=(await as(player,'select public.iig_get_player_group($1) as result',[group.group_pin]))[0].result;
+assert.equal(view.state.players.find(p=>p.id===pid).playingThisRound,true);
+assert.equal(view.state.players.find(p=>p.id===pid2).playingThisRound,false);checks++;
+owned=(await as(owner,'select public.iig_get_owned_group() as result'))[0].result;
+const submitScore='select public.iig_submit_my_score($1,$2,$3,$4) as revision';
+const scoreState={...owned.state,course:'Score Test',date:'2099-10-24',pointsCompetition:'stableford'};
+await as(owner,save,[group.group_pin,scoreState,owned.revision]);
+view=(await as(player,'select public.iig_get_player_group($1) as result',[group.group_pin]))[0].result;
+for(const id of [null,other]) await denied(id,submitScore,[group.group_pin,36,'stableford',view.revision]);
+await denied(player,submitScore,[group2.group_pin,36,'stableford',view.revision]);
+await denied(player2,submitScore,[group.group_pin,36,'stableford',view.revision],/marked as playing/);
+for(const score of [-1,100,null]) await denied(player,submitScore,[group.group_pin,score,'stableford',view.revision]);
+await denied(player,submitScore,[group.group_pin,36,'net',view.revision]);
+await denied(player,submitScore,[group.group_pin,36,'stableford',view.revision-1]);
+await denied(player,submitScore,[group.group_pin,36,'stableford',null]);
+await as(player,submitScore,[group.group_pin,0,'stableford',view.revision]);
+view=(await as(player,'select public.iig_get_player_group($1) as result',[group.group_pin]))[0].result;
+assert.equal(view.state.players.find(p=>p.id===pid).stableford,0);
+assert.equal(view.state.players.find(p=>p.id===pid).scoreSubmitted,true);
+assert.equal(view.state.players.find(p=>p.id===pid2).stableford,null);checks++;
+await denied(player,submitScore,[group.group_pin,1,'stableford',view.revision],/already recorded/);
+await denied(player,attend,[group.group_pin,false,view.revision]);
+owned=(await as(owner,'select public.iig_get_owned_group() as result'))[0].result;
+const netState={...scoreState,pointsCompetition:'net',players:scoreState.players.map(p=>({...p,stableford:null,netScore:null,scoreSubmitted:false}))};
+await as(owner,save,[group.group_pin,netState,owned.revision]);
+view=(await as(player,'select public.iig_get_player_group($1) as result',[group.group_pin]))[0].result;
+await denied(player,submitScore,[group.group_pin,1000,'net',view.revision]);
+await as(player,submitScore,[group.group_pin,999,'net',view.revision]);
+view=(await as(player,'select public.iig_get_player_group($1) as result',[group.group_pin]))[0].result;
+assert.equal(view.state.players.find(p=>p.id===pid).netScore,999);assert.equal(view.state.players.find(p=>p.id===pid).stableford,null);checks++;
+owned=(await as(owner,'select public.iig_get_owned_group() as result'))[0].result;
+await as(owner,save,[group.group_pin,{...netState,roundOpen:false},owned.revision]);
+view=(await as(player,'select public.iig_get_player_group($1) as result',[group.group_pin]))[0].result;
+await denied(player,submitScore,[group.group_pin,70,'net',view.revision]);
+owned=(await as(owner,'select public.iig_get_owned_group() as result'))[0].result;
+await as(owner,save,[group.group_pin,scoreState,owned.revision]);
+owned=(await as(owner,'select public.iig_get_owned_group() as result'))[0].result;
+const scoring=structuredClone(owned.state);scoring.players[0].stableford=30;
+scoring.secretFutureAdminField='must not leak';scoring.players[0].bankDetails='must not leak';
+await as(owner,save,[group.group_pin,scoring,owned.revision]);
+view=(await as(player,'select public.iig_get_player_group($1) as result',[group.group_pin]))[0].result;
+assert(!JSON.stringify(view).includes('must not leak'));checks++;
+await denied(player2,attend,[group.group_pin,true,view.revision]);
+await db.query("update public.tens_in_groups set status='suspended' where id=$1",[group.group_id]);
+await denied(owner,'select public.iig_get_owned_group()');
+await denied(player,submitScore,[group.group_pin,36,'stableford',view.revision]);
+await denied(player,'select public.iig_get_player_group($1)',[group.group_pin]);
+await denied(owner,save,[group.group_pin,scoring,view.revision]);
+await denied(player,join,[group.group_pin,owned.invite_token,'Player',11]);
+// Existing groups retain their legacy behavior, including its known security gap.
+const legacy=(await as(null,"select public.get_group_state('1010') as s"))[0].s;
+assert.equal(legacy.adminPin,'fixture-only');
+assert.equal((await as(null,"select public.save_group_state('1260',$1) as ok",[{players:[],history:[],legacyTest:true}]))[0].ok,true);checks++;
+await assert.rejects(()=>db.query("insert into public.tens_in_groups(group_pin,group_name,state) values('1010','Duplicate','{}')"),/unique/);checks++;
+// Exercise the supplied notification bodies, not just recorder triggers.
+const notifyPin='1010';
+assert.equal((await db.query('select enabled from public.iig_notification_settings where group_pin=$1',[notifyPin])).rows[0].enabled,true);checks++;
+const future=(await db.query("select (current_date+10)::text as date")).rows[0].date;
+const competition={course:'Test Course',date:future,roundOpen:true,history:[],players:[]};
+const setState=async s=>db.query('update public.tens_in_groups set state=$1 where group_pin=$2',[s,notifyPin]);
+await setState(competition);
+let events=(await db.query('select * from public.iig_notification_events where group_pin=$1',[notifyPin])).rows;
+assert.deepEqual(events.map(e=>e.event_type).sort(),['competition_created','night_before','three_days_before']);
+assert(events.every(e=>e.status==='pending'&&e.attempts===0));checks++;
+const localTimes=(await db.query("select to_char(scheduled_for at time zone 'Europe/London','HH24:MI') as t from public.iig_notification_events where group_pin=$1 and event_type in ('three_days_before','night_before')",[notifyPin])).rows;
+assert(localTimes.every(e=>e.t==='18:00'));checks++;
+await setState(competition);
+assert.equal((await db.query('select count(*)::int as n from public.iig_notification_events where group_pin=$1',[notifyPin])).rows[0].n,3);checks++;
+competition.players=[{id:'test',name:'Test Golfer',paid:true}];
+await setState(competition);await setState(competition);
+assert.equal((await db.query("select count(*)::int as n from public.iig_notification_events where group_pin=$1 and event_type='first_player_joined'",[notifyPin])).rows[0].n,1);checks++;
+await setState({...competition,roundOpen:false});
+assert.equal((await db.query("select count(*)::int as n from public.iig_notification_events where group_pin=$1 and status='cancelled' and event_type in ('three_days_before','night_before')",[notifyPin])).rows[0].n,2);checks++;
+await setState({...competition,course:'Changed Course'});
+assert.equal((await db.query("select count(*)::int as n from public.iig_notification_events where group_pin=$1 and status='pending' and event_type in ('competition_created','three_days_before','night_before')",[notifyPin])).rows[0].n,3);checks++;
+await db.query("update public.iig_notification_settings set enabled=false where group_pin=$1",[notifyPin]);
+const beforeCount=(await db.query('select count(*)::int as n from public.iig_notification_events')).rows[0].n;
+await setState({...competition,course:'Disabled Notifications'});
+assert.equal((await db.query('select count(*)::int as n from public.iig_notification_events')).rows[0].n,beforeCount);checks++;
+// Match actual access rules: expired trials blocked, paid/non-trial access preserved.
+await db.query("update public.tens_in_groups set trial_expiry_date=current_date-1 where group_pin='1260'");
+assert.equal((await as(null,"select access_reason from public.get_group_access_status('1260')"))[0].access_reason,'trial_expired');checks++;
+await db.query("update public.tens_in_groups set plan_type='plus' where group_pin='1260'");
+assert.equal((await as(null,"select access_allowed from public.get_group_access_status('1260')"))[0].access_allowed,true);checks++;
+// Applying the baseline to a populated database must fail before any changes.
+await assert.rejects(()=>db.exec(readFileSync(new URL('../supabase/staging/empty-test-schema.sql',import.meta.url),'utf8')),/STOP: this database already has app tables/);
+assert.equal((await db.query('select count(*)::int as n from public.tens_in_groups')).rows[0].n,4);checks++;
+console.log(`PASS: ${checks} checks against PostgreSQL (PGlite), including role enforcement, verified organiser, allowlist, replay, cross-group access, legacy bypass, stale writes, member isolation, data projection, suspension, defaults, triggers and legacy compatibility.`);
+console.log('LIMIT: synthetic Auth and reconstructed tables with supplied trial/notification functions; no hosted JWT, email, browser, real concurrent connections or existing-group migration tested.');
+// Self-service registration and platform-owner visibility (incremental migration).
+await db.exec(readFileSync(new URL('../supabase/staging/self-service-registration.sql',import.meta.url),'utf8'));
+const reg=(await as(notAllowed,create,['New self-service group','New organiser',req]))[0].result;
+assert.deepEqual((await as(notAllowed,create,['New self-service group','New organiser',req]))[0].result,reg); checks++;
+const regRow=(await db.query('select * from public.tens_in_groups where id=$1',[reg.group_id])).rows[0];
+assert.equal(regRow.admin_contact,notAllowed+'@example.test'); assert.equal(regRow.admin_name,'New organiser');
+assert.equal(regRow.plan_type,'trial'); assert(regRow.trial_expiry_date); checks++;
+for(const id of [null,unverified,banned,owner,notAllowed]) await denied(id,'select public.iig_list_registered_groups()');
+await denied(notAllowed,'insert into iig_private.platform_owners values($1)',[notAllowed]);
+await db.query('insert into iig_private.platform_owners values($1)',[owner]);
+const register=(await as(owner,'select public.iig_list_registered_groups() as result'))[0].result;
+assert(register.some(g=>g.group_pin===reg.group_pin && g.admin_contact===regRow.admin_contact));
+assert(register.every(g=>!('state' in g) && !('invite_token' in g))); checks++;
+await denied(owner,'select public.iig_list_registered_groups(-1)',[],/Invalid offset/);
+assert.deepEqual((await as(owner,'select public.iig_list_registered_groups(100) as result'))[0].result,[]); checks++;
+for(const id of [null,unverified,banned]) await denied(id,create,['Blocked','Blocked',req]);
+await db.exec('update iig_private.registration_settings set enabled=false');
+await denied(player,create,['Closed','Closed',req]);
+assert.equal((await db.query("select count(*)::int as n from public.tens_in_groups where group_pin in ('1010','1260')")).rows[0].n,2); checks++;
+console.log('PASS: self-service creation, retry reconciliation, saved contact/trial, private owner register, pagination, registration switch and existing-group preservation.');
+// Hardening applies to existing test groups without rewriting a single saved result.
+const beforeHardening=(await db.query('select id,state from public.tens_in_groups order by id')).rows;
+await db.exec(readFileSync(new URL('../supabase/staging/integration-hardening.sql',import.meta.url),'utf8'));
+assert.deepEqual((await db.query('select id,state from public.tens_in_groups order by id')).rows,beforeHardening);
+await db.exec(readFileSync(new URL('../supabase/staging/integration-hardening.sql',import.meta.url),'utf8'));
+assert.deepEqual((await db.query('select id,state from public.tens_in_groups order by id')).rows,beforeHardening);
+await db.query("update public.tens_in_groups set status='active' where id=$1",[group.group_id]);
+for(const query of [
+ ['select public.iig_get_player_group($1)',[group.group_pin]],
+ [join,[group.group_pin,owned.invite_token,'Player',11]],
+ [attend,[group.group_pin,true,0]],
+ [submitScore,[group.group_pin,36,'stableford',0]]
+]) await denied(player,...query,/Verified organiser sign-in required/);
+await db.query('update auth.users set email_confirmed_at=now(),is_anonymous=false where id=$1',[player]);
+owned=(await as(owner,'select public.iig_get_owned_group() as result'))[0].result;
+const historical={date:'2026-10-01',course:'Historic Course',gameType:'points',pointsCompetition:'stableford',
+ players:[{id:pid,name:'Player',handicap:11,stableford:36,bankDetails:'PRIVATE'}],
+ pointsResults:[{name:'Player',score:36,points:10,contact:'PRIVATE'}],adminPin:'PRIVATE',payouts:[{paymentLink:'PRIVATE'}]};
+const historyState={...owned.state,gameType:'points',trip:{active:false},history:[historical],players:owned.state.players.map(p=>({...p,stableford:null,netScore:null,scoreSubmitted:false,playingThisRound:true,leaguePoints:10}))};
+await as(owner,save,[group.group_pin,historyState,owned.revision]);
+view=(await as(player,'select public.iig_get_player_group($1) as result',[group.group_pin]))[0].result;
+assert.equal(view.state.history[0].course,'Historic Course');
+assert.equal(view.state.history[0].players[0].stableford,36);
+assert.equal(view.state.history[0].pointsResults[0].points,10);
+assert.equal(view.state.players[0].leaguePoints,10);
+assert(!JSON.stringify(view).includes('PRIVATE'));
+await denied(player,'select iig_private.player_result($1)',[{}]);
+for(const mode of [{gameType:'money'},{gameType:'points',trip:{active:true}}]){
+ owned=(await as(owner,'select public.iig_get_owned_group() as result'))[0].result;
+ await as(owner,save,[group.group_pin,{...historyState,...mode},owned.revision]);
+ view=(await as(player,'select public.iig_get_player_group($1) as result',[group.group_pin]))[0].result;
+ for(const [query,args] of [[attend,[group.group_pin,true,view.revision]],[submitScore,[group.group_pin,36,'stableford',view.revision]]])
+  await denied(player,query,args,/individual Points Game/);
+}
+await db.query("update auth.users set banned_until=now()+interval '1 day' where id=$1",[player]);
+for(const [query,args] of [
+ ['select public.iig_get_player_group($1)',[group.group_pin]],
+ [join,[group.group_pin,owned.invite_token,'Player',11]],
+ [attend,[group.group_pin,true,view.revision]],
+ [submitScore,[group.group_pin,36,'stableford',view.revision]]
+]) await denied(player,query,args,/Verified organiser sign-in required/);
+console.log('PASS: incremental hardening is repeatable and preserves all groups/history; verified member checks, banned-session denial, private historical projection, league totals and unsupported game mutation denial.');
+await db.close();

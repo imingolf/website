@@ -1,0 +1,18 @@
+import {PGlite} from '@electric-sql/pglite';
+import {readFileSync} from 'node:fs';
+import assert from 'node:assert/strict';
+const db=new PGlite();
+await db.exec(`create role anon;create role authenticated;create schema auth;
+create table auth.users(id uuid primary key,email text,email_confirmed_at timestamptz,is_anonymous boolean,banned_until timestamptz);
+create function auth.uid() returns uuid language sql as $$select null::uuid$$;`);
+const sql=readFileSync(new URL('../supabase/staging/setup-test-project.sql',import.meta.url),'utf8');
+const result=await db.exec(sql);
+assert.equal(result.at(-1).rows[0].result,'Test database setup complete');
+assert.equal(Number(result.at(-1).rows[0].groups),0);
+assert.equal((await db.query("select count(*)::int as n from pg_tables where schemaname='iig_private' and rowsecurity")).rows[0].n,3);
+assert.equal((await db.query('select count(*)::int as n from public.iig_notification_events')).rows[0].n,0);
+await assert.rejects(()=>db.exec(sql),/STOP: this database already has app tables/);
+await db.exec('rollback');
+assert.equal((await db.query('select count(*)::int as n from public.tens_in_groups')).rows[0].n,0);
+console.log('PASS: complete setup bundle installs atomically on an empty database, enables private-table RLS, creates no groups or events and refuses repeat application.');
+await db.close();

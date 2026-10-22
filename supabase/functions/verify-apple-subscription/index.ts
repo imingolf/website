@@ -1,4 +1,5 @@
 import "@supabase/functions-js/edge-runtime.d.ts";
+import {activateVerifiedSubscription} from "./authorise.mjs";
 import { withSupabase } from "@supabase/server";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { SignJWT, importPKCS8, decodeJwt } from "npm:jose@6";
@@ -113,7 +114,7 @@ export default {
 
         const expiresDate = Number(transaction.expiresDate || 0);
 
-        if (!expiresDate || expiresDate <= Date.now()) {
+        if (!expiresDate || expiresDate <= Date.now() || transaction.revocationDate) {
           return Response.json(
             { ok: false, error: "Subscription is not active" },
             { status: 400 },
@@ -128,28 +129,18 @@ export default {
         }
 
         const supabase = createClient(supabaseUrl, serviceRoleKey);
-        const renewalDate = new Date(expiresDate).toISOString().slice(0, 10);
-
-        const { data: updatedGroup, error: updateError } = await supabase
-          .from("tens_in_groups")
-          .update({
-            plan_type: "plus",
-            paid_status: "paid",
-            renewal_date: renewalDate,
-            status: "active",
-            updated_at: new Date().toISOString(),
-          })
-          .eq("group_pin", groupPin)
-          .select("group_pin")
-          .maybeSingle();
-
-        if (updateError) {
-          throw new Error(`PLUS_ACTIVATION_FAILED: ${updateError.message}`);
-        }
-
-        if (!updatedGroup) {
-          throw new Error(`GROUP_NOT_FOUND: ${groupPin}`);
-        }
+        await activateVerifiedSubscription({
+          admin:supabase,
+          allowSandbox:new URL(supabaseUrl).hostname==="nyavvwrsrxqfyhiygkgw.supabase.co",
+          authorization:req.headers.get("authorization"),
+          groupPin,
+          transaction,
+          verifyUser:async (authorization:string)=>{
+            const {data,error}=await supabase.auth.getUser(authorization.replace(/^Bearer /,""));
+            if(error)throw Error("Sign in as your group organiser before upgrading");
+            return data.user;
+          }
+        });
 
         console.log(`APPLE PLUS ACTIVATED: group ${groupPin} until ${renewalDate}`);
 

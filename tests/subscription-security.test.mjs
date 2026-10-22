@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import {activateVerifiedSubscription} from '../supabase/functions/verify-apple-subscription/authorise.mjs';
+let calls=[],protectedGroup=true,denied=false;
+const args={admin:{rpc:async(name,body)=>{calls.push({name,body});return name==='iig_is_protected_group'?{data:protectedGroup}:{data:!denied,error:denied?{message:'Receipt already linked'}:null};}},verifyUser:async()=>({id:'verified-owner'}),authorization:'Bearer fake',groupPin:'3520',transaction:{appAccountToken:'verified-owner',originalTransactionId:'receipt',expiresDate:Date.now()+3600000}};
+await activateVerifiedSubscription(args);assert.equal(calls.at(-1).body.p_user_id,'verified-owner');
+await assert.rejects(()=>activateVerifiedSubscription({...args,authorization:null}),/Sign in/);
+await assert.rejects(()=>activateVerifiedSubscription({...args,verifyUser:async()=>null}),/Sign in/);
+await assert.rejects(()=>activateVerifiedSubscription({...args,transaction:{...args.transaction,revocationDate:Date.now()}}),/not active/);
+await assert.rejects(()=>activateVerifiedSubscription({...args,transaction:{...args.transaction,environment:'Sandbox'}}),/test project/);
+await assert.rejects(()=>activateVerifiedSubscription({...args,transaction:{...args.transaction,appAccountToken:'someone-else'}}),/does not belong/);
+denied=true;await assert.rejects(()=>activateVerifiedSubscription(args),/already linked/);
+denied=false;protectedGroup=false;await activateVerifiedSubscription({...args,authorization:null});assert.equal(calls.at(-1).body.p_user_id,null);
+console.log('PASS: protected subscription activation requires verified Auth identity, revoked receipts are rejected, binding failures fail closed and legacy groups retain their existing purchase entry. No Apple or Supabase requests.');

@@ -173,6 +173,7 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
 
 <script>
 (()=>{
+  if(location.hostname === "deploy-preview-6--super-quokka-51747d.netlify.app" || ["localhost","127.0.0.1"].includes(location.hostname)) return;
   const TEST_PINS=new Set(["2894"]);
   const OWNER_PROTECTED_PIN="1010";
   const PRICE_PER_YEAR=29.99;
@@ -1132,5 +1133,7 @@ input,select,textarea{width:100%;padding:11px 12px;border:1px solid #ccd8cf;bord
   $("logoutBtn").addEventListener("click",logout);
 })();
 </script>
+<script src="account-controls.js"></script>
+<script src="self-service.js"></script>
 </body>
 </html>

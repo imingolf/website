@@ -1,0 +1,76 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const {parseHTML}=require(process.env.LINKEDOM_PATH||'linkedom');
+const storage=new Map();
+const html=fs.readFileSync('app/index.html','utf8');const {document}=parseHTML(html);
+const ctx={document,location:{hostname:'deploy-preview-6--super-quokka-51747d.netlify.app'},console,URL,URLSearchParams,Date,structuredClone,localStorage:{getItem:k=>storage.get(k)||null,setItem:(k,v)=>storage.set(k,String(v)),removeItem:k=>storage.delete(k)},sessionStorage:{getItem:()=>null,setItem(){},removeItem(){}},navigator:{userAgent:'test'},setInterval:()=>1,clearInterval(){},setTimeout:()=>1,clearTimeout(){},alert(){},confirm:()=>true};
+ctx.window=ctx;ctx.addEventListener=()=>{};ctx.scrollTo=()=>{};vm.createContext(ctx);
+for(const el of document.querySelectorAll('*'))el.animate=()=>{};
+for(const script of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)) if(script[1].includes('let db=null') || script[1].includes('function showWelcomePanel'))vm.runInContext(script[1],ctx);
+vm.runInContext(fs.readFileSync('app/secure-organiser.js','utf8'),ctx);
+vm.runInContext(fs.readFileSync('app/secure-player.js','utf8'),ctx);
+let data={player_id:'me',revision:0,state:{groupName:'Pam’s people',course:'Hazel Grove',date:'2099-10-24',history:[{course:'Historic Course',date:'2026-10-01',gameType:'points',pointsCompetition:'stableford',players:[],pointsResults:[]}],gameType:'points',pointsCompetition:'stableford',roundOpen:true,players:[{id:'me',name:'Player one',handicap:11,playingThisRound:false,stableford:null,netScore:null},{id:'other',name:'Player two',handicap:15,playingThisRound:true,stableford:null,netScore:null}]}};
+const realConfirm=ctx.appConfirm;
+const calls=[];let fail=false;
+async function request(url,body){calls.push({url,body});if(url.endsWith('iig_get_player_group'))return structuredClone(data);if(fail)throw Error('Group changed; reload before saving');assert.equal(body.p_revision,data.revision);assert.equal(body.p_pin,'3520');assert.equal(body.p_state,undefined);assert.equal(body.p_player_id,undefined);data.revision++;if(url.endsWith('iig_set_my_attendance')||body.p_action==='attendance')data.state.players[0].playingThisRound=body.p_attending??body.p_payload.attending;else if(url.endsWith('iig_submit_my_score')||body.p_action==='score'){data.state.players[0].stableford=body.p_score??body.p_payload.score;data.state.players[0].scoreSubmitted=true;}else if(body.p_action==='payment')data.state.players[0].paid=true;
+else if(body.p_action==='no_return')data.state.players[0].noReturn=true;
+else if(body.p_action==='team_score')data.state.trip.currentTeamScores[body.p_payload.team_id]=body.p_payload.score;
+else if(body.p_action==='side_create')data.state.sideGame.bets.push({id:'bet',player1Id:'me',player2Id:body.p_payload.other_id,player1Name:'Player one',player2Name:'Player two',stake:body.p_payload.stake,format:body.p_payload.format,status:'pending',date:ctx.sideGameToday(),setup:'challenge'});
+else if(body.p_action==='side_score')data.state.sideGame.scores.push({playerId:'me',score:body.p_payload.score,date:ctx.sideGameToday(),format:body.p_payload.format});
+else if(body.p_action==='side_accept'||body.p_action==='side_decline'||body.p_action==='side_settle'||body.p_action==='side_confirm'||body.p_action==='claim_prize'){}else throw Error('Unexpected RPC');return data.revision;}
+(async()=>{
+ ctx.iigSecurePlayer.open(data,'3520',request,()=>ctx.iigSecurePlayer.close());
+ assert.equal(vm.runInContext('isAdmin',ctx),false);assert.match(document.getElementById('screen').textContent,/Hazel Grove/);
+ await ctx.enterNormalPointsGame();assert.equal(data.state.players[0].playingThisRound,true);assert.equal(data.state.players[1].playingThisRound,true);
+ await document.getElementById('securePlayerWithdraw').onclick();assert.equal(data.state.players[0].playingThisRound,false);
+ await ctx.enterNormalPointsGame();ctx.show('scores');
+ let count=calls.length;await ctx.submitPlayerScore(1,'stableford');assert.equal(calls.length,count);
+ document.getElementById('scoreInput_0').value='100';await ctx.submitPlayerScore(0,'stableford');assert.equal(calls.length,count);
+ document.getElementById('scoreInput_0').value='36';vm.runInContext('appConfirm=async()=>true',ctx);
+ fail=true;await ctx.submitPlayerScore(0,'stableford');assert.match(document.getElementById('securePlayerStatus').textContent,/Reload group/);
+ count=calls.length;await ctx.enterNormalPointsGame();assert.equal(calls.length,count);
+ fail=false;await document.getElementById('securePlayerReload').onclick();
+ document.getElementById('scoreInput_0').value='36';await ctx.submitPlayerScore(0,'stableford');
+ assert.equal(data.state.players[0].stableford,36);assert.equal(data.state.players[1].stableford,null);
+ assert.equal(await ctx.save(),false);assert(calls.every(c=>!c.url.includes('owned_group')));
+ ctx.show('league');assert.match(document.getElementById('screen').textContent,/League/);
+ ctx.showRoundHistory(0);assert.match(document.getElementById('screen').textContent,/Historic Course/);
+ // Money entry uses an explicit identity-bound declaration; it never calls legacy payment RPCs.
+ data.state={...data.state,roundId:'money-round',gameType:'money',stake:10,roundOpen:true,paymentLink:'https://monzo.me/golfer',players:data.state.players.map(p=>({...p,paid:false,stableford:null,netScore:null,scoreSubmitted:false})),sideGame:{bets:[],scores:[],settlements:[]}};
+ ctx.iigSecurePlayer.open(data,'3520',request,()=>ctx.iigSecurePlayer.close());ctx.show('pay');
+ assert.equal(document.getElementById('npay').hidden,false);
+ await document.getElementById('securePlayerConfirmPayment').onclick();
+ assert.equal(data.state.players[0].paid,true);assert.equal(data.state.players[1].paid,false);
+ const payment=calls.findLast(c=>c.body.p_action==='payment');assert.equal(payment.body.p_payload.round_id,'money-round');assert.equal(payment.body.p_payload.confirmed,true);
+ // Original Trip pair and Net No Return screens call the protected dispatcher.
+ data.state.players[1].paid=true;
+ data.state.trip={active:true,currentRound:1,totalRounds:2,currentFormat:'pairsaggregate',currentPlayingIds:['me','other'],currentTeams:[{id:'pair',playerIds:['me','other']}],currentTeamScores:{},rounds:[]};data.state.pointsCompetition='net';
+ ctx.iigSecurePlayer.open(data,'3520',request,()=>ctx.iigSecurePlayer.close());ctx.show('scores');
+ document.getElementById('tripTeamScore_pair').value='142';await ctx.submitTripTeamScore('pair');
+ assert.equal(calls.findLast(c=>c.body.p_action==='team_score').body.p_payload.score,142);
+ assert.equal(data.state.trip.currentTeamScores.pair,142);
+ data.state.trip.currentFormat='individual';data.state.trip.currentTeamScores={};
+ ctx.iigSecurePlayer.open(data,'3520',request,()=>ctx.iigSecurePlayer.close());await ctx.submitNoReturn(0);assert.equal(data.state.players[0].noReturn,true);
+ // Side Game setup retains the original forms and asks the other player to accept.
+ data.state.trip={active:false};ctx.iigSecurePlayer.open(data,'3520',request,()=>ctx.iigSecurePlayer.close());
+ ctx.sideGameHome();assert.match(document.getElementById('screen').textContent,/SIDE GAME/);
+ ctx.sideGameSendChallenge('other');document.getElementById('sideGameStake').value='5';ctx.sideGameSelectFormat('other','stableford');
+ await ctx.sideGameSendChallenge('other');assert.equal(data.state.sideGame.bets[0].status,'pending');
+ const challenge=calls.findLast(c=>c.body.p_action==='side_create');assert.equal(challenge.body.p_payload.other_id,'other');assert.equal(challenge.body.p_payload.stake,5);
+ await ctx.sideGameAcceptChallenge('bet');assert.equal(calls.findLast(c=>c.body.p_action==='side_accept').body.p_payload.id,'bet');
+ await ctx.sideGameRequestSettlement('other',999);assert.equal(calls.findLast(c=>c.body.p_action==='side_settle').body.p_payload.amount,undefined);
+ assert(calls.filter(c=>c.url.endsWith('iig_player_action')).every(c=>c.body.p_state===undefined&&c.body.p_player_id===undefined));
+ // Untrusted IDs must be encoded as JavaScript strings, not HTML-escaped inside quotes.
+ const attack="x');globalThis.pwned=true;//";
+ vm.runInContext('state.players[1].id='+JSON.stringify(attack),ctx);ctx.show('league');
+ let seen;ctx.showPlayerStats=id=>{seen=id;};
+ const stats=document.querySelector('[onclick^="showPlayerStats("]');vm.runInContext(stats.getAttribute('onclick'),ctx);assert.equal(ctx.pwned,undefined);
+ vm.runInContext('state.sideGame.bets=[{id:'+JSON.stringify(attack)+',player1Id:"other",player2Id:"me",player1Name:"Opponent",date:sideGameToday(),status:"pending",setup:"challenge",stake:1,format:"stableford"}]',ctx);
+ ctx.sideGameHome();ctx.sideGameAcceptChallenge=id=>{seen=id;};
+ const accept=document.querySelector('[onclick^="sideGameAcceptChallenge("]');vm.runInContext(accept.getAttribute('onclick'),ctx);assert.equal(seen,attack);assert.equal(ctx.pwned,undefined);
+ for(const link of ['https://revolut.evil.invalid/p','https://evilstarlingbank.com/p','https://paypal.com.evil.invalid/p','https://user@paypal.me/p'])assert.equal(ctx.payoutProvider(link),'');
+ for(const link of ['https://monzo.me/player','https://www.paypal.com/paypalme/player','https://settleup.starlingbank.com/player','https://wise.com/pay/player'])assert(ctx.payoutProvider(link));
+ assert.equal(document.getElementById('nsettings').hidden,true);
+ const cancelled=realConfirm('Private account dialog','Private content');
+ ctx.iigSecurePlayer.close();assert.equal(await cancelled,false);assert(!document.getElementById('appConfirmYes'));assert.equal(document.getElementById('nsettings').hidden,false);assert.equal(vm.runInContext('state.players.length+state.history.length',ctx),0);assert.equal(vm.runInContext('myPlayerId',ctx),'');assert.equal(vm.runInContext('db',ctx),null);
+ console.log('PASS: original player round/scores, Money payment declaration, Trip pair/NR and Side Game forms; own attendance/withdrawal; score limits; no other-player edits; stale lockout/reload; narrow RPC only; sign-out.');
+})().catch(e=>{console.error(e);process.exit(1)});
