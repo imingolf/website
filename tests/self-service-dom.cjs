@@ -34,6 +34,8 @@ function setup(dashboard=false,host='deploy-preview-6--super-quokka-51747d.netli
  const guest=setup(false,'deploy-preview-6--super-quokka-51747d.netlify.app','#pin=3520&invite=11111111-1111-4111-8111-111111111111');
  await guest.login();guest.queue.push({status:403,data:{code:'42501',message:'Group membership required'}});await guest.act('regCodeForm','onsubmit');
  assert.equal(guest.el('regJoinForm').hidden,false);assert.equal(guest.el('regGroupForm').hidden,true);
+ const handicapInput=guest.el('regHandicap');
+ for(const [typed,expected] of [['1','1'],['11','11'],['111','11'],['11.','11.'],['11.2','11.2'],['11.23','11.2'],['123456789','11.2'],['',''],['-','-'],['-1','-1'],['-10','-10'],['-10.0','-10.0'],['abc','-10.0']]){handicapInput.value=typed;handicapInput.oninput();assert.equal(handicapInput.value,expected);}
  guest.el('regPlayerName').value='New player';guest.el('regHandicap').value='11.2';
  guest.queue.push({data:'member-id'},{data:{player_id:'member-id',revision:1,state:{players:[{id:'member-id'}]}}});await guest.act('regJoinForm','onsubmit');
  assert.equal(guest.ctx.playerOpen[1],'3520');assert.equal(guest.calls.at(-2).body.p_handicap,11.2);

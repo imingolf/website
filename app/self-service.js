@@ -28,7 +28,7 @@
     <form id="regCodeForm" hidden><label for="regCode">Code from your email</label><p id="regSentTo"></p><input id="regCode" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6,10}" minlength="6" maxlength="10" required><button class="primary full">Verify email</button><button id="regResend" type="button" class="secondary full">Send another code</button><button id="regChangeEmail" type="button" class="ghost full">Use a different email</button></form>
     <section id="regSignedIn" hidden><p id="regAccount" class="muted"></p>
     <form id="regGroupForm" hidden><label for="regName">Your name</label><input id="regName" autocomplete="name" maxlength="80" required><label for="regGroupName">Group name</label><input id="regGroupName" maxlength="80" required placeholder="e.g. Sunday Golfers"><button class="primary full">Create my group</button><p class="muted">One group per organiser account. Your name and email are shared with I’m In Golf to manage your group and trial.</p></form>
-    <form id="regJoinForm" hidden><label for="regPlayerName">Your name</label><input id="regPlayerName" autocomplete="name" maxlength="80" required><label for="regHandicap">Handicap</label><input id="regHandicap" type="text" inputmode="decimal" maxlength="5" required><button class="primary full">Join my group</button></form>
+    <form id="regJoinForm" hidden><label for="regPlayerName">Your name</label><input id="regPlayerName" autocomplete="name" maxlength="80" required><label for="regHandicap">Handicap</label><input id="regHandicap" type="text" inputmode="decimal" maxlength="5" pattern="-?[0-9]{1,2}([.][0-9])?" aria-describedby="regHandicapHelp" required><small id="regHandicapHelp">Up to two digits and one decimal place, e.g. 11.2.</small><button class="primary full">Join my group</button></form>
     <section id="regCreated" hidden><h2>Your group is ready</h2><p id="regCreatedName"></p><p>Group PIN: <strong id="regPin"></strong></p><p>Your group has been registered with I’m In Golf.</p><p class="notice">This is a test group. Open your group to test competition setup in the original app layout. Player invitations now support Points Game attendance and final scores in this preview.</p><button id="regOpenGroup" type="button" class="primary full">Open my group</button></section>
     <button id="regReload" type="button" class="secondary full">${dashboard ? 'Open dashboard' : 'Check my group'}</button><button id="regSignout" type="button" class="ghost full">Sign out</button></section>`;
   // Author styles in the original app must not override hidden form visibility.
@@ -147,6 +147,13 @@
     window.iigSecurePlayer.open(data,invitePin,request,()=>action(signout));
     $('regJoinForm').hidden=true;
   }
+  let lastHandicap = '';
+  $('regHandicap').oninput = () => {
+    const input = $('regHandicap');
+    // Reject excess digits while typing or pasting; never silently change a handicap.
+    if (/^-?(?:[0-9]{0,2}|[0-9]{1,2}\.[0-9]?)$/.test(input.value)) lastHandicap = input.value;
+    else input.value = lastHandicap;
+  };
   $('regJoinForm').onsubmit=event=>{event.preventDefault();action(async()=>{
     const name=$('regPlayerName').value.trim(),raw=$('regHandicap').value.trim(),handicap=Number(raw);
     if(!name||name.length>80||!/^[-]?[0-9]{1,2}(?:\.[0-9])?$/.test(raw)||handicap < -10||handicap > 60)throw new Error('Enter your name and a handicap from -10 to 60, with up to one decimal place.');
