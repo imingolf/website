@@ -1,5 +1,5 @@
 -- IM IN GOLF TEST ONLY: empty-project setup. Do not run on the live project.
--- Expected test project: nyavvwrsxqfyhiygkgw (confirm the dashboard before running).
+-- Expected test project: nyavvwrsrxqfyhiygkgw (confirm the dashboard before running).
 -- This creates empty tables and functions; it sends no notifications or emails.
 begin;
 -- ONLY for a new, empty Im In Golf Test project. No live player data is copied.

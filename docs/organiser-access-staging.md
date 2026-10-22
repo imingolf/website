@@ -39,6 +39,17 @@ No live migration, account creation, invitation or public release is part of thi
 
 The owner created **Im In Golf Test**, distinct from the production project, with Data API enabled, automatic table exposure disabled and automatic RLS enabled. The empty-project installation script is `supabase/staging/setup-test-project.sql`. It combines the reconstructed three-table baseline, supplied access/notification rules and staged access migration in one transaction. It refuses to run if any target table or the private schema already exists; do not remove that guard to rerun it. It installs no notification sender, subscriptions, scheduled jobs or emails and creates no groups or Auth accounts. It does not recreate the whole production database or migrate existing data.
 
-`node security-tests/setup-bundle.test.mjs` verifies the complete deliverable installs on an empty PostgreSQL database, enables private-table RLS, creates no groups/events and refuses reapplication. `node security-tests/access.test.mjs` passes 62 checks. Production is unchanged. Hosted test installation still awaits the owner's SQL Editor run.
+`node security-tests/setup-bundle.test.mjs` verifies the complete deliverable installs on an empty PostgreSQL database, enables private-table RLS, creates no groups/events and refuses reapplication. `node security-tests/access.test.mjs` passes 62 checks. Production is unchanged. The owner ran the bundle successfully and reported 'Test database setup complete, 0 groups'. Do not rerun it.
 
 For the owner: switch the Supabase project selector to **Im In Golf Test**, open SQL Editor → New query, paste the complete setup-test-project.sql and run once. Expected final result: **Test database setup complete**, **groups = 0**. A SQL Editor warning about privilege revocation is expected because the script explicitly restricts table/function access. If an error occurs, share the error text; do not rerun individual fragments.
+
+
+## Organiser test page (22 October)
+
+`app/organiser-test.html` and `app/organiser-test.js` provide an isolated email OTP and group-creation client for `https://nyavvwrsrxqfyhiygkgw.supabase.co`. The owner supplied the exact URL and publishable key; Auth settings returned HTTP 200 with email enabled and confirmation required. The owner configured staging SMTP and both OTP email templates. Actual email delivery and real JWT integration still need the manual test.
+
+The page operates only on deploy-preview-6--super-quokka-51747d.netlify.app or localhost. This hostname check prevents accidental live use; server ownership and the tester allowlist enforce security. No production config is imported. Credentials are held in memory only; reload requires a new code. There is no automatic refresh or cross-tab login. Only retry metadata is stored in sessionStorage. The page rechecks the owned group before creation and reuses a request UUID on retry. It renders server text with textContent.
+
+Run `node tests/organiser-test.cjs` from the repo root for mocked browser/API behavior tests (no emails): host restriction, expired OTP, verification, bearer-authenticated RPC, allowlist denial, retry reuse, existing-group reconciliation and staging-only requests. These are not real-browser, SMTP or hosted JWT tests.
+
+Manual next step: request a code on the preview, verify it, attempt a test group. If the account is not allowlisted, the page displays its UUID. A trusted operator must enable that verified UUID in the test database before creation can succeed. No invitation or live gameplay link is offered. Existing live-group security weaknesses and other release blockers above remain.
