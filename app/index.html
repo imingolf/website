@@ -1,5 +1,4 @@
-<!doctype html>
-<html lang="en">
+<!doctype html><html lang="en">
 <head>
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="manifest" href="manifest.webmanifest">
@@ -144,6 +143,43 @@ body:not(.admin-mode) nav button.active:not(.hidden) {
 body:not(.admin-mode) nav button:not(.hidden):active {
   background: #91c7a0; border-color: #579568;
 }
+
+/* First-visit welcome and guided group entry */
+#setupOverlay{background:radial-gradient(ellipse at 80% 0%,#e1efdd 0,transparent 50%),#f7f9f4;padding:calc(30px + env(safe-area-inset-top)) 22px calc(28px + env(safe-area-inset-bottom))}
+.welcome-shell{width:min(540px,100%);margin:auto 0}
+.welcome-brand{display:flex;align-items:center;gap:13px;font-size:23px;font-weight:850;margin-bottom:38px}
+.welcome-brand img{border-radius:17px;box-shadow:0 5px 18px #173b1b18}
+.welcome-eyebrow{font-size:11px;font-weight:800;letter-spacing:1.7px;color:#356246}
+.welcome-shell h1{font-size:clamp(36px,7vw,52px);line-height:1.06;letter-spacing:-1.8px;margin:15px 0 18px}
+.welcome-shell h1 span{color:#176b3a}
+.welcome-intro,.welcome-panel>p{font-size:18px;line-height:1.55;color:#526157;margin:0 0 22px}
+.welcome-benefits{display:flex;flex-wrap:wrap;gap:8px 16px;font-size:13px;color:#285b38;margin-bottom:29px}
+.welcome-choices{display:grid;gap:12px}
+.welcome-choice{width:100%;text-align:left;padding:20px 22px;border-radius:18px;cursor:pointer;min-height:91px}
+.welcome-choice>span{display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:19px;font-weight:800}
+.welcome-choice small{display:block;font-size:14px;font-weight:400;margin-top:7px;line-height:1.4}
+.welcome-join{background:#176b3a;color:#fff;box-shadow:0 8px 20px #176b3a1a}
+.welcome-start{background:white;color:#193b27;border:1px solid #cad9cc}
+.welcome-link{display:block;background:transparent;color:#176b3a;padding:14px 0;min-height:48px;text-align:left;font-size:14px;text-decoration:underline;text-underline-offset:4px;cursor:pointer}
+.welcome-footnote{font-size:13px!important;line-height:1.65!important;color:#667268!important;margin:16px 0 0!important}
+.welcome-footnote a{color:#176b3a}
+.welcome-panel{background:#fff;padding:26px;border:1px solid #dae4d8;border-radius:24px;box-shadow:0 10px 40px #183b2010}
+.welcome-panel h1{font-size:34px;letter-spacing:-1px}
+.welcome-back{padding:0;background:transparent;color:#526157;cursor:pointer;min-height:44px}
+.welcome-panel input{margin-top:10px;padding:16px;font-size:20px}
+.welcome-panel .primary{padding:17px;font-size:16px;cursor:pointer}
+.welcome-help{border-top:1px solid #e1e7df;margin-top:24px;padding-top:18px;font-size:14px;line-height:1.6}
+.welcome-help summary{cursor:pointer;font-weight:750;color:#176b3a;min-height:32px}
+.welcome-steps{padding-left:22px;margin:24px 0}
+.welcome-steps li{padding-left:6px;margin-bottom:21px;color:#176b3a}
+.welcome-steps b{display:block;color:#203a29;font-size:16px}
+.welcome-steps span{display:block;color:#58665c;font-size:14px;line-height:1.6;margin-top:5px}
+.welcome-email{display:block;background:#176b3a;color:white;text-align:center;text-decoration:none;padding:17px;border-radius:13px;font-weight:750}
+.welcome-note{background:#f0f6ec;padding:14px;border-radius:12px;font-size:14px!important}
+.welcome-shell :focus-visible{outline:3px solid #8a6500;outline-offset:4px}
+@media(max-width:380px){.welcome-brand{margin-bottom:25px}.welcome-choice{padding:17px}.welcome-choice>span{font-size:17px}.welcome-panel{padding:20px}}
+@media(min-width:760px){.welcome-shell{padding:35px 0}.welcome-brand{margin-bottom:42px}}
+
 </style>
 <script>
 if(/iPhone|iPod/.test(navigator.userAgent) &&
@@ -255,18 +291,62 @@ if(/iPhone|iPod/.test(navigator.userAgent) &&
 
 
 <div id="setupOverlay">
- <div class="setup">
-  <div class="card">
-   <h1 style="margin-top:0">⛳ I'm In Golf</h1>
-   <p>Golf. Mates. You're In.</p>
-   <div id="configMissing" class="notice warning hidden"><b>One-time setup needed.</b><br>This shared version needs your Supabase project details added to <code>config.js</code>.</div>
-   <label><b>Group PIN</b></label>
-<input id="pinInput" inputmode="numeric" autocomplete="off" placeholder="Enter your shared PIN">
-<button class="primary full" onclick="connect()">Open I'm In Golf</button>
-<div id="connectMsg" class="muted" style="margin-top:10px"></div>
-     </div>
+ <div class="setup welcome-shell">
+  <div class="welcome-brand"><img src="icon-192.png" alt="I'm In Golf" width="64" height="64"><span>I’m In Golf</span></div>
+  <div id="welcomeHome">
+   <span class="welcome-eyebrow">GOOD GOLF. GREAT COMPANY.</span>
+   <h1>Your golf group.<br><span>All organised.</span></h1>
+   <p class="welcome-intro">Competitions, scores, leagues and golf trips — in one simple place.</p>
+   <div class="welcome-benefits"><span>✓ See who’s playing</span><span>✓ Enter one final score</span><span>✓ Follow the results</span></div>
+   <div class="welcome-choices">
+    <button type="button" class="welcome-choice welcome-join" onclick="showWelcomePanel('join')"><span>Join my golf group <b aria-hidden="true">→</b></span><small>I have a PIN from my organiser</small></button>
+    <button type="button" class="welcome-choice welcome-start" onclick="showWelcomePanel('start')"><span>Start a golf group <b aria-hidden="true">→</b></span><small>Bring your friends or society together</small></button>
+   </div>
+   <button type="button" class="welcome-link" onclick="showWelcomePanel('how')">New here? See how it works →</button>
+   <p class="welcome-footnote">For friends, societies and golf trips.<br>No hole-by-hole scoring. Just enjoy your round.</p>
+  </div>
+  <section id="welcomeJoin" class="welcome-panel hidden" aria-labelledby="welcomeJoinTitle">
+   <button type="button" class="welcome-back" onclick="showWelcomePanel('home')">← Back</button>
+   <h1 id="welcomeJoinTitle" tabindex="-1">Join your group.</h1>
+   <p>Your organiser will give you a group PIN. Enter it below to open your private golf group.</p>
+   <form onsubmit="event.preventDefault();connect()">
+    <label for="pinInput"><b>Group PIN</b></label>
+    <input id="pinInput" inputmode="numeric" autocomplete="off" placeholder="Enter your group PIN" aria-describedby="connectMsg">
+    <button class="primary full" type="submit">Open my group →</button>
+   </form>
+   <div id="connectMsg" class="muted" role="status" aria-live="polite" style="margin-top:10px"></div>
+   <details class="welcome-help"><summary>I don’t have a PIN</summary><p>Ask the person organising your golf for the group PIN. If you want to organise your own group, we can help you get started.</p><button class="welcome-link" type="button" onclick="showWelcomePanel('start')">Start a golf group →</button></details>
+  </section>
+  <section id="welcomeStart" class="welcome-panel hidden" aria-labelledby="welcomeStartTitle">
+   <button type="button" class="welcome-back" onclick="showWelcomePanel('home')">← Back</button>
+   <h1 id="welcomeStartTitle" tabindex="-1">Get your mates in.</h1>
+   <p>Give your friends or society one place to organise competitions, follow results and plan golf trips.</p>
+   <ol class="welcome-steps"><li><b>Tell us about your group</b><span>Email us your name and the group name you’d like.</span></li><li><b>We’ll help you get set up</b><span>We’ll explain the setup and any plan options before you decide.</span></li><li><b>Invite your golfers</b><span>Once your group is ready, share its PIN with your players.</span></li></ol>
+   <a class="welcome-email" href="mailto:hello@imingolf.co.uk?subject=Start%20my%20golf%20group&amp;body=Hello%2C%20I%27d%20like%20to%20start%20a%20golf%20group.%0A%0AMy%20name%3A%20%0AGroup%20name%3A%20%0AApproximate%20number%20of%20golfers%3A%20">Request my group by email →</a>
+   <p class="welcome-footnote">This opens your email app. You can also email<br><a href="mailto:hello@imingolf.co.uk">hello@imingolf.co.uk</a><br>Group setup is arranged with our team.</p>
+  </section>
+  <section id="welcomeHow" class="welcome-panel hidden" aria-labelledby="welcomeHowTitle">
+   <button type="button" class="welcome-back" onclick="showWelcomePanel('home')">← Back</button>
+   <h1 id="welcomeHowTitle" tabindex="-1">Less organising.<br>More golf.</h1>
+   <ol class="welcome-steps"><li><b>Get your group together</b><span>Join with your organiser’s PIN, or request your own group.</span></li><li><b>See what’s coming up</b><span>Check the competition, course and date, then join the round.</span></li><li><b>Play. Score. Enjoy the results.</b><span>Enter your final Stableford or Net score. Follow the leaderboard, leagues and golf trips.</span></li></ol>
+   <p class="welcome-note">You keep your usual scorecard. I’m In Golf only needs your final total.</p>
+   <button type="button" class="primary full" onclick="showWelcomePanel('join')">Join my golf group →</button>
+   <button type="button" class="welcome-link" onclick="showWelcomePanel('start')">Start a golf group →</button>
+  </section>
+  <div id="configMissing" class="notice warning hidden">We’re having trouble getting things ready. Please try again shortly or contact hello@imingolf.co.uk.</div>
  </div>
 </div>
+<script>
+function showWelcomePanel(panel, moveFocus=true){
+ const names={home:'welcomeHome',join:'welcomeJoin',start:'welcomeStart',how:'welcomeHow'};
+ Object.entries(names).forEach(([key,id])=>document.getElementById(id).classList.toggle('hidden',key!==panel));
+ document.getElementById('setupOverlay').scrollTop=0;
+ if(moveFocus){
+  const target=panel==='join'?document.getElementById('pinInput'):document.querySelector('#'+names[panel]+' h1');
+  if(target){if(target.tagName!=='INPUT')target.setAttribute('tabindex','-1');target.focus({preventScroll:true});}
+ }
+}
+</script>
 
 <div class="app">
 <header class="app-header">
@@ -579,15 +659,17 @@ window.addEventListener("load",()=>{
   const saved=localStorage.getItem("tensInPin");
 
   if(urlPin){
+    showWelcomePanel("join",false);
     $("pinInput").value=urlPin;
     connect();
   }else if(saved){
+    showWelcomePanel("join",false);
     $("pinInput").value=saved;
   }
 });
 
 async function connect(){
- if(!configured()){ $("connectMsg").textContent="Please complete the one-time database setup first."; return; }
+ if(!configured()){ $("connectMsg").textContent="We couldn’t open your group. Please try again shortly."; return; }
  pin=$("pinInput").value.trim(); if(!pin){$("connectMsg").textContent="Enter your group PIN.";return}
  $("connectMsg").textContent="Opening shared group…";
  db=supabase.createClient(TENS_IN_CONFIG.supabaseUrl,TENS_IN_CONFIG.supabaseKey);
@@ -606,7 +688,7 @@ async function connect(){
  groupPlanType=String(access?.plan_type||"").toLowerCase();
 
  if(!access){
-   $("connectMsg").textContent="PIN not recognised.";
+   $("connectMsg").textContent="We couldn’t find that group. Check the PIN with your organiser and try again.";
    return;
  }
 
@@ -6511,7 +6593,7 @@ function switchGolfGroup(){
   $("setupOverlay").classList.remove("hidden");
   $("pinInput").value="";
   $("connectMsg").textContent="";
-  $("pinInput").focus();
+  showWelcomePanel("join");
 }
 async function changeMyHandicap(i){
  if(!demoCanEdit())return;
