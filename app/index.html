@@ -321,16 +321,13 @@ if(/iPhone|iPod/.test(navigator.userAgent) &&
   <section id="welcomeStart" class="welcome-panel hidden" aria-labelledby="welcomeStartTitle">
    <button type="button" class="welcome-back" onclick="showWelcomePanel('home')">← Back</button>
    <h1 id="welcomeStartTitle" tabindex="-1">Get your mates in.</h1>
-   <div id="selfServicePreviewLink" class="welcome-note hidden"><b>Try the new self-service setup</b><p>A design preview: no real account or group will be created.</p><a class="welcome-email" href="group-setup-preview.html">Try creating your group →</a></div>
-   <p>Give your friends or society one place to organise competitions, follow results and plan golf trips.</p>
-   <ol class="welcome-steps"><li><b>Tell us about your group</b><span>Email us your name and the group name you’d like.</span></li><li><b>We’ll help you get set up</b><span>We’ll explain the setup and any plan options before you decide.</span></li><li><b>Invite your golfers</b><span>Once your group is ready, share its PIN with your players.</span></li></ol>
-   <a class="welcome-email" href="mailto:hello@imingolf.co.uk?subject=Start%20my%20golf%20group&amp;body=Hello%2C%20I%27d%20like%20to%20start%20a%20golf%20group.%0A%0AMy%20name%3A%20%0AGroup%20name%3A%20%0AApproximate%20number%20of%20golfers%3A%20">Request my group by email →</a>
-   <p class="welcome-footnote">This opens your email app. You can also email<br><a href="mailto:hello@imingolf.co.uk">hello@imingolf.co.uk</a><br>Group setup is arranged with our team.</p>
+   <p>Create your group here. Verify your email, add your name and choose a group name.</p>
+   <div id="registrationAuth"><p>Loading group setup…</p></div>
   </section>
   <section id="welcomeHow" class="welcome-panel hidden" aria-labelledby="welcomeHowTitle">
    <button type="button" class="welcome-back" onclick="showWelcomePanel('home')">← Back</button>
    <h1 id="welcomeHowTitle" tabindex="-1">Less organising.<br>More golf.</h1>
-   <ol class="welcome-steps"><li><b>Get your group together</b><span>Join with your organiser’s PIN, or request your own group.</span></li><li><b>See what’s coming up</b><span>Check the competition, course and date, then join the round.</span></li><li><b>Play. Score. Enjoy the results.</b><span>Enter your final Stableford or Net score. Follow the leaderboard, leagues and golf trips.</span></li></ol>
+   <ol class="welcome-steps"><li><b>Get your group together</b><span>Join with your organiser’s PIN, or create your own group in the app.</span></li><li><b>See what’s coming up</b><span>Check the competition, course and date, then join the round.</span></li><li><b>Play. Score. Enjoy the results.</b><span>Enter your final Stableford or Net score. Follow the leaderboard, leagues and golf trips.</span></li></ol>
    <p class="welcome-note">You keep your usual scorecard. I’m In Golf only needs your final total.</p>
    <button type="button" class="primary full" onclick="showWelcomePanel('join')">Join my golf group →</button>
    <button type="button" class="welcome-link" onclick="showWelcomePanel('start')">Start a golf group →</button>
@@ -339,7 +336,6 @@ if(/iPhone|iPod/.test(navigator.userAgent) &&
  </div>
 </div>
 <script>
-if(/^deploy-preview-\d+--super-quokka-51747d\.netlify\.app$/.test(location.hostname)){document.getElementById('selfServicePreviewLink').classList.remove('hidden');}
 function showWelcomePanel(panel, moveFocus=true){
  const names={home:'welcomeHome',join:'welcomeJoin',start:'welcomeStart',how:'welcomeHow'};
  Object.entries(names).forEach(([key,id])=>document.getElementById(id).classList.toggle('hidden',key!==panel));
@@ -9491,4 +9487,5 @@ function formatDate(d){
 function esc(s){return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
 function escAttr(s){return esc(s)}
 </script>
+<script src="self-service.js"></script>
 </body></html>

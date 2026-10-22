@@ -1,0 +1,1 @@
+{"private":true,"scripts":{"self-service":"cd .. && node tests/self-service-dom.cjs","self-service-browser":"cd .. && node tests/self-service.cjs"},"devDependencies":{"linkedom":"0.18.14","playwright":"1.62.1"}}

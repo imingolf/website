@@ -75,3 +75,47 @@ On 22 October the owner confirmed iPhone return sign-in restored Greg Aspinall a
 `supabase/staging/player-scores.sql` is a separate additive transaction to apply in Im In Golf Test only, after the initial setup. Do not rerun the initial setup. The hosted score RPC has NOT yet been installed by the assistant. It authorises the signed member, locks the owner revision, checks active access/open round/attendance/format, accepts integer totals (Stableford 0–99, Net 0–999), and writes only that member's relevant score plus scoreSubmitted. Already-recorded results are rejected; no player correction flow exists yet. A matching monotonic group revision prevents submissions from a stale round view. No hole-by-hole scores or payment changes.
 
 The test player UI confirms the total, reads back after saving and lists submitted totals in score order without tie-breaking. Failed or uncertain saves require a reload. Database tests now pass 79 checks, including own-score isolation, zero and Net upper boundary, invalid totals, stale revisions, wrong format, non-attendees, closed groups, duplicate scores and suspended access. Mocked client tests cover limits, cancelled confirmation, submission/readback and stale-save lockout. Hosted score submission remains the next manual test. Production has not been changed.
+
+## Self-service welcome and owner registration list — 22 October
+
+PR 7 (email-request-only welcome) is closed: the required journey is self-service.
+PR 6 now mounts email-code verification and group creation inside the original welcome
+screen using `app/self-service.js`. It talks only to the isolated test project and only
+runs on preview 6 / localhost. The original gameplay adapter remains unchanged.
+New groups are NOT yet playable in the original gameplay screens; the confirmation
+explicitly states this integration limit. The earlier organiser/player test pages remain.
+
+Apply `supabase/staging/self-service-registration.sql` only to **Im In Golf Test**
+(`nyavvwrsrxqfyhiygkgw`), after the installed baseline. It opens test self-service to
+verified accounts (one group/account), preserves creation locking/idempotency and
+trial defaults, and adds an authenticated, private platform-owner registrations RPC.
+It does not reset groups. The known verified test account UUID supplied by Greg is
+given platform-owner visibility. No email-address-only privilege elevation exists.
+
+On preview 6, the existing `app/owner-dashboard.html` uses email sign-in and displays
+these test registrations, including organiser name/email, creation date, trial and status.
+This stage is read-only and refreshed manually, 100 groups/page. Legacy dashboard
+management stays unchanged on other hosts. Only metadata for protected groups is
+returned; state/invitation tokens are not exposed. Existing live groups do not appear
+in the isolated test register. Once deployed to production later, the registry must
+be integrated with the existing group-management views, not replace them.
+
+Manual next check: run the incremental SQL in the test project; sign into the preview
+welcome with a fresh email; create a group; sign into the preview owner dashboard
+as Greg and confirm the exact group, name, email and trial. Test an ordinary organiser
+is denied the owner view. Existing Greg account should retrieve group 5021, not create
+another. Keep all production deployment blocked pending original-gameplay integration,
+account deletion/recovery, abuse controls and full existing-group regression checks.
+
+To close new test registration: `update iig_private.registration_settings set enabled=false;`
+(the earlier tester allowlist still works). Revoke owner visibility by deleting its row
+from `iig_private.platform_owners`. Do not delete customer/group records as rollback.
+
+Validation for this increment: existing 79 PostgreSQL checks plus self-service/owner
+register checks pass in PGlite. Existing organiser-client checks pass. A real-HTML DOM
+test with mocked HTTP passes OTP, creation, failed readback/retry, escaping, owner
+denial/list and sign-out clearing. `npm install --prefix tests` then
+`node tests/self-service-dom.cjs` from repository root runs that DOM check.
+`node tests/self-service.cjs` is an additional Playwright browser check; it has NOT
+been executed here because the Chromium download failed. It uses mocked network,
+not hosted Supabase. Physical-iPhone and real owner-register checks remain pending.

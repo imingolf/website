@@ -176,4 +176,24 @@ await assert.rejects(()=>db.exec(readFileSync(new URL('../supabase/staging/empty
 assert.equal((await db.query('select count(*)::int as n from public.tens_in_groups')).rows[0].n,4);checks++;
 console.log(`PASS: ${checks} checks against PostgreSQL (PGlite), including role enforcement, verified organiser, allowlist, replay, cross-group access, legacy bypass, stale writes, member isolation, data projection, suspension, defaults, triggers and legacy compatibility.`);
 console.log('LIMIT: synthetic Auth and reconstructed tables with supplied trial/notification functions; no hosted JWT, email, browser, real concurrent connections or existing-group migration tested.');
+// Self-service registration and platform-owner visibility (incremental migration).
+await db.exec(readFileSync(new URL('../supabase/staging/self-service-registration.sql',import.meta.url),'utf8'));
+const reg=(await as(notAllowed,create,['New self-service group','New organiser',req]))[0].result;
+assert.deepEqual((await as(notAllowed,create,['New self-service group','New organiser',req]))[0].result,reg); checks++;
+const regRow=(await db.query('select * from public.tens_in_groups where id=$1',[reg.group_id])).rows[0];
+assert.equal(regRow.admin_contact,notAllowed+'@example.test'); assert.equal(regRow.admin_name,'New organiser');
+assert.equal(regRow.plan_type,'trial'); assert(regRow.trial_expiry_date); checks++;
+for(const id of [null,unverified,banned,owner,notAllowed]) await denied(id,'select public.iig_list_registered_groups()');
+await denied(notAllowed,'insert into iig_private.platform_owners values($1)',[notAllowed]);
+await db.query('insert into iig_private.platform_owners values($1)',[owner]);
+const register=(await as(owner,'select public.iig_list_registered_groups() as result'))[0].result;
+assert(register.some(g=>g.group_pin===reg.group_pin && g.admin_contact===regRow.admin_contact));
+assert(register.every(g=>!('state' in g) && !('invite_token' in g))); checks++;
+await denied(owner,'select public.iig_list_registered_groups(-1)',[],/Invalid offset/);
+assert.deepEqual((await as(owner,'select public.iig_list_registered_groups(100) as result'))[0].result,[]); checks++;
+for(const id of [null,unverified,banned]) await denied(id,create,['Blocked','Blocked',req]);
+await db.exec('update iig_private.registration_settings set enabled=false');
+await denied(player,create,['Closed','Closed',req]);
+assert.equal((await db.query("select count(*)::int as n from public.tens_in_groups where group_pin in ('1010','1260')")).rows[0].n,2); checks++;
+console.log('PASS: self-service creation, retry reconciliation, saved contact/trial, private owner register, pagination, registration switch and existing-group preservation.');
 await db.close();
