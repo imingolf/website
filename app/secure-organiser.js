@@ -3,7 +3,7 @@
  'use strict';
  if(location.hostname!=='deploy-preview-6--super-quokka-51747d.netlify.app' && !['localhost','127.0.0.1'].includes(location.hostname))return;
  let active=null, epoch=0, revision=0, blocked=false, queue=Promise.resolve(), pending=0, readSequence=0, manualLoading=false;
- const originals={save,refresh,refreshSideGameLive,render,adminLogout,returnToPlayerView,copyInvite,changeAdminPin};
+ const originals={save,refresh,refreshSideGameLive,render,adminLogout,returnToPlayerView,copyInvite,changeAdminPin,savePlayerPatch};
  const clone=value=>JSON.parse(JSON.stringify(value));
  const valid=g=>g && /^\d{4}$/.test(g.group_pin) && Number.isSafeInteger(g.revision) && Array.isArray(g.state?.players) && Array.isArray(g.state?.history);
  function status(text){const node=document.getElementById('secureOrganiserStatus');if(node)node.textContent=text;}
@@ -12,7 +12,7 @@
   let node=document.getElementById('secureOrganiserBanner');
   if(!node){
    node=document.createElement('div');node.id='secureOrganiserBanner';node.className='notice';
-   node.innerHTML='<b>Test group · signed-in organiser</b><p id="secureOrganiserStatus" role="status" aria-live="polite"></p><button type="button" id="secureOrganiserReload" class="secondary">Reload saved group</button> <button type="button" id="secureOrganiserInvite" class="secondary">Invite players</button><div id="secureInviteBox" hidden><label for="secureInviteLink">Player invitation</label><input id="secureInviteLink" readonly><button type="button" id="secureInviteCopy" class="secondary">Copy invitation link</button><p id="secureInviteStatus" role="status" aria-live="polite"></p><a id="secureInviteOpen" target="_blank" rel="noopener noreferrer">Open invitation in a new tab</a></div> <button type="button" id="secureOrganiserSignout" class="ghost">Sign out</button>';
+   node.innerHTML='<b>Test group · signed-in organiser</b><p id="secureOrganiserStatus" role="status" aria-live="polite"></p><button type="button" id="secureOrganiserReload" class="secondary">Reload saved group</button> <button type="button" id="secureOrganiserInvite" class="secondary">Invite players</button><div id="secureInviteBox" hidden><label for="secureInviteLink">Player invitation</label><input id="secureInviteLink" readonly><button type="button" id="secureInviteCopy" class="secondary">Copy invitation link</button><p id="secureInviteStatus" role="status" aria-live="polite"></p><a id="secureInviteOpen" target="_blank" rel="noopener noreferrer">Open invitation in a new tab</a></div> <button type="button" id="secureOrganiserAccount" class="secondary">My account</button> <button type="button" id="secureOrganiserSignout" class="ghost">Sign out</button>';
    document.getElementById('screen').before(node);
    node.querySelector('#secureOrganiserInvite').onclick=invitePlayers;
    node.querySelector('#secureInviteCopy').onclick=async()=>{
@@ -20,6 +20,7 @@
     note.textContent='Link selected. Touch and hold to copy, or press Command+C on your Mac.';
     try{if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(input.value);note.textContent='Invitation copied.';}}catch(_){}
    };
+   node.querySelector('#secureOrganiserAccount').onclick=()=>window.iigAccount?.open();
    node.querySelector('#secureOrganiserReload').onclick=()=>reload(true);
    node.querySelector('#secureOrganiserSignout').onclick=()=>{if(pending){status('Wait for saving to finish.');return;}active?.signout();};
   }
@@ -28,7 +29,7 @@
   if(!active)return;
   const g=active.group;
   if(pending||blocked){status('Reload the saved group before inviting players.');return;}
-  if(g.state.gameType!=='points'||g.state.roundOpen!==true){status('Set up and save an open Points Game before inviting test players.');return;}
+  if(g.state.roundOpen!==true){status('Set up and save an open competition before inviting test players.');return;}
   if(!/^[0-9a-f-]{36}$/i.test(g.invite_token||'')){status('Reload your saved group to load its invitation.');return;}
   const url=location.origin+'/app/#pin='+encodeURIComponent(active.pin)+'&invite='+encodeURIComponent(g.invite_token);
   document.getElementById('secureInviteLink').value=url;
@@ -85,7 +86,7 @@
   open(group,request,signout,plan){
    if(!valid(group))throw Error('Group details are incomplete. Tap Check my group.');
    epoch++;active={pin:group.group_pin,request,signout,group};blocked=false;revision=group.revision;
-   pin=group.group_pin;state=clone(group.state);groupPlanType=plan || 'trial';
+   pin=group.group_pin;state=clone(group.state);groupPlanType=plan || group.plan_type || 'trial';
    // A deny-by-default stub prevents any legacy RPC from reaching production.
    db={rpc:async()=>({data:null,error:{message:'This action is not connected for secure test groups yet.'}})};
    isAdmin=true;isOwner=false;ownerCreationCode='';myPlayerId='';
@@ -96,6 +97,7 @@
   },
   close(){
    if(!active)return;
+   cancelProtectedDialogs();
    epoch++;active=null;blocked=true;clearInterval(poller);poller=null;db=null;pin='';isAdmin=false;isOwner=false;myPlayerId='';state={players:[],history:[]};lastWinnerRecord=null;statsPlayerId=null;scoreDraftActive=false;
    document.getElementById('secureOrganiserBanner')?.remove();document.getElementById('screen').textContent='';
    document.getElementById('setupOverlay').classList.remove('hidden');showWelcomePanel('start');
@@ -126,12 +128,24 @@
   originals.render();if(!active)return;
   // These legacy journeys depend on a PIN-only identity or an unconnected native service.
   for(const el of document.querySelectorAll('#screen [onclick]')){
-   if(/^(changeAdminPin|returnToPlayerView|ownerLogin|adminInvitePage|openAdminHelp|changeGroupName)\(/.test(el.getAttribute('onclick')||''))el.hidden=true;
+   if(/^(changeAdminPin|ownerLogin|adminInvitePage|openAdminHelp)\(/.test(el.getAttribute('onclick')||''))el.hidden=true;
   }
   banner();
  };
  adminLogout=function(){if(active){if(pending){status('Wait for saving to finish.');return;}active.signout();}else originals.adminLogout();};
- returnToPlayerView=function(){if(active){status('Player sign-in in the original layout is the next integration step.');return;}originals.returnToPlayerView();};
+ savePlayerPatch=async function(id,patch){
+  if(!active)return originals.savePlayerPatch(id,patch);
+  if(pending||blocked)return false;
+  const current=active,e=epoch,v=stateSaveVersion;
+  try{
+   const g=await current.request('/rest/v1/rpc/iig_get_owned_group',{},true);
+   if(e!==epoch||pending||stateSaveVersion!==v)return false;
+   apply(g);const player=state.players.find(p=>p.id===id);if(!player)return false;
+   if(Object.keys(patch).some(k=>!['stableford','netScore','scoreSubmitted','noReturn','competition'].includes(k)))throw Error('Unsupported score correction');
+   Object.assign(player,patch);return await save();
+  }catch(error){if(e===epoch){blocked=true;status(error.message+' Reload the saved group.');}return false;}
+ };
+ returnToPlayerView=function(){if(active){window.iigAccount?.open();return;}originals.returnToPlayerView();};
  copyInvite=function(){if(active){invitePlayers();return;}return originals.copyInvite();};
  changeAdminPin=function(){if(active){status('This group uses your verified email sign-in.');return;}return originals.changeAdminPin();};
 })();

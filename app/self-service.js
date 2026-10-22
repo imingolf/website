@@ -31,8 +31,8 @@
     <section id="regSignedIn" hidden><p id="regAccount" class="muted"></p>
     <form id="regGroupForm" hidden><label for="regName">Your name</label><input id="regName" autocomplete="name" maxlength="80" required><label for="regGroupName">Group name</label><input id="regGroupName" maxlength="80" required placeholder="e.g. Sunday Golfers"><button class="primary full">Create my group</button><p class="muted">One group per organiser account. Your name and email are shared with I’m In Golf to manage your group and trial.</p></form>
     <form id="regJoinForm" hidden><label for="regPlayerName">Your name</label><input id="regPlayerName" autocomplete="name" maxlength="80" required><label for="regHandicap">Handicap</label><input id="regHandicap" type="text" inputmode="decimal" maxlength="5" pattern="-?[0-9]{1,2}([.][0-9])?" aria-describedby="regHandicapHelp" required><small id="regHandicapHelp">Up to two digits and one decimal place, e.g. 11.2.</small><button class="primary full">Join my group</button></form>
-    <section id="regCreated" hidden><h2>Your group is ready</h2><p id="regCreatedName"></p><p>Group PIN: <strong id="regPin"></strong></p><p>Your group has been registered with I’m In Golf.</p><p class="notice">This is a test group. Open your group to test competition setup in the original app layout. Player invitations now support Points Game attendance and final scores in this preview.</p><button id="regOpenGroup" type="button" class="primary full">Open my group</button></section>
-    <button id="regReload" type="button" class="secondary full">${dashboard ? 'Open dashboard' : 'Check my group'}</button><button id="regSignout" type="button" class="ghost full">Sign out</button></section>`;
+    <section id="regCreated" hidden><h2>Your group is ready</h2><p id="regCreatedName"></p><p>Group PIN: <strong id="regPin"></strong></p><p>Your group has been registered with I’m In Golf.</p><p class="notice">This is a test group. Open your group to test competition setup in the original app layout. Player invitations support verified player entry, payments, individual and Trip scores, Side Games and results in this preview.</p><button id="regOpenGroup" type="button" class="primary full">Open my group</button></section>
+    <button id="regReload" type="button" class="secondary full">${dashboard ? 'Open dashboard' : 'Check my group'}</button><button id="regAccountControls" type="button" class="secondary full">My account</button><button id="regSignout" type="button" class="ghost full">Sign out</button></section>`;
   // Author styles in the original app must not override hidden form visibility.
   const style = document.createElement('style');
   style.textContent = '#registrationAuth [hidden]{display:none!important}#registrationAuth button:disabled{opacity:.55}#registrationAuth p{overflow-wrap:anywhere}#registrationAuth label{display:block;font-weight:700;margin-top:14px}#registrationAuth button{min-height:44px}';
@@ -45,6 +45,7 @@
   };
   function reset() {
     clearTimeout(expiryTimer); expiryTimer=null;
+    window.iigAccount?.close();
     window.iigSecureOrganiser?.close();
     window.iigSecurePlayer?.close();
     $('regJoinForm').hidden = true;
@@ -62,7 +63,7 @@
     try {
       const headers = { apikey: key, 'Content-Type': 'application/json' };
       if (auth) headers.Authorization = 'Bearer ' + session.access_token;
-      const response = await fetch(base + path, { method: 'POST', headers, body: JSON.stringify(body), cache: 'no-store', signal: controller.signal });
+      const response = await fetch(base + path, { method: path.startsWith('/auth/v1/user') ? 'PUT' : 'POST', headers, body: JSON.stringify(body), cache: 'no-store', signal: controller.signal });
       const data = response.status === 204 ? {} : await response.json();
       if (!response.ok) {
         if (response.status === 401 && auth) reset();
@@ -153,6 +154,7 @@
     const accessRows = await request('/rest/v1/rpc/get_group_access_status', {p_pin:group.group_pin}, true);
     const access = Array.isArray(accessRows) ? accessRows[0] : accessRows;
     if (!access || access.access_allowed !== true) throw new Error('Your group is not currently available.');
+    window.iigSecurePlayer?.close();
     window.iigSecureOrganiser.open(group, request, () => action(signout), access.plan_type);
   });
   async function loadPlayer(){
@@ -183,7 +185,31 @@
     try { if (session) await request('/auth/v1/logout', {}, true); }
     finally { reset(); message('Signed out on this page.'); }
   }
+  // Native wrappers return the Apple transaction ID to this callback; the JWT stays private here.
+  window.iigNativePurchase={get accountToken(){return session?.user.id||null;},async confirm(transactionId,groupPin){
+    if(!session)throw Error('Sign in as your group organiser before upgrading.');
+    const group=await request('/rest/v1/rpc/iig_my_group_identity',{},true);
+    if(!group||group.group_pin!==String(groupPin))throw Error('Only your group organiser can upgrade this group.');
+    const result=await request('/functions/v1/verify-apple-subscription',{transactionId:String(transactionId),groupPin:group.group_pin},true);
+    if(result.verified!==true||result.groupPin!==group.group_pin)throw Error('Subscription activation could not be confirmed.');
+    return result;
+  }};
   $('regSignout').onclick = () => action(signout);
+  $('regAccountControls').onclick = () => window.iigAccount?.open();
+  window.iigAccount?.configure({request,reset,canSwitch:!dashboard,
+   async openOrganiser(){
+    const group=await request('/rest/v1/rpc/iig_get_owned_group',{},true);
+    if(!group)throw Error('Your account does not own a group.');
+    window.iigSecurePlayer?.close();window.iigSecureOrganiser.open(group,request,()=>action(signout));
+   },
+   async openPlayer(name,handicap){
+    const group=await request('/rest/v1/rpc/iig_get_owned_group',{},true);
+    if(!group)throw Error('Use your organiser’s invitation or the returning-player PIN login.');
+    await request('/rest/v1/rpc/iig_join_owned_group',{p_pin:group.group_pin,p_invite:group.invite_token,p_name:name,p_handicap:handicap},true);
+    const player=await request('/rest/v1/rpc/iig_get_player_group',{p_pin:group.group_pin},true);
+    window.iigSecureOrganiser?.close();window.iigSecurePlayer.open(player,group.group_pin,request,()=>action(signout));
+   }
+  });
   async function loadDashboard() {
     // Only the server-side platform-owner role can return customer metadata.
     let rows;
@@ -222,7 +248,8 @@
     $('registerPrev').onclick = () => refresh(Math.max(0,offset - 100));
     $('registerNext').onclick = () => refresh(offset + 100);
     $('registerRefresh').onclick = () => refresh(0);
-    document.querySelector('#dashView .nav').innerHTML = '<button id="registerLogout">Sign out</button>';
+    document.querySelector('#dashView .nav').innerHTML = '<button id="registerAccount">My account</button><button id="registerLogout">Sign out</button>';
+    $('registerAccount').onclick = () => window.iigAccount?.open();
     $('registerLogout').onclick = () => action(signout);
     $('liveText').textContent = 'Test database';
     document.querySelector('#dashView .side-foot').textContent = 'I’m In Golf • Test registrations';

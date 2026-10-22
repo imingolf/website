@@ -487,7 +487,7 @@ function chooseMyPlayer(){
           <b>Already in the group?</b><br>Tap your name below.
         </div>
         ${[...state.players].sort((a,b)=>a.name.localeCompare(b.name)).map(p=>`
-          <button class="secondary full" onclick="selectMyPlayer('${p.id}')">
+          <button class="secondary full" onclick="selectMyPlayer(${escAttr(JSON.stringify(p.id))})">
             ${esc(p.name)}
           </button>
         `).join("")}
@@ -822,6 +822,12 @@ startPolling();
 // focus/pageshow handlers are useful. Re-check once group + player state are loaded.
 setTimeout(recognisePaymentReturn,500);
  }
+function cancelProtectedDialogs(){
+ for(const id of ['appConfirmNo','appPromptCancel','cancelWinnerPayout','newRoundCancel','roundCompCancel','normalSetupCancel','tripSetupCancel','cancelTripDay'])document.getElementById(id)?.click();
+ document.querySelectorAll('.player-big-message,.app-toast').forEach(el=>el.remove());
+}
+function sideGameBackToGolf(){sideGameOpen=false;sideGameHomeOpen=false;show("round");}
+function sideGameToday(){return window.iigSecurePlayer?.active && state.sideGameDate ? state.sideGameDate : new Date().toLocaleDateString("en-CA");}
 function ensureSideGameState(){
   if(!state.sideGame || typeof state.sideGame!=="object"){
     state.sideGame={};
@@ -1697,7 +1703,7 @@ function sideGameChoosePlayer(){
 
       ${others.length
         ? others.map(p=>`
-            <button class="secondary full" onclick="sideGamePickPlayer('${escAttr(p.id)}')">
+            <button class="secondary full" onclick="sideGamePickPlayer(${escAttr(JSON.stringify(p.id))})">
               🤝 ${esc(p.name)}
             </button>
           `).join("")
@@ -1722,7 +1728,7 @@ function sideGamePickPlayer(playerId){
   if(!me || !player)return;
 
   ensureSideGameState();
-  const today=new Date().toLocaleDateString("en-CA");
+  const today=sideGameToday();
   const existingBet=state.sideGame.bets.find(b=>
     b.date===today &&
     (b.status==="pending" || b.status==="active") &&
@@ -1748,7 +1754,7 @@ function sideGamePickPlayer(playerId){
     <div class="card">
       <h2 style="margin-top:0;">How are you setting this up?</h2>
 
-      <button class="primary full" onclick="sideGameAgreedInPerson('${escAttr(player.id)}')">
+      <button class="primary full" onclick="sideGameAgreedInPerson(${escAttr(JSON.stringify(player.id))})">
         🤝 Agreed in Person
       </button>
 
@@ -1756,7 +1762,7 @@ function sideGamePickPlayer(playerId){
         You've already agreed this Side Game.
       </div>
 
-      <button class="secondary full" onclick="sideGameSendChallenge('${escAttr(player.id)}')">
+      <button class="secondary full" onclick="sideGameSendChallenge(${escAttr(JSON.stringify(player.id))})">
         📲 Send Challenge
       </button>
 
@@ -1793,7 +1799,7 @@ function sideGameAgreedInPerson(playerId,mode="in_person"){
     existingBets=[];
   }
 
-  const today=new Date().toLocaleDateString("en-CA");
+  const today=sideGameToday();
   ensureSideGameState();
 
   const todaysExistingBet=state.sideGame.bets.find(b=>
@@ -1830,7 +1836,7 @@ function sideGameAgreedInPerson(playerId,mode="in_person"){
           inputmode="numeric"
           value="${escAttr(savedStake)}"
           style="font-size:24px;font-weight:800;text-align:center;"
-          oninput="sideGameUpdateConfirm('${escAttr(player.id)}')"
+          oninput="sideGameUpdateConfirm(${escAttr(JSON.stringify(player.id))})"
         >
       </div>
 
@@ -1844,7 +1850,7 @@ function sideGameAgreedInPerson(playerId,mode="in_person"){
       <button
         id="sideGameStableford"
         class="${savedFormat==="stableford" ? "primary" : "secondary"} full"
-        onclick="sideGameSelectFormat('${escAttr(player.id)}','stableford')"
+        onclick="sideGameSelectFormat(${escAttr(JSON.stringify(player.id))},'stableford')"
         ${formatLocked ? "disabled" : ""}>
         Stableford
       </button>
@@ -1852,7 +1858,7 @@ function sideGameAgreedInPerson(playerId,mode="in_person"){
       <button
         id="sideGameNet"
         class="${savedFormat==="net" ? "primary" : "secondary"} full"
-        onclick="sideGameSelectFormat('${escAttr(player.id)}','net')"
+        onclick="sideGameSelectFormat(${escAttr(JSON.stringify(player.id))},'net')"
         ${formatLocked ? "disabled" : ""}>
         Net
       </button>
@@ -1868,14 +1874,14 @@ function sideGameAgreedInPerson(playerId,mode="in_person"){
         class="primary full"
         style="margin-top:18px;"
         onclick="${mode==="challenge"
-          ? `sideGameSendChallenge('${escAttr(player.id)}')`
-          : `sideGameConfirmBet('${escAttr(player.id)}')`}"
+          ? `sideGameSendChallenge(${escAttr(JSON.stringify(player.id))})`
+          : `sideGameConfirmBet(${escAttr(JSON.stringify(player.id))})`}"
         ${savedFormat ? "" : "disabled"}>
         ${mode==="challenge" ? "📲 Send Challenge" : "🤝 Confirm Side Game"}
       </button>
     </div>
 
-    <button class="secondary full" onclick="sideGamePickPlayer('${escAttr(player.id)}')">
+    <button class="secondary full" onclick="sideGamePickPlayer(${escAttr(JSON.stringify(player.id))})">
       ← Back
     </button>
   `;
@@ -1935,7 +1941,7 @@ function sideGameConfirmBet(playerId){
     bets=[];
   }
 
-  const today=new Date().toLocaleDateString("en-CA");
+  const today=sideGameToday();
 
   const duplicate=bets.some(b=>
     b.playerId===playerId &&
@@ -2023,7 +2029,7 @@ function sideGameSendChallenge(playerId){
     return;
   }
 
-  const today=new Date().toLocaleDateString("en-CA");
+  const today=sideGameToday();
 
   const duplicate=state.sideGame.bets.some(b=>
     b.date===today &&
@@ -2078,7 +2084,7 @@ function sideGameAcceptChallenge(betId){
     return;
   }
 
-  const today=new Date().toLocaleDateString("en-CA");
+  const today=sideGameToday();
 
   const todaysExistingBet=state.sideGame.bets.find(b=>
     b.id!==bet.id &&
@@ -2134,7 +2140,7 @@ function sideGameDeclineChallenge(betId){
 function sideGameResolveBetsForToday(){
   ensureSideGameState();
 
-  const today=new Date().toLocaleDateString("en-CA");
+  const today=sideGameToday();
 
   state.sideGame.bets.forEach(b=>{
     if(b.date!==today || b.status!=="active")return;
@@ -2187,7 +2193,7 @@ async function sideGameSaveScore(format){
   }
   const score=Number(raw);
 
-  const today=new Date().toLocaleDateString("en-CA");
+  const today=sideGameToday();
 
   ensureSideGameState();
 
@@ -2231,7 +2237,7 @@ function sideGameScoreEntry(){
 
   ensureSideGameState();
 
-  const today=new Date().toLocaleDateString("en-CA");
+  const today=sideGameToday();
 
   const todaysBets=state.sideGame.bets.filter(b=>
     b.date===today &&
@@ -2419,7 +2425,7 @@ function sideGameHome(){
       ${(()=>{
         ensureSideGameState();
 
-        const today=new Date().toLocaleDateString("en-CA");
+        const today=sideGameToday();
 
         const todaysBets=state.sideGame.bets
           .filter(b=>
@@ -2525,12 +2531,12 @@ function sideGameHome(){
                 </div>
 
                 <button class="primary full" style="margin-top:12px;"
-                  onclick="sideGameAcceptChallenge('${b.id}')">
+                  onclick="sideGameAcceptChallenge(${escAttr(JSON.stringify(b.id))})">
                   ✓ Accept
                 </button>
 
                 <button class="secondary full" style="margin-top:8px;"
-                  onclick="sideGameDeclineChallenge('${b.id}')">
+                  onclick="sideGameDeclineChallenge(${escAttr(JSON.stringify(b.id))})">
                   Decline
                 </button>
               `).join("")}
@@ -2613,7 +2619,7 @@ function sideGameHome(){
       ${(()=>{
         ensureSideGameState();
 
-        const today=new Date().toLocaleDateString("en-CA");
+        const today=sideGameToday();
 
         const hasBet=state.sideGame.bets.some(b=>
           b.date===today &&
@@ -2642,7 +2648,7 @@ function sideGameHome(){
       </button>
     </div>
 
-    <button class="secondary full" onclick="sideGameOpen=false;round()">← Back to Golf</button>
+    <button class="secondary full" onclick="sideGameBackToGolf()">← Back to Golf</button>
   `;
 
   window.scrollTo(0,0);
@@ -3555,7 +3561,7 @@ function tripBetterBallScores(){
       ${visibleTeams.map(team=>{
         const teamScore=scores[team.id];
         const canEnter=eligible.some(t=>t.id===team.id);
-        return `<div class="player"><div><b>${esc(tripTeamName(team))}</b><div class="muted">${esc(formatLabel)} pair</div></div><div style="margin-top:10px;">${teamScore!=null?`<div class="notice">✅ <b>Pair score submitted</b><br>${Number(teamScore)} ${state.pointsCompetition==="net"?"combined net":"pts"}</div>${isAdmin?`<button class="secondary small" onclick="editTripTeamScore('${escAttr(team.id)}')">✏️ Correct score</button>`:""}`:canEnter?`<label class="muted">Enter final ${esc(formatLabel)} total</label><input id="tripTeamScore_${escAttr(team.id)}" type="number" min="0" inputmode="numeric" placeholder="Total" oninput="scoreDraftActive=true"><button class="primary full" onclick="submitTripTeamScore('${escAttr(team.id)}')">🏌️ Submit Pair Score</button>`:`<div class="notice warning">Both partners must be marked paid before this pair can enter.</div>`}</div></div>`;
+        return `<div class="player"><div><b>${esc(tripTeamName(team))}</b><div class="muted">${esc(formatLabel)} pair</div></div><div style="margin-top:10px;">${teamScore!=null?`<div class="notice">✅ <b>Pair score submitted</b><br>${Number(teamScore)} ${state.pointsCompetition==="net"?"combined net":"pts"}</div>${isAdmin?`<button class="secondary small" onclick="editTripTeamScore(${escAttr(JSON.stringify(team.id))})">✏️ Correct score</button>`:""}`:canEnter?`<label class="muted">Enter final ${esc(formatLabel)} total</label><input id="tripTeamScore_${escAttr(team.id)}" type="number" min="0" inputmode="numeric" placeholder="Total" oninput="scoreDraftActive=true"><button class="primary full" onclick="submitTripTeamScore(${escAttr(JSON.stringify(team.id))})">🏌️ Submit Pair Score</button>`:`<div class="notice warning">Both partners must be marked paid before this pair can enter.</div>`}</div></div>`;
       }).join("")}
     </div>
     <div class="card"><h2>🏆 ${esc(formatLabel)} Leaderboard</h2>${ranked.length?ranked.map((team,i)=>`<div class="player row"><span class="pos">${i+1}</span><div style="flex:1"><b>${esc(tripTeamName(team))}</b></div><span class="money">${Number(scores[team.id])}</span></div>`).join(""):`<div class="muted">Waiting for the first pair score…</div>`}</div>
@@ -4972,12 +4978,12 @@ function showPrizeStatusAlert(){
 function payoutProvider(link){
   try{
     const parsed=new URL(link);
-    if(parsed.protocol!=="https:")return "";
+    if(parsed.protocol!=="https:" || parsed.username || parsed.password)return "";
     const host=parsed.hostname.toLowerCase().replace(/^www\./,"");
     if(host==="monzo.me" || host.endsWith(".monzo.me"))return "Monzo";
-    if(host==="revolut.me" || host.endsWith(".revolut.me") || host.includes("revolut"))return "Revolut";
-    if(host==="paypal.me" || host.endsWith(".paypal.me") || host.includes("paypal"))return "PayPal";
-    if(host.includes("starlingbank.com"))return "Starling";
+    if(host==="revolut.me" || host.endsWith(".revolut.me") || host==="revolut.com" || host.endsWith(".revolut.com"))return "Revolut";
+    if(host==="paypal.me" || host.endsWith(".paypal.me") || host==="paypal.com" || host.endsWith(".paypal.com"))return "PayPal";
+    if(host==="starlingbank.com" || host.endsWith(".starlingbank.com"))return "Starling";
     if(host==="wise.com" || host.endsWith(".wise.com"))return "Wise";
   }catch(e){}
   return "";
@@ -5013,15 +5019,15 @@ function payoutCardHtml(record,historyIndex){
   const visible=isAdmin ? payouts : payouts.filter(currentPlayerMatchesPayout);
   if(!visible.length)return "";
   return `<div class="card"><h2>💷 Result payment</h2>${visible.map(p=>{
-    const key=escAttr(p.id);
+    const key=escAttr(JSON.stringify(p.id));
     const amount=moneyText(p.amount);
     if(p.status==="paid")return `<div class="notice"><b>✅ £${amount} paid to ${esc(p.winnerName)}</b><br><span class="muted">Paid ${esc(formatDate(String(p.paidAt||"").slice(0,10)))}</span></div>`;
-    if(isAdmin && p.status==="ready")return `<div class="notice"><b>Payment details received from ${esc(p.winnerName)}</b><br>Payment: £${amount} via ${esc(p.paymentProvider)}</div><button class="primary full" onclick="openWinnerPaymentLink(${Number(historyIndex)},'${key}')">Pay ${esc(p.winnerName)} £${amount}</button><button class="secondary full" onclick="markWinnerPaid(${Number(historyIndex)},'${key}')">✅ Mark £${amount} as paid</button>`;
-    if(isAdmin && p.status==="bank_details_needed")return `<div class="notice warning"><b>${esc(p.winnerName)} needs a private bank transfer</b><br>They have been asked to contact you privately with their bank details. Do not enter those details into I'm In Golf.</div><button class="secondary full" onclick="markWinnerPaid(${Number(historyIndex)},'${key}')">✅ Mark £${amount} as paid</button>`;
-    if(isAdmin)return `<div class="notice"><b>£${amount} owed to ${esc(p.winnerName)}</b><br>Waiting for the player to choose Monzo, Revolut, PayPal, Starling, Wise or a private bank transfer.</div><button class="secondary full" onclick="markWinnerPaid(${Number(historyIndex)},'${key}',true)">✅ Mark £${amount} as paid</button>`;
+    if(isAdmin && p.status==="ready")return `<div class="notice"><b>Payment details received from ${esc(p.winnerName)}</b><br>Payment: £${amount} via ${esc(p.paymentProvider)}</div><button class="primary full" onclick="openWinnerPaymentLink(${Number(historyIndex)},${key})">Pay ${esc(p.winnerName)} £${amount}</button><button class="secondary full" onclick="markWinnerPaid(${Number(historyIndex)},${key})">✅ Mark £${amount} as paid</button>`;
+    if(isAdmin && p.status==="bank_details_needed")return `<div class="notice warning"><b>${esc(p.winnerName)} needs a private bank transfer</b><br>They have been asked to contact you privately with their bank details. Do not enter those details into I'm In Golf.</div><button class="secondary full" onclick="markWinnerPaid(${Number(historyIndex)},${key})">✅ Mark £${amount} as paid</button>`;
+    if(isAdmin)return `<div class="notice"><b>£${amount} owed to ${esc(p.winnerName)}</b><br>Waiting for the player to choose Monzo, Revolut, PayPal, Starling, Wise or a private bank transfer.</div><button class="secondary full" onclick="markWinnerPaid(${Number(historyIndex)},${key},true)">✅ Mark £${amount} as paid</button>`;
     if(p.status==="ready")return `<div class="notice"><b>✅ Payment details sent</b><br>Your Group Admin can now send your £${amount} payment.</div>`;
     if(p.status==="bank_details_needed")return `<div class="notice"><b>✅ Private bank transfer selected</b><br>Contact your Group Admin privately and send them your bank details. Never enter your bank details into I'm In Golf.</div>`;
-    return `<div class="notice"><b>Result confirmed for ${esc(p.winnerName)} — £${amount} payment</b><br>Add a payment link only when a result payment is due. We do not ask every player for payment details.</div><button class="primary full" onclick="claimWinnerPrize(${Number(historyIndex)},'${key}')">Set up your £${amount} payment</button>`;
+    return `<div class="notice"><b>Result confirmed for ${esc(p.winnerName)} — £${amount} payment</b><br>Add a payment link only when a result payment is due. We do not ask every player for payment details.</div><button class="primary full" onclick="claimWinnerPrize(${Number(historyIndex)},${key})">Set up your £${amount} payment</button>`;
   }).join("")}</div>`;
 }
 
@@ -6099,7 +6105,7 @@ ${leagueView==="points" ? `
       <div>
 <b>
   ${i===0 && Number(p.leaguePoints||0)>0 ? "👑 " : ""}
-  <span onclick="showPlayerStats('${p.id}')" style="cursor:pointer;text-decoration:underline;">
+  <span onclick="showPlayerStats(${escAttr(JSON.stringify(p.id))})" style="cursor:pointer;text-decoration:underline;">
     ${pointsPlayed(p.name)>0 ? (i+1)+". " : ""}${esc(p.name)}
   </span>
 </b>
@@ -6126,7 +6132,7 @@ ${leagueView==="points" ? `
     <div class="player row">
       <div>
         <b>
-  <span onclick="showPlayerStats('${p.id}')" style="cursor:pointer;text-decoration:underline;">
+  <span onclick="showPlayerStats(${escAttr(JSON.stringify(p.id))})" style="cursor:pointer;text-decoration:underline;">
     ${moneyPlayed(p.name)>0 ? (i+1)+". " : ""}${esc(p.name)}
   </span>
 </b>
@@ -7376,7 +7382,7 @@ function adminHelpPage(){
     </div>
     <div class="card">
       ${items.map(([key,icon,label])=>`
-        <button class="secondary full" onclick="openAdminHelp('${key}')">
+        <button class="secondary full" onclick="openAdminHelp(${key})">
           <span style="font-size:18px;margin-right:6px;">${icon}</span>${label}
         </button>`).join("")}
     </div>
@@ -8114,9 +8120,9 @@ function detectPaymentProvider(link){
   try{
     const host=new URL(String(link||"")).hostname.toLowerCase().replace(/^www\./,"");
     if(host==="monzo.me" || host.endsWith(".monzo.com"))return "monzo";
-    if(host.includes("revolut"))return "revolut";
-    if(host.includes("paypal") || host==="paypal.me")return "paypal";
-    if(host.includes("starling"))return "starling";
+    if(host==="revolut.me" || host==="revolut.com" || host.endsWith(".revolut.com"))return "revolut";
+    if(host==="paypal.me" || host==="paypal.com" || host.endsWith(".paypal.com"))return "paypal";
+    if(host==="starlingbank.com" || host.endsWith(".starlingbank.com"))return "starling";
     if(host==="wise.com" || host.endsWith(".wise.com"))return "wise";
   }catch(e){}
   return "other";
@@ -9494,5 +9500,6 @@ function escAttr(s){return esc(s)}
 </script>
 <script src="secure-organiser.js"></script>
 <script src="secure-player.js"></script>
+<script src="account-controls.js"></script>
 <script src="self-service.js"></script>
 </body></html>

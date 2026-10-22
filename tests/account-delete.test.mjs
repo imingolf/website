@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import {deletionHandler} from '../supabase/functions/account-delete/handler.mjs';
+const origin='https://deploy-preview-6--super-quokka-51747d.netlify.app';
+let calls=[],fail='';
+const handler=deletionHandler({allowedOrigins:[origin],verifyUser:async token=>{calls.push(['verify',token]);if(fail==='verify')throw Error('Sign in again');return {id:'verified-user'};},prepareDeletion:async()=>{calls.push(['prepare']);if(fail==='prepare')throw Error('Transfer your group first');},deleteUser:async id=>{calls.push(['delete',id]);if(fail==='delete')throw Error('Retry deletion');}});
+const req=(body={confirm:'DELETE MY ACCOUNT',user_id:'forged'},headers={Origin:origin,Authorization:'Bearer fake'},method='POST')=>new Request('https://fixture.invalid/functions/v1/account-delete',{method,headers,body:method==='POST'?JSON.stringify(body):undefined});
+assert.equal((await handler(req({}, {Origin:'https://evil.invalid'}))).status,403);
+assert.equal((await handler(req({}, {Origin:origin}))).status,401);
+assert.equal((await handler(req({confirm:'no'}))).status,400);assert.equal(calls.length,0);
+fail='prepare';assert.equal((await handler(req())).status,409);assert(!calls.some(x=>x[0]==='delete'));
+fail='delete';calls=[];assert.equal((await handler(req())).status,409);assert.deepEqual(calls.map(x=>x[0]),['verify','prepare','delete']);
+fail='';calls=[];const r=await handler(req());assert.equal(r.status,200);assert.equal(r.headers.get('Access-Control-Allow-Origin'),origin);assert.equal(calls.at(-1)[1],'verified-user');assert(!JSON.stringify(calls).includes('forged'));
+assert.equal((await handler(req({}, {Origin:origin},'OPTIONS'))).status,204);
+assert.equal((await handler(req({}, {Origin:origin},'GET'))).status,405);
+console.log('PASS: account deletion authenticates server-side, rejects forged identity, enforces SQL preparation before Auth deletion, handles retries and restricts origins. No hosted Auth calls.');

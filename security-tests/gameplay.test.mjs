@@ -1,0 +1,124 @@
+process.on('uncaughtException',e=>{console.error(e.message,e.where||'',e.position||'');process.exit(1);});
+import {PGlite} from '@electric-sql/pglite';
+import {readFileSync} from 'node:fs';
+import assert from 'node:assert/strict';
+const db=new PGlite();
+await db.exec(`create role anon;create role authenticated;create role service_role;create schema auth;
+create table auth.users(id uuid primary key,email text,email_confirmed_at timestamptz,is_anonymous boolean,banned_until timestamptz);
+create function auth.uid() returns uuid language sql as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
+grant usage on schema public,auth to anon,authenticated;grant execute on function auth.uid() to anon,authenticated;`);
+const sql=file=>readFileSync(new URL('../supabase/staging/'+file,import.meta.url),'utf8');
+for(const file of ['setup-test-project.sql','player-scores.sql','self-service-registration.sql','integration-hardening.sql'])await db.exec(sql(file));
+await db.exec(`insert into public.tens_in_groups(group_pin,group_name,state) values ('1010','Existing one','{"players":[],"history":[{"course":"Old history"}]}'),('1260','Existing two','{"players":[],"history":[{"course":"Older history"}]}');`);
+const legacyBefore=(await db.query("select group_pin,state from public.tens_in_groups order by group_pin")).rows;
+for(const file of ['protected-gameplay.sql','account-lifecycle.sql','subscription-security.sql'])await db.exec(sql(file));
+assert.deepEqual((await db.query("select group_pin,state from public.tens_in_groups order by group_pin")).rows,legacyBefore);
+const ids=Array.from({length:5},(_,i)=>`00000000-0000-4000-8000-${String(i+1).padStart(12,'0')}`),[owner,a,b,c,outsider]=ids;
+for(const id of ids)await db.query('insert into auth.users(id,email,email_confirmed_at,is_anonymous) values($1,$2,now(),false)',[id,id+'@example.test']);
+let checks=0;
+async function as(id,query,args=[],fresh=true){await db.exec('begin');try{
+ await db.query("select set_config('request.jwt.claim.sub',$1,true)",[id||'']);
+ await db.query("select set_config('request.jwt.claims',$1,true)",[JSON.stringify({amr:[{method:'otp',timestamp:Math.floor(Date.now()/1000)-(fresh?0:1000)}]})]);
+ await db.exec('set local role '+(id?'authenticated':'anon'));const r=await db.query(query,args);await db.exec('commit');return r.rows[0]?.result;
+}catch(e){await db.exec('rollback');throw e;}}
+async function deny(id,query,args=[],pattern=/required|denied|closed|changed|already|only|invalid|before|no |choose|score|transfer|fresh|format|pay/i,fresh=true){await assert.rejects(()=>as(id,query,args,fresh),pattern);checks++;}
+const group=await as(owner,'select public.iig_create_owned_group($1,$2,$3) result',['Full Golf','Owner','11111111-1111-4111-8111-111111111111']);
+const get=()=>as(owner,'select public.iig_get_owned_group() result');
+const owned=await get();
+const join='select public.iig_join_owned_group($1,$2,$3,$4) result';
+const pids=[];for(const [i,id] of [a,b,c].entries())pids.push(await as(id,join,[group.group_pin,owned.invite_token,'Golfer '+i,11+i]));
+const [pa,pb,pc]=pids;
+async function put(state){const g=await get();return as(owner,'select public.iig_save_owned_group($1,$2,$3) result',[group.group_pin,state,g.revision]);}
+const base=(await get()).state;
+let state={...base,gameType:'money',roundOpen:true,roundId:'round-1',course:'Golf Course',date:'2099-10-24',stake:10,pointsCompetition:'stableford',players:base.players,history:[{id:'old',gameType:'money',players:[{id:pa,name:'Historic',bankDetails:'PRIVATE'}],payouts:[{id:'prize',winnerPlayerId:pa,winnerName:'Golfer 0',amount:30,status:'awaiting_details',paymentLink:'PRIVATE'}]}],sideGame:{bets:[],scores:[],settlements:[]}};
+await put(state);
+const rpc='select public.iig_player_action($1,$2,$3,$4) result';
+async function act(id,name,payload={},rev){const g=await get();return as(id,rpc,[group.group_pin,name,{round_id:g.state.roundId||'',...payload},rev??g.revision]);}
+await db.query("update public.tens_in_groups set plan_type='free' where id=$1",[group.group_id]);
+await assert.rejects(()=>act(a,'side_create',{other_id:pb,stake:5,format:'stableford'}),/requires/);checks++;
+await assert.rejects(()=>put({...state,trip:{active:true}}),/requires/);checks++;
+await assert.rejects(()=>put({...state,players:[...state.players,...Array.from({length:8},(_,i)=>({id:'added'+i,name:'Added'}))]}),/10-player/);checks++;
+assert.deepEqual((await get()).state,state);checks++;
+await db.query("update public.tens_in_groups set plan_type='trial' where id=$1",[group.group_id]);
+await deny(null,rpc,[group.group_pin,'payment',{confirmed:true},0]);
+await deny(outsider,rpc,[group.group_pin,'payment',{confirmed:true},0]);
+await deny(a,rpc,[group.group_pin,'payment',{confirmed:true,round_id:'old'},(await get()).revision]);
+await assert.rejects(()=>act(a,'payment',{confirmed:false}),/Confirm/);checks++;
+await assert.rejects(()=>act(a,'score',{score:36,format:'stableford'}),/Pay/);checks++;
+await act(a,'payment',{confirmed:true,player_id:pb,paid:true});
+let g=await get();assert.equal(g.state.players[0].paid,true);assert.equal(g.state.players[1].paid,false);checks++;
+await act(a,'score',{score:36,format:'stableford'});
+await assert.rejects(()=>act(a,'score',{score:37,format:'stableford'}),/already/);checks++;
+await assert.rejects(()=>act(b,'payment',{confirmed:true}),/closed/);checks++;
+await deny(a,rpc,[group.group_pin,'payment',{confirmed:true},0]);
+// Trip participation, money eligibility and teammate-only writes.
+state={...state,players:base.players.map(p=>({...p,paid:true})),trip:{active:true,currentFormat:'individual',currentRound:1,totalRounds:2,playerIds:[pa,pb],currentPlayingIds:[pa,pb],currentTeams:[],currentTeamScores:{},rounds:[]}};
+await put(state);await act(a,'score',{score:38,format:'stableford'});
+await assert.rejects(()=>act(c,'score',{score:39,format:'stableford'}),/not playing/);checks++;
+await put({...state,trip:{...state.trip,currentFormat:'betterball',currentTeams:[{id:'team',playerIds:[pa,pb]}]}});
+await assert.rejects(()=>act(c,'team_score',{team_id:'team',score:40,format:'stableford'}),/not playing|team member/);checks++;
+await assert.rejects(()=>act(a,'score',{score:40,format:'stableford'}),/pair score/);checks++;
+await act(a,'team_score',{team_id:'team',score:40,format:'stableford'});
+await assert.rejects(()=>act(b,'team_score',{team_id:'team',score:41,format:'stableford'}),/already/);checks++;
+await put({...state,pointsCompetition:'net',trip:{...state.trip,currentFormat:'pairsaggregate',currentTeams:[{id:'team',playerIds:[pa,pb]}]}});
+await act(b,'team_score',{team_id:'team',score:142,format:'net'});assert.equal((await get()).state.trip.currentTeamScores.team,142);checks++;
+await put({...state,trip:{...state.trip,currentFormat:'individual'},pointsCompetition:'net'});await act(a,'no_return',{format:'net'});assert.equal((await get()).state.players[0].noReturn,true);checks++;
+// Side Games: pending consent, opponent only, no winner/amount injection, immutable scores.
+await put({...state,trip:{active:false}});
+await act(a,'side_create',{other_id:pb,stake:5,format:'stableford',winnerId:pa,status:'active'});
+g=await get();let bet=g.state.sideGame.bets[0];assert.equal(bet.status,'pending');checks++;
+await assert.rejects(()=>act(a,'side_accept',{id:bet.id}),/pending challenge/);checks++;
+await act(b,'side_accept',{id:bet.id});
+await act(a,'side_score',{score:36,format:'stableford'});await act(b,'side_score',{score:34,format:'stableford'});
+g=await get();bet=g.state.sideGame.bets[0];assert.equal(bet.winnerId,pa);assert.equal(bet.amount,5);checks++;
+await assert.rejects(()=>act(a,'side_score',{score:99,format:'stableford'}),/active|already/);checks++;
+await assert.rejects(()=>act(a,'side_settle',{other_id:pb,amount:1000}),/No debt/);checks++;
+await act(b,'side_settle',{other_id:pa,amount:1000});
+g=await get();let settlement=g.state.sideGame.settlements[0];assert.equal(settlement.amount,5);checks++;
+await assert.rejects(()=>act(b,'side_confirm',{id:settlement.id}),/creditor/);checks++;
+await act(a,'side_confirm',{id:settlement.id});
+await assert.rejects(()=>act(b,'side_settle',{other_id:pa}),/No debt/);checks++;
+// Full historical projection and third-party private agreements stay isolated.
+const read='select public.iig_get_player_group($1) result';
+let v=await as(a,read,[group.group_pin]);assert.equal(v.state.history[0].gameType,'money');assert(!JSON.stringify(v).includes('PRIVATE'));checks++;
+v=await as(c,read,[group.group_pin]);assert.equal(v.state.sideGame.bets.length,0);assert.equal(v.state.sideGame.settlements.length,0);checks++;
+await act(a,'claim_prize',{history_id:'old',payout_id:'prize',payment_link:'https://monzo.me/golfer'});
+await assert.rejects(()=>act(b,'claim_prize',{history_id:'old',payout_id:'prize',payment_link:''}),/named winner/);checks++;
+await assert.rejects(()=>act(a,'claim_prize',{history_id:'old',payout_id:'prize',payment_link:'javascript:alert(1)'}),/secure/);checks++;
+// Lifecycle installation does not rewrite any golf state. Account deletion requires fresh OTP and transfer.
+async function service(query,args){await db.exec('begin;set local role service_role');try{const r=await db.query(query,args);await db.exec('commit');return r.rows[0]?.result;}catch(e){await db.exec('rollback');throw e;}}
+const sub='select public.iig_apply_verified_subscription($1,$2,$3,$4) result',expires=new Date(Date.now()+86400000);
+await deny(a,sub,[group.group_pin,a,'receipt',expires]);
+await assert.rejects(()=>service(sub,[group.group_pin,a,'receipt',expires]),/organiser required/);checks++;
+await db.query("update public.tens_in_groups set status='suspended' where id=$1",[group.group_id]);
+await assert.rejects(()=>service(sub,[group.group_pin,owner,'receipt',expires]),/suspended/);checks++;
+assert.equal((await as(owner,'select public.iig_my_group_identity() result')).group_pin,group.group_pin);checks++;
+await db.query("update public.tens_in_groups set status='active' where id=$1",[group.group_id]);
+await service(sub,[group.group_pin,owner,'receipt',expires]);
+await assert.rejects(()=>service(sub,['1010',null,'receipt',expires]),/different group/);checks++;
+await service(sub,[group.group_pin,owner,'receipt',expires]);
+assert.equal((await db.query('select count(*)::int n from iig_private.subscription_bindings')).rows[0].n,1);checks++;
+const before=(await get()).state;
+await deny(owner,'select public.iig_prepare_account_deletion() result',[],/Transfer your group/);
+await deny(c,'select public.iig_prepare_account_deletion() result',[],/fresh/,false);
+await deny(owner,'select public.iig_request_owner_transfer($1) result',[b+'@example.test'],/fresh/,false);
+const token=await as(owner,'select public.iig_request_owner_transfer($1) result',[b+'@example.test']);
+await deny(c,'select public.iig_accept_owner_transfer($1) result',[token]);
+await as(b,'select public.iig_accept_owner_transfer($1) result',[token]);
+await deny(owner,'select public.iig_accept_owner_transfer($1) result',[token]);
+assert.equal(await as(owner,'select public.iig_get_owned_group() result'),null);checks++;
+const newOwner=await as(b,'select public.iig_get_owned_group() result');assert.deepEqual(newOwner.state,before);assert.notEqual(newOwner.invite_token,owned.invite_token);checks++;
+await as(owner,'select public.iig_prepare_account_deletion() result');
+await deny(owner,'select public.iig_create_owned_group($1,$2,$3) result',['New','Owner','22222222-2222-4222-8222-222222222222']);
+await as(c,'select public.iig_prepare_account_deletion() result');await deny(c,read,[group.group_pin]);
+await as(c,'select public.iig_prepare_account_deletion() result'); // retry after an Auth API outage
+await db.query('delete from auth.users where id=$1',[c]);
+assert.deepEqual((await as(b,'select public.iig_get_owned_group() result')).state,before);checks++;
+assert.equal((await db.query('select count(*)::int n from iig_private.group_members where user_id=$1',[c])).rows[0].n,0);checks++;
+assert.deepEqual((await db.query("select group_pin,state from public.tens_in_groups where group_pin in('1010','1260') order by group_pin")).rows,legacyBefore);checks++;
+await db.query('update auth.users set email=$1 where id=$2',['updated@example.test',b]);
+assert.equal((await db.query('select admin_contact from public.tens_in_groups where id=$1',[group.group_id])).rows[0].admin_contact,'updated@example.test');checks++;
+assert.equal((await db.query("select count(*)::int n from pg_proc p join pg_namespace ns on ns.oid=p.pronamespace where ns.nspname='iig_private' and (has_function_privilege('anon',p.oid,'execute') or has_function_privilege('authenticated',p.oid,'execute'))")).rows[0].n,0);checks++;
+for(const f of ['iig_player_action(text,text,jsonb,bigint)','iig_prepare_account_deletion()'])assert.equal((await db.query('select has_function_privilege(\'anon\',$1,\'execute\') allowed',[f])).rows[0].allowed,false);
+console.log(`PASS: ${checks} protected gameplay/lifecycle PostgreSQL assertions; payment identity, Trip eligibility, pairs, NR, Side Game consent/results/settlement, projections, ownership transfer, deletion and retained golf history.`);
+await db.close();

@@ -33,6 +33,9 @@ function setup(dashboard=false,host='deploy-preview-6--super-quokka-51747d.netli
  d.queue.push({status:403,data:{message:'Platform owner access required'}});await d.act('regReload');
  assert(d.el('dashView').classList.contains('hidden'));assert.equal(d.document.querySelector('#dashView .content').textContent,'');
  d.queue.push({data:[]});await d.act('regReload');
+ d.queue.push({data:{group_pin:'4321'}});await assert.rejects(()=>d.ctx.iigNativePurchase.confirm('transaction','1260'),/organiser/);
+ d.queue.push({data:{group_pin:'4321'}},{data:{verified:true,groupPin:'4321'}});assert.equal((await d.ctx.iigNativePurchase.confirm('transaction','4321')).verified,true);
+ assert.equal(d.calls.at(-1).opts.headers.Authorization,'Bearer fake');assert.equal(d.calls.at(-1).body.access_token,undefined);
  d.queue.push({data:{}});await d.act('registerLogout');assert(d.el('dashView').classList.contains('hidden'));assert.equal(d.document.querySelector('#dashView .content').textContent,'');
  const guest=setup(false,'deploy-preview-6--super-quokka-51747d.netlify.app','#pin=3520&invite=11111111-1111-4111-8111-111111111111');
  await guest.login();guest.queue.push({status:403,data:{code:'42501',message:'Group membership required'}});await guest.act('regCodeForm','onsubmit');

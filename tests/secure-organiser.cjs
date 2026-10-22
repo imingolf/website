@@ -76,6 +76,8 @@ async function request(url,body){calls.push({url,body});if(url.endsWith('iig_get
   fail=false;await document.getElementById('secureOrganiserReload').onclick();alerts.length=0;
   await ctx.finishRound();assert.equal(group.state.trip.rounds.length,1);assert.equal(group.state.trip.currentRound,2);assert.deepEqual(alerts,[]);
  }
+ const savedRounds=structuredClone(group.state.trip.rounds);
+ assert.equal(await ctx.savePlayerPatch('A',{stableford:45}),true);assert.equal(group.state.players[0].stableford,45);assert.deepEqual(structuredClone(group.state.trip.rounds),savedRounds);
  ctx.iigSecureOrganiser.close();assert.equal(vm.runInContext('state.players.length+state.history.length',ctx),0);assert.equal(vm.runInContext('db',ctx),null);assert.equal(vm.runInContext('isAdmin',ctx),false);
  assert(!document.getElementById('setupOverlay').classList.contains('hidden'));
  console.log('PASS: original app renders first competition; verified-owner saves and reloads; revision conflict blocks retries until reload; legacy RPC denied; sign-out clears access.');
