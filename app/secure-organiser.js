@@ -12,11 +12,29 @@
   let node=document.getElementById('secureOrganiserBanner');
   if(!node){
    node=document.createElement('div');node.id='secureOrganiserBanner';node.className='notice';
-   node.innerHTML='<b>Test group · signed-in organiser</b><p id="secureOrganiserStatus" role="status" aria-live="polite"></p><button type="button" id="secureOrganiserReload" class="secondary">Reload saved group</button> <button type="button" id="secureOrganiserSignout" class="ghost">Sign out</button>';
+   node.innerHTML='<b>Test group · signed-in organiser</b><p id="secureOrganiserStatus" role="status" aria-live="polite"></p><button type="button" id="secureOrganiserReload" class="secondary">Reload saved group</button> <button type="button" id="secureOrganiserInvite" class="secondary">Invite players</button><div id="secureInviteBox" hidden><label for="secureInviteLink">Player invitation</label><input id="secureInviteLink" readonly><button type="button" id="secureInviteCopy" class="secondary">Copy invitation link</button><p id="secureInviteStatus" role="status" aria-live="polite"></p><a id="secureInviteOpen" target="_blank" rel="noopener noreferrer">Open invitation in a new tab</a></div> <button type="button" id="secureOrganiserSignout" class="ghost">Sign out</button>';
    document.getElementById('screen').before(node);
+   node.querySelector('#secureOrganiserInvite').onclick=invitePlayers;
+   node.querySelector('#secureInviteCopy').onclick=async()=>{
+    const input=document.getElementById('secureInviteLink'),note=document.getElementById('secureInviteStatus');input.focus();input.select();input.setSelectionRange?.(0,input.value.length);
+    note.textContent='Link selected. Touch and hold to copy, or press Command+C on your Mac.';
+    try{if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(input.value);note.textContent='Invitation copied.';}}catch(_){}
+   };
    node.querySelector('#secureOrganiserReload').onclick=()=>reload(true);
    node.querySelector('#secureOrganiserSignout').onclick=()=>{if(pending){status('Wait for saving to finish.');return;}active?.signout();};
   }
+ }
+ function invitePlayers(){
+  if(!active)return;
+  const g=active.group;
+  if(pending||blocked){status('Reload the saved group before inviting players.');return;}
+  if(g.state.gameType!=='points'||g.state.roundOpen!==true){status('Set up and save an open Points Game before inviting test players.');return;}
+  if(!/^[0-9a-f-]{36}$/i.test(g.invite_token||'')){status('Reload your saved group to load its invitation.');return;}
+  const url=location.origin+'/app/#pin='+encodeURIComponent(active.pin)+'&invite='+encodeURIComponent(g.invite_token);
+  document.getElementById('secureInviteLink').value=url;
+  document.getElementById('secureInviteOpen').href=url;
+  document.getElementById('secureInviteBox').hidden=false;
+  status('Share this test invitation with your player. They will verify their email before joining.');
  }
  function apply(g){
   if(!valid(g)||g.group_pin!==active.pin)throw Error('Could not confirm the signed-in group.');
@@ -94,12 +112,12 @@
   originals.render();if(!active)return;
   // These legacy journeys depend on a PIN-only identity or an unconnected native service.
   for(const el of document.querySelectorAll('[onclick]')){
-   if(/^(changeAdminPin|copyInvite|returnToPlayerView|ownerLogin|adminInvitePage|openAdminHelp|changeGroupName)\(/.test(el.getAttribute('onclick')||''))el.hidden=true;
+   if(/^(changeAdminPin|returnToPlayerView|ownerLogin|adminInvitePage|openAdminHelp|changeGroupName)\(/.test(el.getAttribute('onclick')||''))el.hidden=true;
   }
   banner();
  };
  adminLogout=function(){if(active){if(pending){status('Wait for saving to finish.');return;}active.signout();}else originals.adminLogout();};
  returnToPlayerView=function(){if(active){status('Player sign-in in the original layout is the next integration step.');return;}originals.returnToPlayerView();};
- copyInvite=function(){if(active){status('Use the tested invitation page for now. Player invitations in this layout are still being connected.');return;}return originals.copyInvite();};
+ copyInvite=function(){if(active){invitePlayers();return;}return originals.copyInvite();};
  changeAdminPin=function(){if(active){status('This group uses your verified email sign-in.');return;}return originals.changeAdminPin();};
 })();

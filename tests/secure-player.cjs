@@ -1,0 +1,30 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const {parseHTML}=require(process.env.LINKEDOM_PATH||'linkedom');
+const html=fs.readFileSync('app/index.html','utf8');const {document}=parseHTML(html);
+const ctx={document,location:{hostname:'deploy-preview-6--super-quokka-51747d.netlify.app'},console,URLSearchParams,Date,structuredClone,localStorage:{getItem:()=>null,setItem(){},removeItem(){}},sessionStorage:{getItem:()=>null,setItem(){},removeItem(){}},navigator:{userAgent:'test'},setInterval:()=>1,clearInterval(){},setTimeout:()=>1,clearTimeout(){},alert(){},confirm:()=>true};
+ctx.window=ctx;ctx.addEventListener=()=>{};ctx.scrollTo=()=>{};vm.createContext(ctx);
+for(const el of document.querySelectorAll('*'))el.animate=()=>{};
+for(const script of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)) if(script[1].includes('let db=null') || script[1].includes('function showWelcomePanel'))vm.runInContext(script[1],ctx);
+vm.runInContext(fs.readFileSync('app/secure-organiser.js','utf8'),ctx);
+vm.runInContext(fs.readFileSync('app/secure-player.js','utf8'),ctx);
+let data={player_id:'me',revision:0,state:{groupName:'Pam’s people',course:'Hazel Grove',date:'2099-10-24',gameType:'points',pointsCompetition:'stableford',roundOpen:true,players:[{id:'me',name:'Player one',handicap:11,playingThisRound:false,stableford:null,netScore:null},{id:'other',name:'Player two',handicap:15,playingThisRound:true,stableford:null,netScore:null}]}};
+const calls=[];let fail=false;
+async function request(url,body){calls.push({url,body});if(url.endsWith('iig_get_player_group'))return structuredClone(data);if(fail)throw Error('Group changed; reload before saving');assert.equal(body.p_revision,data.revision);assert.equal(body.p_pin,'3520');assert.equal(body.p_state,undefined);assert.equal(body.p_player_id,undefined);data.revision++;if(url.endsWith('iig_set_my_attendance'))data.state.players[0].playingThisRound=body.p_attending;else if(url.endsWith('iig_submit_my_score')){data.state.players[0].stableford=body.p_score;data.state.players[0].scoreSubmitted=true;}else throw Error('Unexpected RPC');return data.revision;}
+(async()=>{
+ ctx.iigSecurePlayer.open(data,'3520',request,()=>ctx.iigSecurePlayer.close());
+ assert.equal(vm.runInContext('isAdmin',ctx),false);assert.match(document.getElementById('screen').textContent,/Hazel Grove/);
+ await ctx.enterNormalPointsGame();assert.equal(data.state.players[0].playingThisRound,true);assert.equal(data.state.players[1].playingThisRound,true);
+ await document.getElementById('securePlayerWithdraw').onclick();assert.equal(data.state.players[0].playingThisRound,false);
+ await ctx.enterNormalPointsGame();ctx.show('scores');
+ let count=calls.length;await ctx.submitPlayerScore(1,'stableford');assert.equal(calls.length,count);
+ document.getElementById('scoreInput_0').value='100';await ctx.submitPlayerScore(0,'stableford');assert.equal(calls.length,count);
+ document.getElementById('scoreInput_0').value='36';vm.runInContext('appConfirm=async()=>true',ctx);
+ fail=true;await ctx.submitPlayerScore(0,'stableford');assert.match(document.getElementById('securePlayerStatus').textContent,/Reload group/);
+ count=calls.length;await ctx.enterNormalPointsGame();assert.equal(calls.length,count);
+ fail=false;await document.getElementById('securePlayerReload').onclick();
+ document.getElementById('scoreInput_0').value='36';await ctx.submitPlayerScore(0,'stableford');
+ assert.equal(data.state.players[0].stableford,36);assert.equal(data.state.players[1].stableford,null);
+ assert.equal(await ctx.save(),false);assert(calls.every(c=>!c.url.includes('owned_group')));
+ ctx.iigSecurePlayer.close();assert.equal(vm.runInContext('myPlayerId',ctx),'');assert.equal(vm.runInContext('db',ctx),null);
+ console.log('PASS: original player round/scores; own attendance/withdrawal; score limits; no other-player edits; stale lockout/reload; narrow RPC only; sign-out.');
+})().catch(e=>{console.error(e);process.exit(1)});

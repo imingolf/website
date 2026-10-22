@@ -9,6 +9,10 @@
     if (!dashboard && $('registrationAuth')) $('registrationAuth').textContent = 'Group setup is not available on this preview. Please use the current setup preview.';
     return;
   }
+  const invitation = new URLSearchParams((location.hash || '').replace(/^#/,''));
+  const playerMode = !dashboard && (invitation.has('pin') || invitation.has('invite'));
+  const invitePin = invitation.get('pin'), inviteToken = invitation.get('invite');
+  const validInvitation = /^\d{4}$/.test(invitePin || '') && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(inviteToken || '');
   const base = 'https://nyavvwrsrxqfyhiygkgw.supabase.co';
   const key = 'sb_publishable_fDGji75-j3GP5VeAAIAdZg_f9TNmtWL';
   let session = null, email = '', busy = false, resendAt = 0, pending = null, offset = 0;
@@ -20,11 +24,12 @@
   root.innerHTML = `
     <p class="notice">Preview: creates real groups in the test database only.</p>
     <p id="regMessage" role="status" aria-live="polite"></p>
-    <form id="regEmailForm"><label for="regEmail">Your email address</label><input id="regEmail" type="email" autocomplete="email" maxlength="254" required><button class="primary full">Email me a sign-in code</button><p class="muted">${dashboard ? 'Only authorised I’m In Golf owners can view registrations.' : 'Use an email you can access. Your account will manage your group.'}</p></form>
+    <form id="regEmailForm"><label for="regEmail">Your email address</label><input id="regEmail" type="email" autocomplete="email" maxlength="254" required><button class="primary full">Email me a sign-in code</button><p class="muted">${dashboard ? 'Only authorised I’m In Golf owners can view registrations.' : playerMode ? 'Verify your email to join your golf group.' : 'Use an email you can access. Your account will manage your group.'}</p></form>
     <form id="regCodeForm" hidden><label for="regCode">Code from your email</label><p id="regSentTo"></p><input id="regCode" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6,10}" minlength="6" maxlength="10" required><button class="primary full">Verify email</button><button id="regResend" type="button" class="secondary full">Send another code</button><button id="regChangeEmail" type="button" class="ghost full">Use a different email</button></form>
     <section id="regSignedIn" hidden><p id="regAccount" class="muted"></p>
     <form id="regGroupForm" hidden><label for="regName">Your name</label><input id="regName" autocomplete="name" maxlength="80" required><label for="regGroupName">Group name</label><input id="regGroupName" maxlength="80" required placeholder="e.g. Sunday Golfers"><button class="primary full">Create my group</button><p class="muted">One group per organiser account. Your name and email are shared with I’m In Golf to manage your group and trial.</p></form>
-    <section id="regCreated" hidden><h2>Your group is ready</h2><p id="regCreatedName"></p><p>Group PIN: <strong id="regPin"></strong></p><p>Your group has been registered with I’m In Golf.</p><p class="notice">This is a test group. Open your group to test competition setup in the original app layout. Player sign-in in that layout is still being connected.</p><button id="regOpenGroup" type="button" class="primary full">Open my group</button></section>
+    <form id="regJoinForm" hidden><label for="regPlayerName">Your name</label><input id="regPlayerName" autocomplete="name" maxlength="80" required><label for="regHandicap">Handicap</label><input id="regHandicap" type="text" inputmode="decimal" maxlength="5" required><button class="primary full">Join my group</button></form>
+    <section id="regCreated" hidden><h2>Your group is ready</h2><p id="regCreatedName"></p><p>Group PIN: <strong id="regPin"></strong></p><p>Your group has been registered with I’m In Golf.</p><p class="notice">This is a test group. Open your group to test competition setup in the original app layout. Player invitations now support Points Game attendance and final scores in this preview.</p><button id="regOpenGroup" type="button" class="primary full">Open my group</button></section>
     <button id="regReload" type="button" class="secondary full">${dashboard ? 'Open dashboard' : 'Check my group'}</button><button id="regSignout" type="button" class="ghost full">Sign out</button></section>`;
   // Author styles in the original app must not override hidden form visibility.
   const style = document.createElement('style');
@@ -38,6 +43,8 @@
   };
   function reset() {
     window.iigSecureOrganiser?.close();
+    window.iigSecurePlayer?.close();
+    $('regJoinForm').hidden = true;
     session = null; pending = null;
     $('regSignedIn').hidden = true; $('regGroupForm').hidden = true; $('regCreated').hidden = true;
     $('regEmailForm').hidden = false; $('regCodeForm').hidden = true; $('regCode').value = '';
@@ -56,7 +63,7 @@
       if (!response.ok) {
         if (response.status === 401 && auth) reset();
         if (data.code === 'PGRST202') throw new Error('The test database update is needed before this step can run.');
-        throw new Error(data.msg || data.message || 'Unable to connect. Please try again.');
+        const error = new Error(data.msg || data.message || 'Unable to connect. Please try again.'); error.code=data.code; throw error;
       }
       return data;
     } catch (error) {
@@ -105,7 +112,7 @@
       session = { access_token: data.access_token, user: data.user, expires_at: expires };
       $('regCode').value = ''; $('regCodeForm').hidden = true; $('regSignedIn').hidden = false;
       $('regAccount').textContent = 'Signed in as ' + data.user.email;
-      if (dashboard) { offset = 0; await loadDashboard(); } else await loadGroup();
+      if (dashboard) { offset = 0; await loadDashboard(); } else if(playerMode) await loadPlayer(); else await loadGroup();
     });
   };
   $('regGroupForm').onsubmit = event => {
@@ -131,7 +138,23 @@
     if (!access || access.access_allowed !== true) throw new Error('Your group is not currently available.');
     window.iigSecureOrganiser.open(group, request, () => action(signout), access.plan_type);
   });
-  $('regReload').onclick = () => action(dashboard ? loadDashboard : loadGroup);
+  async function loadPlayer(){
+    if(!validInvitation)throw new Error('Open the complete invitation link from your organiser.');
+    let data;
+    try{data=await request('/rest/v1/rpc/iig_get_player_group',{p_pin:invitePin},true);}
+    catch(error){if(error.code==='42501' && error.message==='Group membership required'){$('regJoinForm').hidden=false;message('Email verified. Enter your name and handicap.');return;}throw error;}
+    if(!window.iigSecurePlayer)throw new Error('Reload this preview to open your player account.');
+    window.iigSecurePlayer.open(data,invitePin,request,()=>action(signout));
+    $('regJoinForm').hidden=true;
+  }
+  $('regJoinForm').onsubmit=event=>{event.preventDefault();action(async()=>{
+    const name=$('regPlayerName').value.trim(),raw=$('regHandicap').value.trim(),handicap=Number(raw);
+    if(!name||name.length>80||!/^[-]?[0-9]{1,2}(?:\.[0-9])?$/.test(raw)||handicap < -10||handicap > 60)throw new Error('Enter your name and a handicap from -10 to 60, with up to one decimal place.');
+    if(!validInvitation)throw new Error('Open the complete invitation link from your organiser.');
+    await request('/rest/v1/rpc/iig_join_owned_group',{p_pin:invitePin,p_invite:inviteToken,p_name:name,p_handicap:handicap},true);
+    await loadPlayer();
+  });};
+  $('regReload').onclick = () => action(dashboard ? loadDashboard : playerMode ? loadPlayer : loadGroup);
   async function signout() {
     try { if (session) await request('/auth/v1/logout', {}, true); }
     finally { reset(); message('Signed out on this page.'); }
@@ -173,6 +196,14 @@
     document.querySelector('#dashView .side-foot').textContent = 'I’m In Golf • Test registrations';
     $('loginView').classList.add('hidden'); $('dashView').classList.remove('hidden');
     message('Registrations loaded.');
+  }
+  if(playerMode){
+    showWelcomePanel('start',false);
+    window.addEventListener('load',()=>showWelcomePanel('start',false));
+    $('welcomeStartTitle').textContent='Join your golf group.';
+    $('welcomeStartTitle').nextElementSibling.textContent='Verify your email, then join using your name and handicap.';
+    $('regReload').textContent='Open my player account';
+    if(!validInvitation){$('regEmailForm').hidden=true;message('Open the complete invitation link from your organiser.');return;}
   }
   message(dashboard ? 'Sign in with your I’m In Golf owner email.' : 'Start by verifying your email.');
 })();

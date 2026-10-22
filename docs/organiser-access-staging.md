@@ -142,3 +142,22 @@ block/recovery, legacy RPC denial and sign-out pass. No new SQL is needed for th
 increment. Next physical check: sign in with the account that owns 3520; Open my group;
 Start First Competition → Points Game → Stableford; save course/date, then Reload
 saved group to verify. Keep draft: no production merge/release.
+
+## Original player screens and invitations
+
+Greg confirmed original-layout competition save/reload on group 3520. The next
+increment adds Invite players to the organiser banner. It exposes the stored invite
+UUID as an /app/#pin=…&invite=… link with a copy fallback and open-link option.
+The original welcome verifies email, collects a new member name/handicap, and opens
+existing members without making a duplicate. The player adapter renders original
+Round/Scores screens for Points Games only. Attendance/withdrawal and final score use
+only narrow authenticated player RPCs. No player state-replacement endpoint is used;
+legacy db.rpc and whole-state save are blocked. Other feature controls are hidden
+until their data and endpoints are integrated. Returning players use their complete
+invitation link and email; plain PIN entry is still the legacy path in this preview.
+
+Actual HTML/script DOM checks with mocked HTTP cover organiser invitation generation,
+invalid invitation rejection, email join flow, membership lookup, actual round/score
+rendering, attendance/withdrawal, score digit limits, other-player denial, stale revision
+lockout/reload and sign-out. Existing PostgreSQL tests pass. Hosted invitation/phone
+check remains. No new SQL required. Still no production release.
