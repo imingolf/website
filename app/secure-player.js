@@ -2,12 +2,14 @@
 (() => {
  'use strict';
  if(location.hostname!=='deploy-preview-6--super-quokka-51747d.netlify.app' && !['localhost','127.0.0.1'].includes(location.hostname))return;
- const old={render,show,save,refresh,refreshSideGameLive,enterNormalPointsGame,submitPlayerScore};
+ const old={render,show,save,refresh,refreshSideGameLive,enterNormalPointsGame,submitPlayerScore,league,showRoundHistory,showPlayerStats};
+ let navVisibility=new Map();
  let active=null,busy=false,blocked=false,version=0,revision=0;
  function message(text){const el=document.getElementById('securePlayerStatus');if(el)el.textContent=text;}
  function apply(data){
   if(!data || !Number.isSafeInteger(data.revision) || !Array.isArray(data.state?.players) || !data.state.players.some(p=>p.id===data.player_id))throw Error('Your player record could not be loaded.');
   if(data.state.gameType!=='points')throw Error('This preview currently supports joining Points Games. Ask your organiser to set up a Points Game.');
+  if(data.state.trip?.active)throw Error('Trip player actions require the Trip Mode integration.');
   state={history:[],pointsValue:10,stake:0,...JSON.parse(JSON.stringify(data.state))};
   myPlayerId=data.player_id;revision=data.revision;isAdmin=false;isOwner=false;
  }
@@ -52,31 +54,37 @@
  window.iigSecurePlayer={
   open(data,groupPin,request,signout){
    if(!/^\d{4}$/.test(groupPin))throw Error('Invalid group PIN.');
-   apply(data);version++;active={pin:groupPin,request,signout};blocked=false;pin=groupPin;groupPlanType='trial';ownerCreationCode='';
+   apply(data);
+   if(!active)navVisibility=new Map([...document.querySelectorAll('nav [onclick]')].map(el=>[el,el.hidden]));
+   version++;active={pin:groupPin,request,signout};blocked=false;pin=groupPin;groupPlanType='trial';ownerCreationCode='';
    db={rpc:async()=>({data:null,error:{message:'Use your signed-in player actions.'}})};
    document.getElementById('setupOverlay').classList.add('hidden');document.getElementById('demoBadge').classList.add('hidden');
    banner();show('round');message('You are signed in as '+state.players.find(p=>p.id===myPlayerId).name+'.');startPolling();
   },
-  close(){if(!active)return;version++;active=null;clearInterval(poller);poller=null;db=null;pin='';myPlayerId='';isAdmin=false;isOwner=false;scoreDraftActive=false;
+  close(){if(!active)return;for(const [el,hidden] of navVisibility)el.hidden=hidden;navVisibility.clear();version++;active=null;clearInterval(poller);poller=null;db=null;pin='';myPlayerId='';isAdmin=false;isOwner=false;scoreDraftActive=false;state={players:[],history:[]};lastWinnerRecord=null;statsPlayerId=null;
    document.getElementById('securePlayerBanner')?.remove();document.getElementById('screen').textContent='';document.getElementById('setupOverlay').classList.remove('hidden');showWelcomePanel('start');
   }
  };
  save=async()=>{if(!active)return old.save();message('That action is not connected for player accounts in this preview.');return false;};
  refresh=async()=>active?reload(false):old.refresh();
  refreshSideGameLive=async()=>active?reload(false):old.refreshSideGameLive();
- show=function(p){if(active&&!['round','scores'].includes(p)){message('This test covers joining, attendance and final scores.');return;}old.show(p);};
- render=function(){
-  old.render();if(!active)return;
-  for(const el of document.querySelectorAll('[onclick]')){
+ show=function(p){if(active&&!['round','scores','league','playerstats'].includes(p)){message('Use Round, Scores or League for your player account.');return;}old.show(p);};
+ function filterActions(){
+  if(!active)return;
+  for(const el of document.querySelectorAll('#screen [onclick], nav [onclick]')){
    const handler=el.getAttribute('onclick')||'';
-   if(!/^(enterNormalPointsGame\(|submitPlayerScore\(|show\(['"](?:round|scores)['"]\))/.test(handler))el.hidden=true;
+   if(!/^(enterNormalPointsGame\(|submitPlayerScore\(|show\(['"](?:round|scores|league)['"]\)|league\(|showRoundHistory\(|showPlayerStats\(|shareHistoricalResult\()/.test(handler))el.hidden=true;
   }
   // Hide unavailable feature cards, rather than showing misleading empty actions.
   for(const button of document.querySelectorAll('#screen button[onclick]')){
    if(/sideGame|shareApp|notification/i.test(button.getAttribute('onclick')||''))button.closest('.card')?.setAttribute('hidden','');
   }
   banner();
- };
+ }
+ render=function(){old.render();filterActions();};
+ league=function(){old.league();filterActions();};
+ showRoundHistory=function(i){old.showRoundHistory(i);filterActions();};
+ showPlayerStats=function(id){old.showPlayerStats(id);filterActions();};
  enterNormalPointsGame=async()=>active?attendance(true):old.enterNormalPointsGame();
  submitPlayerScore=async function(i,type){
   if(!active)return old.submitPlayerScore(i,type);

@@ -1,5 +1,7 @@
 # Self-service setup release gate
 
+Current implementation and remaining gates: [PR #6 integration status](pr6-integration-status.md). The findings below are the original setup audit.
+
 app/group-setup-preview.html is a design prototype. No network calls, accounts, groups, email or stored personal details. Its link appears only on the Netlify deploy preview. Do not use mock screens as App Store screenshots.
 
 ## Findings

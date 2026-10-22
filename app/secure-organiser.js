@@ -78,7 +78,7 @@
    if(e!==epoch || pending || stateSaveVersion!==v)throw Error('Your group changed. Reload it before finishing the round.');
    if(!valid(group)||group.group_pin!==current.pin)throw Error('Could not confirm your saved group.');
    if(group.state.roundOpen!==true)throw Error('This round is already closed. Check League → Previous rounds.');
-   if(group.state.gameType!=='points'||group.state.trip?.active)throw Error('Finishing this game type is not connected in the test preview yet.');
+   if(group.state.trip?.completed)throw Error('This trip is already complete. Check its saved results.');
    apply(group);
    status('Latest scores loaded. Finishing the round…');
   },
@@ -96,7 +96,7 @@
   },
   close(){
    if(!active)return;
-   epoch++;active=null;blocked=true;clearInterval(poller);poller=null;db=null;pin='';isAdmin=false;isOwner=false;myPlayerId='';
+   epoch++;active=null;blocked=true;clearInterval(poller);poller=null;db=null;pin='';isAdmin=false;isOwner=false;myPlayerId='';state={players:[],history:[]};lastWinnerRecord=null;statsPlayerId=null;scoreDraftActive=false;
    document.getElementById('secureOrganiserBanner')?.remove();document.getElementById('screen').textContent='';
    document.getElementById('setupOverlay').classList.remove('hidden');showWelcomePanel('start');
   }
@@ -125,7 +125,7 @@
  render=function(){
   originals.render();if(!active)return;
   // These legacy journeys depend on a PIN-only identity or an unconnected native service.
-  for(const el of document.querySelectorAll('[onclick]')){
+  for(const el of document.querySelectorAll('#screen [onclick]')){
    if(/^(changeAdminPin|returnToPlayerView|ownerLogin|adminInvitePage|openAdminHelp|changeGroupName)\(/.test(el.getAttribute('onclick')||''))el.hidden=true;
   }
   banner();

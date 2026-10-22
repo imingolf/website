@@ -196,4 +196,46 @@ await db.exec('update iig_private.registration_settings set enabled=false');
 await denied(player,create,['Closed','Closed',req]);
 assert.equal((await db.query("select count(*)::int as n from public.tens_in_groups where group_pin in ('1010','1260')")).rows[0].n,2); checks++;
 console.log('PASS: self-service creation, retry reconciliation, saved contact/trial, private owner register, pagination, registration switch and existing-group preservation.');
+// Hardening applies to existing test groups without rewriting a single saved result.
+const beforeHardening=(await db.query('select id,state from public.tens_in_groups order by id')).rows;
+await db.exec(readFileSync(new URL('../supabase/staging/integration-hardening.sql',import.meta.url),'utf8'));
+assert.deepEqual((await db.query('select id,state from public.tens_in_groups order by id')).rows,beforeHardening);
+await db.exec(readFileSync(new URL('../supabase/staging/integration-hardening.sql',import.meta.url),'utf8'));
+assert.deepEqual((await db.query('select id,state from public.tens_in_groups order by id')).rows,beforeHardening);
+await db.query("update public.tens_in_groups set status='active' where id=$1",[group.group_id]);
+for(const query of [
+ ['select public.iig_get_player_group($1)',[group.group_pin]],
+ [join,[group.group_pin,owned.invite_token,'Player',11]],
+ [attend,[group.group_pin,true,0]],
+ [submitScore,[group.group_pin,36,'stableford',0]]
+]) await denied(player,...query,/Verified organiser sign-in required/);
+await db.query('update auth.users set email_confirmed_at=now(),is_anonymous=false where id=$1',[player]);
+owned=(await as(owner,'select public.iig_get_owned_group() as result'))[0].result;
+const historical={date:'2026-10-01',course:'Historic Course',gameType:'points',pointsCompetition:'stableford',
+ players:[{id:pid,name:'Player',handicap:11,stableford:36,bankDetails:'PRIVATE'}],
+ pointsResults:[{name:'Player',score:36,points:10,contact:'PRIVATE'}],adminPin:'PRIVATE',payouts:[{paymentLink:'PRIVATE'}]};
+const historyState={...owned.state,gameType:'points',trip:{active:false},history:[historical],players:owned.state.players.map(p=>({...p,stableford:null,netScore:null,scoreSubmitted:false,playingThisRound:true,leaguePoints:10}))};
+await as(owner,save,[group.group_pin,historyState,owned.revision]);
+view=(await as(player,'select public.iig_get_player_group($1) as result',[group.group_pin]))[0].result;
+assert.equal(view.state.history[0].course,'Historic Course');
+assert.equal(view.state.history[0].players[0].stableford,36);
+assert.equal(view.state.history[0].pointsResults[0].points,10);
+assert.equal(view.state.players[0].leaguePoints,10);
+assert(!JSON.stringify(view).includes('PRIVATE'));
+await denied(player,'select iig_private.player_result($1)',[{}]);
+for(const mode of [{gameType:'money'},{gameType:'points',trip:{active:true}}]){
+ owned=(await as(owner,'select public.iig_get_owned_group() as result'))[0].result;
+ await as(owner,save,[group.group_pin,{...historyState,...mode},owned.revision]);
+ view=(await as(player,'select public.iig_get_player_group($1) as result',[group.group_pin]))[0].result;
+ for(const [query,args] of [[attend,[group.group_pin,true,view.revision]],[submitScore,[group.group_pin,36,'stableford',view.revision]]])
+  await denied(player,query,args,/individual Points Game/);
+}
+await db.query("update auth.users set banned_until=now()+interval '1 day' where id=$1",[player]);
+for(const [query,args] of [
+ ['select public.iig_get_player_group($1)',[group.group_pin]],
+ [join,[group.group_pin,owned.invite_token,'Player',11]],
+ [attend,[group.group_pin,true,view.revision]],
+ [submitScore,[group.group_pin,36,'stableford',view.revision]]
+]) await denied(player,query,args,/Verified organiser sign-in required/);
+console.log('PASS: incremental hardening is repeatable and preserves all groups/history; verified member checks, banned-session denial, private historical projection, league totals and unsupported game mutation denial.');
 await db.close();

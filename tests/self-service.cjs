@@ -15,6 +15,7 @@ const assert = require('node:assert/strict');
    if(url.pathname.endsWith('/verify')) data={access_token:'fake-test-token',expires_in:3600,user:{id:'00000000-0000-4000-8000-000000000001',email:'test@example.test'}};
    if(url.pathname.endsWith('iig_get_owned_group')) {data=created?group:null;if(failedRead){failedRead=false;status=503;data={message:'Read failed'};}}
    if(url.pathname.endsWith('iig_create_owned_group')) {created=true;failedRead=true;data=group;}
+   if(url.pathname.endsWith('iig_get_player_group')) data={player_id:'member',revision:1,state:{groupName:'Sunday Golfers',course:'Player Course',date:'2099-10-24',gameType:'points',pointsCompetition:'stableford',roundOpen:false,players:[{id:'member',name:'Test Player',handicap:11,leaguePoints:10}],history:[{course:'Historic Course',date:'2026-10-01',gameType:'points',pointsCompetition:'stableford',players:[],pointsResults:[{name:'Test Player',score:36,points:10}]}]}};
    if(url.pathname.endsWith('iig_list_registered_groups')) {
     data=[{...group,group_name:'Sunday <Golfers>',admin_name:'Test Organiser',admin_contact:'test@example.test',plan_type:'trial',trial_expiry_date:'2099-01-15',status:'active'}];
     if(dashboardDenied){status=403;data={message:'Platform owner access required'};}
@@ -28,6 +29,7 @@ const assert = require('node:assert/strict');
   }
   return route.fulfill({status:200,body:'',contentType:'application/javascript'});
  });
+ await page.clock.install();
  const errors=[];page.on('pageerror',e=>errors.push(e.message));
  await page.goto('https://deploy-preview-6--super-quokka-51747d.netlify.app/app/index.html');
  await page.getByRole('button',{name:'Start a golf group',exact:false}).first().click();
@@ -44,6 +46,7 @@ const assert = require('node:assert/strict');
  assert.equal(await page.locator('#regCreatedName').textContent(),'Sunday <Golfers>');
  assert.equal(calls.filter(c=>c.path.endsWith('iig_create_owned_group')).length,1);
  await page.locator('#regSignout').click();await page.locator('#regEmailForm').waitFor({state:'visible'});
+ await page.clock.fastForward(61000); // Respect the one-minute OTP resend limit on returning login.
  await login();await page.locator('#regCreated').waitFor({state:'visible'});
  assert.equal(calls.filter(c=>c.path.endsWith('iig_create_owned_group')).length,1);
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
@@ -57,6 +60,14 @@ const assert = require('node:assert/strict');
  await page.screenshot({path:'/tmp/iig-registration-dashboard.png',fullPage:true});
  await page.locator('#registerLogout').click();await page.locator('#regEmailForm').waitFor({state:'visible'});
  assert.equal(await page.locator('#dashView').isVisible(),false);
+ await page.goto('https://deploy-preview-6--super-quokka-51747d.netlify.app/app/index.html#pin=3520');
+ await login();await page.locator('#securePlayerBanner').waitFor();
+ await page.locator('#nleague').click();
+ await page.locator('[onclick="showRoundHistory(0)"]').click();
+ await page.getByRole('heading',{name:'Historic Course'}).waitFor();
+ await page.locator('#securePlayerSignout').click();
+ await page.locator('#securePlayerBanner').waitFor({state:'detached'});
+ assert.equal(await page.evaluate(()=>state.players.length+state.history.length),0);
  assert.deepEqual(errors,[]);
  console.log('PASS: actual welcome form, email verification, create/readback failure, safe retry, return login, escaped text, mobile width, owner denial, dashboard rendering and sign-out. HTTP mocked; hosted email/JWT still requires the test database migration.');
  await browser.close();

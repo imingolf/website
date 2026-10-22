@@ -1,7 +1,7 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
 const {parseHTML}=require(process.env.LINKEDOM_PATH||'linkedom');
 const html=fs.readFileSync('app/index.html','utf8');const {document}=parseHTML(html);
-const ctx={document,location:{hostname:'deploy-preview-6--super-quokka-51747d.netlify.app',origin:'https://deploy-preview-6--super-quokka-51747d.netlify.app'},console,URLSearchParams,Date,structuredClone,localStorage:{getItem:()=>null,setItem(){},removeItem(){}},sessionStorage:{getItem:()=>null,setItem(){},removeItem(){}},navigator:{userAgent:'test'},setInterval:()=>1,clearInterval(){},setTimeout:()=>1,clearTimeout(){},alert(){},confirm:()=>true};
+const ctx={document,location:{hostname:'deploy-preview-6--super-quokka-51747d.netlify.app',origin:'https://deploy-preview-6--super-quokka-51747d.netlify.app'},console,crypto:require("node:crypto").webcrypto,URLSearchParams,Date,structuredClone,localStorage:{getItem:()=>null,setItem(){},removeItem(){}},sessionStorage:{getItem:()=>null,setItem(){},removeItem(){}},navigator:{userAgent:'test'},setInterval:()=>1,clearInterval(){},setTimeout:()=>1,clearTimeout(){},alert(){},confirm:()=>true};
 ctx.window=ctx;ctx.addEventListener=()=>{};ctx.scrollTo=()=>{};vm.createContext(ctx);
 for(const el of document.querySelectorAll('*'))el.animate=()=>{};
 for(const script of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)) if(script[1].includes('let db=null') || script[1].includes('function showWelcomePanel'))vm.runInContext(script[1],ctx);
@@ -52,7 +52,31 @@ async function request(url,body){calls.push({url,body});if(url.endsWith('iig_get
  assert.equal(group.state.players[0].stableford,null);assert.deepEqual(alerts,[]);
  await ctx.finishRound();assert.equal(group.state.history.length,1);assert.equal(group.state.players[0].leaguePoints,10);
  assert.match(alerts.at(-1),/already closed/);
- ctx.iigSecureOrganiser.close();assert.equal(vm.runInContext('db',ctx),null);assert.equal(vm.runInContext('isAdmin',ctx),false);
+ // The original Money and Trip finish paths must use the protected owner snapshot too.
+ for(const trip of [false,true])for(const format of ['stableford','net']){
+  group={...group,revision:group.revision+1,state:{course:'Protected Money',date:'2099-10-24',roundOpen:true,gameType:'money',pointsCompetition:format,
+   history:[],stake:10,splitPrizes:true,secondPrize:2,thirdPrize:1,
+   players:['A','B','C'].map((name,i)=>({id:name,name,paid:true,stableford:40-i,netScore:70+i})),
+   ...(trip?{trip:{active:true,currentRound:1,totalRounds:2,competition:format,rounds:[]}}:{})}};
+  await document.getElementById('secureOrganiserReload').onclick();alerts.length=0;
+  await ctx.finishRound();
+  const record=trip?group.state.trip.rounds[0]:group.state.history[0];
+  assert(record);assert.deepEqual(Array.from(record.payouts,p=>p.amount),[27,2,1]);
+  assert.equal(group.state.roundOpen,false);assert.deepEqual(alerts,[]);
+  if(trip)assert.equal(group.state.trip.currentRound,2);
+ }
+ // Team completion must not advance the screen when saving fails.
+ for(const format of ['betterball','pairsaggregate']){
+  group={...group,revision:group.revision+1,state:{course:'Protected Pairs',date:'2099-10-24',roundOpen:true,gameType:'points',pointsCompetition:'stableford',history:[],stake:0,
+   players:[{id:'A',name:'A',playingThisRound:true},{id:'B',name:'B',playingThisRound:true}],
+   trip:{active:true,currentRound:1,totalRounds:2,currentFormat:format,rounds:[],playerIds:['A','B'],currentPlayingIds:['A','B'],
+   currentTeams:[{id:'pair',playerIds:['A','B']}],currentTeamScores:{pair:40}}}};
+  await document.getElementById('secureOrganiserReload').onclick();fail=true;alerts.length=0;
+  await ctx.finishRound();assert.equal(group.state.trip.rounds.length,0);assert.match(alerts.at(-1),/could not be saved/);
+  fail=false;await document.getElementById('secureOrganiserReload').onclick();alerts.length=0;
+  await ctx.finishRound();assert.equal(group.state.trip.rounds.length,1);assert.equal(group.state.trip.currentRound,2);assert.deepEqual(alerts,[]);
+ }
+ ctx.iigSecureOrganiser.close();assert.equal(vm.runInContext('state.players.length+state.history.length',ctx),0);assert.equal(vm.runInContext('db',ctx),null);assert.equal(vm.runInContext('isAdmin',ctx),false);
  assert(!document.getElementById('setupOverlay').classList.contains('hidden'));
  console.log('PASS: original app renders first competition; verified-owner saves and reloads; revision conflict blocks retries until reload; legacy RPC denied; sign-out clears access.');
 })().catch(e=>{console.error(e);process.exit(1)});

@@ -4129,7 +4129,8 @@ async function finishTripBetterBallRound(){
   state.trip.currentTeamScores={};
   if(state.trip.currentRound<state.trip.totalRounds){state.trip.currentRound+=1;state.roundOpen=false;}
   else{state.trip.completed=true;state.trip.active=false;setTripChampion();}
-  await save();
+  const teamFinishSaved=await save();
+  if(!teamFinishSaved){alert('The finished team round could not be saved. Reload the group before continuing.');return;}
   if(state.trip?.completed)showTripSummary();else showTripBetterBallResult(record);
 }
 

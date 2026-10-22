@@ -7,7 +7,7 @@ for(const el of document.querySelectorAll('*'))el.animate=()=>{};
 for(const script of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)) if(script[1].includes('let db=null') || script[1].includes('function showWelcomePanel'))vm.runInContext(script[1],ctx);
 vm.runInContext(fs.readFileSync('app/secure-organiser.js','utf8'),ctx);
 vm.runInContext(fs.readFileSync('app/secure-player.js','utf8'),ctx);
-let data={player_id:'me',revision:0,state:{groupName:'Pam’s people',course:'Hazel Grove',date:'2099-10-24',gameType:'points',pointsCompetition:'stableford',roundOpen:true,players:[{id:'me',name:'Player one',handicap:11,playingThisRound:false,stableford:null,netScore:null},{id:'other',name:'Player two',handicap:15,playingThisRound:true,stableford:null,netScore:null}]}};
+let data={player_id:'me',revision:0,state:{groupName:'Pam’s people',course:'Hazel Grove',date:'2099-10-24',history:[{course:'Historic Course',date:'2026-10-01',gameType:'points',pointsCompetition:'stableford',players:[],pointsResults:[]}],gameType:'points',pointsCompetition:'stableford',roundOpen:true,players:[{id:'me',name:'Player one',handicap:11,playingThisRound:false,stableford:null,netScore:null},{id:'other',name:'Player two',handicap:15,playingThisRound:true,stableford:null,netScore:null}]}};
 const calls=[];let fail=false;
 async function request(url,body){calls.push({url,body});if(url.endsWith('iig_get_player_group'))return structuredClone(data);if(fail)throw Error('Group changed; reload before saving');assert.equal(body.p_revision,data.revision);assert.equal(body.p_pin,'3520');assert.equal(body.p_state,undefined);assert.equal(body.p_player_id,undefined);data.revision++;if(url.endsWith('iig_set_my_attendance'))data.state.players[0].playingThisRound=body.p_attending;else if(url.endsWith('iig_submit_my_score')){data.state.players[0].stableford=body.p_score;data.state.players[0].scoreSubmitted=true;}else throw Error('Unexpected RPC');return data.revision;}
 (async()=>{
@@ -25,6 +25,9 @@ async function request(url,body){calls.push({url,body});if(url.endsWith('iig_get
  document.getElementById('scoreInput_0').value='36';await ctx.submitPlayerScore(0,'stableford');
  assert.equal(data.state.players[0].stableford,36);assert.equal(data.state.players[1].stableford,null);
  assert.equal(await ctx.save(),false);assert(calls.every(c=>!c.url.includes('owned_group')));
- ctx.iigSecurePlayer.close();assert.equal(vm.runInContext('myPlayerId',ctx),'');assert.equal(vm.runInContext('db',ctx),null);
+ ctx.show('league');assert.match(document.getElementById('screen').textContent,/League/);
+ ctx.showRoundHistory(0);assert.match(document.getElementById('screen').textContent,/Historic Course/);
+ assert.equal(document.getElementById('nsettings').hidden,true);
+ ctx.iigSecurePlayer.close();assert.equal(document.getElementById('nsettings').hidden,false);assert.equal(vm.runInContext('state.players.length+state.history.length',ctx),0);assert.equal(vm.runInContext('myPlayerId',ctx),'');assert.equal(vm.runInContext('db',ctx),null);
  console.log('PASS: original player round/scores; own attendance/withdrawal; score limits; no other-player edits; stale lockout/reload; narrow RPC only; sign-out.');
 })().catch(e=>{console.error(e);process.exit(1)});
