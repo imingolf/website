@@ -6,6 +6,7 @@ function setup(dashboard=false,host='deploy-preview-6--super-quokka-51747d.netli
  const {document}=parseHTML(fs.readFileSync('app/'+(dashboard?'owner-dashboard.html':'index.html'),'utf8'));
  const calls=[],queue=[],storage=new Map();
  const ctx={document,location:{hostname:host,pathname:dashboard?'/app/owner-dashboard.html':'/app/'},Date,AbortController,setTimeout:()=>1,clearTimeout(){},crypto:{randomUUID:()=> '11111111-1111-4111-8111-111111111111'},sessionStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v)},fetch:async(url,opts)=>{calls.push({url,opts,body:JSON.parse(opts.body)});const r=queue.shift();if(!r)throw Error('Unexpected request');return {ok:!r.status||r.status<400,status:r.status||200,json:async()=>r.data};}};
+ ctx.window=ctx;
  vm.runInNewContext(source,ctx);
  const el=id=>document.getElementById(id);
  async function act(id,event='onclick'){el(id)[event]({preventDefault(){}});for(let j=0;j<100;j++)await Promise.resolve();}

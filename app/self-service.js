@@ -24,7 +24,7 @@
     <form id="regCodeForm" hidden><label for="regCode">Code from your email</label><p id="regSentTo"></p><input id="regCode" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6,10}" minlength="6" maxlength="10" required><button class="primary full">Verify email</button><button id="regResend" type="button" class="secondary full">Send another code</button><button id="regChangeEmail" type="button" class="ghost full">Use a different email</button></form>
     <section id="regSignedIn" hidden><p id="regAccount" class="muted"></p>
     <form id="regGroupForm" hidden><label for="regName">Your name</label><input id="regName" autocomplete="name" maxlength="80" required><label for="regGroupName">Group name</label><input id="regGroupName" maxlength="80" required placeholder="e.g. Sunday Golfers"><button class="primary full">Create my group</button><p class="muted">One group per organiser account. Your name and email are shared with I’m In Golf to manage your group and trial.</p></form>
-    <section id="regCreated" hidden><h2>Your group is ready</h2><p id="regCreatedName"></p><p>Group PIN: <strong id="regPin"></strong></p><p>Your group has been registered with I’m In Golf.</p><p class="notice">This is a test group. Full competition setup in the original app layout is still being connected.</p></section>
+    <section id="regCreated" hidden><h2>Your group is ready</h2><p id="regCreatedName"></p><p>Group PIN: <strong id="regPin"></strong></p><p>Your group has been registered with I’m In Golf.</p><p class="notice">This is a test group. Open your group to test competition setup in the original app layout. Player sign-in in that layout is still being connected.</p><button id="regOpenGroup" type="button" class="primary full">Open my group</button></section>
     <button id="regReload" type="button" class="secondary full">${dashboard ? 'Open dashboard' : 'Check my group'}</button><button id="regSignout" type="button" class="ghost full">Sign out</button></section>`;
   // Author styles in the original app must not override hidden form visibility.
   const style = document.createElement('style');
@@ -37,6 +37,7 @@
     $('regResend').disabled = value || Date.now() < resendAt;
   };
   function reset() {
+    window.iigSecureOrganiser?.close();
     session = null; pending = null;
     $('regSignedIn').hidden = true; $('regGroupForm').hidden = true; $('regCreated').hidden = true;
     $('regEmailForm').hidden = false; $('regCodeForm').hidden = true; $('regCode').value = '';
@@ -121,6 +122,15 @@
       try { await loadGroup(); } catch (_) { message('Your group was created. Tap Check my group to reload its details.'); }
     });
   };
+  $('regOpenGroup').onclick = () => action(async () => {
+    if (!window.iigSecureOrganiser) throw new Error('Please reload this preview to open your group.');
+    const group = await loadGroup();
+    if (!group) return;
+    const accessRows = await request('/rest/v1/rpc/get_group_access_status', {p_pin:group.group_pin}, true);
+    const access = Array.isArray(accessRows) ? accessRows[0] : accessRows;
+    if (!access || access.access_allowed !== true) throw new Error('Your group is not currently available.');
+    window.iigSecureOrganiser.open(group, request, () => action(signout), access.plan_type);
+  });
   $('regReload').onclick = () => action(dashboard ? loadDashboard : loadGroup);
   async function signout() {
     try { if (session) await request('/auth/v1/logout', {}, true); }

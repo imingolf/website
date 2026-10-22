@@ -119,3 +119,26 @@ denial/list and sign-out clearing. `npm install --prefix tests` then
 `node tests/self-service.cjs` is an additional Playwright browser check; it has NOT
 been executed here because the Chromium download failed. It uses mocked network,
 not hosted Supabase. Physical-iPhone and real owner-register checks remain pending.
+
+## Original organiser-screen adapter
+
+Hosted registration has now been observed: Pam’s people, PIN 3520, appeared in the
+private test owner register alongside 5021, with contact and 14-day trial metadata.
+
+`secure-organiser.js` connects Open my group from the verified welcome to the original
+organiser round/settings screens. It bypasses PIN-only connection/admin persistence;
+all saves use iig_save_owned_group with the accepted revision. Serial writes, refresh
+version checks, stale/uncertain-save blocking, rollback of optimistic display and
+explicit reload protect the adapter from overwriting concurrent changes. Legacy RPCs
+are denied for these sessions; no production client is reused. Sign-out clears access.
+Original player identity/invites, native purchase/push and other specialised legacy
+flows are NOT fully integrated. PIN changes, legacy invitations, player-view switching,
+group renaming and outdated PIN help are hidden/blocked in this preview adapter.
+The old test player/invitation pages remain available for that phase.
+
+DOM integration executes the actual original app script and newRound save path with
+mocked wizard choices/network. First-competition rendering, saving/reload, stale-write
+block/recovery, legacy RPC denial and sign-out pass. No new SQL is needed for this
+increment. Next physical check: sign in with the account that owns 3520; Open my group;
+Start First Competition → Points Game → Stableford; save course/date, then Reload
+saved group to verify. Keep draft: no production merge/release.
