@@ -5,6 +5,13 @@
   const allowed = location.hostname === 'deploy-preview-6--super-quokka-51747d.netlify.app' || ['localhost', '127.0.0.1'].includes(location.hostname);
   const message = text => { $('message').textContent = text; };
   if (!allowed) { message('This test page is only available on the authorised preview.'); return; }
+  const playerMode = location.pathname === '/app/player-test.html';
+  const invite = new URLSearchParams(location.hash.slice(1));
+  const invitePin = invite.get('pin'), inviteToken = invite.get('invite');
+  if (playerMode && (!/^\d{4}$/.test(invitePin || '') || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(inviteToken || ''))) {
+    message('Open the complete invitation link from your organiser.'); return;
+  }
+  let playerGroup = null;
   const base = 'https://nyavvwrsrxqfyhiygkgw.supabase.co';
   const key = 'sb_publishable_fDGji75-j3GP5VeAAIAdZg_f9TNmtWL';
   // Session credentials remain in memory only. Reloading requires a new email code.
@@ -26,7 +33,7 @@
       if (authorised) headers.Authorization = 'Bearer ' + session.access_token;
       const response = await fetch(base + path, { method: 'POST', headers, body: JSON.stringify(body), signal: controller.signal, cache: 'no-store' });
       const data = response.status === 204 ? {} : await response.json();
-      if (!response.ok) throw new Error(data.msg || data.message || data.error_description || 'Request failed. Please try again.');
+      if (!response.ok) { const error = new Error(data.msg || data.message || data.error_description || 'Request failed. Please try again.'); error.code = data.code; throw error; }
       return data;
     } catch (error) {
       if (error.name === 'AbortError') throw new Error('The connection timed out. You can safely retry.');
@@ -43,6 +50,7 @@
     if (!data || !/^\d{4}$/.test(data.group_pin)) throw new Error('Unexpected group response. Use Check for my test group before retrying.');
     $('pin').textContent = data.group_pin;
     $('groupForm').hidden = true; $('approval').hidden = true; $('result').hidden = false;
+    $('inviteSection').hidden = true;
     ownedGroup = null;
     $('competitionForm').hidden = true;
     $('reloadCompetition').hidden = true;
@@ -56,6 +64,13 @@
       const editable = data.state.roundOpen === false && data.state.players.length === 0 && data.state.history.length === 0;
       $('competitionForm').hidden = !editable;
       $('reloadCompetition').hidden = false;
+      const ready = !!data.state.course && /^\d{4}-\d{2}-\d{2}$/.test(data.state.date || '');
+      $('inviteSection').hidden = !ready;
+      $('openEntries').hidden = data.state.roundOpen === true || data.state.history.length > 0;
+      $('entryStatus').textContent = data.state.roundOpen === true ? 'Test entries are open.' : 'Open test entries before inviting players.';
+      $('inviteLink').value = data.state.roundOpen === true && data.invite_token
+        ? location.origin + '/app/player-test.html#pin=' + encodeURIComponent(data.group_pin) + '&invite=' + encodeURIComponent(data.invite_token) : '';
+      $('copyInvite').hidden = !$('inviteLink').value;
       $('competitionSummary').textContent = editable
         ? (data.state.course && data.state.date ? 'Saved draft: ' + data.state.course + ' · ' + data.state.date + ' · ' + ($('format').value === 'net' ? 'Net' : 'Stableford') : 'Your group is ready. Add your first competition below.')
         : 'This group already has activity. First-competition setup is unavailable.';
@@ -89,7 +104,8 @@
       $('code').value = ''; $('codeForm').hidden = true; $('signedIn').hidden = false;
       $('account').textContent = 'Signed in as ' + data.user.email;
       $('identity').textContent = data.user.id;
-      await checkGroup();
+      if (playerMode) { $('check').hidden = true; $('playerSection').hidden = false; await loadPlayer(); }
+      else await checkGroup();
     });
   };
   $('check').onclick = () => action(checkGroup);
@@ -144,6 +160,63 @@
       message('Competition draft saved and checked. Entries are not open yet.');
     });
   };
+  $('copyInvite').onclick = () => action(async () => {
+    if (!$('inviteLink').value) throw new Error('Open entries and reload your group first.');
+    try { await navigator.clipboard.writeText($('inviteLink').value); message('Invitation link copied. Share it with your test player.'); }
+    catch (_) { $('inviteLink').focus(); $('inviteLink').select(); message('Select and copy the invitation link above.'); }
+  });
+  $('openEntries').onclick = () => action(async () => {
+    if (!ownedGroup || $('openEntries').hidden || !ownedGroup.state.course || !ownedGroup.state.date) throw new Error('Reload your saved competition first.');
+    const group = ownedGroup;
+    ownedGroup = null; $('inviteSection').hidden = true; $('competitionForm').hidden = true;
+    try {
+      await request('/rest/v1/rpc/iig_save_owned_group', {p_pin:group.group_pin,p_revision:group.revision,p_state:{...group.state,roundOpen:true}},true);
+      await checkGroup();
+      message('Test entries are open. Copy your invitation link below.');
+    } catch (error) { throw new Error(error.message + ' Reload saved competition before trying again.'); }
+  });
+  async function loadPlayer() {
+    playerGroup = null; $('playerResult').hidden = true; $('joinForm').hidden = true;
+    let data;
+    try { data = await request('/rest/v1/rpc/iig_get_player_group',{p_pin:invitePin},true); }
+    catch (error) {
+      if (error.code === '42501' && error.message === 'Group membership required') {
+        $('joinForm').hidden = false; message('Email verified. Enter your name and handicap to join.'); return;
+      }
+      throw error;
+    }
+    if (!data || !data.state || !Array.isArray(data.state.players) || !Number.isSafeInteger(data.revision)) throw new Error('Unable to read the group. Reload to try again.');
+    const me = data.state.players.find(p => p.id === data.player_id);
+    if (!me) throw new Error('Your player record is unavailable. Contact your organiser.');
+    playerGroup = data;
+    $('playerResult').hidden = false;
+    $('playerTitle').textContent = data.state.groupName || 'Your test group';
+    $('playerCompetition').textContent = (data.state.course || 'Course to be confirmed') + ' · ' + (data.state.date || '') + ' · ' + (data.state.pointsCompetition === 'net' ? 'Net' : 'Stableford');
+    $('attendanceStatus').textContent = me.name + (me.playingThisRound ? ': you’re marked as playing.' : ': you’re not marked as playing.');
+    const closed = data.state.roundOpen !== true || data.state.players.some(p => p.scoreSubmitted === true || p.stableford != null || p.netScore != null);
+    $('attend').hidden = closed || me.playingThisRound === true;
+    $('withdraw').hidden = closed || me.playingThisRound !== true;
+    $('playerList').textContent = 'Playing: ' + (data.state.players.filter(p => p.playingThisRound).map(p => p.name).join(', ') || 'Nobody yet');
+    message(closed ? 'Attendance changes are closed.' : 'Your test group is loaded.');
+  }
+  $('reloadPlayer').onclick = () => action(loadPlayer);
+  $('joinForm').onsubmit = event => { event.preventDefault(); action(async () => {
+    const name = $('playerName').value.trim(), raw = $('handicap').value.trim(), handicap = Number(raw);
+    if (!name || name.length > 80 || !raw || !Number.isFinite(handicap) || handicap < -10 || handicap > 60 || Math.abs(handicap * 10 - Math.round(handicap * 10)) > 1e-8) throw new Error('Enter your name and a handicap from -10 to 60, with up to one decimal place.');
+    await request('/rest/v1/rpc/iig_join_owned_group',{p_pin:invitePin,p_invite:inviteToken,p_name:name,p_handicap:handicap},true);
+    await loadPlayer();
+  }); };
+  async function attendance(attending) {
+    if (!playerGroup) throw new Error('Reload your group before changing attendance.');
+    const revision = playerGroup.revision;
+    playerGroup = null; $('attend').hidden = true; $('withdraw').hidden = true;
+    try {
+      await request('/rest/v1/rpc/iig_set_my_attendance',{p_pin:invitePin,p_attending:attending,p_revision:revision},true);
+      await loadPlayer();
+    } catch (error) { throw new Error(error.message + ' Reload group to check your attendance before trying again.'); }
+  }
+  $('attend').onclick = () => action(() => attendance(true));
+  $('withdraw').onclick = () => action(() => attendance(false));
   $('signout').onclick = () => action(async () => {
     try { if (session) await request('/auth/v1/logout', {}, true); }
     catch (_) { /* Local credentials are always discarded. */ }
