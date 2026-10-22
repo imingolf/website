@@ -161,3 +161,15 @@ invalid invitation rejection, email join flow, membership lookup, actual round/s
 rendering, attendance/withdrawal, score digit limits, other-player denial, stale revision
 lockout/reload and sign-out. Existing PostgreSQL tests pass. Hosted invitation/phone
 check remains. No new SQL required. Still no production release.
+
+## Finish Round integration correction
+
+Hosted tests confirmed Greg Steel joined 3520, entered, and submitted 36 Stableford
+points visible on both devices. Finish Round exposed a legacy get_group_state call
+that the secure adapter correctly denied. The normal Points Game finish path now
+loads the latest verified-owned snapshot and revision before computing results,
+retains revision-checked save, and rejects already-closed rounds. It does not enable
+legacy RPC access. Manual reload is blocked during finishing to avoid snapshot races.
+The actual finishRound flow passes DOM tests for latest-score loading, failed-save
+preservation, one history record, 36-point result, 10 league points, one win and
+repeat-finish rejection. Hosted close/history check remains next. No SQL required.

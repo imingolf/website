@@ -43,7 +43,7 @@
  async function reload(manual=false){
   if(!active || manualLoading)return;
   if(!manual && (pending || blocked || refreshBlocked()))return;
-  if(manual && (scoreDraftActive || document.querySelector('#appPromptInput,#appConfirmYes,#normalSetupCourse'))) {status('Finish or cancel your current entry before reloading.');return;}
+  if(manual && (finishRoundActive || normalFinishInProgress || scoreDraftActive || document.querySelector('#appPromptInput,#appConfirmYes,#normalSetupCourse'))) {status('Finish or cancel your current entry before reloading.');return;}
   const current=active,e=epoch,sequence=++readSequence;
   const button=document.getElementById('secureOrganiserReload');
   if(manual){manualLoading=true;if(button){button.disabled=true;button.textContent='Reloading…';}status(pending?'Finishing your save, then reloading…':'Loading your saved group…');}
@@ -68,6 +68,20 @@
  }
 
  window.iigSecureOrganiser={
+  get active(){return !!active;},
+  async prepareFinish(){
+   if(!active || !isAdmin)throw Error('Sign in as your group organiser to finish the round.');
+   if(pending || blocked)throw Error('Reload the saved group before finishing the round.');
+   const current=active,e=epoch,v=stateSaveVersion;
+   readSequence++;
+   const group=await current.request('/rest/v1/rpc/iig_get_owned_group',{},true);
+   if(e!==epoch || pending || stateSaveVersion!==v)throw Error('Your group changed. Reload it before finishing the round.');
+   if(!valid(group)||group.group_pin!==current.pin)throw Error('Could not confirm your saved group.');
+   if(group.state.roundOpen!==true)throw Error('This round is already closed. Check League → Previous rounds.');
+   if(group.state.gameType!=='points'||group.state.trip?.active)throw Error('Finishing this game type is not connected in the test preview yet.');
+   apply(group);
+   status('Latest scores loaded. Finishing the round…');
+  },
   open(group,request,signout,plan){
    if(!valid(group))throw Error('Group details are incomplete. Tap Check my group.');
    epoch++;active={pin:group.group_pin,request,signout,group};blocked=false;revision=group.revision;

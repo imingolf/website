@@ -37,6 +37,21 @@ async function request(url,body){calls.push({url,body});if(url.endsWith('iig_get
  assert.equal(button.disabled,false);
  assert(calls.every(c=>/iig_(get|save)_owned_group$/.test(c.url)));
  assert.equal((await vm.runInContext("db.rpc('save_group_state',{})",ctx)).data,null);
+ // Execute the actual Finish Round flow against the saved server snapshot.
+ group.state.players=[{id:'greg',name:'Greg Steel',handicap:11,playingThisRound:true,stableford:36,netScore:null,scoreSubmitted:true}];
+ group.revision++;vm.runInContext('state.players=[]',ctx);
+ const alerts=[];ctx.alert=text=>alerts.push(text);
+ fail=true;await ctx.finishRound();
+ assert.equal(group.state.roundOpen,true);assert.equal(group.state.history.length,0);
+ assert.equal(group.state.players[0].stableford,36);assert.equal(vm.runInContext('state.players[0].stableford',ctx),36);
+ fail=false;await document.getElementById('secureOrganiserReload').onclick();alerts.length=0;
+ await ctx.finishRound();
+ assert.equal(group.state.roundOpen,false);assert.equal(group.state.history.length,1);
+ assert.equal(group.state.history[0].players[0].stableford,36);
+ assert.equal(group.state.players[0].leaguePoints,10);assert.equal(group.state.players[0].wins,1);
+ assert.equal(group.state.players[0].stableford,null);assert.deepEqual(alerts,[]);
+ await ctx.finishRound();assert.equal(group.state.history.length,1);assert.equal(group.state.players[0].leaguePoints,10);
+ assert.match(alerts.at(-1),/already closed/);
  ctx.iigSecureOrganiser.close();assert.equal(vm.runInContext('db',ctx),null);assert.equal(vm.runInContext('isAdmin',ctx),false);
  assert(!document.getElementById('setupOverlay').classList.contains('hidden'));
  console.log('PASS: original app renders first competition; verified-owner saves and reloads; revision conflict blocks retries until reload; legacy RPC denied; sign-out clears access.');

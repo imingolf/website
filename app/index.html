@@ -4159,6 +4159,10 @@ async function finishRound(){
 }
 
 async function finishRoundImpl(){
+  if(window.iigSecureOrganiser?.active){
+    try{await window.iigSecureOrganiser.prepareFinish();}
+    catch(error){alert(error.message);return;}
+  }
 
 
   const isPointsGame=state.gameType==="points";
@@ -4172,7 +4176,7 @@ async function finishRoundImpl(){
 
   // Normal rounds: refresh from Supabase before finalising so the
   // Admin cannot finish using a stale copy while a player is submitting.
-  if(!isTrip && db){
+  if(!isTrip && db && !window.iigSecureOrganiser?.active){
     const {data:latestState,error:latestError}=await db.rpc(
       "get_group_state",
       {p_pin:pin}
