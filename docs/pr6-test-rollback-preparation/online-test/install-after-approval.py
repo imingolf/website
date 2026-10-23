@@ -27,6 +27,13 @@ def main():
     preflight=json.loads((folder/'report.json').read_text())
     require(manifest['project']==pmod.PROJECT and preflight['result']=='PASS'
             and preflight['migrations_executed'] is False,'Require successful read-only TEST package')
+    if preflight.get('historical_checksum_missing'):
+        backup=preflight.get('fresh_backup',{})
+        require(backup.get('project')==pmod.PROJECT and backup.get('historical_checksum_missing') is True,
+                'Missing distinct fresh TEST recovery backup evidence')
+        archive=Path(backup.get('path',''))
+        require(archive.is_file() and hashlib.sha256(archive.read_bytes()).hexdigest()==backup.get('sha256'),
+                'Fresh TEST recovery backup missing or changed; STOP')
     controls_ok,_=pmod.writer_controls(folder/'controlled-pause.json')
     require(controls_ok,'Pause evidence expired/incomplete; repeat read-only preparation')
     expected=dict(pmod.local.MIGRATIONS)

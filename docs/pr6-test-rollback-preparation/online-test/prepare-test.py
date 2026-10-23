@@ -87,15 +87,19 @@ def evidence(folder):
     require(installed['fingerprints']==before['fingerprints'],'Local installation changed protected data')
     return audit
 
-def backup_check(archive,manifest,out):
-    require(archive.is_file() and manifest.is_file(),'Missing TEST backup or previously recorded backup.sha256; do not invent a new anchor')
-    saved=manifest.read_text().strip().splitlines()
-    require(len(saved)==1 and re.match(r'^[a-fA-F0-9]{64}\s',saved[0]),'Unrecognised original backup checksum manifest')
-    expected=saved[0].split()[0].lower()
+def backup_check(archive,manifest,out,allow_unanchored=False):
+    require(archive.is_file(),'Missing TEST archive')
+    require(manifest.is_file() or allow_unanchored,
+            'Historical backup checksum missing. Review recovery procedure and use --recover-missing-checksum; no historical anchor will be invented')
+    expected=None
+    if manifest.is_file():
+        saved=manifest.read_text().strip().splitlines()
+        require(len(saved)==1 and re.match(r'^[a-fA-F0-9]{64}\s',saved[0]),'Unrecognised original backup checksum manifest')
+        expected=saved[0].split()[0].lower()
     h=hashlib.sha256()
     with archive.open('rb') as f:
         for chunk in iter(lambda:f.read(1024*1024),b''): h.update(chunk)
-    require(h.hexdigest()==expected,'TEST backup changed since recorded local restore preparation')
+    require(expected is None or h.hexdigest()==expected,'TEST backup changed since recorded local restore preparation')
     require('18.6' in run(['pg_restore','--version']),'Require Mac pg_restore 18.6')
     toc=run(['pg_restore','--list',str(archive)])
     require(re.search(r'Dumped from database version:\s*17\.11\b',toc),'Archive source version is not expected TEST 17.11')
@@ -108,6 +112,38 @@ def backup_check(archive,manifest,out):
         require('TABLE DATA '+table+' ' in toc,'Missing archived application data: '+table)
     require('SEQUENCE public tens_in_groups_id_seq ' in toc,'Missing archived identity sequence')
     return h.hexdigest()
+
+def fresh_backup(reader,before,audit,out):
+    """New, separately named recovery backup. Never rewrite the original archive/manifest."""
+    require('18.6' in run(['pg_dump','--version']),'Require Mac pg_dump 18.6')
+    local.compare_baseline(before,reader.capture('before-fresh-backup'))
+    local.compare_supplementary(audit,reader.audit('before-fresh-backup-audit'))
+    archive=out/'TEST-fresh-preinstall.dump'
+    require(not archive.exists(),'Fresh backup path already exists; refuse overwrite')
+    # O_EXCL and umask 077 prevent accidental replacement or readable credentials.
+    fd=os.open(archive,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
+    os.close(fd)
+    env={k:v for k,v in os.environ.items() if not k.startswith('PG')}
+    env['PGOPTIONS']='-c default_transaction_read_only=on'
+    if 'password' in reader.c: env['PGPASSWORD']=reader.c['password']
+    if 'passfile' in reader.c: env['PGPASSFILE']=str(Path(reader.c['passfile']).expanduser())
+    run(['pg_dump','--no-password','--dbname',conninfo(reader.c),'--format=custom',
+         '--no-owner','--no-acl','--lock-wait-timeout=5s','--file',str(archive)],env=env)
+    # Only after pg_dump succeeds: anchor the NEW archive, explicitly dated now.
+    digest=hashlib.sha256(archive.read_bytes()).hexdigest()
+    manifest=out/'fresh-backup.sha256'
+    manifest.write_text(digest+'  '+archive.name+'\n')
+    validation=out/'fresh-backup-validation'; validation.mkdir(mode=0o700)
+    backup_check(archive,manifest,validation)
+    local.compare_baseline(before,reader.capture('after-fresh-backup'))
+    local.compare_supplementary(audit,reader.audit('after-fresh-backup-audit'))
+    record={'project':PROJECT,'path':str(archive.resolve()),'sha256':digest,
+            'created_at_utc':datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            'historical_checksum_missing':True,'original_archive_integrity_proven':False,
+            'validated':'pg_dump succeeded; full pg_restore traversal; original captured scope unchanged before/after',
+            'limits':'Independent consistent dump snapshot; before/after comparisons do not prove absence of transient writers. No full Auth/ACL restore test.'}
+    (out/'fresh-backup.json').write_text(json.dumps(record,indent=2)+'\n')
+    return record
 
 def writer_controls(path):
     if not path.exists():
@@ -251,6 +287,7 @@ def main():
     p.add_argument('--service-file',type=Path,default=Path.home()/'.pg_service.conf')
     p.add_argument('--root',type=Path,default=Path.home()/'Documents/ImInGolf-Local-Rehearsal')
     p.add_argument('--backup',type=Path,default=Path.home()/'Documents/ImInGolf-Backups/ImInGolf-Test-2026-10-22.dump')
+    p.add_argument('--recover-missing-checksum',action='store_true',help='Explicitly record missing historical checksum and create a distinct fresh read-only TEST backup')
     a=p.parse_args(); os.umask(0o077)
     base=Path.home()/'Documents/ImInGolf-TEST-Installation'; base.mkdir(exist_ok=True,mode=0o700)
     out=base/('readonly-preflight-'+datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%S.%fZ'))
@@ -270,7 +307,14 @@ def main():
         require(before['project_attestation']==PROJECT and before['role']=='postgres','Wrong original TEST capture')
         audit_local=evidence(a.root/'local-restore-generated'/PASS_RUN)
         report['local_rehearsal_evidence']='PASS revalidated from saved files'
-        report['backup_sha256']=backup_check(a.backup,a.root/'local-restore-generated/backup.sha256',out)
+        historical_manifest=a.root/'local-restore-generated/backup.sha256'
+        missing_history=not historical_manifest.is_file()
+        report['historical_checksum_missing']=missing_history
+        report['original_backup_observed_sha256']=backup_check(a.backup,historical_manifest,out,allow_unanchored=a.recover_missing_checksum)
+        report['original_backup_path']=str(a.backup.resolve())
+        report['original_backup_observed_at_utc']=datetime.datetime.now(datetime.timezone.utc).isoformat()
+        report['original_backup_hash_scope']='Observed now only; NOT historical integrity evidence' if missing_history else 'Matched previously recorded manifest'
+        (out/'original-backup-observation.json').write_text(json.dumps({k:v for k,v in report.items() if k.startswith(('original_backup','historical_checksum'))},indent=2))
         report['backup_limit']='Readable original archive; synthetic Auth/local ACL restoration does not prove full hosted Auth recovery'
         originals=[]
         for name,digest in local.MIGRATIONS:
@@ -289,6 +333,10 @@ def main():
             require(audit['rows'][table]==audit_local['rows'][table],
                     'Notification data differs from rehearsed backup: '+table+'; STOP for review')
         report['background_inventory']=status
+        if missing_history:
+            report['stage']='fresh read-only TEST recovery backup'
+            report['fresh_backup']=fresh_backup(reader,before,audit,out)
+        report['stage']='writer controls and final read-only comparison'
         controls_ok,controls_note=writer_controls(base/'controlled-pause.json')
         report['writer_controls']=controls_note
         # A second snapshot detects movement during preparation; it is not proof of a pause.

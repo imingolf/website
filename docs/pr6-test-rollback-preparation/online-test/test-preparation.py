@@ -124,8 +124,92 @@ class PreparationTests(unittest.TestCase):
             root=Path(d); archive=root/'test.dump'; archive.write_bytes(b'offline fixture')
             manifest=root/'backup.sha256'; manifest.write_text('0'*64+'  test.dump\n')
             with patch.object(p,'run') as run,self.assertRaises(RuntimeError):
-                p.backup_check(archive,manifest,root)
+                p.backup_check(archive,manifest,root,allow_unanchored=True)
             run.assert_not_called()
+
+    def test_missing_history_requires_explicit_recovery_and_never_writes_old_manifest(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d); archive=root/'original.dump'; archive.write_bytes(b'fixture')
+            manifest=root/'backup.sha256'
+            with patch.object(p,'run') as command:
+                with self.assertRaisesRegex(RuntimeError,'Historical backup checksum missing'):
+                    p.backup_check(archive,manifest,root)
+                command.assert_not_called()
+                toc='Dumped from database version: 17.11\n'
+                tables=['public tens_in_groups','public iig_notification_settings','public iig_notification_events',
+                        'iig_private group_owners','iig_private group_members','iig_private setup_testers',
+                        'iig_private platform_owners','iig_private registration_settings']
+                toc+=''.join('TABLE DATA '+t+' postgres\n' for t in tables)
+                toc+='SEQUENCE public tens_in_groups_id_seq postgres\n'
+                command.side_effect=['pg_restore (PostgreSQL) 18.6',toc,'']
+                observed=p.backup_check(archive,manifest,root,allow_unanchored=True)
+                self.assertEqual(observed,p.hashlib.sha256(b'fixture').hexdigest())
+                self.assertFalse(manifest.exists())
+                self.assertEqual(archive.read_bytes(),b'fixture')
+                self.assertEqual(command.call_args.args[0][-2:], [p.os.devnull,str(archive)])
+
+    def test_fresh_dump_is_test_readonly_and_comparisons_remain_mandatory(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d); before=fixtures.capture_fixture()
+            audit=fixtures.AutomationTests().supplementary_fixture()
+            class FakeReader:
+                c=self.config()
+                def capture(self,*args): return copy.deepcopy(before)
+                def audit(self,*args): return copy.deepcopy(audit)
+            def command(args,env=None):
+                if args==['pg_dump','--version']: return 'pg_dump (PostgreSQL) 18.6'
+                self.assertEqual(args[0],'pg_dump')
+                self.assertIn('--no-password',args)
+                self.assertIn('default_transaction_read_only=on',args[args.index('--dbname')+1])
+                self.assertIn(p.PROJECT,args[args.index('--dbname')+1])
+                self.assertNotIn('PGHOST',env)
+                Path(args[-1]).write_bytes(b'new archive fixture')
+                return ''
+            with patch.object(p,'run',side_effect=command),patch.object(p,'backup_check') as validate, \
+                 patch.dict(p.os.environ,{'PGHOST':'forbidden.example'}):
+                result=p.fresh_backup(FakeReader(),before,audit,root)
+                self.assertTrue(result['historical_checksum_missing'])
+                self.assertFalse(result['original_archive_integrity_proven'])
+                validate.assert_called_once()
+                self.assertTrue((root/'fresh-backup.sha256').exists())
+                self.assertFalse((root/'backup.sha256').exists())
+                with self.assertRaisesRegex(RuntimeError,'refuse overwrite'):
+                    p.fresh_backup(FakeReader(),before,audit,root)
+
+    def test_failed_dump_or_changed_post_dump_baseline_cannot_be_promoted(self):
+        for failure in ('dump','changed'):
+            with self.subTest(failure=failure),tempfile.TemporaryDirectory() as d:
+                root=Path(d); before=fixtures.capture_fixture()
+                audit=fixtures.AutomationTests().supplementary_fixture()
+                class FakeReader:
+                    c=self.config()
+                    calls=0
+                    def capture(self,*args):
+                        self.calls+=1
+                        value=copy.deepcopy(before)
+                        if self.calls>1: value['fingerprints']={}
+                        return value
+                    def audit(self,*args): return copy.deepcopy(audit)
+                def command(args,env=None):
+                    if args==['pg_dump','--version']: return 'pg_dump (PostgreSQL) 18.6'
+                    if failure=='dump': raise RuntimeError('fixture dump failed')
+                    Path(args[-1]).write_bytes(b'fresh fixture')
+                    return ''
+                with patch.object(p,'run',side_effect=command),patch.object(p,'backup_check'):
+                    with self.assertRaises(RuntimeError):
+                        p.fresh_backup(FakeReader(),before,audit,root)
+                self.assertFalse((root/'fresh-backup.json').exists())
+
+    def test_fresh_backup_stops_if_original_capture_changed(self):
+        with tempfile.TemporaryDirectory() as d:
+            before=fixtures.capture_fixture()
+            class ChangedReader:
+                def capture(self,*args):
+                    changed=copy.deepcopy(before); changed['fingerprints']={}; return changed
+            with patch.object(p,'run',return_value='pg_dump (PostgreSQL) 18.6') as command:
+                with self.assertRaises(RuntimeError):
+                    p.fresh_backup(ChangedReader(),before,{},Path(d))
+                self.assertEqual(command.call_count,1) # version check only, no dump
 
     def test_unconfirmed_writers_produce_fail_without_install_package(self):
         with tempfile.TemporaryDirectory() as d:
@@ -152,7 +236,7 @@ class PreparationTests(unittest.TestCase):
             argv=['prepare-test.py','--capture',str(capture),'--rollback',str(rollback),'--root',str(root)]
             with patch.object(p.Path,'home',return_value=root),patch.object(p.sys,'argv',argv),\
                  patch.object(p,'run',side_effect=command),patch.object(p,'evidence',return_value=audit),\
-                 patch.object(p,'backup_check',return_value='offline-backup-hash'),\
+                 patch.object(p,'backup_check',return_value='offline-backup-hash'),patch.object(p,'fresh_backup',return_value={'offline':True}),\
                  patch.object(p,'service_config',return_value=self.config()),patch.object(p,'Reader',FakeReader),\
                  patch.object(p,'online_checks',return_value=(before,audit,{})),patch.object(p.time,'sleep'),\
                  patch('builtins.print'):

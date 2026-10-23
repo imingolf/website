@@ -13,7 +13,7 @@ Run this single block in Mac Terminal:
       IIG_REPO="$HOME/Downloads/imingolf-rollback"
       test "$(git -C "$IIG_REPO" branch --show-current)" = pr6-test-rollback-preparation
       git -C "$IIG_REPO" pull --ff-only origin pr6-test-rollback-preparation
-      python3 "$IIG_REPO/docs/pr6-test-rollback-preparation/online-test/prepare-test.py"
+      python3 "$IIG_REPO/docs/pr6-test-rollback-preparation/online-test/prepare-test.py" --recover-missing-checksum
     )
 
 Git contacts GitHub. Python connects read-only to TEST only after offline target
@@ -29,10 +29,10 @@ Confirmed default inputs:
 - Original rollback: the sibling rollback.TEST.sql.
 - Private service: iig-test-only in ~/.pg_service.conf.
 - Backup: ~/Documents/ImInGolf-Backups/ImInGolf-Test-2026-10-22.dump.
-- Recorded checksum: local-restore-generated/backup.sha256.
+- Historical checksum: NOT recorded/found. This is explicitly documented, not reconstructed.
 - Local PASS: local-restore-generated/automated-rehearsal-20261023T115001.671715Z.
 
-The latter two are under ~/Documents/ImInGolf-Local-Rehearsal. Original capture,
+The local PASS and legacy optional checksum location are under ~/Documents/ImInGolf-Local-Rehearsal. Original capture,
 rollback, backup and rehearsal evidence are never overwritten or committed.
 
 Output is PASS/FAIL and a private evidence folder under
@@ -49,10 +49,12 @@ Do not replace the capture or delete data to manufacture PASS.
    and audits: all original fingerprints, function grants/owners, column ACLs,
    history/data, sequence, indexes, constraints, policies, normal/event triggers
    and RLS. Codex cannot inspect the Mac; the command reviews the actual files there.
-2. Compare backup SHA-256 with the already-recorded checksum. pg_restore 18.6
-   inventories and traverses/decompresses the full archive to /dev/null with no
-   database target. Require application data, sequence and source version 17.11.
-   This is not a full restore; a missing old checksum needs review, not a new anchor.
+2. With explicit --recover-missing-checksum, preserve the original archive and
+   record its SHA-256 as OBSERVED NOW ONLY. pg_restore 18.6 inventories and
+   traverses/decompresses it to /dev/null with no database target. Require
+   application data, sequence and source version 17.11. An existing historical
+   manifest must still match; recovery never bypasses a mismatch. No legacy
+   backup.sha256 is manufactured. See the recovery limitations below.
 3. Require the original online TEST capture, postgres ownership, and exact original
    guarded rollback. Never regenerate against current data to excuse a mismatch.
 4. Parse the service offline before connecting. Allow only exact TEST direct host,
@@ -78,7 +80,8 @@ Do not replace the capture or delete data to manufacture PASS.
    and do not prove a pause. An empty Edge dashboard does not exclude external jobs.
 9. Compare notification-table hashes to the rehearsed backup baseline (the older
    capture did not hash them). Collect expanded catalogs and repeat all read-only
-   snapshots to detect movement during preflight.
+   snapshots to detect movement during preflight. When historical checksum is
+   missing, first create a distinct fresh recovery archive as described below.
 
 The original capture cannot prove that every uncaptured hosted object/session/log
 has stayed unchanged. Protected golf, ownership, membership, history and Auth
@@ -87,6 +90,55 @@ audits expand the baseline now; they do not retroactively prove uncaptured state
 Any checked mismatch is STOP. Review legitimate changes read-only, then decide
 whether a new backup/capture/rollback/rehearsal is needed. Never auto-adopt current
 state as the original baseline.
+
+## Missing historical checksum: controlled recovery
+
+The original 22 October archive remains immutable. Its size, timestamp, today's
+hash and a readable TOC do not establish historical integrity. Full traversal
+finds unreadable/compression failures; it is not an authenticity check. The saved
+local PASS provides evidence for the selectively restored application baseline,
+original function bodies and protected golf/history checks. Sanitised Auth/users
+and ownership references prevent treating that rehearsal as a full byte-for-byte
+verification of the original online fingerprints. Parsing a TOC or comparing
+schema names cannot prove all original row fingerprints. Full original Auth and
+permissions recovery remains untested; no new claim of that recovery is made.
+
+The explicit recovery option therefore takes a NEW backup, only after the original
+online capture/security checks match and notification fingerprints match the
+rehearsed baseline. Any mismatch stops before pg_dump. It never replaces capture,
+rollback or the original archive. The private, unique preflight evidence folder
+contains:
+
+- original-backup-observation.json: missing historical anchor and observed hash;
+- backup-inventory.txt: original archive inventory;
+- TEST-fresh-preinstall.dump: NEW full custom-format TEST backup;
+- fresh-backup.sha256 and fresh-backup.json: NEW dated anchor and provenance;
+- fresh-backup-validation/backup-inventory.txt: NEW archive inventory;
+- before/after backup captures and audits, plus the normal PASS/FAIL report.
+
+pg_dump 18.6 uses only the validated TEST host/user/SSL connection, clears inherited
+PG settings, forces default_transaction_read_only=on and uses its normal consistent
+MVCC snapshot. No credentials enter argv. Locks time out after five seconds;
+command errors stop preparation. The new archive uses --no-owner --no-acl to match
+the recovery assumptions; captured security metadata and the original guarded
+rollback remain essential. pg_restore inventories and fully traverses this new
+archive without a database connection, then the original capture and expanded
+audit must still match after backup. The future installer rechecks the new
+archive's recorded SHA-256 before any migration.
+
+The dump snapshot and before/after audits are separate consistent snapshots. Their
+agreement does not exclude transient activity or changes in uncaptured objects.
+Writer pause/drain remains mandatory; no fresh backup substitutes for this gate.
+An unconfirmed pause produces FAIL/NO-GO, even if the fresh backup is valid. A rerun
+creates a distinct new archive, never overwrites one. Failed/incomplete artifacts
+are retained as evidence and are not promoted to a valid fresh backup record.
+
+All evidence is private (directory 0700, files created under umask 077). Full dumps
+contain real Auth data/credential material: keep them on the trusted Mac, never
+commit/upload their contents or restore them into the fictional-identity local
+rehearsal. Neither archive's readability proves a full Supabase services restore.
+If full Auth/service recovery is a release prerequisite, that remains a separate
+blocker requiring a safely isolated review/rehearsal.
 
 ## Remaining local/hosted differences
 
