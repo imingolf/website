@@ -1,0 +1,5 @@
+# Database-specific captures and generated rollback files must remain private.
+capture*.json
+rollback*.sql
+__pycache__/
+*.pyc
