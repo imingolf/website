@@ -209,8 +209,17 @@ class AutomationTests(unittest.TestCase):
         return {'Name':'/supabase_auth_'+m.PROJECT,'Id':'local-auth-id',
                 'Config':{'Image':'public.ecr.aws/supabase/gotrue:v2.0',
                           'Labels':{'com.supabase.cli.project':m.PROJECT}},
-                'State':{'Running':True},'HostConfig':{'NetworkMode':'local-project'},
-                'NetworkSettings':{'Networks':{'local-project':{'IPAddress':'172.20.0.5'}}}}
+                'State':{'Running':True,'StartedAt':'2026-10-23T11:00:00Z'},
+                'HostConfig':{'NetworkMode':'supabase_network_'+m.PROJECT},
+                'NetworkSettings':{'Networks':{'supabase_network_'+m.PROJECT:
+                   {'IPAddress':'172.20.0.5','NetworkID':'network-id','EndpointID':'endpoint-id'}}}}
+
+    def network_fixture(self,c):
+        net=next(iter(c['NetworkSettings']['Networks'].values()))
+        return {'network-id':{'Id':'network-id','Name':'supabase_network_'+m.PROJECT,
+                'Labels':{'com.supabase.cli.project':m.PROJECT},
+                'Containers':{c['Id']:{'EndpointID':net['EndpointID'],
+                                       'IPv4Address':net['IPAddress']+'/16'}}}}
 
     def client_fixture(self):
         return {'pid':123,'backend_start':'2026-10-23T12:00:00Z',
@@ -244,10 +253,12 @@ class AutomationTests(unittest.TestCase):
         for scenario in ['idle','external','transaction','orphan','timeout']:
             with self.subTest(scenario=scenario),tempfile.TemporaryDirectory() as d:
                 r=m.Runner(Path(d)); container=self.service_fixture()
-                service=m.approved_service(container); client=self.client_fixture(); actions=[]
+                service,_=m.verified_network_service(container,self.network_fixture(container))
+                client=self.client_fixture(); actions=[]
                 if scenario=='external': client['client_addr']='10.0.0.20'
                 if scenario=='transaction': client['xact_start']='now'
                 r.service_inventory=lambda:[service]
+                r.inspect_project_networks=lambda containers:self.network_fixture(container)
                 r.isolated=lambda:None
                 r.client_snapshot=lambda:([copy.deepcopy(client)] if container['State']['Running'] or scenario=='orphan' else [])
                 def docker(*args,**kwargs):
@@ -284,6 +295,66 @@ class AutomationTests(unittest.TestCase):
                 self.assertEqual(execute.call_args.args[0],m.CLIENT_DIAGNOSTICS)
                 r.sql('-- inert offline fixture','guard-check')
                 self.assertTrue(execute.call_args.args[0].startswith(m.SQL_GUARD))
+
+    def test_network_identity_and_ip_reuse_fail_closed(self):
+        c=self.service_fixture(); docs=self.network_fixture(c)
+        service,reason=m.verified_network_service(c,docs)
+        self.assertIsNone(reason)
+        self.assertEqual(service['verified_networks'][0]['endpoint_id'],'endpoint-id')
+        for change in ['container_id','endpoint','network_id','network_name','project','ip']:
+            wrong=copy.deepcopy(docs); doc=wrong['network-id']
+            if change=='container_id': doc['Containers']={'someone-else':doc['Containers'][c['Id']]}
+            if change=='endpoint': doc['Containers'][c['Id']]['EndpointID']='wrong'
+            if change=='network_id': doc['Id']='wrong'
+            if change=='network_name': doc['Name']='another-project'
+            if change=='project': doc['Labels']['com.supabase.cli.project']='another-project'
+            if change=='ip': doc['Containers'][c['Id']]['IPv4Address']='172.20.0.99/16'
+            with self.subTest(change=change):
+                self.assertIsNone(m.verified_network_service(c,wrong)[0])
+        newer=dict(service,started_at='2026-10-23T13:00:00Z')
+        self.assertEqual(m.classify_client(self.client_fixture(),[newer])['category'],'unexpected_or_unattributed')
+
+    def test_official_registry_aliases_only(self):
+        for image in ['supabase/gotrue:v2','docker.io/supabase/gotrue:v2',
+                      'index.docker.io/supabase/gotrue:v2','public.ecr.aws/supabase/gotrue:v2']:
+            c=self.service_fixture(); c['Config']['Image']=image
+            self.assertIsNotNone(m.approved_service(c))
+        c=self.service_fixture(); c['Config']['Image']='untrusted.example/supabase/gotrue:v2'
+        self.assertIsNone(m.approved_service(c))
+
+    def test_rejected_container_is_reported_with_specific_reason(self):
+        with tempfile.TemporaryDirectory() as d:
+            r=m.Runner(Path(d)); c=self.service_fixture()
+            c['Config']['Labels']['com.supabase.cli.project']='another-project'
+            r.isolated=lambda:None
+            def docker(*args,**kwargs):
+                if args[0]=='ps': return c['Id']+'\n'
+                if args[0]=='inspect': return json.dumps([c])
+                if args[:2]==('network','inspect'): return json.dumps(list(self.network_fixture(c).values()))
+                raise AssertionError(args)
+            r.docker=docker
+            services=r.service_inventory()
+            self.assertEqual(services,[])
+            client=r.classify_with_evidence(self.client_fixture(),services)
+            self.assertEqual(client['category'],'unexpected_or_unattributed')
+            candidate=client['docker_candidates'][0]
+            self.assertEqual(candidate['id'],c['Id'])
+            self.assertIn('Project label',candidate['rejection'])
+            saved=(r.run_dir/'docker-client-container-inventory.json').read_text()
+            self.assertNotIn('Env',saved)
+
+    def test_seven_clients_require_verified_container_not_supabase_admin_role(self):
+        c=self.service_fixture(); c['Name']='/supabase_realtime_'+m.PROJECT
+        c['Config']['Image']='docker.io/supabase/realtime:v2'
+        net=next(iter(c['NetworkSettings']['Networks'].values()))
+        net['IPAddress']='172.18.0.8'
+        service,_=m.verified_network_service(c,self.network_fixture(c))
+        clients=[dict(self.client_fixture(),pid=pid,user='supabase_admin',client_addr='172.18.0.8')
+                 for pid in range(281,288)]
+        self.assertEqual(len(clients),7)
+        for client in clients:
+            self.assertEqual(m.classify_client(client,[service])['category'],'internal_idle')
+            self.assertEqual(m.classify_client(client,[])['category'],'unexpected_or_unattributed')
 
 if __name__=='__main__':
     unittest.main()

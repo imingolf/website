@@ -55,28 +55,79 @@ def address(value):
     except ValueError:
         return None
 
-def approved_service(c):
+def canonical_image(image):
+    for registry in ('public.ecr.aws/','docker.io/','index.docker.io/','registry-1.docker.io/'):
+        if image.startswith(registry):
+            return image[len(registry):]
+    return image
+
+def service_rejection(c):
     name=c.get('Name','').lstrip('/')
     for kind,(images,roles) in SERVICE_RULES.items():
         if name!='supabase_'+kind+'_'+PROJECT:
             continue
         config=c.get('Config',{})
         if (config.get('Labels') or {}).get('com.supabase.cli.project')!=PROJECT:
-            return None
-        image=config.get('Image','')
-        if image.startswith('public.ecr.aws/'):
-            image=image[len('public.ecr.aws/'):]
+            return 'Project label is missing or differs from '+PROJECT
+        image=canonical_image(config.get('Image',''))
         if not any(image.startswith(prefix) for prefix in images):
-            return None
+            return 'Image is not an approved official image for this exact service name'
         if not c.get('State',{}).get('Running') or c.get('HostConfig',{}).get('NetworkMode')=='host':
-            return None
+            return 'Service is stopped or uses host networking'
+        return None
+    return 'Not an approved exact direct-service name (poolers/proxies and other projects are excluded)'
+
+def approved_service(c):
+    if service_rejection(c) is not None:
+        return None
+    name=c['Name'].lstrip('/')
+    for kind,(images,roles) in SERVICE_RULES.items():
+        if name!='supabase_'+kind+'_'+PROJECT:
+            continue
         ips=set()
         for network in c.get('NetworkSettings',{}).get('Networks',{}).values():
             for key in ('IPAddress','GlobalIPv6Address'):
                 if address(network.get(key)):
                     ips.add(address(network[key]))
-        return {'name':name,'id':c['Id'],'image':config['Image'],'ips':sorted(ips),'roles':sorted(roles)}
+        return {'name':name,'id':c['Id'],'image':c['Config']['Image'],'ips':sorted(ips),
+                'roles':sorted(roles),'started_at':c.get('State',{}).get('StartedAt')}
     return None
+
+def verified_network_service(c, networks):
+    service=approved_service(c)
+    if service is None:
+        return None,service_rejection(c)
+    verified=[]
+    ips=set()
+    for net in c.get('NetworkSettings',{}).get('Networks',{}).values():
+        doc=networks.get(net.get('NetworkID'))
+        if not doc or doc.get('Id')!=net.get('NetworkID') or doc.get('Name')!='supabase_network_'+PROJECT:
+            continue
+        label=(doc.get('Labels') or {}).get('com.supabase.cli.project')
+        if label is not None and label!=PROJECT:
+            continue
+        member=(doc.get('Containers') or {}).get(c['Id'])
+        if not member or not net.get('EndpointID') or member.get('EndpointID')!=net['EndpointID']:
+            continue
+        own={address(net.get(k)) for k in ('IPAddress','GlobalIPv6Address')} - {None}
+        corroborated={address(member.get(k,'').split('/')[0]) for k in ('IPv4Address','IPv6Address')} - {None}
+        matching=own & corroborated
+        if matching:
+            ips.update(matching)
+            verified.append({'id':doc['Id'],'name':doc['Name'],'endpoint_id':net['EndpointID'],
+                             'ips':sorted(matching)})
+    if not ips:
+        return None,'No project-network endpoint corroborated by BOTH container inspect and network inspect'
+    service.update(ips=sorted(ips),verified_networks=sorted(verified,key=lambda n:n['id']))
+    return service,None
+
+def started_before_backend(service, client):
+    try:
+        start=datetime.datetime.fromisoformat(service['started_at'].replace('Z','+00:00'))
+        backend=datetime.datetime.fromisoformat(client['backend_start'].replace('Z','+00:00'))
+        return start.tzinfo is not None and backend.tzinfo is not None and start<=backend
+    except (AttributeError,KeyError,TypeError,ValueError):
+        return False
 
 def classify_client(client, services):
     matches=[s for s in services if address(client.get('client_addr')) in s['ips']
@@ -85,6 +136,9 @@ def classify_client(client, services):
         return dict(client,category='unexpected_or_unattributed',
                     reason='No unique verified direct local service IP + role; socket/proxy/role alone is insufficient')
     service=matches[0]
+    if not started_before_backend(service,client):
+        return dict(client,category='unexpected_or_unattributed',service=service['name'],
+                    reason='Container start is missing/newer than backend start; IP reuse or stale ownership cannot be excluded')
     if client.get('xact_start') is not None or client.get('state')=='idle in transaction':
         return dict(client,category='internal_transaction',service=service['name'],
                     reason='Verified local service has an open transaction; no automatic stop')
@@ -183,6 +237,7 @@ class Runner:
         self.endpoint = None
         self.container_id = None
         self.counter = 0
+        self.container_observations = []
         self.generator = load_generator()
 
     def command(self, args, data=None, timeout=None):
@@ -241,19 +296,56 @@ class Runner:
         # All schema/data/rollback/capture operations still use the zero-client SQL_GUARD.
         return json.loads(self._psql(CLIENT_DIAGNOSTICS,'client-diagnostics'))
 
+    def inspect_project_networks(self, containers):
+        ids={net['NetworkID'] for c in containers
+             for name,net in c.get('NetworkSettings',{}).get('Networks',{}).items()
+             if name=='supabase_network_'+PROJECT and net.get('NetworkID')}
+        if not ids:
+            return {}
+        docs=json.loads(self.docker('network','inspect',*sorted(ids)))
+        return {doc['Id']:doc for doc in docs}
+
     def service_inventory(self):
         self.isolated()
-        names=set(self.docker('ps','--format','{{.Names}}').splitlines())
-        expected=['supabase_'+kind+'_'+PROJECT for kind in SERVICE_RULES]
-        present=[name for name in expected if name in names]
+        # Observe all running containers so rejected/unknown source owners are visible.
+        # Never save environment variables, commands, secrets or full raw inspect output.
+        ids=self.docker('ps','--no-trunc','--format','{{.ID}}').splitlines()
+        containers=json.loads(self.docker('inspect',*ids)) if ids else []
+        networks=self.inspect_project_networks(containers)
+        sanitized_networks=[{'id':d['Id'],'name':d['Name'],
+                             'project_label':(d.get('Labels') or {}).get('com.supabase.cli.project'),
+                             'containers':d.get('Containers',{})} for d in networks.values()]
+        (self.run_dir/'docker-project-network-inventory.json').write_text(json.dumps(sanitized_networks,indent=2))
         services=[]
-        if present:
-            for c in json.loads(self.docker('inspect',*present)):
-                service=approved_service(c)
-                if service:
-                    services.append(service)
+        self.container_observations=[]
+        for c in containers:
+            service,rejection=verified_network_service(c,networks)
+            ips={address(net.get(key)) for net in c.get('NetworkSettings',{}).get('Networks',{}).values()
+                 for key in ('IPAddress','GlobalIPv6Address')} - {None}
+            record={'name':c.get('Name','').lstrip('/'),'id':c['Id'],
+                    'image':c.get('Config',{}).get('Image'),
+                    'project_label':(c.get('Config',{}).get('Labels') or {}).get('com.supabase.cli.project'),
+                    'started_at':c.get('State',{}).get('StartedAt'),'ips':sorted(ips),
+                    'approved':service is not None,'rejection':rejection,
+                    'verified_networks':service['verified_networks'] if service else []}
+            self.container_observations.append(record)
+            if service:
+                services.append(service)
+        (self.run_dir/'docker-client-container-inventory.json').write_text(json.dumps(self.container_observations,indent=2))
         (self.run_dir/'local-service-inventory.json').write_text(json.dumps(services,indent=2))
         return services
+
+    def classify_with_evidence(self, client, services):
+        result=classify_client(client,services)
+        candidates=[dict(c) for c in self.container_observations if address(client.get('client_addr')) in c['ips']]
+        for candidate in candidates:
+            if candidate['approved'] and result['category']=='unexpected_or_unattributed':
+                candidate['client_rejection']=result['reason']
+                service=next(s for s in services if s['id']==candidate['id'])
+                if client.get('user') not in service['roles']:
+                    candidate['client_rejection']='Observed database role is not approved for this verified service'
+        result['docker_candidates']=candidates
+        return result
 
     def drain_internal_clients(self):
         self.report['stage']='classify and drain local background clients'
@@ -262,7 +354,7 @@ class Runner:
         deadline=time.monotonic()+8
         while True:
             clients=self.client_snapshot()
-            classified=[classify_client(c,services) for c in clients]
+            classified=[self.classify_with_evidence(c,services) for c in clients]
             (self.run_dir/'clients-before-drain.json').write_text(json.dumps(classified,indent=2))
             self.report['clients']=classified
             require(not any(c['category'] in ('unexpected_or_unattributed','internal_transaction') for c in classified),
@@ -277,7 +369,8 @@ class Runner:
             # Recheck identities and all clients immediately before each graceful stop.
             self.isolated()
             old=next(s for s in services if s['name']==name)
-            now=approved_service(json.loads(self.docker('inspect',name))[0])
+            container=json.loads(self.docker('inspect',name))[0]
+            now,_=verified_network_service(container,self.inspect_project_networks([container]))
             require(now==old,'Service identity changed; no stop attempted: '+name)
             current=[classify_client(c,services) for c in self.client_snapshot()]
             require(all(c['category']=='internal_idle' for c in current),
@@ -299,7 +392,7 @@ class Runner:
         deadline=time.monotonic()+12
         while True:
             remaining=self.client_snapshot()
-            self.report['remaining_clients']=[classify_client(c,services) for c in remaining]
+            self.report['remaining_clients']=[self.classify_with_evidence(c,services) for c in remaining]
             (self.run_dir/'clients-after-drain.json').write_text(json.dumps(remaining,indent=2))
             if not remaining:
                 break
@@ -521,6 +614,10 @@ SELECT jsonb_build_object('rows',jsonb_build_object(FINGERPRINTS),
                 text += ('Client PID '+str(client['pid'])+': role='+str(client.get('user'))+
                          ', source='+str(client.get('client_addr') or 'local socket')+
                          ', state='+str(client.get('state'))+', '+str(client.get('category'))+'\n')
+                for c in client.get('docker_candidates',[]):
+                    text += ('  Docker owner candidate: '+c['name']+' ['+c['id'][:12]+']'+
+                             ', image='+str(c['image'])+', project_label='+str(c['project_label'])+'\n')
+                    text += '  Verification: '+str(c.get('client_rejection') or c['rejection'] or 'container/network identity verified')+'\n'
         text += 'Evidence: '+str(self.run_dir)+'\nRemaining limits:\n'+'\n'.join('- '+r for r in RISKS)+'\n'
         (self.run_dir/'report.txt').write_text(text)
         print(text)

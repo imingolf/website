@@ -10,7 +10,7 @@ Run this single block in Mac Terminal:
 ```bash
 (
   set -e
-  IIG_REPO="$HOME/Documents/ImInGolf-Local-Rehearsal/rollback-rehearsal-source"
+  IIG_REPO="$HOME/Downloads/imingolf-rollback"
   test "$(git -C "$IIG_REPO" branch --show-current)" = pr6-test-rollback-preparation
   git -C "$IIG_REPO" pull --ff-only origin pr6-test-rollback-preparation
   python3 "$IIG_REPO/docs/pr6-test-rollback-preparation/local-rehearsal/run-rehearsal.py"
@@ -91,6 +91,11 @@ A client qualifies for controlled drain only if all of these match:
 - The PostgreSQL client source IP uniquely matches that service's Docker IP and
   the database role is expected for that particular service. Application/role
   names alone never prove origin.
+- Docker network inspection independently confirms the same container ID, network
+  ID, endpoint ID and IP on supabase_network_ImInGolf-Local-Rehearsal. Any present
+  network project label must agree. The service must have started no later than
+  the database backend, preventing a restarted/replacement container from gaining
+  trust merely by reusing an old IP.
 - The connection is idle and has no transaction. Busy clients and open transactions
   are not interrupted. Proxy/pooler connections, socket/loopback connections,
   ambiguous addresses, unexpected roles or unknown services are not auto-drained.
@@ -118,6 +123,30 @@ fails; the runner never rewrites that capture to excuse the change.
 This is a safe local-only drain, not proof that every reported role came from a
 particular service on your Mac. Unattributed clients intentionally produce FAIL
 and usable diagnostics instead of an invented classification.
+
+### Explaining the reported 172.18.0.8 clients
+
+PIDs 281–287 represent **seven** connections. The prior report did not retain
+rejected container identities, so it cannot establish their source. Neither
+supabase_admin nor 172.18.0.8 identifies a specific service. No such attribution
+has been made from Codex, which cannot inspect the Mac Docker daemon.
+
+The runner now inventories all running container identities (read-only), including
+rejected candidates, instead of looking only at already-approved service names.
+It writes docker-client-container-inventory.json and the independently inspected
+docker-project-network-inventory.json. For each database client it records the
+matching Docker owner candidates and exactly why a candidate is rejected: name,
+project label, official image, role, missing endpoint corroboration, or container
+start after backend start. Registry-qualified forms of the same explicitly allowed
+Docker Hub images are recognized; arbitrary registries/services are not added.
+No container environment variables, commands, secrets or SQL query text are saved.
+
+On FAIL the terminal/report includes candidate container name/ID, image, project
+label and rejection reason, so another diagnostic command is not required. An IP
+match is only an observation: without all the verification above, no stop occurs.
+Pooler/proxy, unknown service or changed/reused identity remains a blocker. This
+does not automatically add whichever service happens to own the reported address.
+All migration, data, rollback and zero-client guards remain in place.
 
 ## Results and failures
 
