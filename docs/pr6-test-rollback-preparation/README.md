@@ -12,6 +12,10 @@ Package files: [pre-install-capture.sql](pre-install-capture.sql) and
 [prepare.py](prepare.py). Download all three files, including this README, into
 the same local directory before following the commands below. No ZIP is needed.
 
+For the Docker-based local Supabase rehearsal, use the separate
+[local rehearsal guide](local-rehearsal/README.md) and its supporting files. It
+creates a local-only variant; the TEST-targeted scripts below stay unchanged.
+
 ## Recommendation
 
 **NO-GO until the pre-install capture has been obtained and reviewed, the rollback
