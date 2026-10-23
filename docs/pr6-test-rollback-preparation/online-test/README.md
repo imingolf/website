@@ -300,3 +300,12 @@ This is source-review evidence, not a claim about the TEST installed version:
 - https://github.com/supabase/supautils/blob/7a22990746ec17b1a84cf2a097dda411222f8ec7/src/table_grants.c
 - https://www.postgresql.org/docs/17/sql-droptrigger.html
 - https://www.postgresql.org/docs/17/functions-info.html
+
+## Assessment after the reported successful diagnostic
+
+The reported exact Supautils candidate does not yet approve installation.
+See [the authority assessment](AUTH-ROLLBACK-AUTHORITY.md) for the documented
+mechanism, evidence limits and remaining gates. The single next action is to
+send [the prepared support request](SUPPORT-AUTH-ROLLBACK.txt) with the existing
+private auth-trigger-ownership.json to Supabase support. No further database
+checks or DDL are requested at this stage. Existing executable guards are unchanged.

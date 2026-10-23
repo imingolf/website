@@ -1,0 +1,40 @@
+Subject: Confirm existing Supautils DROP TRIGGER authority on TEST auth.users — no changes requested
+
+Project: nyavvwrsrxqfyhiygkgw (TEST only), PostgreSQL 17.11.
+Please do not access or change our LIVE project, modify permissions/ownership,
+execute test DDL or apply migrations. This is a request for confirmation of the
+existing managed configuration and supported behaviour only.
+
+We are preparing a guarded schema migration and original schema rollback.
+Our read-only diagnostic reports an exact configured
+supautils.drop_trigger_grants entry for current role postgres and table auth.users,
+with Supautils in preload configuration and a registered sighup setting.
+Native inherited-owner authority was not established. TRIGGER creation privilege
+alone is insufficient. The original captured TEST baseline remains unchanged.
+
+Please confirm for THIS project's currently installed and active Supautils build:
+Does the existing drop_trigger_grants mechanism authorise current_user postgres
+(on our verified TEST port-5432 session connection) to execute this exact statement,
+without SET ROLE, new grants, changing Auth ownership or another helper?
+
+    DROP TRIGGER IF EXISTS iig_sync_owner_email ON auth.users RESTRICT;
+
+The custom application trigger would be created by our account-lifecycle
+migration. The drop is top-level SQL inside a guarded BEGIN/COMMIT rollback
+transaction, with search_path pg_catalog and auth.users explicitly qualified.
+It is not an event trigger. The original rollback checks unchanged protected data,
+requires new tables to be empty and obtains table locks before dropping triggers.
+
+Please identify/confirm the active managed hook implementation/build and its
+valid managed elevation target, and whether any Auth-specific restrictions or
+utility/event hooks prevent this exact operation. The setting's existence alone
+is not being treated as proof of execution authority. If this route is not
+supported on this project, please describe a supported approach for review
+without making changes or requesting arbitrary elevated privileges.
+
+Attached: auth-trigger-ownership.json from read-only diagnostic run
+readonly-preflight-20261023T125316.213657Z.
+No backup, credentials, Auth records or database service configuration is attached.
+
+Installation remains NO-GO pending this authority review and separate confirmation
+that all TEST writers are paused/drained. No migration or rollback has been run online.
