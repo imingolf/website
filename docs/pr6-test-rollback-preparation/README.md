@@ -1,5 +1,9 @@
 # PR #6 — TEST installation-window rollback package
 
+After the local PASS, use the [controlled ONLINE TEST preparation](online-test/README.md).
+Its next command is read-only. Writer pause/drain is NOT yet confirmed, so online
+installation remains NO-GO until that prerequisite and all verification pass.
+
 Reviewed source: `imingolf/website`, `improve-first-visit-welcome`, commit
 `eadb4950e8cc1de8046b7654a89a490e6eae6643`.
 Only authorised target for the proposed procedure: Supabase TEST
