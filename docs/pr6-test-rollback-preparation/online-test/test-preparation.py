@@ -55,6 +55,45 @@ class PreparationTests(unittest.TestCase):
                 self.assertIn('default_transaction_read_only=on',env['PGOPTIONS'])
                 self.assertIn('default_transaction_read_only=on',args[args.index('--dbname')+1])
 
+    def test_missing_password_prompts_once_and_never_persists_secret(self):
+        from types import SimpleNamespace
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d); reader=p.Reader(self.config(),root)
+            secret='offline-secret-DoNotPersist'
+            replies=[SimpleNamespace(returncode=2,stdout='',stderr='fe_sendauth: no password supplied'),
+                     SimpleNamespace(returncode=0,stdout='verified '+secret,stderr='diagnostic '+secret)]
+            with patch.object(p.subprocess,'run',side_effect=replies) as command, \
+                 patch.object(p.sys.stdin,'isatty',return_value=True), \
+                 patch.object(p.getpass,'getpass',return_value=secret) as prompt:
+                result=reader.sql('\\conninfo\n','identity',allow_password_prompt=True)
+                prompt.assert_called_once()
+                self.assertNotIn(secret,result)
+                self.assertEqual(reader.c['password'],secret)
+                self.assertEqual(command.call_args.kwargs['env']['PGPASSWORD'],secret)
+                self.assertNotIn(secret,' '.join(command.call_args.args[0]))
+                self.assertIn(p.PROJECT,' '.join(command.call_args.args[0]))
+                self.assertIn('default_transaction_read_only=on',' '.join(command.call_args.args[0]))
+            for path in root.iterdir(): self.assertNotIn(secret,path.read_text())
+
+    def test_no_password_prompt_for_other_errors_or_ordinary_queries(self):
+        from types import SimpleNamespace
+        for error,allowed in [('password authentication failed',True),('fe_sendauth: no password supplied',False)]:
+            with tempfile.TemporaryDirectory() as d, \
+                 patch.object(p.subprocess,'run',return_value=SimpleNamespace(returncode=2,stdout='',stderr=error)), \
+                 patch.object(p.getpass,'getpass') as prompt:
+                with self.assertRaises(RuntimeError):
+                    p.Reader(self.config(),Path(d)).sql('SELECT 1;','test',allow_password_prompt=allowed)
+                prompt.assert_not_called()
+
+    def test_noninteractive_password_input_fails_closed(self):
+        from types import SimpleNamespace
+        with tempfile.TemporaryDirectory() as d, \
+             patch.object(p.subprocess,'run',return_value=SimpleNamespace(returncode=2,stdout='',stderr='fe_sendauth: no password supplied')), \
+             patch.object(p.sys.stdin,'isatty',return_value=False),patch.object(p.getpass,'getpass') as prompt:
+            with self.assertRaisesRegex(RuntimeError,'interactive Mac Terminal'):
+                p.Reader(self.config(),Path(d)).sql('SELECT 1;','identity',allow_password_prompt=True)
+            prompt.assert_not_called()
+
     def test_unconfirmed_or_stale_writers_block_readiness(self):
         with tempfile.TemporaryDirectory() as d:
             path=Path(d)/'controlled-pause.json'
@@ -224,7 +263,7 @@ class PreparationTests(unittest.TestCase):
                 def __init__(self,*args): pass
                 def capture(self,*args): return copy.deepcopy(before)
                 def audit(self,*args): return copy.deepcopy(audit)
-                def sql(self,*args): return 'Offline fake TEST SSL connection'
+                def sql(self,*args,**kwargs): return 'Offline fake TEST SSL connection'
             def command(args,env=None):
                 if args[-2:]==['branch','--show-current']: return 'pr6-test-rollback-preparation\n'
                 if 'status' in args: return ''

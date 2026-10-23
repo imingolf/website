@@ -4,6 +4,8 @@ import argparse
 import configparser
 import datetime
 import hashlib
+import getpass
+import warnings
 import importlib.util
 import json
 import os
@@ -35,7 +37,9 @@ require=local.require
 
 def run(args,env=None):
     r=subprocess.run(args,text=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,env=env)
-    require(r.returncode==0,'Command failed: '+args[0]+'\n'+r.stderr[-2000:])
+    error=r.stderr
+    if env and env.get('PGPASSWORD'): error=error.replace(env['PGPASSWORD'],'[REDACTED]')
+    require(r.returncode==0,'Command failed: '+args[0]+'\n'+error[-2000:])
     return r.stdout
 
 def service_config(path):
@@ -187,7 +191,7 @@ class Reader:
     def __init__(self,c,out):
         self.c=c; self.run_dir=out; self.generator=g; self.counter=0
 
-    def sql(self,text,label,variables=()):
+    def sql(self,text,label,variables=(),allow_password_prompt=False):
         require(not variables,'Read-only preflight accepts no execution variables')
         self.counter+=1
         prefix=self.run_dir/f'{self.counter:02d}-{label}'
@@ -198,6 +202,21 @@ class Reader:
         if 'passfile' in self.c: env['PGPASSFILE']=str(Path(self.c['passfile']).expanduser())
         args=['psql','-X','-w','-qAt','--dbname',conninfo(self.c),'-v','ON_ERROR_STOP=1']
         r=subprocess.run(args,input=READ_GUARD+text,text=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,env=env)
+        if (allow_password_prompt and r.returncode!=0 and
+                'fe_sendauth: no password supplied' in r.stderr and not self.c.get('password')):
+            require(sys.stdin.isatty(),'TEST password required: rerun in an interactive Mac Terminal; no insecure input fallback')
+            # getpass must never fall back to echoed stdin. No password in argv or files.
+            with warnings.catch_warnings():
+                warnings.simplefilter('error',getpass.GetPassWarning)
+                secret=getpass.getpass('Password for verified Supabase TEST '+PROJECT+' (hidden): ')
+            require(bool(secret),'Empty TEST password; stopped')
+            self.c['password']=secret
+            env['PGPASSWORD']=secret
+            r=subprocess.run(args,input=READ_GUARD+text,text=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,env=env)
+        # Defensive redaction also covers unexpected subprocess diagnostics.
+        if self.c.get('password'):
+            r.stdout=r.stdout.replace(self.c['password'],'[REDACTED]')
+            r.stderr=r.stderr.replace(self.c['password'],'[REDACTED]')
         prefix.with_suffix('.stdout').write_text(r.stdout)
         prefix.with_suffix('.stderr').write_text(r.stderr)
         require(r.returncode==0,'Read-only TEST check failed: '+label+'; see '+str(prefix.with_suffix('.stderr')))
@@ -326,7 +345,7 @@ def main():
         report['connection']={k:c[k] for k in ('host','user','sslmode')}
         report['stage']='read-only TEST comparison'
         reader=Reader(c,out)
-        report['connection_diagnostics']=reader.sql('\\conninfo\n','connection-identity')
+        report['connection_diagnostics']=reader.sql('\\conninfo\n','connection-identity',allow_password_prompt=True)
         current,audit,status=online_checks(reader,before,audit_local)
         report['baseline_unchanged']=True
         for table in ('public.iig_notification_settings','public.iig_notification_events'):

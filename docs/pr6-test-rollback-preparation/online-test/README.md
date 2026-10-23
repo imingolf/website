@@ -23,6 +23,16 @@ execution switch. The libpq connection and environment both enforce
 default_transaction_read_only=on; SQL snapshots explicitly BEGIN READ ONLY.
 No application RPC is called (some take Auth row locks).
 
+If the verified TEST connection reports that no password was supplied, Terminal
+prompts once for the TEST database password with input hidden. Existing service
+password/passfile authentication is tried first. The prompt is available only at
+the initial read-only identity check, after the service target/SSL checks; other
+connection errors stop without prompting. Noninteractive or echo-fallback input
+is rejected. The password is kept in process memory and passed only in the
+verified TEST child process environment (psql/pg_dump), never argv, Git or evidence.
+Do not paste the password into commands or reports. An incorrect password stops;
+rerun the same command to retry. This adds no installation authorisation.
+
 Confirmed default inputs:
 
 - Original capture: ~/Downloads/imingolf-rollback/docs/pr6-test-rollback-preparation/capture.json.
