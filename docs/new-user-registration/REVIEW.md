@@ -117,3 +117,12 @@ Host allowlists still permit only localhost/127.0.0.1 and the existing PR #6 tes
 preview, never arbitrary hosts or production. A new preview target requires
 separate approval/configuration. No native iOS project is included here; app
 wrapper/WhatsApp behaviour cannot be certified from these web sources alone.
+
+## Local, isolated visual demonstration
+
+An approved local-only demonstration is now available in
+[tools/registration-demo](../../tools/registration-demo/README.md). It renders
+filtered copies of these actual screens with fictional in-memory responses,
+without changing this application's real host guards or connecting to any online
+project. Follow its single Mac launch block to review on the Mac and an iPhone
+on the same trusted Wi-Fi. This does not deploy or approve production release.

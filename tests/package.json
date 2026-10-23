@@ -4,7 +4,8 @@
     "self-service": "cd .. && node tests/self-service-dom.cjs",
     "self-service-browser": "cd .. && node tests/self-service.cjs",
     "test": "node run.cjs",
-    "onboarding": "node onboarding-offline.cjs"
+    "onboarding": "node onboarding-offline.cjs",
+    "local-demo": "node local-registration-demo.cjs"
   },
   "devDependencies": {
     "linkedom": "0.18.14",
