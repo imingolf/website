@@ -1,5 +1,9 @@
 # Isolated local Supabase baseline, migration and rollback rehearsal
 
+**Baseline already restored and before.json / rollback.LOCAL.sql prepared?**
+Use the [one-command automated rehearsal](AUTOMATED.md) instead of the manual
+migration/rollback steps below. It verifies the existing baseline before writing.
+
 This procedure is for Docker container **supabase_db_ImInGolf-Local-Rehearsal**
 ONLY. No online Supabase connection or credentials are needed. None of these SQL
 steps has been executed by Codex. The Mac archive and its TOC have not been

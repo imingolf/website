@@ -15,6 +15,9 @@ the same local directory before following the commands below. No ZIP is needed.
 For the Docker-based local Supabase rehearsal, use the separate
 [local rehearsal guide](local-rehearsal/README.md) and its supporting files. It
 creates a local-only variant; the TEST-targeted scripts below stay unchanged.
+If that local baseline is already restored, the
+[automated rehearsal](local-rehearsal/AUTOMATED.md) replaces the remaining manual
+migration, verification and rollback steps with one command.
 
 ## Recommendation
 
