@@ -222,6 +222,57 @@ class Reader:
         require(r.returncode==0,'Read-only TEST check failed: '+label+'; see '+str(prefix.with_suffix('.stderr')))
         return r.stdout
 
+OWNERSHIP_SQL="""BEGIN READ ONLY;
+SET LOCAL search_path=pg_catalog;
+SELECT jsonb_build_object(
+ 'current_role',current_user,'session_role',session_user,
+ 'table_owner',(select pg_get_userbyid(relowner) from pg_class where oid='auth.users'::regclass),
+ 'current_superuser',(select rolsuper from pg_roles where rolname=current_user),
+ 'owner_usage',(select pg_has_role(current_user,relowner,'USAGE') from pg_class where oid='auth.users'::regclass),
+ 'owner_member',(select pg_has_role(current_user,relowner,'MEMBER') from pg_class where oid='auth.users'::regclass),
+ 'owner_set',(select pg_has_role(current_user,relowner,'SET') from pg_class where oid='auth.users'::regclass),
+ 'trigger_privilege',has_table_privilege(current_user,'auth.users','TRIGGER'),
+ 'roles',(select coalesce(jsonb_agg(jsonb_build_object('name',rolname,'superuser',rolsuper,'inherit',rolinherit,
+ 'member',pg_has_role(current_user,oid,'MEMBER'),'usage',pg_has_role(current_user,oid,'USAGE'),
+ 'set',pg_has_role(current_user,oid,'SET'))),'[]') from pg_roles),
+ 'memberships',(select coalesce(jsonb_agg(jsonb_build_object('role',pg_get_userbyid(roleid),
+ 'member',pg_get_userbyid(member),'grantor',pg_get_userbyid(grantor),
+ 'admin_option',admin_option,'inherit_option',inherit_option,'set_option',set_option)),'[]') from pg_auth_members),
+ 'settings',(select coalesce(jsonb_agg(jsonb_build_object('name',name,'setting',setting,
+ 'context',context,'source',source,'pending_restart',pending_restart)),'[]') from pg_settings
+ where name in ('shared_preload_libraries','session_preload_libraries','local_preload_libraries',
+ 'supautils.drop_trigger_grants','supautils.superuser','supautils.privileged_extensions_superuser','supautils.privileged_role')));
+COMMIT;
+"""
+
+def ownership_diagnostics(reader):
+    d=json.loads(reader.sql(OWNERSHIP_SQL,'auth-trigger-ownership'))
+    require(d['current_role']=='postgres','Unexpected diagnostic execution role')
+    d['native_drop_authority']=d['current_superuser'] is True or d['owner_usage'] is True
+    # SET-only membership is diagnostic: the original rollback never SET ROLEs to
+    # the Auth owner before DROP TRIGGER. Never treat MEMBER/SET/TRIGGER as USAGE.
+    settings={x['name']:x for x in d['settings']}
+    grant=settings.get('supautils.drop_trigger_grants',{})
+    try:
+        grants=json.loads(grant.get('setting','null'))
+    except (ValueError,TypeError):
+        grants=None
+    preloaded=any('supautils' in [v.strip().strip('"') for v in
+                  settings.get(name,{}).get('setting','').split(',')]
+                  for name in ('shared_preload_libraries','session_preload_libraries','local_preload_libraries'))
+    d['supautils_exact_grant_candidate']=(preloaded and grant.get('context')=='sighup'
+        and grant.get('pending_restart') is False and isinstance(grants,dict)
+        and isinstance(grants.get(d['current_role']),list)
+        and 'auth.users' in grants[d['current_role']])
+    d['assessment']=('Native effective ownership/superuser authority established' if d['native_drop_authority'] else
+        'Supautils exact configured grant found; review managed implementation/support before approving original rollback' if d['supautils_exact_grant_candidate'] else
+        'No proven authority for original rollback; contact Supabase support. No privilege/ownership changes authorised')
+    (reader.run_dir/'auth-trigger-ownership.json').write_text(json.dumps(d,indent=2)+'\n')
+    return d
+
+class OwnershipDiagnosisComplete(Exception):
+    pass
+
 def online_checks(reader,before,audit_local):
     current=reader.capture('test-current')
     local.compare_baseline(before,current)  # STOP, never replace the original capture.
@@ -272,11 +323,12 @@ SELECT jsonb_build_object('locks',(select coalesce(jsonb_agg(jsonb_build_object(
  where datname=current_database() and pid<>pg_backend_pid())); COMMIT;
 """
     status=json.loads(reader.sql(q,'writers-and-lock-privileges'))
+    status['auth_ownership_diagnostics']=ownership_diagnostics(reader)
     require(not status['locks'] and status['prepared']==0,'Potential writer/DDL locks or prepared transactions exist; STOP')
     require(not status['extensions'],'pg_cron/pg_net infrastructure differs from recorded TEST; review before proceeding')
     require(status['lock_privileges'] is True,'Cannot establish privileges for guarded install/rollback locks')
-    require(status['auth_trigger_drop_authority'] is True,
-            'Cannot prove inherited auth.users ownership needed to DROP its trigger during original rollback; TRIGGER privilege alone is insufficient')
+    require(status['auth_ownership_diagnostics']['native_drop_authority'] is True,
+            'Cannot prove native authority to DROP auth.users trigger. See auth-trigger-ownership.json for role inheritance and Supautils evidence; installation remains NO-GO pending supported rollback review. TRIGGER/MEMBER/SET alone are insufficient')
     defaults="""BEGIN READ ONLY; SELECT jsonb_object_agg(schema_name,grants) FROM (
  SELECT schema_name,(SELECT coalesce(jsonb_agg(jsonb_build_object('grantee',case when a.grantee=0 then 'PUBLIC' else pg_get_userbyid(a.grantee) end,
  'grantor',pg_get_userbyid(a.grantor),'privilege',a.privilege_type,'grantable',a.grantable)),'[]') FROM
@@ -307,6 +359,7 @@ def main():
     p.add_argument('--root',type=Path,default=Path.home()/'Documents/ImInGolf-Local-Rehearsal')
     p.add_argument('--backup',type=Path,default=Path.home()/'Documents/ImInGolf-Backups/ImInGolf-Test-2026-10-22.dump')
     p.add_argument('--recover-missing-checksum',action='store_true',help='Explicitly record missing historical checksum and create a distinct fresh read-only TEST backup')
+    p.add_argument('--diagnose-auth-ownership',action='store_true',help='Read-only ownership evidence only; never creates installation package or fresh backup')
     a=p.parse_args(); os.umask(0o077)
     base=Path.home()/'Documents/ImInGolf-TEST-Installation'; base.mkdir(exist_ok=True,mode=0o700)
     out=base/('readonly-preflight-'+datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%S.%fZ'))
@@ -346,6 +399,11 @@ def main():
         report['stage']='read-only TEST comparison'
         reader=Reader(c,out)
         report['connection_diagnostics']=reader.sql('\\conninfo\n','connection-identity',allow_password_prompt=True)
+        if a.diagnose_auth_ownership:
+            local.compare_baseline(before,reader.capture('ownership-original-baseline'))
+            report['baseline_unchanged']=True
+            report['auth_ownership_diagnostics']=ownership_diagnostics(reader)
+            raise OwnershipDiagnosisComplete()
         current,audit,status=online_checks(reader,before,audit_local)
         report['baseline_unchanged']=True
         for table in ('public.iig_notification_settings','public.iig_notification_events'):
@@ -368,6 +426,8 @@ def main():
                         json.loads((base/'controlled-pause.json').read_text()))
         report.update(result='PASS',stage='read-only preparation complete; installation still requires explicit approval',
                       rollback_sha256=hashlib.sha256(rollback.encode()).hexdigest())
+    except OwnershipDiagnosisComplete:
+        report.update(result='PASS',stage='read-only ownership evidence collected; installation remains NO-GO pending review',installation_ready=False)
     except (Exception,KeyboardInterrupt) as e:
         report['error']=str(e) or 'Interrupted'
         (out/'exception.txt').write_text(traceback.format_exc())
@@ -375,6 +435,7 @@ def main():
     text=report['result']+' — '+report['stage']+'\n'
     text+='Online migrations executed: NO\n'
     if report.get('baseline_unchanged'): text+='Original captured TEST baseline: unchanged\n'
+    if 'auth_ownership_diagnostics' in report: text+=report['auth_ownership_diagnostics']['assessment']+'\n'
     if 'error' in report: text+=report['error']+'\n'
     text+='Evidence: '+str(out)+'\n'
     (out/'report.txt').write_text(text); print(text)

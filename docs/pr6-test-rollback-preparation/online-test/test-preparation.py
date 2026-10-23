@@ -94,6 +94,59 @@ class PreparationTests(unittest.TestCase):
                 p.Reader(self.config(),Path(d)).sql('SELECT 1;','identity',allow_password_prompt=True)
             prompt.assert_not_called()
 
+    def ownership_fixture(self):
+        return {'current_role':'postgres','session_role':'postgres','table_owner':'supabase_auth_admin',
+                'current_superuser':False,'owner_usage':False,'owner_member':False,'owner_set':False,
+                'trigger_privilege':True,'roles':[],'memberships':[],'settings':[]}
+
+    def diagnose(self,d):
+        with tempfile.TemporaryDirectory() as directory:
+            class FakeReader:
+                run_dir=Path(directory)
+                def sql(self,sql,label):
+                    self_sql=sql
+                    if not self_sql.startswith('BEGIN READ ONLY;'): raise AssertionError('not read-only')
+                    return json.dumps(d)
+            result=p.ownership_diagnostics(FakeReader())
+            self.assertTrue((Path(directory)/'auth-trigger-ownership.json').exists())
+            return result
+
+    def test_effective_ownership_and_actual_superuser_are_native_authority(self):
+        for field in ('owner_usage','current_superuser'):
+            d=self.ownership_fixture(); d[field]=True
+            self.assertTrue(self.diagnose(d)['native_drop_authority'])
+
+    def test_trigger_member_set_and_role_inherit_alone_never_prove_ownership(self):
+        d=self.ownership_fixture(); d.update(owner_member=True,owner_set=True)
+        d['roles']=[{'name':'postgres','inherit':True}]
+        result=self.diagnose(d)
+        self.assertFalse(result['native_drop_authority'])
+        self.assertFalse(result['supautils_exact_grant_candidate'])
+
+    def test_supautils_exact_current_role_table_is_candidate_not_native_ownership(self):
+        d=self.ownership_fixture()
+        d['settings']=[{'name':'shared_preload_libraries','setting':'pg_stat_statements, supautils'},
+                       {'name':'supautils.drop_trigger_grants','context':'sighup','pending_restart':False,
+                        'setting':json.dumps({'postgres':['auth.users']})}]
+        result=self.diagnose(d)
+        self.assertTrue(result['supautils_exact_grant_candidate'])
+        self.assertFalse(result['native_drop_authority'])
+        self.assertIn('review',result['assessment'])
+        for malformed in ({'other_role':['auth.users']},{'postgres':['auth.users_extra']},
+                          {'postgres':'auth.users'},['auth.users']):
+            d['settings'][1]['setting']=json.dumps(malformed)
+            self.assertFalse(self.diagnose(d)['supautils_exact_grant_candidate'])
+        d['settings'][1]['setting']='invalid JSON'
+        self.assertFalse(self.diagnose(d)['supautils_exact_grant_candidate'])
+
+    def test_unloaded_or_spoofable_supautils_settings_do_not_count(self):
+        for preload,context,restart in [('not_supautils','sighup',False),('supautils','user',False),('supautils','sighup',True)]:
+            d=self.ownership_fixture()
+            d['settings']=[{'name':'shared_preload_libraries','setting':preload},
+                           {'name':'supautils.drop_trigger_grants','context':context,'pending_restart':restart,
+                            'setting':json.dumps({'postgres':['auth.users']})}]
+            self.assertFalse(self.diagnose(d)['supautils_exact_grant_candidate'])
+
     def test_unconfirmed_or_stale_writers_block_readiness(self):
         with tempfile.TemporaryDirectory() as d:
             path=Path(d)/'controlled-pause.json'
@@ -287,6 +340,48 @@ class PreparationTests(unittest.TestCase):
             self.assertFalse(report['migrations_executed'])
             self.assertTrue(report['baseline_unchanged'])
             self.assertIn('Writers NOT confirmed',report['error'])
+            self.assertFalse((reports[0].parent/'package.json').exists())
+
+    def test_ownership_diagnosis_never_runs_readiness_dump_or_builds_package(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d); (root/'Documents').mkdir()
+            before=fixtures.capture_fixture(); before['project_attestation']=p.PROJECT
+            capture=root/'capture.json'; capture.write_text(json.dumps(before))
+            rollback=root/'rollback.TEST.sql'; rollback.write_text(p.g.rollback(before))
+            audit=fixtures.AutomationTests().supplementary_fixture()
+            for table in ('public.iig_notification_settings','public.iig_notification_events'):
+                audit['rows'][table]={'rows':0,'md5':'offline'}
+            class FakeReader:
+                def __init__(self,*args): pass
+                def capture(self,*args): return copy.deepcopy(before)
+                def audit(self,*args): return copy.deepcopy(audit)
+                def sql(self,*args,**kwargs): return 'Offline fake TEST SSL connection'
+            def command(args,env=None):
+                if args[-2:]==['branch','--show-current']: return 'pr6-test-rollback-preparation\n'
+                if 'status' in args: return ''
+                if 'show' in args:
+                    name=args[-1].split('/')[-1]
+                    return (p.REPO/'supabase/staging'/name).read_text()
+                if args==['psql','--version']: return 'psql (PostgreSQL) 18.6'
+                raise AssertionError('Unexpected command boundary: '+str(args))
+            argv=['prepare-test.py','--capture',str(capture),'--rollback',str(rollback),'--root',str(root),'--diagnose-auth-ownership']
+            with patch.object(p.Path,'home',return_value=root),patch.object(p.sys,'argv',argv),\
+                 patch.object(p,'run',side_effect=command),patch.object(p,'evidence',return_value=audit),\
+                 patch.object(p,'backup_check',return_value='offline-backup-hash'),patch.object(p,'fresh_backup') as dump,\
+                 patch.object(p,'service_config',return_value=self.config()),patch.object(p,'Reader',FakeReader),\
+                 patch.object(p,'online_checks') as checks,patch.object(p.time,'sleep'),\
+                 patch.object(p,'ownership_diagnostics',return_value={'assessment':'No native authority; review managed route'}) as diagnosis,\
+                 patch('builtins.print'):
+                self.assertEqual(p.main(),0)
+                checks.assert_not_called(); dump.assert_not_called(); diagnosis.assert_called_once()
+            reports=list((root/'Documents/ImInGolf-TEST-Installation').glob('*/report.json'))
+            self.assertEqual(len(reports),1)
+            report=json.loads(reports[0].read_text())
+            self.assertEqual(report['result'],'PASS')
+            self.assertFalse(report['installation_ready'])
+            self.assertFalse(report['migrations_executed'])
+            self.assertTrue(report['baseline_unchanged'])
+            self.assertIn('installation remains NO-GO',report['stage'])
             self.assertFalse((reports[0].parent/'package.json').exists())
 
 if __name__=='__main__': unittest.main()

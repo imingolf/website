@@ -243,3 +243,60 @@ does not prove full hosted Auth recovery.
 
 Offline tests: test-preparation.py and the existing local test-automation.py and
 test-selection.py. Those tests execute no SQL, Docker or online requests.
+
+## Read-only Auth trigger ownership diagnosis
+
+If readiness stops at Auth trigger ownership, use the same preparation command
+with both --recover-missing-checksum and --diagnose-auth-ownership. This mode
+validates the original archive, original capture/rollback and local evidence,
+verifies TEST connection identity (hidden password prompt if needed), compares
+TEST to the original baseline, then collects only ownership evidence. It does
+not create a fresh backup or an installation package. PASS means evidence was
+collected, not that installation is approved. A changed baseline still fails.
+
+The private auth-trigger-ownership.json records current/session role, auth.users
+owner, actual superuser status, pg_has_role USAGE/MEMBER/SET, TRIGGER privilege,
+role flags and all membership edges including inherit_option/set_option. It also
+records only the allowlisted preload/Supautils settings, their context, source
+and pending-restart status. No passwords or pg_authid credential fields are read.
+
+PostgreSQL DROP TRIGGER requires table ownership (including effective inherited
+owner privileges) or superuser authority. USAGE answers whether the owner's
+privileges are immediately available. MEMBER alone, role-level INHERIT alone,
+TRIGGER privilege, or ability to SET ROLE do not prove the original rollback can
+DROP the trigger. That rollback drops it as postgres before any later SET ROLE;
+this preparation must not silently change its execution identity. Creation via
+TRIGGER privilege and function EXECUTE does not prove drop authority.
+
+Supabase's supported Supautils library provides a separate table-specific
+mechanism: supautils.drop_trigger_grants. The reviewed implementation matches the
+exact current role and resolves the configured table to its OID, then executes
+DROP TRIGGER through its managed utility hook. It does not use inherited role
+names for this grant. Therefore a false owner-USAGE result does not by itself
+exclude that managed mechanism. The old check covered standard PostgreSQL only.
+
+The diagnostic recognises a candidate only with an exact postgres/auth.users
+entry, the Supautils preload name, and a registered sighup setting with no pending
+restart. It deliberately does not promote configuration evidence to proven
+native ownership or automatically approve a managed implementation that we have
+not verified on this TEST instance. Review the generated evidence and obtain
+Supabase confirmation of the installed hook/version/active configuration if that
+is the only available route. No CREATE/DROP probe is permitted in this read-only
+step, including inside a transaction that would be rolled back.
+
+If native ownership is absent and no supported, verified managed route exists,
+installation remains NO-GO: ask Supabase support about the existing supported
+trigger-management mechanism. Do not request arbitrary superuser grants, change
+Auth ownership, SET ROLE to bypass the original guards, or invent a privileged
+helper. A required migration/rollback design change needs separate review; the
+original capture and rollback remain untouched here. Writer controls and full
+Auth recovery limitations remain outstanding independently of this diagnosis.
+
+Reviewed upstream Supautils commit: 7a22990746ec17b1a84cf2a097dda411222f8ec7.
+This is source-review evidence, not a claim about the TEST installed version:
+
+- https://github.com/supabase/supautils/blob/7a22990746ec17b1a84cf2a097dda411222f8ec7/README.md#drop-triggers
+- https://github.com/supabase/supautils/blob/7a22990746ec17b1a84cf2a097dda411222f8ec7/src/drop_trigger_grants.c
+- https://github.com/supabase/supautils/blob/7a22990746ec17b1a84cf2a097dda411222f8ec7/src/table_grants.c
+- https://www.postgresql.org/docs/17/sql-droptrigger.html
+- https://www.postgresql.org/docs/17/functions-info.html
