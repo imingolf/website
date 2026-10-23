@@ -13,7 +13,8 @@ Run this single block in Mac Terminal:
   IIG_REPO="$HOME/Downloads/imingolf-rollback"
   test "$(git -C "$IIG_REPO" branch --show-current)" = pr6-test-rollback-preparation
   git -C "$IIG_REPO" pull --ff-only origin pr6-test-rollback-preparation
-  python3 "$IIG_REPO/docs/pr6-test-rollback-preparation/local-rehearsal/run-rehearsal.py"
+  python3 "$IIG_REPO/docs/pr6-test-rollback-preparation/local-rehearsal/run-rehearsal.py" \
+    --verify-recovery-from "$HOME/Documents/ImInGolf-Local-Rehearsal/local-restore-generated/automated-rehearsal-20261023T113617.009829Z"
 )
 ```
 
@@ -25,6 +26,42 @@ guards. It can gracefully stop precisely verified idle local Supabase services a
 described below; it never stops the database. Its schema DROP statements come only from the existing
 guarded rollback, with RESTRICT. The reviewed migrations' foreign keys with
 ON DELETE CASCADE are left unchanged; no deletions are exercised.
+
+## Resuming the completed rollback with the Python comparison error
+
+The command above explicitly verifies the reported 20261023T113617.009829Z run.
+Do not remove the recovery flag to bypass a mismatch. It requires that prior
+report to record completed rollback SQL for the same database container, and reads
+its original-before.json, after-rollback.json, audit-before.json and
+audit-after-rollback.json without changing them. Missing or inconsistent evidence
+stops the run before migrations.
+
+The cause of `'NoneType' object is not iterable` is the previous comparator's
+generic handling of any field called `acl`. Function audit ACLs are expanded JSON
+grant arrays; column audit ACLs are `pg_attribute.attacl::text`, normally SQL NULL
+or otherwise an ACL string. The old code tried to iterate NULL column ACLs and
+also incorrectly sorted strings as characters. The fix sorts **only function
+grant arrays**, while comparing nullable column ACL text exactly. NULL is not
+coerced to an empty list or treated as a permission exemption. Malformed function
+ACL arrays and missing inventory arrays still fail explicitly.
+
+Before any new migration, the runner now:
+
+1. Rechecks the prior saved rollback snapshots using the corrected comparison,
+   including every original fingerprint, effective grant, raw column ACL, normal/
+   event trigger, RLS/policy/catalog, sequence, index and constraint check.
+2. Keeps all existing local-only/client-drain guards, verifies the actual current
+   database against the original before.json, then compares its supplementary audit
+   against the prior run's original audit-before.json. It does not adopt the
+   post-rollback database as a new baseline to conceal differences.
+3. Prints confirmation that both prior rollback evidence and the current database
+   match the original baseline, then starts the ordinary four-migration/guarded
+   rollback rehearsal. Any mismatch prevents the first migration.
+
+For a genuinely new disposable baseline with no previous run, recovery verification
+is optional; the normal mandatory before.json and current-database checks remain.
+For this reported run use the exact command above. Exceptions now also save a
+private exception.txt traceback so future Python faults identify the code path.
 
 ## What it checks and does
 

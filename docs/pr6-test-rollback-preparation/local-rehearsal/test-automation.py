@@ -356,5 +356,94 @@ class AutomationTests(unittest.TestCase):
             self.assertEqual(m.classify_client(client,[service])['category'],'internal_idle')
             self.assertEqual(m.classify_client(client,[])['category'],'unexpected_or_unattributed')
 
+    def supplementary_fixture(self):
+        return {'rows':{'groups':'protected-fingerprint'},'sequence':{'last_value':2,'is_called':True},
+                'functions':[{'signature':'public.example()', 'acl':[
+                    {'grantee':1,'grantor':1,'privilege':'EXECUTE','grantable':False},
+                    {'grantee':2,'grantor':1,'privilege':'EXECUTE','grantable':False}]}],
+                'constraints':[],'indexes':[],
+                'columns':[{'table':'public.tens_in_groups','column':'state','acl':None},
+                           {'table':'public.tens_in_groups','column':'id','acl':'{anon=r/postgres}'}],
+                'groups':[{'pin':'3520','history_md5':'history'}]}
+
+    def test_nullable_column_acl_regression_and_function_acl_order(self):
+        before=self.supplementary_fixture(); after=copy.deepcopy(before)
+        after['functions'][0]['acl'].reverse()
+        after['columns'].reverse()
+        m.compare_supplementary(before,after)
+        self.assertIsNone(before['columns'][0]['acl'])
+        # Unlike functions, column ACL text must never be sorted as characters.
+        changed=copy.deepcopy(before)
+        changed['columns'][1]['acl']='{nona=r/postgres}'
+        self.assertEqual(sorted(before['columns'][1]['acl']),sorted(changed['columns'][1]['acl']))
+        with self.assertRaises(RuntimeError): m.compare_supplementary(before,changed)
+
+    def test_null_is_not_a_permission_or_inventory_exemption(self):
+        before=self.supplementary_fixture()
+        for change in ['column-grant','column-invalid-list','function-null','function-grant',
+                       'inventory-null','rows','sequence','history']:
+            changed=copy.deepcopy(before)
+            if change=='column-grant': changed['columns'][0]['acl']='{anon=w/postgres}'
+            if change=='column-invalid-list': changed['columns'][0]['acl']=[]
+            if change=='function-null': changed['functions'][0]['acl']=None
+            if change=='function-grant': changed['functions'][0]['acl'][0]['grantable']=True
+            if change=='inventory-null': changed['constraints']=None
+            if change=='rows': changed['rows']['groups']='changed'
+            if change=='sequence': changed['sequence']['last_value']=3
+            if change=='history': changed['groups'][0]['history_md5']='changed'
+            with self.subTest(change=change),self.assertRaises(RuntimeError):
+                m.compare_supplementary(before,changed)
+
+    def write_recovery_fixture(self,folder):
+        before=capture_fixture(); audit=self.supplementary_fixture()
+        files={'report.json':{'rollback_completed':True,'stage':'post-rollback comparison',
+                              'target':{'id':'same-container'}},
+               'original-before.json':before,'after-rollback.json':copy.deepcopy(before),
+               'audit-before.json':audit,'audit-after-rollback.json':copy.deepcopy(audit)}
+        for name,value in files.items(): (folder/name).write_text(json.dumps(value))
+        return before,files
+
+    def test_previous_failed_comparison_evidence_is_rechecked(self):
+        with tempfile.TemporaryDirectory() as d:
+            folder=Path(d); before,files=self.write_recovery_fixture(folder)
+            previous=m.recovery_evidence(folder,before,'same-container')
+            m.compare_supplementary(previous,self.supplementary_fixture())
+            # The old code raised TypeError on these NULL column ACLs; no ACL is dropped.
+            self.assertIsNone(previous['columns'][0]['acl'])
+            changed=self.supplementary_fixture(); changed['columns'][0]['acl']='{anon=r/postgres}'
+            with self.assertRaises(RuntimeError): m.compare_supplementary(previous,changed)
+            for fault in ['container','rollback','saved-data','saved-grant','missing']:
+                self.write_recovery_fixture(folder)
+                if fault=='container':
+                    with self.assertRaises(RuntimeError): m.recovery_evidence(folder,before,'different-container')
+                    continue
+                name='report.json' if fault=='rollback' else 'audit-after-rollback.json'
+                value=json.loads((folder/name).read_text())
+                if fault=='rollback': value['rollback_completed']=False
+                if fault=='saved-data': value['rows']['groups']='changed'
+                if fault=='saved-grant': value['columns'][0]['acl']='{anon=r/postgres}'
+                if fault=='missing': (folder/'after-rollback.json').unlink()
+                else: (folder/name).write_text(json.dumps(value))
+                with self.subTest(fault=fault),self.assertRaises(RuntimeError):
+                    m.recovery_evidence(folder,before,'same-container')
+
+    def test_recovery_mismatch_stops_before_any_migration(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d); folder=root/'old-evidence'; folder.mkdir()
+            before,files=self.write_recovery_fixture(folder)
+            class RecoveryRunner(FakeRunner):
+                def prepare(self):
+                    previous=m.recovery_evidence(folder,before,'same-container')
+                    current=self.supplementary_fixture_for_test
+                    m.compare_supplementary(previous,current)
+                    return super().prepare()
+            r=RecoveryRunner(root)
+            r.supplementary_fixture_for_test=self.supplementary_fixture()
+            r.supplementary_fixture_for_test['rows']['groups']='changed'
+            with self.assertRaises(RuntimeError): r.execute()
+            self.assertEqual(r.events,[])
+            self.assertEqual(r.report['completed_migrations'],[])
+            self.assertFalse(r.report['rollback_completed'])
+
 if __name__=='__main__':
     unittest.main()

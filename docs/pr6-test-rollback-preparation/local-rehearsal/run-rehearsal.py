@@ -12,6 +12,7 @@ import sys
 import time
 import types
 import ipaddress
+import traceback
 
 CONTAINER = 'supabase_db_ImInGolf-Local-Rehearsal'
 PROJECT = 'ImInGolf-Local-Rehearsal'
@@ -173,6 +174,48 @@ def compare_baseline(before, after):
         require(normalized(before['inventory'][key])==normalized(after['inventory'][key]),
                 'Baseline catalog mismatch: '+key)
 
+def supplementary_records(kind, items):
+    require(isinstance(items,list), 'Expected supplementary inventory array: '+kind)
+    result=[]
+    for item in items:
+        require(isinstance(item,dict), 'Expected supplementary inventory record: '+kind)
+        record=dict(item)
+        if kind=='functions':
+            # Audit SQL expands effective function ACLs into a COALESCE'd JSON array.
+            require(isinstance(record.get('acl'),list), 'Invalid effective function ACL array')
+            record['acl']=normalized(record['acl'])
+        elif kind=='columns':
+            # pg_attribute.attacl::text is nullable TEXT, NOT a grant array.
+            # Preserve NULL and explicit ACL strings exactly, including their distinction.
+            require('acl' in record and (record['acl'] is None or isinstance(record['acl'],str)),
+                    'Invalid raw column ACL text')
+        result.append(record)
+    return normalized(result)
+
+def compare_supplementary(before, after):
+    require(before['rows']==after['rows'] and before['sequence']==after['sequence'],
+            'Supplementary data/sequence mismatch')
+    for key in ['functions','constraints','indexes','columns','groups']:
+        require(supplementary_records(key,before[key])==supplementary_records(key,after[key]),
+                'Supplementary catalog mismatch: '+key)
+
+def recovery_evidence(folder, original_before, container_id):
+    require(folder.is_dir(), 'Previous rollback evidence folder is missing')
+    files={name:folder/name for name in ['report.json','original-before.json','after-rollback.json',
+                                       'audit-before.json','audit-after-rollback.json']}
+    require(all(path.is_file() for path in files.values()), 'Previous rollback evidence is incomplete; no migration attempted')
+    values={name:json.loads(path.read_text()) for name,path in files.items()}
+    report=values['report.json']
+    require(report.get('rollback_completed') is True and
+            report.get('stage') in ('post-rollback comparison','complete'),
+            'Evidence does not establish completed rollback SQL; stop for review')
+    require(report.get('target',{}).get('id')==container_id,
+            'Previous evidence belongs to a different database container')
+    compare_baseline(original_before,values['original-before.json'])
+    compare_baseline(original_before,values['after-rollback.json'])
+    compare_supplementary(values['audit-before.json'],values['audit-after-rollback.json'])
+    return values['audit-before.json']
+
 def load_generator():
     # Same reviewed local substitution as prepare-local.py; online generator stays unchanged.
     source = (HERE.parent/'prepare.py').read_text()
@@ -226,7 +269,7 @@ COMMIT;
 """
 
 class Runner:
-    def __init__(self, root):
+    def __init__(self, root, recovery_from=None):
         self.root = root
         self.generated = root/'local-restore-generated'
         self.run_dir = self.generated/('automated-rehearsal-'+datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%S.%fZ'))
@@ -239,6 +282,7 @@ class Runner:
         self.counter = 0
         self.container_observations = []
         self.generator = load_generator()
+        self.recovery_from = recovery_from
 
     def command(self, args, data=None, timeout=None):
         env = dict(os.environ)
@@ -489,6 +533,12 @@ SELECT jsonb_build_object('rows',jsonb_build_object(FINGERPRINTS),
         (self.run_dir/'original-before.json').write_text(json.dumps(before,indent=2))
         (self.run_dir/'rollback.LOCAL.sql').write_text(rollback)
         self.report['rollback_sha256']=hashlib.sha256(rollback.encode()).hexdigest()
+        previous_audit=None
+        if self.recovery_from is not None:
+            self.report['stage']='verify previous rollback evidence'
+            previous_audit=recovery_evidence(self.recovery_from,before,self.container_id)
+            self.report['previous_rollback_evidence']=str(self.recovery_from)
+            self.report['previous_evidence_comparison_passed']=True
         self.drain_internal_clients()
         self.report['stage']='baseline verification after client drain'
         current = self.capture('current-before')
@@ -510,6 +560,10 @@ SELECT jsonb_build_object('rows',jsonb_build_object(FINGERPRINTS),
                 'Expected exactly groups 3520 and 5021')
         require(audit['owners']==2 and audit['members']==3 and audit['fixture_ok'] is True,
                 'Owner/member/fictional-user baseline mismatch')
+        if previous_audit is not None:
+            compare_supplementary(previous_audit,audit)
+            self.report['current_database_matches_previous_original_baseline']=True
+            print('Previous rollback evidence AND current database match the original baseline.',flush=True)
         return before,audit,migrations,rollback
 
     def installed_checks(self, before, audit_before):
@@ -586,18 +640,7 @@ SELECT jsonb_build_object('rows',jsonb_build_object(FINGERPRINTS),
         compare_baseline(before,after)
         self.verify_rls()
         after_audit=self.audit('audit-after-rollback')
-        require(audit['rows']==after_audit['rows'] and audit['sequence']==after_audit['sequence'], 'Supplementary data/sequence mismatch')
-        for key in ['functions','constraints','indexes','columns','groups']:
-            def stable(items):
-                # Canonicalize ACL array order inside supplementary function records.
-                result=[]
-                for x in items:
-                    x=dict(x)
-                    if 'acl' in x:
-                        x['acl']=normalized(x['acl'])
-                    result.append(x)
-                return normalized(result)
-            require(stable(audit[key])==stable(after_audit[key]), 'Supplementary catalog mismatch: '+key)
+        compare_supplementary(audit,after_audit)
         self.report.update(result='PASS',stage='complete')
 
     def save_report(self):
@@ -606,6 +649,8 @@ SELECT jsonb_build_object('rows',jsonb_build_object(FINGERPRINTS),
         if 'error' in self.report:
             text += self.report['error']+'\nNo automatic recovery/retry was attempted. Earlier file commits may remain installed.\n'
         text += 'Rollback SQL completed: '+str(self.report['rollback_completed'])+'\n'
+        if self.report.get('current_database_matches_previous_original_baseline'):
+            text += 'Previous rollback and current baseline: verified before migrations.\n'
         for action in self.report.get('local_service_stops',[]):
             text += 'Local service '+action['status']+': '+action['service']+' (graceful stop only)\n'
         if self.report['result']=='FAIL':
@@ -625,6 +670,8 @@ SELECT jsonb_build_object('rows',jsonb_build_object(FINGERPRINTS),
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--root',type=Path,default=Path.home()/'Documents/ImInGolf-Local-Rehearsal')
+    p.add_argument('--verify-recovery-from',type=Path,
+                   help='Require saved completed-rollback evidence and current DB to match its original baseline before migrations')
     a=p.parse_args()
     os.umask(0o077)
     if not a.root.is_dir() or not (a.root/'local-restore-generated').is_dir():
@@ -639,11 +686,12 @@ def main():
     os.write(fd,str(os.getpid()).encode()); os.close(fd)
     runner=None
     try:
-        runner=Runner(a.root)
+        runner=Runner(a.root,a.verify_recovery_from)
         runner.execute()
     except (Exception,KeyboardInterrupt) as e:
         if runner is not None:
             runner.report['error']=str(e) or 'Interrupted; database execution state may be uncertain'
+            (runner.run_dir/'exception.txt').write_text(traceback.format_exc())
         else:
             print('FAIL — '+str(e),file=sys.stderr)
         return 1
