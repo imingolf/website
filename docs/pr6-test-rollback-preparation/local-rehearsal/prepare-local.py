@@ -19,6 +19,15 @@ tables = {'public.tens_in_groups', 'public.iig_notification_settings',
           'iig_private.group_owners', 'iig_private.group_members',
           'iig_private.registration_settings', 'iig_private.platform_owners'}
 indexes = {'iig_group_pin_unique', 'iig_notification_events_due_idx'}
+managed_event_triggers = {
+    'ensure_rls', 'issue_graphql_placeholder', 'issue_pg_cron_access',
+    'issue_pg_graphql_access', 'issue_pg_net_access',
+    'pgrst_ddl_watch', 'pgrst_drop_watch',
+}
+application_triggers = {
+    ('public.tens_in_groups', 'iig_create_notification_events_trigger'),
+    ('public.tens_in_groups', 'iig_enable_notifications_for_new_group_trigger'),
+}
 selected = []
 seen_tables = set()
 seen_functions = set()
@@ -29,7 +38,10 @@ unknown = []
 for line in a.inventory.read_text().splitlines():
     if not line or line.startswith(';'):
         continue
-    m = re.match(r'^\d+;\s+\d+\s+\d+\s+(.+?)\s+(public|iig_private|-)\s+(.+)$', line)
+    # Parse every event-trigger entry, even an unexpected namespace, to fail closed.
+    m = re.match(r'^\d+;\s+\d+\s+\d+\s+(EVENT TRIGGER)\s+(\S+)\s+(.+)$', line)
+    if not m:
+        m = re.match(r'^\d+;\s+\d+\s+\d+\s+(.+?)\s+(public|iig_private|-)\s+(.+)$', line)
     if not m:
         if re.search(r'\b(public|iig_private)\b',line):
             raise SystemExit('Unrecognised application TOC format; review manually: ' + line)
@@ -40,7 +52,8 @@ for line in a.inventory.read_text().splitlines():
         excluded_managed.append(line)
         continue
     if kind == 'EVENT TRIGGER':
-        if schema == '-' and re.fullmatch(r'ensure_rls\s+\S+', tail):
+        identity = re.fullmatch(r'(\S+)\s+\S+', tail)
+        if schema == '-' and identity and identity.group(1) in managed_event_triggers:
             excluded_managed.append(line)
         else:
             unknown.append(line)
@@ -56,7 +69,10 @@ for line in a.inventory.read_text().splitlines():
     if kind == 'TABLE' and name in tables:
         seen_tables.add(name)
         keep = True
-    elif kind in {'TABLE DATA', 'CONSTRAINT', 'FK CONSTRAINT', 'TRIGGER',
+    elif kind == 'TRIGGER':
+        parts = tail.split()
+        keep = len(parts) == 3 and (name, parts[1]) in application_triggers
+    elif kind in {'TABLE DATA', 'CONSTRAINT', 'FK CONSTRAINT',
                   'POLICY', 'ROW SECURITY', 'DEFAULT'} and name in tables:
         keep = True
         if kind == 'ROW SECURITY':
@@ -88,7 +104,7 @@ if seen_rls != tables:
     raise SystemExit('Missing explicit baseline ROW SECURITY entries: '+str(tables-seen_rls))
 a.out.mkdir(parents=True, exist_ok=True)
 (a.out/'restore-selection.app.txt').write_text('; CANDIDATE: inspect schema SQL before execution. Auth/managed objects excluded.\n'+'\n'.join(selected)+'\n')
-(a.out/'excluded-managed-rls.txt').write_text('; Explicitly excluded managed RLS automation; inspect local equivalent separately.\n'+'\n'.join(excluded_managed)+'\n')
+(a.out/'excluded-managed-rls.txt').write_text('; Explicitly excluded managed function/event triggers; local managed definitions remain unchanged.\n'+'\n'.join(excluded_managed)+'\n')
 # Extract only top-level GRANT/REVOKE statements, never the destructive baseline setup.
 grants = re.findall(r'^(?:grant|revoke)\b[^;]*;', text, re.M | re.I)
 (a.out/'baseline-acl.sql').write_text('-- Intended repository baseline ACLs; not recovered online ACLs.\n'+'\n'.join(grants)+'\n')

@@ -67,5 +67,38 @@ class SelectionTests(unittest.TestCase):
         self.assertNotEqual(result.returncode,0)
         self.assertIn('Missing explicit baseline ROW SECURITY',result.stderr)
 
+    def test_six_additional_managed_event_triggers_excluded(self):
+        names=['issue_graphql_placeholder','issue_pg_cron_access',
+               'issue_pg_graphql_access','issue_pg_net_access',
+               'pgrst_ddl_watch','pgrst_drop_watch']
+        entries=[f'EVENT TRIGGER - {name} supabase_admin' for name in names]
+        result,out=self.run_helper(entries)
+        self.assertEqual(result.returncode,0,result.stderr)
+        self.assertNotIn('EVENT TRIGGER',out['restore-selection.app.txt'])
+        for entry in entries:
+            self.assertIn(entry,out['excluded-managed-rls.txt'])
+        for name in names:
+            for entry in [f'EVENT TRIGGER - {name}_extra postgres',
+                          f'EVENT TRIGGER - prefix_{name} postgres',
+                          f'EVENT TRIGGER public {name} postgres',
+                          f'EVENT TRIGGER auth {name} postgres',
+                          f'FUNCTION public {name}() postgres']:
+                with self.subTest(entry=entry):
+                    result,_=self.run_helper([entry])
+                    self.assertNotEqual(result.returncode,0)
+
+    def test_unknown_event_and_application_triggers_rejected(self):
+        for entry in ['EVENT TRIGGER - unknown_trigger postgres',
+                      'TRIGGER public tens_in_groups unknown_trigger postgres']:
+            with self.subTest(entry=entry):
+                result,_=self.run_helper([entry])
+                self.assertNotEqual(result.returncode,0)
+        entries=['TRIGGER public tens_in_groups iig_create_notification_events_trigger postgres',
+                 'TRIGGER public tens_in_groups iig_enable_notifications_for_new_group_trigger postgres']
+        result,out=self.run_helper(entries)
+        self.assertEqual(result.returncode,0,result.stderr)
+        for entry in entries:
+            self.assertIn(entry,out['restore-selection.app.txt'])
+
 if __name__=='__main__':
     unittest.main()

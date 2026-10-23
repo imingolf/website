@@ -27,8 +27,16 @@ have actually run and their comparisons pass.
   restore rather than justify selecting the entire managed schema.
 - The source-managed `public.rls_auto_enable()` and `ensure_rls` event trigger
   are explicitly excluded, with an audit list in excluded-managed-rls.txt. No
-  similarly named function/overload is exempted. Other unexpected event triggers
-  now stop selection, as do other unexpected application objects.
+  similarly named function/overload is exempted. Six further source inventory
+  event-trigger names are explicitly excluded: `issue_graphql_placeholder`,
+  `issue_pg_cron_access`, `issue_pg_graphql_access`, `issue_pg_net_access`,
+  `pgrst_ddl_watch` and `pgrst_drop_watch`. These exact database-global names only
+  are allowed in EVENT TRIGGER entries; no associated functions are added to the
+  application allowlist. The local managed triggers are retained unchanged.
+  Their names in the source inventory do not imply pg_cron/pg_net are installed.
+  Other unexpected event triggers stop selection, as do other unexpected
+  application objects. Application table triggers are limited to the two original
+  notification triggers on public.tens_in_groups.
   The helper requires all eight original ROW SECURITY entries. It does not rely
   on automatic RLS to make the restored application tables safe.
 - The eight application tables are public.tens_in_groups,
