@@ -2,6 +2,7 @@
 (() => {
   'use strict';
   const $ = id => document.getElementById(id);
+  window.iigHandicap?.bind($('handicap'));
   const allowed = location.hostname === 'deploy-preview-6--super-quokka-51747d.netlify.app' || ['localhost', '127.0.0.1'].includes(location.hostname);
   const message = text => { $('message').textContent = text; };
   if (!allowed) { message('This test page is only available on the authorised preview.'); return; }
@@ -226,7 +227,7 @@
   $('reloadPlayer').onclick = () => action(loadPlayer);
   $('joinForm').onsubmit = event => { event.preventDefault(); action(async () => {
     const name = $('playerName').value.trim(), raw = $('handicap').value.trim(), handicap = Number(raw);
-    if (!name || name.length > 80 || !raw || !Number.isFinite(handicap) || handicap < -10 || handicap > 60 || Math.abs(handicap * 10 - Math.round(handicap * 10)) > 1e-8) throw new Error('Enter your name and a handicap from -10 to 60, with up to one decimal place.');
+    if (!name || name.length > 80 || !/^[-]?[0-9]{1,2}(?:\.[0-9])?$/.test(raw) || !Number.isFinite(handicap) || handicap < -10 || handicap > 60 || Math.abs(handicap * 10 - Math.round(handicap * 10)) > 1e-8) throw new Error('Enter your name and a handicap from -10 to 60, with up to one decimal place.');
     await request('/rest/v1/rpc/iig_join_owned_group',{p_pin:invitePin,p_invite:inviteToken,p_name:name,p_handicap:handicap},true);
     await loadPlayer();
   }); };

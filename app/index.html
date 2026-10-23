@@ -188,7 +188,7 @@ if(/iPhone|iPod/.test(navigator.userAgent) &&
   document.documentElement.classList.add("iig-ios-fullscreen");
 }
 </script>
-</head>
+<script src="handicap-input.js"></script></head>
 <body>
 
 <div id="openingSplash" aria-hidden="true">
@@ -321,7 +321,7 @@ if(/iPhone|iPod/.test(navigator.userAgent) &&
   <section id="welcomeStart" class="welcome-panel hidden" aria-labelledby="welcomeStartTitle">
    <button type="button" class="welcome-back" onclick="showWelcomePanel('home')">← Back</button>
    <h1 id="welcomeStartTitle" tabindex="-1">Get your mates in.</h1>
-   <p>Create your group here. Verify your email, add your name and choose a group name.</p>
+   <p>Name your group and enter your details. We’ll verify your email before creating it.</p>
    <div id="registrationAuth"><p>Loading group setup…</p></div>
   </section>
   <section id="welcomeHow" class="welcome-panel hidden" aria-labelledby="welcomeHowTitle">
@@ -1199,7 +1199,7 @@ function waitingScreen(section="round"){
         <div style="font-size:17px;line-height:1.45;font-weight:600;color:#40564a;margin-top:12px;">
           Choose your game and add the details for your first competition.
         </div>
-        <button class="primary full" style="margin-top:18px;" onclick="newRound()">➕ Start First Competition</button>
+        <button class="primary full" style="margin-top:18px;" onclick="window.iigSecureOrganiser?.active ? window.iigSecureOrganiser.firstCompetition() : newRound()">➕ Start First Competition</button>
       </div>
       ${sideGameEntranceHtml()}`;
     return;
@@ -3365,7 +3365,7 @@ function appPrompt(title,message="",initial="",options={}){
     document.body.appendChild(overlay);
     const input=overlay.querySelector("#appPromptInput");
     if(options.handicap){
-      input.addEventListener("input",()=>{input.value=limitHandicapText(input.value);});
+      window.iigHandicap.bind(input);
     }
     const finish=value=>{overlay.remove();resolve(value);};
     overlay.querySelector("#appPromptOk").onclick=()=>finish(input.value);
@@ -3915,16 +3915,7 @@ function validIndividualScore(raw,type){
 function validGolfHandicap(raw){
   return /^-?[0-9]{1,2}(?:\.[0-9])?$/.test(raw) && Number(raw)>=-10 && Number(raw)<=60;
 }
-function limitHandicapText(value){
-  const raw=String(value);
-  const sign=raw.startsWith("-") ? "-" : "";
-  const digits=raw.slice(sign.length).replace(/[^0-9.]/g,"");
-  const dot=digits.indexOf(".");
-  const whole=(dot<0?digits:digits.slice(0,dot)).replace(/\D/g,"").slice(0,2);
-  if(dot<0)return sign+whole;
-  const decimal=digits.slice(dot+1).replace(/\D/g,"").slice(0,1);
-  return sign+(whole||"0")+"."+decimal;
-}
+
 async function submitPlayerScore(i,type){
   if(!demoCanEdit())return;
   type=state.pointsCompetition||type||"stableford";
@@ -6641,7 +6632,7 @@ function playerJoinForm(){
     document.body.appendChild(overlay);
     const msg=overlay.querySelector("#joinMsg");
     const handicapInput=overlay.querySelector("#joinHandicap");
-    handicapInput.addEventListener("input",()=>{handicapInput.value=limitHandicapText(handicapInput.value);});
+    window.iigHandicap.bind(handicapInput);
     overlay.querySelector("#joinCancel").onclick=()=>{overlay.remove();resolve(null)};
     overlay.querySelector("#joinSubmit").onclick=()=>{
       const first=overlay.querySelector("#joinFirst").value.trim();
@@ -6697,7 +6688,7 @@ async function adminAddPlayer(){
     return;
   }
 
-  const h=prompt("Handicap","18");
+  const h=await appPrompt("Golf handicap","Up to two digits and one decimal place.","18",{handicap:true,inputmode:"decimal"});
   if(h===null)return;
 
   const handicapText=String(h).trim();
@@ -6727,7 +6718,7 @@ async function adminAddPlayer(){
   alert("✅ " + cleanName + " added to the group.");
 }
 
-async function editPlayer(i){const p=state.players[i];const name=prompt("Player name",p.name);if(!name)return;const h=prompt("Handicap",p.handicap);if(h===null)return;const handicapText=String(h).trim();if(!validGolfHandicap(handicapText)){alert("Enter a handicap between -10 and 60, with up to 1 decimal place.");return}p.name=name.trim();p.handicap=Number(handicapText);render();await save()}
+async function editPlayer(i){const p=state.players[i];const name=prompt("Player name",p.name);if(!name)return;const h=await appPrompt("Golf handicap","Up to two digits and one decimal place.",p.handicap,{handicap:true,inputmode:"decimal"});if(h===null)return;const handicapText=String(h).trim();if(!validGolfHandicap(handicapText)){alert("Enter a handicap between -10 and 60, with up to 1 decimal place.");return}p.name=name.trim();p.handicap=Number(handicapText);render();await save()}
 async function removePlayer(i){const p=state.players[i];if(!p)return;if(!await appConfirm("Remove Player","Remove "+p.name+" from this group? Their past round history will stay saved.","Remove Player",true))return;state.players.splice(i,1);render();await save()}
 
 

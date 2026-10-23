@@ -7,6 +7,7 @@ function setup(dashboard=false,host='deploy-preview-6--super-quokka-51747d.netli
  const calls=[],queue=[],storage=new Map(),timers=new Map();let timerId=0;
  const ctx={document,URLSearchParams,location:{hostname:host,hash,pathname:dashboard?'/app/owner-dashboard.html':'/app/'},Date,AbortController,setTimeout:(fn,ms)=>{timers.set(++timerId,{fn,ms});return timerId;},clearTimeout(id){timers.delete(id);},crypto:{randomUUID:()=> '11111111-1111-4111-8111-111111111111'},sessionStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v)},fetch:async(url,opts)=>{calls.push({url,opts,body:JSON.parse(opts.body)});const r=queue.shift();if(!r)throw Error('Unexpected request');return {ok:!r.status||r.status<400,status:r.status||200,json:async()=>r.data};}};
  ctx.window=ctx;ctx.addEventListener=()=>{};ctx.showWelcomePanel=()=>{};ctx.iigSecurePlayer={open:(...args)=>{ctx.playerOpen=args;},close(){}};
+ vm.runInNewContext(fs.readFileSync('app/handicap-input.js','utf8'),ctx);
  vm.runInNewContext(source,ctx);
  const el=id=>document.getElementById(id);
  async function act(id,event='onclick'){el(id)[event]({preventDefault(){}});for(let j=0;j<100;j++)await Promise.resolve();}
@@ -56,5 +57,30 @@ function setup(dashboard=false,host='deploy-preview-6--super-quokka-51747d.netli
  const expired=setup(true);await expired.login();expired.queue.push({data:[{group_name:'Private group'}]});await expired.act('regCodeForm','onsubmit');
  const expiry=[...expired.timers.values()].find(t=>t.ms>3000000);assert(expiry);expiry.fn();
  assert(expired.el('dashView').classList.contains('hidden'));assert.equal(expired.document.querySelector('#dashView .content').textContent,'');assert.match(expired.el('regMessage').textContent,/expired/);
+ const guided=setup();
+ assert.equal(guided.el('regGroupForm').hidden,false);assert.equal(guided.el('regEmailForm').hidden,true);
+ guided.el('regName').value='Alex';guided.el('regGroupName').value='Weekend <Golfers>';guided.el('regSetupEmail').value='alex@example.test';
+ guided.queue.push({data:{}});await guided.act('regGroupForm','onsubmit');
+ assert.equal(guided.el('regCodeForm').hidden,false);assert.match(guided.el('regVerify').textContent,/create my group/);
+ assert.equal(guided.calls[0].body.email,'alex@example.test');
+ const ready={group_pin:'3520',invite_token:'11111111-1111-4111-8111-111111111111',revision:0,state:{groupName:'Weekend <Golfers>',players:[],history:[],roundOpen:false}};
+ guided.el('regCode').value='12345678';
+ guided.queue.push({data:{access_token:'fake',expires_in:3600,user:{id:'alex',email:'alex@example.test'}}},{data:null},{data:null},{data:{group_pin:'3520'}},{data:ready});
+ await guided.act('regCodeForm','onsubmit');
+ assert.equal(guided.el('regCreated').hidden,false);assert.equal(guided.el('regCreatedName').textContent,'Weekend <Golfers>');
+ assert.equal(guided.calls.filter(c=>c.url.endsWith('iig_create_owned_group')).length,1);
+ assert(guided.calls.filter(c=>c.url.includes('/rpc/')).every(c=>c.opts.headers.Authorization==='Bearer fake'));
+ // Adding the organiser as a player must not create/open a round or switch their role.
+ guided.el('regOwnerPlayerName').value='Alex';guided.el('regOwnerHandicap').value='22.7';
+ guided.queue.push({data:ready},{data:'alex-player'});await guided.act('regOwnerPlayerForm','onsubmit');
+ assert.equal(guided.calls.at(-1).body.p_handicap,22.7);assert.equal(ready.state.roundOpen,false);
+ assert.match(guided.el('regOwnerPlayerStatus').textContent,/organiser access/);
+ const countBeforeInvalid=guided.calls.length;guided.el('regOwnerHandicap').value='227';await guided.act('regOwnerPlayerForm','onsubmit');assert.equal(guided.calls.length,countBeforeInvalid);
+ // A returning account reaching the guided flow must use its existing group.
+ const existing=setup();existing.el('regName').value='Alex';existing.el('regGroupName').value='Another name';existing.el('regSetupEmail').value='alex@example.test';
+ existing.queue.push({data:{}});await existing.act('regGroupForm','onsubmit');existing.el('regCode').value='12345678';
+ existing.queue.push({data:{access_token:'fake',expires_in:3600,user:{id:'alex',email:'alex@example.test'}}},{data:ready});await existing.act('regCodeForm','onsubmit');
+ assert.equal(existing.calls.filter(c=>c.url.endsWith('iig_create_owned_group')).length,0);
+ assert.equal(existing.el('regPin').textContent,'3520');
  console.log('PASS: real welcome/dashboard DOM; OTP; authenticated creation; readback failure; safe retry; escaped group text; owner denial/list; sign-out clearing; no production requests. Network mocked, no rendered browser.');
 })().catch(e=>{console.error(e);process.exit(1)});

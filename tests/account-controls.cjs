@@ -1,7 +1,7 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
 const {parseHTML}=require('linkedom');
 const {document}=parseHTML('<html><body></body></html>');
-const ctx={document,location:{hostname:'localhost',origin:'http://localhost'},console};ctx.window=ctx;vm.runInNewContext(fs.readFileSync('app/account-controls.js','utf8'),ctx);
+const ctx={document,location:{hostname:'localhost',origin:'http://localhost'},console};ctx.window=ctx;vm.runInNewContext(fs.readFileSync('app/handicap-input.js','utf8'),ctx);vm.runInNewContext(fs.readFileSync('app/account-controls.js','utf8'),ctx);
 const calls=[];let reset=false,fail=false;
 ctx.iigAccount.configure({request:async(path,body,auth)=>{calls.push({path,body,auth});if(fail)throw Error('Fresh sign-in required');return '11111111-1111-4111-8111-111111111111';},reset(){reset=true;},openOrganiser:async()=>{},openPlayer:async()=>{}});
 const el=id=>document.getElementById(id);async function click(id){el(id).onclick();for(let i=0;i<30;i++)await Promise.resolve();}

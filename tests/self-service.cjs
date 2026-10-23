@@ -43,6 +43,7 @@ const assert = require('node:assert/strict');
  await page.goto('https://deploy-preview-6--super-quokka-51747d.netlify.app/app/index.html');
  await page.getByRole('button',{name:'Start a golf group',exact:false}).first().click();
  assert.equal(await page.getByText('Request my group by email').count(),0);
+ await page.locator('#regReturning').click();
  assert(await page.locator('#regEmail').isVisible());
  async function login(){await page.locator('#regEmail').fill('test@example.test');await page.locator('#regEmailForm button').click();await page.locator('#regCode').fill('12345678');await page.locator('#regCodeForm button').first().click();}
  await login();await page.locator('#regGroupForm').waitFor({state:'visible'});

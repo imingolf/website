@@ -330,10 +330,10 @@ setTimeout(function(){
         if(name===null)return;
         name=String(name).trim();
         if(!name){showAppToast('Name needed','Please enter the player’s name.',3000);return;}
-        var h=await appPrompt('Edit Player','Golf handicap',p.handicap,{type:'number',inputmode:'decimal',okLabel:'Save Player'});
+        var h=await appPrompt('Edit Player','Golf handicap',p.handicap,{type:'text',inputmode:'decimal',handicap:true,okLabel:'Save Player'});
         if(h===null)return;
         var handicap=Number(h);
-        if(!Number.isFinite(handicap)||handicap < -10||handicap > 60){showAppToast('Invalid handicap','Please enter a handicap between -10 and 60.',3200);return;}
+        if(!validGolfHandicap(String(h).trim())){showAppToast('Invalid handicap','Please enter a handicap between -10 and 60.',3200);return;}
         p.name=name;
         p.handicap=handicap;
         render();
@@ -350,10 +350,10 @@ setTimeout(function(){
         if(!first||!surname){showAppToast('Name needed','Please enter the player’s first name and surname.',3200);return;}
         var cleanName=(first+' '+surname).trim();
         if(state.players.some(function(p){return p.name.trim().toLowerCase()===cleanName.toLowerCase();})){showAppToast('Already in the group',cleanName+' is already listed.',3200);return;}
-        var h=await appPrompt('Add Player','Golf handicap','18',{type:'number',inputmode:'decimal',okLabel:'Add Player'});
+        var h=await appPrompt('Add Player','Golf handicap','18',{type:'text',inputmode:'decimal',handicap:true,okLabel:'Add Player'});
         if(h===null)return;
         var handicap=Number(h);
-        if(!Number.isFinite(handicap)||handicap < -10||handicap > 60){showAppToast('Invalid handicap','Please enter a handicap between -10 and 60.',3200);return;}
+        if(!validGolfHandicap(String(h).trim())){showAppToast('Invalid handicap','Please enter a handicap between -10 and 60.',3200);return;}
         state.players.push({id:Date.now().toString(36),name:cleanName,handicap:handicap,competition:null,paid:false,stableford:null,netScore:null,noReturn:false,scoreSubmitted:false,wins:0,leaguePoints:0,netWinnings:0});
         await save();
         render();
