@@ -9,7 +9,9 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+import time
 import types
+import ipaddress
 
 CONTAINER = 'supabase_db_ImInGolf-Local-Rehearsal'
 PROJECT = 'ImInGolf-Local-Rehearsal'
@@ -32,6 +34,65 @@ RISKS = [
  'Runtime-mutating feature tests are excluded; changed data intentionally blocks rollback.',
  'Keep the container isolated and evidence private; no automatic retry, cleanup or network reconnection.',
 ]
+
+# Only direct service connections can be attributed. Poolers/proxies are excluded:
+# their IP/role would not identify the originating client.
+SERVICE_RULES = {
+ 'auth': (('supabase/gotrue:',), {'supabase_auth_admin'}),
+ 'rest': (('postgrest/postgrest:','supabase/postgrest:'), {'authenticator'}),
+ 'realtime': (('supabase/realtime:',), {'supabase_admin','supabase_realtime_admin'}),
+ 'storage': (('supabase/storage-api:',), {'supabase_storage_admin'}),
+ 'pg_meta': (('supabase/postgres-meta:',), {'supabase_admin','postgres'}),
+ 'analytics': (('supabase/logflare:',), {'supabase_admin'}),
+}
+
+def address(value):
+    if not value:
+        return None
+    try:
+        ip=ipaddress.ip_address(value)
+        return str(ip.ipv4_mapped) if isinstance(ip,ipaddress.IPv6Address) and ip.ipv4_mapped else str(ip)
+    except ValueError:
+        return None
+
+def approved_service(c):
+    name=c.get('Name','').lstrip('/')
+    for kind,(images,roles) in SERVICE_RULES.items():
+        if name!='supabase_'+kind+'_'+PROJECT:
+            continue
+        config=c.get('Config',{})
+        if (config.get('Labels') or {}).get('com.supabase.cli.project')!=PROJECT:
+            return None
+        image=config.get('Image','')
+        if image.startswith('public.ecr.aws/'):
+            image=image[len('public.ecr.aws/'):]
+        if not any(image.startswith(prefix) for prefix in images):
+            return None
+        if not c.get('State',{}).get('Running') or c.get('HostConfig',{}).get('NetworkMode')=='host':
+            return None
+        ips=set()
+        for network in c.get('NetworkSettings',{}).get('Networks',{}).values():
+            for key in ('IPAddress','GlobalIPv6Address'):
+                if address(network.get(key)):
+                    ips.add(address(network[key]))
+        return {'name':name,'id':c['Id'],'image':config['Image'],'ips':sorted(ips),'roles':sorted(roles)}
+    return None
+
+def classify_client(client, services):
+    matches=[s for s in services if address(client.get('client_addr')) in s['ips']
+             and client.get('user') in s['roles']]
+    if len(matches)!=1:
+        return dict(client,category='unexpected_or_unattributed',
+                    reason='No unique verified direct local service IP + role; socket/proxy/role alone is insufficient')
+    service=matches[0]
+    if client.get('xact_start') is not None or client.get('state')=='idle in transaction':
+        return dict(client,category='internal_transaction',service=service['name'],
+                    reason='Verified local service has an open transaction; no automatic stop')
+    if client.get('state')!='idle':
+        return dict(client,category='internal_busy',service=service['name'],
+                    reason='Verified local service is busy; wait briefly, never interrupt an active client')
+    return dict(client,category='internal_idle',service=service['name'],
+                reason='Verified project label, exact service/image, Docker source IP, role; idle with no transaction')
 
 def require(ok, message):
     if not ok:
@@ -82,19 +143,32 @@ def validate_container(c):
 def validate_endpoint(endpoint):
     require(endpoint.startswith('unix:///'), 'Docker context is not a local Unix socket; remote Docker is forbidden')
 
-SQL_GUARD = """
+SQL_IDENTITY_GUARD = """
 SET lock_timeout='5s'; SET statement_timeout='60s';
 SET idle_in_transaction_session_timeout='60s';
 DO $local$ BEGIN
  IF inet_server_addr() IS NOT NULL OR current_database()<>'postgres' OR current_user<>'postgres'
  OR current_setting('server_version_num')::integer<>170006 THEN
   RAISE EXCEPTION 'Expected local Unix-socket postgres PostgreSQL 17.6 only'; END IF;
- IF EXISTS(SELECT 1 FROM pg_stat_activity WHERE datname=current_database()
- AND pid<>pg_backend_pid() AND backend_type='client backend') THEN
-  RAISE EXCEPTION 'Other database clients exist; pause/drain them first'; END IF;
  IF EXISTS(SELECT 1 FROM pg_prepared_xacts WHERE database=current_database()) THEN
   RAISE EXCEPTION 'Prepared transactions exist'; END IF;
 END $local$;
+"""
+SQL_GUARD = SQL_IDENTITY_GUARD + """
+DO $clients$ BEGIN
+ IF EXISTS(SELECT 1 FROM pg_stat_activity WHERE datname=current_database()
+ AND pid<>pg_backend_pid() AND backend_type='client backend') THEN
+  RAISE EXCEPTION 'Other database clients exist; pause/drain them first'; END IF;
+END $clients$;
+"""
+CLIENT_DIAGNOSTICS = "BEGIN READ ONLY;\n"+SQL_IDENTITY_GUARD+"""
+SELECT coalesce(jsonb_agg(jsonb_build_object('pid',pid,'user',usename,
+ 'application',application_name,'client_addr',host(client_addr),'client_port',client_port,
+ 'state',state,'xact_start',xact_start,'backend_start',backend_start,
+ 'backend_type',backend_type) order by pid),'[]'::jsonb)
+FROM pg_stat_activity WHERE datname=current_database() AND pid<>pg_backend_pid()
+ AND backend_type='client backend';
+COMMIT;
 """
 
 class Runner:
@@ -111,17 +185,17 @@ class Runner:
         self.counter = 0
         self.generator = load_generator()
 
-    def command(self, args, data=None):
+    def command(self, args, data=None, timeout=None):
         env = dict(os.environ)
         for key in ['DOCKER_HOST','DOCKER_CONTEXT','DOCKER_TLS_VERIFY','DOCKER_CERT_PATH',
                     'GIT_DIR','GIT_WORK_TREE','GIT_INDEX_FILE']:
             env.pop(key,None)
-        result = subprocess.run(args,input=data,text=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,env=env)
+        result = subprocess.run(args,input=data,text=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,env=env,timeout=timeout)
         require(result.returncode==0, 'Command failed: '+args[0]+' '+args[1]+'\n'+result.stderr[-4000:])
         return result.stdout
 
-    def docker(self, *args, data=None):
-        return self.command(['docker','--context',self.context,*args],data)
+    def docker(self, *args, data=None, timeout=None):
+        return self.command(['docker','--context',self.context,*args],data,timeout=timeout)
 
     def isolated(self):
         # Context inspection is local CLI metadata, before contacting its daemon.
@@ -137,10 +211,13 @@ class Runner:
         return c
 
     def sql(self, text, label, variables=()):
+        return self._psql(SQL_GUARD+'\n'+text,label,variables)
+
+    def _psql(self, text, label, variables=()):
         self.isolated()  # Recheck before EVERY SQL invocation; no host database connections.
         self.counter += 1
         path = self.run_dir/f'{self.counter:02d}-{label}'
-        path.with_suffix('.sql').write_text(SQL_GUARD+'\n'+text)
+        path.with_suffix('.sql').write_text(text)
         args = ['docker','--context',self.context,'exec','-i',CONTAINER,
                 'env','-u','PGSERVICE','-u','PGSERVICEFILE','-u','PGOPTIONS','-u','PGPASSFILE',
                 'PGAPPNAME=iig-local-automated-rehearsal','psql','-X','-w','-qAt',
@@ -152,12 +229,87 @@ class Runner:
         env = dict(os.environ)
         for key in ['DOCKER_HOST','DOCKER_CONTEXT','DOCKER_TLS_VERIFY','DOCKER_CERT_PATH']:
             env.pop(key,None)
-        r = subprocess.run(args,input=SQL_GUARD+'\n'+text,text=True,
+        r = subprocess.run(args,input=text,text=True,
                            stdout=subprocess.PIPE,stderr=subprocess.PIPE,env=env)
         path.with_suffix('.stdout').write_text(r.stdout)
         path.with_suffix('.stderr').write_text(r.stderr)
         require(r.returncode==0, f'Local SQL failed ({label}); stop. See {path.with_suffix(".stderr")}')
         return r.stdout
+
+    def client_snapshot(self):
+        # This dedicated read-only diagnostic must be able to OBSERVE blocked clients.
+        # All schema/data/rollback/capture operations still use the zero-client SQL_GUARD.
+        return json.loads(self._psql(CLIENT_DIAGNOSTICS,'client-diagnostics'))
+
+    def service_inventory(self):
+        self.isolated()
+        names=set(self.docker('ps','--format','{{.Names}}').splitlines())
+        expected=['supabase_'+kind+'_'+PROJECT for kind in SERVICE_RULES]
+        present=[name for name in expected if name in names]
+        services=[]
+        if present:
+            for c in json.loads(self.docker('inspect',*present)):
+                service=approved_service(c)
+                if service:
+                    services.append(service)
+        (self.run_dir/'local-service-inventory.json').write_text(json.dumps(services,indent=2))
+        return services
+
+    def drain_internal_clients(self):
+        self.report['stage']='classify and drain local background clients'
+        services=self.service_inventory()
+        actions=self.report.setdefault('local_service_stops',[])
+        deadline=time.monotonic()+8
+        while True:
+            clients=self.client_snapshot()
+            classified=[classify_client(c,services) for c in clients]
+            (self.run_dir/'clients-before-drain.json').write_text(json.dumps(classified,indent=2))
+            self.report['clients']=classified
+            require(not any(c['category'] in ('unexpected_or_unattributed','internal_transaction') for c in classified),
+                    'Unexpected/unattributed client or open transaction: no services stopped. See clients-before-drain.json (PID, role, source, state).')
+            if not any(c['category']=='internal_busy' for c in classified):
+                break
+            require(time.monotonic()<deadline,'Verified local services remain busy; no active client interrupted. See clients-before-drain.json')
+            time.sleep(0.5)
+        targets=sorted({c['service'] for c in classified})
+        original_sessions={(c['pid'],c['backend_start']) for c in classified}
+        for name in targets:
+            # Recheck identities and all clients immediately before each graceful stop.
+            self.isolated()
+            old=next(s for s in services if s['name']==name)
+            now=approved_service(json.loads(self.docker('inspect',name))[0])
+            require(now==old,'Service identity changed; no stop attempted: '+name)
+            current=[classify_client(c,services) for c in self.client_snapshot()]
+            require(all(c['category']=='internal_idle' for c in current),
+                    'Clients changed/became busy before service drain; stop without interrupting sessions')
+            reason='Its verified live connections can start transactions during migration/rollback; stop this local service gracefully to drain clients and prevent reconnects.'
+            print('Gracefully stopping '+name+': '+reason,flush=True)
+            action={'service':name,'id':old['id'],'reason':reason,'status':'requested',
+                    'session_pids':[c['pid'] for c in current if c['service']==name]}
+            actions.append(action)
+            try:
+                # -1 means NEVER escalate to SIGKILL. Timeout only abandons waiting;
+                # it does not force-kill the service or any PostgreSQL backend.
+                self.docker('stop','--time=-1',old['id'],timeout=25)
+            except subprocess.TimeoutExpired:
+                raise RuntimeError('Graceful service stop is still pending: '+name+'; no forced termination or migrations attempted')
+            stopped=json.loads(self.docker('inspect',old['id']))[0]
+            require(stopped['State']['Running'] is False,'Local service has not stopped: '+name)
+            action['status']='stopped'
+        deadline=time.monotonic()+12
+        while True:
+            remaining=self.client_snapshot()
+            self.report['remaining_clients']=[classify_client(c,services) for c in remaining]
+            (self.run_dir/'clients-after-drain.json').write_text(json.dumps(remaining,indent=2))
+            if not remaining:
+                break
+            require(all((c['pid'],c['backend_start']) in original_sessions and
+                        classify_client(c,services)['category']=='internal_idle' for c in remaining),
+                    'A new, busy or unattributed client appeared during drain; no migration attempted. See clients-after-drain.json')
+            require(time.monotonic()<deadline,
+                    'Clients remain after graceful drain (possibly stale sockets after network isolation). No PostgreSQL sessions were terminated; see clients-after-drain.json. Stop for review.')
+            time.sleep(0.5)
+        self.report['clients_drained']=True
 
     def capture(self, label):
         c = json.loads(self.sql(self.generator.capture_sql(),label))
@@ -244,6 +396,8 @@ SELECT jsonb_build_object('rows',jsonb_build_object(FINGERPRINTS),
         (self.run_dir/'original-before.json').write_text(json.dumps(before,indent=2))
         (self.run_dir/'rollback.LOCAL.sql').write_text(rollback)
         self.report['rollback_sha256']=hashlib.sha256(rollback.encode()).hexdigest()
+        self.drain_internal_clients()
+        self.report['stage']='baseline verification after client drain'
         current = self.capture('current-before')
         compare_baseline(before,current)
         require(all(current['installation_privileges'].values()), 'Missing installation privileges')
@@ -359,6 +513,14 @@ SELECT jsonb_build_object('rows',jsonb_build_object(FINGERPRINTS),
         if 'error' in self.report:
             text += self.report['error']+'\nNo automatic recovery/retry was attempted. Earlier file commits may remain installed.\n'
         text += 'Rollback SQL completed: '+str(self.report['rollback_completed'])+'\n'
+        for action in self.report.get('local_service_stops',[]):
+            text += 'Local service '+action['status']+': '+action['service']+' (graceful stop only)\n'
+        if self.report['result']=='FAIL':
+            clients=self.report.get('remaining_clients',self.report.get('clients',[]))
+            for client in clients:
+                text += ('Client PID '+str(client['pid'])+': role='+str(client.get('user'))+
+                         ', source='+str(client.get('client_addr') or 'local socket')+
+                         ', state='+str(client.get('state'))+', '+str(client.get('category'))+'\n')
         text += 'Evidence: '+str(self.run_dir)+'\nRemaining limits:\n'+'\n'.join('- '+r for r in RISKS)+'\n'
         (self.run_dir/'report.txt').write_text(text)
         print(text)

@@ -205,5 +205,85 @@ class AutomationTests(unittest.TestCase):
                 self.assertNotIn('--host',args)
                 self.assertIn('ON_ERROR_STOP=1',args)
 
+    def service_fixture(self):
+        return {'Name':'/supabase_auth_'+m.PROJECT,'Id':'local-auth-id',
+                'Config':{'Image':'public.ecr.aws/supabase/gotrue:v2.0',
+                          'Labels':{'com.supabase.cli.project':m.PROJECT}},
+                'State':{'Running':True},'HostConfig':{'NetworkMode':'local-project'},
+                'NetworkSettings':{'Networks':{'local-project':{'IPAddress':'172.20.0.5'}}}}
+
+    def client_fixture(self):
+        return {'pid':123,'backend_start':'2026-10-23T12:00:00Z',
+                'user':'supabase_auth_admin','application':'not-used-for-trust',
+                'client_addr':'172.20.0.5','client_port':40000,
+                'state':'idle','xact_start':None}
+
+    def test_service_and_client_attribution_is_narrow(self):
+        c=self.service_fixture(); service=m.approved_service(c)
+        self.assertIsNotNone(service)
+        client=self.client_fixture()
+        self.assertEqual(m.classify_client(client,[service])['category'],'internal_idle')
+        mapped=dict(client,client_addr='::ffff:172.20.0.5')
+        self.assertEqual(m.classify_client(mapped,[service])['category'],'internal_idle')
+        for change in [{'client_addr':None},{'client_addr':'127.0.0.1'},
+                       {'client_addr':'172.20.0.99'},{'user':'postgres'}]:
+            self.assertEqual(m.classify_client(dict(client,**change),[service])['category'],
+                             'unexpected_or_unattributed')
+        self.assertEqual(m.classify_client(dict(client,state='active'),[service])['category'],'internal_busy')
+        self.assertEqual(m.classify_client(dict(client,xact_start='now'),[service])['category'],'internal_transaction')
+        for change in ['label','name','image','stopped','pooler']:
+            invalid=copy.deepcopy(c)
+            if change=='label': invalid['Config']['Labels']['com.supabase.cli.project']='another-project'
+            if change=='name': invalid['Name']='/supabase_auth_other'
+            if change=='image': invalid['Config']['Image']='untrusted/gotrue:v2'
+            if change=='stopped': invalid['State']['Running']=False
+            if change=='pooler': invalid['Name']='/supabase_pooler_'+m.PROJECT
+            self.assertIsNone(m.approved_service(invalid))
+
+    def test_graceful_local_service_drain_and_blocked_clients(self):
+        for scenario in ['idle','external','transaction','orphan','timeout']:
+            with self.subTest(scenario=scenario),tempfile.TemporaryDirectory() as d:
+                r=m.Runner(Path(d)); container=self.service_fixture()
+                service=m.approved_service(container); client=self.client_fixture(); actions=[]
+                if scenario=='external': client['client_addr']='10.0.0.20'
+                if scenario=='transaction': client['xact_start']='now'
+                r.service_inventory=lambda:[service]
+                r.isolated=lambda:None
+                r.client_snapshot=lambda:([copy.deepcopy(client)] if container['State']['Running'] or scenario=='orphan' else [])
+                def docker(*args,**kwargs):
+                    actions.append(args)
+                    if args[0]=='inspect': return json.dumps([container])
+                    if args[0]=='stop':
+                        self.assertEqual(args,('stop','--time=-1','local-auth-id'))
+                        self.assertEqual(kwargs['timeout'],25)
+                        if scenario=='timeout': raise m.subprocess.TimeoutExpired('docker',25)
+                        container['State']['Running']=False
+                        return 'local-auth-id'
+                    raise AssertionError(args)
+                r.docker=docker
+                with patch.object(m.time,'monotonic',side_effect=range(0,10000,100)),patch.object(m.time,'sleep'):
+                    if scenario=='idle':
+                        r.drain_internal_clients()
+                        self.assertTrue(r.report['clients_drained'])
+                        self.assertEqual(r.report['local_service_stops'][0]['status'],'stopped')
+                    else:
+                        with self.assertRaises(RuntimeError): r.drain_internal_clients()
+                        self.assertNotIn('clients_drained',r.report)
+                        self.assertEqual(r.report['completed_migrations'],[])
+                if scenario in ('external','transaction'):
+                    self.assertFalse(any(a[0]=='stop' for a in actions))
+
+    def test_client_diagnostics_cannot_weaken_migration_guard(self):
+        self.assertIn('Other database clients exist',m.SQL_GUARD)
+        self.assertIn('BEGIN READ ONLY;',m.CLIENT_DIAGNOSTICS)
+        self.assertNotIn('pg_terminate_backend',m.CLIENT_DIAGNOSTICS)
+        with tempfile.TemporaryDirectory() as d:
+            r=m.Runner(Path(d))
+            with patch.object(r,'_psql',return_value='[]') as execute:
+                self.assertEqual(r.client_snapshot(),[])
+                self.assertEqual(execute.call_args.args[0],m.CLIENT_DIAGNOSTICS)
+                r.sql('-- inert offline fixture','guard-check')
+                self.assertTrue(execute.call_args.args[0].startswith(m.SQL_GUARD))
+
 if __name__=='__main__':
     unittest.main()

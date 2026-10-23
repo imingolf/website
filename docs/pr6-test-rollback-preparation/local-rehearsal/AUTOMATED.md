@@ -20,8 +20,9 @@ Run this single block in Mac Terminal:
 Only git pull contacts GitHub. The Python runner has no online database URLs,
 database connection strings or deployment commands. All SQL is passed via stdin
 to psql **inside** supabase_db_ImInGolf-Local-Rehearsal using its Unix socket.
-The runner never reconnects Docker networks, stops services, deletes golf rows or
-relaxes rollback guards. Its schema DROP statements come only from the existing
+The runner never reconnects Docker networks, deletes golf rows or relaxes rollback
+guards. It can gracefully stop precisely verified idle local Supabase services as
+described below; it never stops the database. Its schema DROP statements come only from the existing
 guarded rollback, with RESTRICT. The reviewed migrations' foreign keys with
 ON DELETE CASCADE are left unchanged; no deletions are exercised.
 
@@ -32,6 +33,8 @@ ON DELETE CASCADE are left unchanged; no deletions are exercised.
    attached networks; no host/shared networking. Rechecks isolation/container ID
    before every SQL invocation. SQL independently checks the socket, server version,
    database and role, and refuses other database clients or prepared transactions.
+   A dedicated read-only preflight first identifies Supabase service connections
+   and drains only positively attributed idle local services; see the next section.
 2. Checks all four migration SHA-256 values against commit eadb495, plus any
    already-extracted migration files. Requires before.json and rollback.LOCAL.sql
    in ~/Documents/ImInGolf-Local-Rehearsal/local-restore-generated.
@@ -62,6 +65,59 @@ ON DELETE CASCADE are left unchanged; no deletions are exercised.
 9. Repeats baseline and supplementary comparisons, including original functions,
    owners/effective grants/grant options, policies, normal/event triggers, RLS,
    columns, indexes, constraints, all application data/history and sequence state.
+
+## Local Supabase background clients
+
+Supabase Auth, REST, Realtime, Storage, metadata and analytics services use normal
+PostgreSQL `client backend` connections. They are different from PostgreSQL's own
+autovacuum/background processes (which the guard already excludes). The original
+guard rejected both local service clients and unexpected clients without diagnostic
+detail. Docker network disconnection alone does not close pre-existing TCP sessions.
+
+The updated preflight uses a **dedicated READ ONLY catalog query** to record each
+client's PID, role, application name, source IP/port, state and transaction/backend
+start time. It never captures query text. The connection still must be to the
+isolated local container's Unix socket as postgres 17.6, with no prepared transactions.
+This diagnostic query can observe the clients that block the ordinary guard; it
+cannot install migrations or perform rollback. All ordinary captures, SQL writes
+and rollback retain the unchanged zero-other-client guard.
+
+A client qualifies for controlled drain only if all of these match:
+
+- Exact service container name for ImInGolf-Local-Rehearsal and matching
+  com.supabase.cli.project label.
+- A specifically allowed official Auth/REST/Realtime/Storage/metadata/analytics
+  image, running in this local Docker context, with the same container ID on recheck.
+- The PostgreSQL client source IP uniquely matches that service's Docker IP and
+  the database role is expected for that particular service. Application/role
+  names alone never prove origin.
+- The connection is idle and has no transaction. Busy clients and open transactions
+  are not interrupted. Proxy/pooler connections, socket/loopback connections,
+  ambiguous addresses, unexpected roles or unknown services are not auto-drained.
+
+For each qualifying service the runner explains why it must stop: its live
+connection can start a transaction during the rehearsal. It then rechecks all
+clients and gracefully stops only that service ID using `docker stop --time=-1`.
+There is **no SIGKILL escalation, pg_terminate_backend, pg_cancel_backend, database
+restart, role exemption or general session termination**. The Docker wait is bounded;
+if the service fails to stop gracefully, the run fails before migrations.
+
+The runner waits briefly for PostgreSQL to observe the closed connections, then
+requires **zero other clients** before the baseline check or any migration. A stale
+socket left by network disconnection causes FAIL with clients-after-drain.json;
+it is never force-terminated automatically. A new/active/unknown client also fails.
+Use the private diagnostic report to identify the remaining source before another
+attempt. Do not remove the safeguard or manually kill all sessions.
+
+The stopped local services are recorded in report.json and remain stopped, so they
+cannot reconnect during or after rollback. No other project containers are stopped,
+no networks are reattached, and services are not automatically restarted. If graceful
+shutdown changed protected data, the subsequent original before.json comparison
+fails; the runner never rewrites that capture to excuse the change.
+
+This is a safe local-only drain, not proof that every reported role came from a
+particular service on your Mac. Unattributed clients intentionally produce FAIL
+and usable diagnostics instead of an invented classification.
 
 ## Results and failures
 
