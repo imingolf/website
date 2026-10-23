@@ -23,6 +23,8 @@ selected = []
 seen_tables = set()
 seen_functions = set()
 seen_sequence = False
+seen_rls = set()
+excluded_managed = []
 unknown = []
 for line in a.inventory.read_text().splitlines():
     if not line or line.startswith(';'):
@@ -33,6 +35,16 @@ for line in a.inventory.read_text().splitlines():
             raise SystemExit('Unrecognised application TOC format; review manually: ' + line)
         continue  # Managed-schema entries are never selected.
     kind, schema, tail = m.groups()
+    # Exact managed identities only. Never allow similarly named overloads or triggers.
+    if kind == 'FUNCTION' and schema == 'public' and re.fullmatch(r'rls_auto_enable\(\)\s+\S+', tail):
+        excluded_managed.append(line)
+        continue
+    if kind == 'EVENT TRIGGER':
+        if schema == '-' and re.fullmatch(r'ensure_rls\s+\S+', tail):
+            excluded_managed.append(line)
+        else:
+            unknown.append(line)
+        continue
     # An application-only selection: never managed schema definitions or data.
     if schema == '-':
         if kind == 'SCHEMA' and tail.split()[0] == 'iig_private':
@@ -47,6 +59,8 @@ for line in a.inventory.read_text().splitlines():
     elif kind in {'TABLE DATA', 'CONSTRAINT', 'FK CONSTRAINT', 'TRIGGER',
                   'POLICY', 'ROW SECURITY', 'DEFAULT'} and name in tables:
         keep = True
+        if kind == 'ROW SECURITY':
+            seen_rls.add(name)
     elif kind in {'SEQUENCE', 'SEQUENCE SET', 'SEQUENCE OWNED BY'} and name == 'public.tens_in_groups_id_seq':
         seen_sequence = seen_sequence or kind == 'SEQUENCE'
         keep = True
@@ -70,8 +84,11 @@ if seen_tables != tables or seen_functions != functions or not seen_sequence:
     raise SystemExit('Incomplete baseline inventory. Missing tables: '+str(tables-seen_tables)
                      +'; missing functions: '+str(functions-seen_functions)
                      +'; identity sequence present: '+str(seen_sequence))
+if seen_rls != tables:
+    raise SystemExit('Missing explicit baseline ROW SECURITY entries: '+str(tables-seen_rls))
 a.out.mkdir(parents=True, exist_ok=True)
 (a.out/'restore-selection.app.txt').write_text('; CANDIDATE: inspect schema SQL before execution. Auth/managed objects excluded.\n'+'\n'.join(selected)+'\n')
+(a.out/'excluded-managed-rls.txt').write_text('; Explicitly excluded managed RLS automation; inspect local equivalent separately.\n'+'\n'.join(excluded_managed)+'\n')
 # Extract only top-level GRANT/REVOKE statements, never the destructive baseline setup.
 grants = re.findall(r'^(?:grant|revoke)\b[^;]*;', text, re.M | re.I)
 (a.out/'baseline-acl.sql').write_text('-- Intended repository baseline ACLs; not recovered online ACLs.\n'+'\n'.join(grants)+'\n')

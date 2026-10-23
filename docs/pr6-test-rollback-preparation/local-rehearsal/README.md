@@ -25,6 +25,12 @@ have actually run and their comparisons pass.
   no event triggers, and no subscription/publication objects. Review extension
   references in the selected application definitions; missing dependencies block
   restore rather than justify selecting the entire managed schema.
+- The source-managed `public.rls_auto_enable()` and `ensure_rls` event trigger
+  are explicitly excluded, with an audit list in excluded-managed-rls.txt. No
+  similarly named function/overload is exempted. Other unexpected event triggers
+  now stop selection, as do other unexpected application objects.
+  The helper requires all eight original ROW SECURITY entries. It does not rely
+  on automatic RLS to make the restored application tables safe.
 - The eight application tables are public.tens_in_groups,
   public.iig_notification_settings, public.iig_notification_events,
   iig_private.setup_testers, iig_private.group_owners, iig_private.group_members,
@@ -143,7 +149,10 @@ select rolname,rolsuper,rolbypassrls from pg_roles
 select to_regprocedure('auth.uid()'),to_regprocedure('gen_random_uuid()'),
  to_regprocedure('hashtextextended(text,bigint)');
 select extname,extversion from pg_extension;
-select evtname,evtenabled,evtevent from pg_event_trigger;
+select e.evtname,e.evtenabled,e.evtevent,e.evttags,
+ n.nspname as function_schema,p.proname,pg_get_functiondef(p.oid)
+ from pg_event_trigger e join pg_proc p on p.oid=e.evtfoid
+ join pg_namespace n on n.oid=p.pronamespace order by e.evtname;
 SQL
 ```
 
@@ -154,6 +163,22 @@ event triggers/default privileges for effects on restored DDL. If application
 objects already exist, use a fresh disposable local Supabase project; do not
 DROP CASCADE or apply this procedure over them. No network connections means other
 services cannot write, but existing DB sessions/jobs still need review/draining.
+
+The preceding read-only event-trigger query is the required **local equivalence
+check**. Codex has not queried this Mac container. Inspect the body, not just the
+function name: an enabled `ddl_command_end` trigger (O or A for normal restores)
+covering CREATE TABLE / CREATE TABLE AS / SELECT INTO must enable RLS for the new
+public tables to provide the reported source automation. Check that its body has
+no extra side effects; stop for review if it does. A differently named local
+trigger can be equivalent. Retain it unchanged if it is safe and equivalent.
+
+If no equivalent local trigger exists, **general future-public-table automation
+is not equivalent**. This does not prevent this scoped rehearsal: its eight
+baseline tables have explicit restored RLS, and all three migration-created
+private tables explicitly enable RLS. Exclusion is safe for this scope once those
+flags and policies are verified; it does not prove general Supabase DDL parity.
+Never import the source-managed event trigger to conceal that difference.
+The existing local event-trigger inventory must remain unchanged through rehearsal.
 
 ## 3. Restore the sanitized application baseline atomically
 
@@ -171,6 +196,20 @@ cat "$IIG_OUT/pre-data.sql" "$IIG_OUT/data.sanitized.sql" \
 Any error aborts this transaction. Inspect the log; never ignore restore errors.
 If COPY/FK/Auth definitions differ, stop for a reviewed adjustment. Do not replace
 managed definitions or import real identities to make the restore work.
+
+Immediately check all eight original RLS flags explicitly (read-only; failures
+stop the rehearsal):
+
+```bash
+local_psql < "$IIG_TOOLS/verify-local-rls.sql"
+```
+
+Expected from the repository baseline: ENABLE ROW LEVEL SECURITY on all eight,
+FORCE ROW LEVEL SECURITY on none. Also inspect the archive-selected SQL for the
+same settings; if it differs, stop to reconcile the archive rather than force
+settings to pass. Enabled RLS alone does not prove intended access: inspect the
+restored policies, grants and role bypass behaviour. The postgres restore role
+bypasses ordinary RLS; anonymous/authenticated access needs separate role checks.
 
 Verify before capturing the rollback baseline:
 
@@ -240,6 +279,18 @@ for iig_migration in integration-hardening protected-gameplay account-lifecycle 
 done
 
 local_psql -qAt < "$IIG_OUT/capture.local.sql" > "$IIG_OUT/installed.json"
+local_psql < "$IIG_TOOLS/verify-local-rls.sql"
+local_psql <<'SQL'
+do $$ declare t text; enabled boolean; begin
+ foreach t in array array['iig_private.account_deletions','iig_private.owner_transfers',
+ 'iig_private.subscription_bindings'] loop
+  select relrowsecurity into enabled from pg_class where oid=to_regclass(t);
+  if not found or enabled is distinct from true then
+   raise exception 'New table missing or RLS disabled: %',t;
+  end if;
+ end loop;
+end $$;
+SQL
 python3 - "$IIG_OUT/before.json" "$IIG_OUT/installed.json" <<'PY'
 import json,sys
 a,b=[json.load(open(p)) for p in sys.argv[1:]]
@@ -251,6 +302,7 @@ PY
 local_psql -v confirmed_project=ImInGolf-Local-Rehearsal \
   < "$IIG_OUT/rollback.LOCAL.sql" > "$IIG_OUT/rollback.log" 2>&1
 local_psql -qAt < "$IIG_OUT/capture.local.sql" > "$IIG_OUT/after.json"
+local_psql < "$IIG_TOOLS/verify-local-rls.sql"
 python3 - "$IIG_OUT/before.json" "$IIG_OUT/after.json" <<'PY'
 import json,sys
 a,b=[json.load(open(p)) for p in sys.argv[1:]]
