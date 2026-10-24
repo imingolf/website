@@ -14,10 +14,14 @@
 
 ## Separate upcoming task: fictional-data iPhone demonstration
 
-Keep the existing demonstration separate from real TEST integration. Return to
-its Mac/iPhone visual journey review after the main security work permits it.
+Prepared on this development branch: a separate static HTTPS demonstration,
+novice tasks, fictional scoring/results and manual feedback. See
+[hosting and review instructions](../../tools/registration-demo/HOSTED-DEMO.md).
+Publication and physical iPhone testing await separate approval. Keep it separate
+from real TEST integration; the security/recovery tasks above remain open.
 Use fictional data, permanent DEMONSTRATION labelling and mocked verification,
 group/invitation/competition/returning-user scenarios. Preserve handicap typing
 and paste checks. No real Supabase, Auth, email, payment or WhatsApp sending; no
-public tunnel or deployment. This task remains pending and does not interrupt
-or bypass the security/recovery gates above. No demo changes were made here.
+public tunnel or deployment. The remaining task is approving the isolated publication, then observing the
+independent iPhone usability session. It does not bypass the security/recovery
+gates for the real beta.

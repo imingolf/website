@@ -10,7 +10,7 @@
  const clone=value=>JSON.parse(JSON.stringify(value));
  const uuid=()=> 'd0000000-0000-4000-8000-'+String(++serial).padStart(12,'0');
  const storage={getItem:key=>data.get(String(key))??null,setItem:(key,value)=>data.set(String(key),String(value)),removeItem:key=>data.delete(String(key)),clear:()=>data.clear()};
- const api={isolated:true,storage,uuid,open:simulateOpen,share:async details=>preview(details.text||'Simulated share'),clipboard:Object.freeze({writeText:async text=>preview('Simulated copy — nothing copied:\n'+text)}),purchase:Object.freeze({postMessage:()=>preview('Purchases are disabled in this demonstration.')}),get metrics(){return {requests,blocked,groups:groups.size};}};
+ const api={isolated:true,storage,uuid,open:simulateOpen,share:async details=>preview(details.text||'Simulated share'),clipboard:Object.freeze({writeText:async text=>preview('Simulated copy — nothing copied:\n'+text)}),purchase:Object.freeze({postMessage:()=>preview('Purchases are disabled in this demonstration.')}),practice:Object.freeze({snapshot:practiceSnapshot,addFriends:practiceFriends,fillOtherScores:practiceScores,asOrganiser:practiceOrganiser}),get metrics(){return {requests,blocked,groups:groups.size};}};
  Object.defineProperty(window,'IIG_DEMO',{value:Object.freeze(api),writable:false,configurable:false});
  window.TENS_IN_CONFIG=Object.freeze({supabaseUrl:'',supabaseKey:''});
  function note(text){const el=document.getElementById('iig-demo-note');if(el)el.textContent=text;}
@@ -85,7 +85,7 @@
   if(!g.state.roundOpen)return error('No demonstration competition is open yet');
   if(path.endsWith('/iig_set_my_attendance'))player.playingThisRound=body.p_attending===true;
   else if(path.endsWith('/iig_submit_my_score')){
-   if(!Number.isInteger(body.p_score))return error('Enter a whole final score');
+   if(!Number.isInteger(body.p_score)||body.p_score<0||body.p_score>(g.state.pointsCompetition==='net'?999:99)||body.p_format!==g.state.pointsCompetition||!player.playingThisRound)return error('Enter a valid whole final score for your entered competition');
    player[g.state.pointsCompetition==='net'?'netScore':'stableford']=body.p_score;player.scoreSubmitted=true;
   }
   return reply(++g.revision);
@@ -94,7 +94,41 @@
  function makeGroup(pin,name,owner,organiser){return {group_pin:pin,group_id:++serial,revision:0,invite_token:uuid(),owner,members:new Map(),admin_name:organiser,admin_contact:owner,plan_type:'trial',state:{groupName:name,course:'',date:'',stake:0,gameType:'points',roundOpen:false,pointsCompetition:'stableford',pointsValue:10,players:[],history:[]}};}
  if(['returning','friend'].includes(scenario)){
   const g=makeGroup('4826','Saturday Demo Golfers','alex@example.test','Alex Taylor');groups.set(g.group_pin,g);
+  if(scenario==='friend'&&document.querySelector('meta[name="iig-hosted-demo"]')){
+   Object.assign(g.state,{course:'Fictional Meadow Golf',date:new Date().toISOString().slice(0,10),roundId:uuid(),roundOpen:true});
+   const id=uuid();g.members.set('riley@example.test',id);g.state.players.push({id,name:'Riley Woods',handicap:14.2,playingThisRound:true,stableford:null,netScore:null,scoreSubmitted:false,leaguePoints:0,wins:0});
+  }
   if(scenario==='friend')history.replaceState(null,'',location.pathname+'?scenario=friend#pin=4826&invite='+g.invite_token);
+ }
+ function practiceSnapshot(){
+  const g=[...groups.values()].find(g=>g.owner===sessionEmail||g.members.has(sessionEmail));
+  return g?{pin:g.group_pin,owner:g.owner===sessionEmail,roundOpen:g.state.roundOpen===true,history:g.state.history.length,players:g.state.players.length,entered:g.state.players.filter(p=>p.playingThisRound).length,submitted:g.state.players.filter(p=>p.playingThisRound&&p.scoreSubmitted).length,mySubmitted:g.state.players.some(p=>p.id===g.members.get(sessionEmail)&&p.scoreSubmitted)}:null;
+ }
+ function practiceFriends(){
+  const g=[...groups.values()].find(g=>g.owner===sessionEmail);if(!g||!g.state.roundOpen)throw Error('Create your practice competition first.');
+  if(g.state.players.some(p=>p.scoreSubmitted))throw Error('Practice players must be prepared before scoring starts.');
+  for(const [email,name,handicap] of [['riley@example.test','Riley Woods',14.2],['casey@example.test','Casey Hill',22.7]]){
+   if(g.members.has(email))continue;
+   const id=uuid();g.members.set(email,id);g.state.players.push({id,name,handicap,paid:false,playingThisRound:true,stableford:null,netScore:null,scoreSubmitted:false,wins:0,leaguePoints:0});
+  }
+  for(const p of g.state.players)p.playingThisRound=true;
+  g.revision++;document.getElementById('secureOrganiserReload')?.click();
+ }
+ function practiceScores(){
+  const g=[...groups.values()].find(g=>g.owner===sessionEmail||g.members.has(sessionEmail));if(!g||!g.state.roundOpen)throw Error('Open a practice competition first.');
+  const mine=g.members.get(sessionEmail);let score=g.state.pointsCompetition==='net'?74:32;
+  for(const p of g.state.players){if(p.id===mine||!p.playingThisRound||p.scoreSubmitted)continue;p[g.state.pointsCompetition==='net'?'netScore':'stableford']=score++;p.scoreSubmitted=true;}
+  g.revision++;document.getElementById(g.owner===sessionEmail?'secureOrganiserReload':'securePlayerReload')?.click();
+ }
+ async function practiceRequest(path,body){
+  const response=await window.fetch(location.origin+path,{method:'POST',headers:{Authorization:'Bearer DEMONSTRATION_ONLY'},body:JSON.stringify(body)});
+  const value=await response.json();if(!response.ok)throw Error(value.message||'Practice action failed');return value;
+ }
+ function practiceOrganiser(){
+  const g=[...groups.values()].find(g=>g.members.has(sessionEmail));if(!g)throw Error('Join the fictional group first.');
+  if(!g.state.players.some(p=>p.id===g.members.get(sessionEmail)&&p.scoreSubmitted))throw Error('Submit your own practice score first.');
+  practiceScores();window.iigSecurePlayer?.close();sessionEmail=g.owner;
+  window.iigSecureOrganiser.open(view(g),practiceRequest,()=>location.assign('/app/?scenario=new'),'trial');
  }
  function simulateOpen(url){preview('Simulated destination — not opened:\n'+String(url));return {closed:false,close(){}};}
  const blockedConstructor=function(){return stop();};

@@ -147,3 +147,11 @@ self-joining, real handicap events, invitation interception/no popups, competiti
 save, preserved unrelated browser storage and reset. It also verifies CSP blocking
 native fetch independently of the mock wrapper. No SQL/security migration suites
 are executed by this runner.
+
+## Separate HTTPS demonstration preparation
+
+The local-only server above remains available and unchanged in its binding rules.
+For the separately prepared static iPhone task demonstration, see
+[HOSTED-DEMO.md](HOSTED-DEMO.md). The static builder does not publish anything;
+it requires an explicit new-site HTTPS origin and a new output folder outside
+Git. A distinct Free hosting site and publication still require approval.
