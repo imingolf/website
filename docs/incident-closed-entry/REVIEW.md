@@ -6,6 +6,34 @@ completed demonstration are untouched. No hosted code, database or native binary
 was inspected; production database definitions are NOT established by this review.
 User reports Group 1010 already corrected to three entrants. Do not repair data.
 
+## Latest owner-reported status — round completed
+
+The owner reports Group 1010 finished the competition through the normal Finish
+Round process after the incorrect fourth entrant had been removed. Three legitimate
+entrants remained. No active competition remains at the time of that report.
+This is owner-provided evidence, not a new database observation. No data repair is
+needed or authorised. Preserve completed history and legitimate payment records;
+do not assume current live-round paid flags remain set after the normal reset.
+
+The prior LIVE catalog inspection succeeded on the owner's Mac. Its sanitised
+summary has not yet been supplied for review. Do not claim that deployed organiser
+authority, entry protection or dependencies have been assessed from private evidence
+that is not available here. Next step is offline sanitisation/review of that saved
+capture, not another connection. Finishing the round does not invalidate catalog
+evidence by itself, but schema/writer changes since capture remain unverified.
+
+The lack of an active round reduces interruption risk; it does not approve a release
+or establish a maintenance window for other groups. A later approved release needs
+current baseline/recovery evidence that includes this newly completed result; do
+not reuse a pre-finish data fingerprint or restore older data over it. Review any
+catalog drift separately. No reconnect, backup, SQL or record change is authorised.
+
+Server design must retain a protected closure identity for each round, preserve
+historical entry/payment snapshots on finish, archive/award exactly once and permit
+only an authorised fresh-round transition. The new round must reject delayed payment
+returns and stale snapshots from the completed round. Rehearse that full cycle and
+rollback on fictional data before considering LIVE installation.
+
 ## Root cause in repository source
 
 Round's playerNextActionHtml already checks roundLocked before offering Pay & Join.
