@@ -151,3 +151,12 @@ email, JWT-signature, database-permissions or end-to-end online test.
 
 Stop after this build review. LIVE, production hosting, the production branch,
 PR #6 and all online database permissions/data remain untouched.
+
+## Read-only Step 2 preparation after reconciliation
+
+The approved remote implementation specification is preserved in
+[IMPLEMENTATION.md](../../docs/online-beta/IMPLEMENTATION.md). See the separately
+prepared [Step 2 review](../../docs/online-beta/STEP2-READONLY.md) and offline query
+exporter prepare-step2.py. These prepare read-only SQL files; they do not connect
+or execute them. In particular, the expanded specification still needs multi-group,
+session, plus-handicap and invite-lifecycle work; Step 1 is not that implementation.

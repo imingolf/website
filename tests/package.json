@@ -7,7 +7,8 @@
     "onboarding": "node onboarding-offline.cjs",
     "local-demo": "node local-registration-demo.cjs",
     "test-beta-build": "python3 ../tools/test-beta/test_build.py",
-    "test-beta-browser": "cd .. && node tests/test-beta-isolation.cjs"
+    "test-beta-browser": "cd .. && node tests/test-beta-isolation.cjs",
+    "step2-preparation": "python3 ../tools/test-beta/test_step2_preparation.py"
   },
   "devDependencies": {
     "linkedom": "0.18.14",
