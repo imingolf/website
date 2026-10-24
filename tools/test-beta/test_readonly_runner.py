@@ -133,6 +133,66 @@ class RunnerTests(unittest.TestCase):
             ca.unlink()
             with patch.object(m.subprocess,'run') as command,self.assertRaises(m.StopReview):r.execute('identity')
             command.assert_not_called()
+    def test_direct_profile_example_has_exact_test_identity_and_no_credentials(self):
+        with tempfile.TemporaryDirectory() as d:
+            profile=Path(d)/'direct.conf';profile.write_bytes((HERE/'test-direct-service.example.conf').read_bytes());profile.chmod(0o600)
+            with patch.object(m.subprocess,'run') as command:
+                target,secret=m.read_service(profile,HERE/'fixtures/offline-ca.crt');command.assert_not_called()
+            self.assertEqual(target.host,'db.'+m.PROJECT+'.supabase.co');self.assertEqual(target.user,'postgres');self.assertIsNone(secret)
+            info=m.conninfo(target);self.assertIn("sslmode='verify-full'",info);self.assertIn("host='db."+m.PROJECT+".supabase.co'",info)
+            self.assertNotIn(m.POOLER,info);self.assertIn("passfile='"+os.devnull+"'",info)
+    def test_direct_mocked_review_retains_all_queries_and_no_release_authorisation(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d);report={'checks':{},'installation_authorised':False,'release_readiness':'NO-GO'}
+            target=m.Target('db.'+m.PROJECT+'.supabase.co','postgres',str((HERE/'fixtures/offline-ca.crt').resolve()))
+            reader=m.Reader(target,SECRET,m.query_registry(),m.Tools('/offline/psql','/offline/pg_restore'),root,m.PROJECT)
+            events,fake=self.fake_process()
+            with patch.object(m.subprocess,'run',side_effect=fake):m.online_review(reader,baseline(),audit(),compare,report)
+            self.assertEqual(len(events),5);self.assertTrue(report['review_complete']);self.assertFalse(report['installation_authorised'])
+            for args,kw in events:
+                info=args[args.index('--dbname')+1];self.assertIn("host='"+target.host+"'",info);self.assertIn("user='postgres'",info)
+                self.assertIn("sslmode='verify-full'",info);self.assertNotIn(m.POOLER,info)
+                self.assertIn(m.TRANSACTION_GUARD,kw['input']);self.assertIn('read_only=on',kw['env']['PGOPTIONS'])
+                self.assertEqual(kw['env']['PGPASSWORD'],SECRET)
+    def test_direct_network_tls_and_readonly_failures_never_fall_back(self):
+        for message in ('could not connect: Network is unreachable','SSL error: certificate verify failed',
+                        'server certificate does not match host name','ERROR: PIG01','ERROR: PIG02','ERROR: PIG03'):
+            with tempfile.TemporaryDirectory() as d:
+                root=Path(d);r=m.Reader(m.Target('db.'+m.PROJECT+'.supabase.co','postgres'),SECRET,m.query_registry(),m.Tools('/offline/psql','/offline/pg_restore'),root,m.PROJECT)
+                with patch.object(m.subprocess,'run',return_value=subprocess.CompletedProcess([],2,stdout='',stderr=message)) as command:
+                    with self.assertRaises(m.StopReview):m.online_review(r,baseline(),audit(),compare,{'checks':{}})
+                    command.assert_called_once();self.assertNotIn(m.POOLER,' '.join(command.call_args.args[0]))
+                self.assertEqual(r.count,1)
+    def test_direct_profile_rejects_unapproved_host_and_port_options_offline(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d);direct={'host':'db.'+m.PROJECT+'.supabase.co','user':'postgres','sslmode':'verify-full'}
+            for changed in ({'host':'db.other-project.supabase.co'},{'host':'127.0.0.1'},{'host':direct['host']+','+m.POOLER},
+                            {'hostaddr':'203.0.113.1'},{'port':'6543'},{'user':'other-user'},{'sslmode':'disable'}):
+                with patch.object(m.subprocess,'run') as command,self.assertRaises(m.StopReview):m.read_service(self.service(root,{**direct,**changed}))
+                command.assert_not_called()
+    def test_direct_password_file_cannot_borrow_pooler_or_wildcard_credentials(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d);p=root/'direct-password'
+            direct=m.Target('db.'+m.PROJECT+'.supabase.co','postgres')
+            for entry in (m.POOLER+':5432:postgres:postgres.'+m.PROJECT+':secret','*:5432:postgres:postgres:secret'):
+                p.write_text(entry+'\n');p.chmod(0o600)
+                with self.assertRaises(m.StopReview):m.pgpass_password(p,direct)
+            # Use a simple fixture: password-file escaping is covered separately.
+            p.write_text(direct.host+':5432:postgres:postgres:direct-fixture-secret\n')
+            self.assertEqual(m.pgpass_password(p,direct),'direct-fixture-secret')
+    def test_direct_offline_cli_does_not_touch_existing_pooler_profile_or_connect(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d);capture,rollback,archive,rehearsal=self.write_evidence(root)
+            pooler=self.service(root);original=pooler.read_bytes()
+            direct=root/'direct.conf';direct.write_bytes((HERE/'test-direct-service.example.conf').read_bytes());direct.chmod(0o600)
+            events,fake=self.fake_process()
+            argv=['--offline','--service-file',str(direct),'--ca-file',str((HERE/'fixtures/offline-ca.crt').resolve()),'--capture',str(capture),'--rollback',str(rollback),'--backup',str(archive),'--rehearsal',str(rehearsal),'--historical-manifest',str(root/'missing.sha256')]
+            with patch.object(m.Path,'home',return_value=root),patch.object(m.subprocess,'run',side_effect=fake),patch.object(m.shutil,'which',side_effect=lambda name:'/offline/'+name),patch.object(m.getpass,'getpass') as prompt,patch.object(m,'Reader') as reader,patch('builtins.print'):
+                self.assertEqual(m.main(argv),0);prompt.assert_not_called();reader.assert_not_called()
+            self.assertEqual(pooler.read_bytes(),original)
+            report=json.loads(next((root/'Documents/ImInGolf-TEST-Installation').glob('*/report.json')).read_text())
+            self.assertEqual(report['connections_attempted'],0);self.assertFalse(report['sql_executed']);self.assertEqual(report['release_readiness'],'NO-GO')
+            self.assertEqual(report['checks']['target_binding']['host'],'db.'+m.PROJECT+'.supabase.co')
     def test_exact_test_targets_only(self):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d)

@@ -130,3 +130,11 @@ mandatory checks. The inspection command reads existing Mac evidence only.
 TLS and explains the observed transaction/default modes. Every registered
 transaction now establishes and verifies transaction-local safeguards. Backend
 SSL=false remains a blocker: no connection retry is authorised by offline PASS.
+
+## Direct connection alternative — proposal only
+
+The existing runner already supports the exact TEST direct hostname.
+[Direct-connection review](../../docs/online-beta/DIRECT-CONNECTION-REVIEW.md)
+describes its IPv6/IPv4 prerequisites and the credential-free separate-profile
+example. The default pooler service is not changed and no connection fallback is
+added. No database connection is authorised by these offline tests.
