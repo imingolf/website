@@ -182,3 +182,16 @@ offline tests passed. It does not report actual overload/extension resolution as
 verified because the original capture lacks that complete catalog. Constraint/index
 and downstream effects still need exact review. No raw configuration/schema names,
 private literals or credentials are emitted.
+
+
+## Bounded follow-up preparation (new, OFFLINE by default)
+
+See [remaining evidence and client plan](../../docs/incident-closed-entry/REMAINING-EVIDENCE-AND-CLIENT-PLAN.md).
+prepare_followup.py audits the existing private capture and prepares a NEW private
+review packet with only missing catalog scope. It has no network/client/subprocess
+API. followup_runner.py is separate from the original approved runner and regenerates
+that exact packet before any future explicit connection mode. Default mode cannot
+prompt or connect. Twenty-three exporter and eleven driver tests pass with mocks;
+local fictional PostgreSQL also verifies the metadata SQL and drift rejection.
+Original runner.py, inspection.sql and query-manifest.json are unchanged. No query
+has been authorised or executed online by adding these files.

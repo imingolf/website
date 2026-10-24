@@ -1,0 +1,129 @@
+-- REVIEW DRAFT ONLY. This file has no execution runner or connection command.
+-- Seed substitutions are validated metadata VALUES, never executable user SQL.
+BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;
+SET LOCAL default_transaction_read_only = on;
+SET LOCAL search_path = pg_catalog;
+SET LOCAL standard_conforming_strings = on;
+SET LOCAL statement_timeout = '8s';
+SET LOCAL lock_timeout = '500ms';
+SET LOCAL idle_in_transaction_session_timeout = '15s';
+SELECT 1 / CASE WHEN current_database()='postgres' AND current_user='postgres' AND session_user='postgres'
+ AND current_setting('transaction_read_only')='on' AND current_setting('default_transaction_read_only')='on'
+ AND current_setting('server_version_num')::integer BETWEEN 170000 AND 179999
+ AND encode(sha256(convert_to(current_setting('server_version'),'UTF8')),'hex')=/*__SERVER_VERSION_SHA__*/
+ AND EXISTS(SELECT 1 FROM pg_catalog.pg_stat_ssl WHERE pid=pg_backend_pid() AND ssl)
+ THEN 1 ELSE 0 END AS identity_readonly_tls_guard;
+-- Stop on changed/missing original definitions/security attributes BEFORE collecting new metadata.
+WITH expected(oid,definition_sha,owner_sha,configuration_sha,acl_sha,security_definer,anon_execute,authenticated_execute,service_execute) AS (
+ /*__FUNCTION_BASELINE__*/
+)
+SELECT 1 / CASE WHEN count(*)>0 AND bool_and(p.oid IS NOT NULL
+ AND encode(sha256(convert_to(pg_get_functiondef(p.oid),'UTF8')),'hex')=e.definition_sha
+ AND encode(sha256(convert_to(pg_get_userbyid(p.proowner),'UTF8')),'hex')=e.owner_sha
+ AND encode(sha256(convert_to(coalesce(to_jsonb(p.proconfig)::text,'null'),'UTF8')),'hex')=e.configuration_sha
+ AND encode(sha256(convert_to(coalesce(to_jsonb(p.proacl)::text,'null'),'UTF8')),'hex')=e.acl_sha
+ AND p.prosecdef=e.security_definer
+ AND (e.anon_execute IS NULL OR has_function_privilege('anon',p.oid,'EXECUTE')=e.anon_execute)
+ AND (e.authenticated_execute IS NULL OR has_function_privilege('authenticated',p.oid,'EXECUTE')=e.authenticated_execute)
+ AND (e.service_execute IS NULL OR has_function_privilege('service_role',p.oid,'EXECUTE')=e.service_execute))
+ THEN 1 ELSE 0 END AS original_function_baseline_guard
+FROM expected e LEFT JOIN pg_catalog.pg_proc p ON p.oid=e.oid;
+WITH expected(table_oid,name_sha,definition_sha,enabled,function_oid) AS (
+ /*__TRIGGER_BASELINE__*/
+)
+SELECT 1 / CASE WHEN count(*)>0 AND bool_and(t.oid IS NOT NULL
+ AND encode(sha256(convert_to(pg_get_triggerdef(t.oid,true),'UTF8')),'hex')=e.definition_sha
+ AND t.tgenabled::text=e.enabled AND t.tgfoid=e.function_oid)
+ THEN 1 ELSE 0 END AS original_trigger_baseline_guard
+FROM expected e LEFT JOIN pg_catalog.pg_trigger t ON t.tgrelid=e.table_oid
+ AND encode(sha256(convert_to(t.tgname,'UTF8')),'hex')=e.name_sha;
+WITH wanted(schema_sha,name_sha,oid,owner_sha,acl_sha,schema_acl_sha,rls,force_rls,columns_sha,normal_trigger_count) AS (
+ /*__TABLE_BASELINE__*/
+)
+SELECT 1 / CASE WHEN count(*)>0 AND bool_and(c.oid IS NOT NULL
+ AND encode(sha256(convert_to(n.nspname,'UTF8')),'hex')=w.schema_sha
+ AND encode(sha256(convert_to(c.relname,'UTF8')),'hex')=w.name_sha
+ AND encode(sha256(convert_to(pg_get_userbyid(c.relowner),'UTF8')),'hex')=w.owner_sha
+ AND encode(sha256(convert_to(coalesce(to_jsonb(c.relacl)::text,'null'),'UTF8')),'hex')=w.acl_sha
+ AND encode(sha256(convert_to(coalesce(to_jsonb(n.nspacl)::text,'null'),'UTF8')),'hex')=w.schema_acl_sha
+ AND c.relrowsecurity=w.rls AND c.relforcerowsecurity=w.force_rls
+ AND (SELECT count(*) FROM pg_catalog.pg_trigger t WHERE t.tgrelid=c.oid AND NOT t.tgisinternal)=w.normal_trigger_count::bigint
+ AND encode(sha256(convert_to((SELECT coalesce(jsonb_agg(jsonb_build_object('name',a.attname,
+   'type',format_type(a.atttypid,a.atttypmod),'acl',a.attacl) ORDER BY a.attnum),'[]'::jsonb)::text
+   FROM pg_catalog.pg_attribute a WHERE a.attrelid=c.oid AND a.attnum>0 AND NOT a.attisdropped),'UTF8')),'hex')=w.columns_sha)
+ THEN 1 ELSE 0 END AS original_target_identity_guard
+FROM wanted w LEFT JOIN pg_catalog.pg_class c ON c.oid=w.oid
+ LEFT JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace;
+-- Candidate overloads only for call names found in the SAVED source and reviewed paths.
+WITH saved_routines(oid) AS (
+ /*__FUNCTION_OIDS__*/
+), names(value) AS (
+ /*__CALL_NAMES__*/
+), schemas(value) AS (
+ /*__SCHEMAS__*/
+), candidates AS (
+ SELECT p.*,n.nspname,n.nspacl,n.nspowner FROM pg_catalog.pg_proc p
+ JOIN pg_catalog.pg_namespace n ON n.oid=p.pronamespace
+ WHERE lower(p.proname) IN (SELECT value FROM names)
+ AND n.nspname IN (SELECT value FROM schemas)
+), limit_guard AS (SELECT 1 / CASE WHEN count(*) BETWEEN 1 AND 200 THEN 1 ELSE 0 END AS ok FROM candidates)
+SELECT jsonb_build_object('section','candidate_bindings','count',count(*),
+ 'within_reviewed_limit',bool_and(g.ok=1),
+ 'items',coalesce(jsonb_agg(jsonb_build_object(
+ 'oid',p.oid,'schema',p.nspname,'name',p.proname,'kind',p.prokind,
+ 'arguments',pg_get_function_identity_arguments(p.oid),'result',pg_get_function_result(p.oid),
+ 'argument_types',p.proargtypes::text,'all_argument_types',p.proallargtypes,
+ 'variadic_type',p.provariadic,'default_argument_count',p.pronargdefaults,
+ 'owner',pg_get_userbyid(p.proowner),'security_definer',p.prosecdef,
+ 'configuration',p.proconfig,'acl',p.proacl,
+ 'definition',CASE WHEN p.prokind='f' AND p.oid NOT IN (SELECT oid FROM saved_routines) THEN pg_get_functiondef(p.oid) ELSE NULL END,
+ 'definition_already_saved',p.oid IN (SELECT oid FROM saved_routines),
+ 'owner_superuser',(SELECT rolsuper FROM pg_catalog.pg_roles WHERE oid=p.proowner),
+ 'owner_bypass_rls',(SELECT rolbypassrls FROM pg_catalog.pg_roles WHERE oid=p.proowner),
+ 'extension',(SELECT e.extname FROM pg_catalog.pg_depend d JOIN pg_catalog.pg_extension e ON e.oid=d.refobjid
+  WHERE d.classid='pg_proc'::regclass AND d.objid=p.oid AND d.refclassid='pg_extension'::regclass AND d.deptype='e' LIMIT 1),
+ 'schema_owner',pg_get_userbyid(p.nspowner),'schema_acl',p.nspacl,
+ 'anon_create_schema',has_schema_privilege('anon',p.pronamespace,'CREATE'),
+ 'authenticated_create_schema',has_schema_privilege('authenticated',p.pronamespace,'CREATE'),
+ 'anon_execute',has_function_privilege('anon',p.oid,'EXECUTE'),
+ 'authenticated_execute',has_function_privilege('authenticated',p.oid,'EXECUTE')
+ ) ORDER BY p.oid),'[]'::jsonb))
+FROM candidates p CROSS JOIN limit_guard g;
+WITH targets(oid) AS (
+ /*__TABLE_OIDS__*/
+)
+SELECT jsonb_build_object('section','target_constraints_indexes','items',coalesce(jsonb_agg(jsonb_build_object(
+ 'table_oid',c.oid,'schema',n.nspname,'name',c.relname,'owner',pg_get_userbyid(c.relowner),
+ 'rls',c.relrowsecurity,'force_rls',c.relforcerowsecurity,'acl',c.relacl,
+ 'columns',(SELECT coalesce(jsonb_agg(jsonb_build_object('name',a.attname,'type',format_type(a.atttypid,a.atttypmod),
+   'type_oid',a.atttypid,'not_null',a.attnotnull,'identity',a.attidentity,'generated',a.attgenerated,
+   'acl',a.attacl,'default',pg_get_expr(d.adbin,d.adrelid)) ORDER BY a.attnum),'[]'::jsonb)
+  FROM pg_catalog.pg_attribute a LEFT JOIN pg_catalog.pg_attrdef d ON d.adrelid=a.attrelid AND d.adnum=a.attnum
+  WHERE a.attrelid=c.oid AND a.attnum>0 AND NOT a.attisdropped),
+ 'constraints',(SELECT coalesce(jsonb_agg(jsonb_build_object('oid',con.oid,'name',con.conname,'type',con.contype,
+   'definition',pg_get_constraintdef(con.oid,true),'validated',con.convalidated,'deferrable',con.condeferrable,
+   'initially_deferred',con.condeferred,'referenced_relation_oid',con.confrelid) ORDER BY con.oid),'[]'::jsonb)
+  FROM pg_catalog.pg_constraint con WHERE con.conrelid=c.oid),
+ 'indexes',(SELECT coalesce(jsonb_agg(jsonb_build_object('oid',i.indexrelid,'definition',pg_get_indexdef(i.indexrelid),
+   'unique',i.indisunique,'primary',i.indisprimary,'valid',i.indisvalid,'ready',i.indisready,
+   'predicate',pg_get_expr(i.indpred,i.indrelid)) ORDER BY i.indexrelid),'[]'::jsonb)
+  FROM pg_catalog.pg_index i WHERE i.indrelid=c.oid),
+ 'policies',(SELECT coalesce(jsonb_agg(to_jsonb(pol)),'[]'::jsonb) FROM pg_catalog.pg_policies pol
+   WHERE pol.schemaname=n.nspname AND pol.tablename=c.relname)
+ ) ORDER BY c.oid),'[]'::jsonb))
+FROM targets w JOIN pg_catalog.pg_class c ON c.oid=w.oid JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace;
+WITH saved_routines(oid) AS (
+ /*__FUNCTION_OIDS__*/
+), targets(oid) AS (
+ /*__TABLE_OIDS__*/
+)
+SELECT jsonb_build_object('section','target_trigger_dependencies','items',coalesce(jsonb_agg(jsonb_build_object(
+ 'table_oid',t.tgrelid,'trigger_oid',t.oid,'name',t.tgname,'enabled',t.tgenabled,
+ 'internal',t.tgisinternal,'type_bits',t.tgtype,'constraint_oid',t.tgconstraint,
+ 'definition',pg_get_triggerdef(t.oid,true),'function_oid',p.oid,
+ 'function_owner',pg_get_userbyid(p.proowner),'configuration',p.proconfig,'acl',p.proacl,
+ 'definition_body',CASE WHEN NOT t.tgisinternal AND p.prokind='f' AND p.oid NOT IN (SELECT oid FROM saved_routines) THEN pg_get_functiondef(p.oid) ELSE NULL END,
+ 'definition_already_saved',p.oid IN (SELECT oid FROM saved_routines)
+ ) ORDER BY t.tgrelid,t.tgname),'[]'::jsonb))
+FROM targets w JOIN pg_catalog.pg_trigger t ON t.tgrelid=w.oid JOIN pg_catalog.pg_proc p ON p.oid=t.tgfoid;
+COMMIT;
