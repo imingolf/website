@@ -3,7 +3,7 @@
 begin;
 
 create schema iig_private;
-revoke all on schema iig_private from public, anon, authenticated;
+revoke all on schema iig_private from public, anon, authenticated, service_role;
 
 -- An explicit tester allowlist keeps registration closed during integration.
 create table iig_private.setup_testers (
@@ -28,7 +28,7 @@ create table iig_private.group_members (
 alter table iig_private.setup_testers enable row level security;
 alter table iig_private.group_owners enable row level security;
 alter table iig_private.group_members enable row level security;
-revoke all on all tables in schema iig_private from public, anon, authenticated;
+revoke all on all tables in schema iig_private from public, anon, authenticated, service_role;
 
 -- Fail rather than silently deleting/renumbering a pre-existing duplicate.
 create unique index iig_group_pin_unique on public.tens_in_groups(group_pin);
@@ -223,10 +223,15 @@ begin
   return found;
 end $$;
 
-revoke all on all functions in schema iig_private from public, anon, authenticated;
+-- Explicit legacy RPC access survives a clean reset without automatic function
+-- grants. Their existing protected-group denial checks remain unchanged.
+revoke all on function public.get_group_state(text),public.save_group_state(text,jsonb) from public,anon,authenticated,service_role;
+grant execute on function public.get_group_state(text),public.save_group_state(text,jsonb) to anon,authenticated;
+
+revoke all on all functions in schema iig_private from public, anon, authenticated, service_role;
 revoke all on function public.iig_create_owned_group(text,text,uuid),public.iig_get_owned_group(),
   public.iig_save_owned_group(text,jsonb,bigint),public.iig_join_owned_group(text,uuid,text,numeric),
-  public.iig_get_player_group(text),public.iig_set_my_attendance(text,boolean,bigint) from public,anon;
+  public.iig_get_player_group(text),public.iig_set_my_attendance(text,boolean,bigint) from public,anon,service_role;
 grant execute on function public.iig_create_owned_group(text,text,uuid),public.iig_get_owned_group(),
   public.iig_save_owned_group(text,jsonb,bigint),public.iig_join_owned_group(text,uuid,text,numeric),
   public.iig_get_player_group(text),public.iig_set_my_attendance(text,boolean,bigint) to authenticated;

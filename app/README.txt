@@ -3,7 +3,7 @@
 FILES
 - index.html       The app
 - config.js        Add your Supabase URL + Publishable/Anon key here
-- supabase-setup.sql  Run once in Supabase SQL Editor
+- supabase-setup.sql  OBSOLETE: DO NOT RUN; contains deletion/demo insertion
 
 STARTING PLAYERS
 Greg A, Greg R, Tony, Billy

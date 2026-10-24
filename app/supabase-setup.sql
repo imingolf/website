@@ -1,5 +1,7 @@
+-- OBSOLETE HISTORICAL SOURCE: DO NOT RUN, RESET OR RESTORE FROM THIS FILE.
+-- Contains deletion/demo insertion and an incompatible legacy schema. See docs/online-beta/DATA-API-GRANTS-REVIEW.md.
 -- 10's In shared database setup
--- Run this entire file once in Supabase SQL Editor.
+-- Historical setup retained for reference only; never an installation instruction.
 create extension if not exists pgcrypto;
 
 create table if not exists public.tens_in_groups (

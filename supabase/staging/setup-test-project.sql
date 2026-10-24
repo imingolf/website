@@ -61,6 +61,13 @@ alter table public.iig_notification_events enable row level security;
 revoke all on public.tens_in_groups,public.iig_notification_settings,public.iig_notification_events from public,anon,authenticated;
 revoke all on sequence public.tens_in_groups_id_seq from public,anon,authenticated;
 
+-- RPC-only clean installs: no direct application-table/sequence privileges, even
+-- if an older project still assigns service_role defaults. SECURITY DEFINER
+-- functions run as their owner; server callers use reviewed RPCs, not table REST.
+revoke all on public.tens_in_groups,public.iig_notification_settings,public.iig_notification_events from service_role;
+revoke all on sequence public.tens_in_groups_id_seq from service_role;
+grant usage on schema public to anon,authenticated,service_role;
+
 -- Access and notification function bodies supplied by the owner on 22 October 2026.
 create function public.get_group_access_status(p_pin text)
 returns table(group_pin text,group_name text,plan_type text,trial_expiry_date date,paid_status text,renewal_date date,status text,access_allowed boolean,access_reason text)
@@ -182,7 +189,7 @@ for each row execute function public.iig_create_notification_events();
 create trigger iig_enable_notifications_for_new_group_trigger after insert on public.tens_in_groups
 for each row execute function public.iig_enable_notifications_for_new_group();
 revoke all on function public.get_group_access_status(text), public.iig_create_notification_events(),
-public.iig_enable_notifications_for_new_group() from public,anon,authenticated;
+public.iig_enable_notifications_for_new_group() from public,anon,authenticated,service_role;
 grant execute on function public.get_group_access_status(text) to anon,authenticated;
 -- No push subscriptions, scheduled jobs, Edge Functions or senders are installed.
 
@@ -190,7 +197,7 @@ grant execute on function public.get_group_access_status(text) to anon,authentic
 -- Apply once to a disposable copy of the inventoried schema, never the live project.
 
 create schema iig_private;
-revoke all on schema iig_private from public, anon, authenticated;
+revoke all on schema iig_private from public, anon, authenticated, service_role;
 
 -- An explicit tester allowlist keeps registration closed during integration.
 create table iig_private.setup_testers (
@@ -215,7 +222,7 @@ create table iig_private.group_members (
 alter table iig_private.setup_testers enable row level security;
 alter table iig_private.group_owners enable row level security;
 alter table iig_private.group_members enable row level security;
-revoke all on all tables in schema iig_private from public, anon, authenticated;
+revoke all on all tables in schema iig_private from public, anon, authenticated, service_role;
 
 -- Fail rather than silently deleting/renumbering a pre-existing duplicate.
 create unique index iig_group_pin_unique on public.tens_in_groups(group_pin);
@@ -410,10 +417,15 @@ begin
   return found;
 end $$;
 
-revoke all on all functions in schema iig_private from public, anon, authenticated;
+-- Explicit legacy RPC access survives a clean reset without automatic function
+-- grants. Their existing protected-group denial checks remain unchanged.
+revoke all on function public.get_group_state(text),public.save_group_state(text,jsonb) from public,anon,authenticated,service_role;
+grant execute on function public.get_group_state(text),public.save_group_state(text,jsonb) to anon,authenticated;
+
+revoke all on all functions in schema iig_private from public, anon, authenticated, service_role;
 revoke all on function public.iig_create_owned_group(text,text,uuid),public.iig_get_owned_group(),
   public.iig_save_owned_group(text,jsonb,bigint),public.iig_join_owned_group(text,uuid,text,numeric),
-  public.iig_get_player_group(text),public.iig_set_my_attendance(text,boolean,bigint) from public,anon;
+  public.iig_get_player_group(text),public.iig_set_my_attendance(text,boolean,bigint) from public,anon,service_role;
 grant execute on function public.iig_create_owned_group(text,text,uuid),public.iig_get_owned_group(),
   public.iig_save_owned_group(text,jsonb,bigint),public.iig_join_owned_group(text,uuid,text,numeric),
   public.iig_get_player_group(text),public.iig_set_my_attendance(text,boolean,bigint) to authenticated;

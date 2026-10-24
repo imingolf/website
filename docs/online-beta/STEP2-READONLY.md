@@ -171,3 +171,11 @@ an explicit request. No LIVE access is needed or authorised.
 After approval of the read-only review, report what was found and stop again
 before TEST writes, writer pausing, fresh backup creation, migrations, permission
 changes, email delivery tests or beta publication.
+
+## Platform default-grant rollout review
+
+See [30 October Data API grant review](DATA-API-GRANTS-REVIEW.md). The pinned four
+migrations and original recovery evidence remain unchanged. The new ACL tail and
+supplemental catalog query are review drafts outside the authorised runner. A
+platform change to captured default ACLs must still stop baseline comparison.
+No execution or permission change is authorised by that source review.

@@ -57,6 +57,13 @@ alter table public.iig_notification_events enable row level security;
 revoke all on public.tens_in_groups,public.iig_notification_settings,public.iig_notification_events from public,anon,authenticated;
 revoke all on sequence public.tens_in_groups_id_seq from public,anon,authenticated;
 
+-- RPC-only clean installs: no direct application-table/sequence privileges, even
+-- if an older project still assigns service_role defaults. SECURITY DEFINER
+-- functions run as their owner; server callers use reviewed RPCs, not table REST.
+revoke all on public.tens_in_groups,public.iig_notification_settings,public.iig_notification_events from service_role;
+revoke all on sequence public.tens_in_groups_id_seq from service_role;
+grant usage on schema public to anon,authenticated,service_role;
+
 -- Access and notification function bodies supplied by the owner on 22 October 2026.
 create function public.get_group_access_status(p_pin text)
 returns table(group_pin text,group_name text,plan_type text,trial_expiry_date date,paid_status text,renewal_date date,status text,access_allowed boolean,access_reason text)
@@ -178,6 +185,6 @@ for each row execute function public.iig_create_notification_events();
 create trigger iig_enable_notifications_for_new_group_trigger after insert on public.tens_in_groups
 for each row execute function public.iig_enable_notifications_for_new_group();
 revoke all on function public.get_group_access_status(text), public.iig_create_notification_events(),
-public.iig_enable_notifications_for_new_group() from public,anon,authenticated;
+public.iig_enable_notifications_for_new_group() from public,anon,authenticated,service_role;
 grant execute on function public.get_group_access_status(text) to anon,authenticated;
 -- No push subscriptions, scheduled jobs, Edge Functions or senders are installed.
