@@ -5,6 +5,14 @@ not authorise a connection, SQL execution, account/email operation, pause of a
 service, fresh backup, privilege change, migration or publication. Await approval.
 LIVE must not be accessed. No database check has been executed in this step.
 
+## Mac execution runner — offline preparation only
+
+The separately approved runner is now available with [Mac instructions and exact
+safety boundaries](../../tools/test-beta/READONLY-RUNNER.md). Its default and
+`--offline` modes cannot connect. It has only been tested with mocked clients;
+first database connection still requires approval. The exporter below remains
+separate and does not execute SQL.
+
 ## Reconciliation evidence
 
 Common base: 9fd3b6b. Local c991410 adds TEST build isolation. Remote 4f7727b adds

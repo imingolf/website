@@ -8,6 +8,7 @@
     "local-demo": "node local-registration-demo.cjs",
     "test-beta-build": "python3 ../tools/test-beta/test_build.py",
     "test-beta-browser": "cd .. && node tests/test-beta-isolation.cjs",
+    "step2-runner": "python3 ../tools/test-beta/test_readonly_runner.py",
     "step2-preparation": "python3 ../tools/test-beta/test_step2_preparation.py"
   },
   "devDependencies": {
