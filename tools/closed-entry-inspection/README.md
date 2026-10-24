@@ -129,3 +129,33 @@ separate. No SQL, migrations, emails, deployment or physical-iPhone tests occur.
 Next: review this package and independently verify target/CA/network feasibility.
 Only then separately approve the first explicit read-only connection. Do not alter
 LIVE/TEST permissions, TLS settings, active Group 1010 records or any entrant.
+
+## Share a sanitised summary AFTER a successful saved inspection
+
+Use summarise.py, never paste catalog-private.json, report input, configuration,
+function bodies or credentials. The summariser reads existing private files only;
+it contains no subprocess, network client or SQL execution. By default it selects
+the newest timestamp-named readonly-YYYYMMDDTHHMMSSZ folder under
+~/Documents/ImInGolf-LIVE-Inspection. It fails rather than falling back to older
+evidence. --folder can explicitly select a different existing inspection folder.
+It does not modify evidence or create a new output file.
+
+Run test_summarise.py, then summarise.py. Share ONLY its generated JSON. Output
+is constructed from fixed labels, booleans, counts and allowlisted RPC/role names.
+It excludes raw definitions, arguments, configuration settings, owners with custom
+names, ACL strings, policy expressions, trigger names, role-membership names, local
+paths and all arbitrary report strings. Even metadata can contain secret literals;
+none is reflected. Read-only/TLS/project evidence is validated again from the saved
+files. Files/folder must retain private permissions; no automatic chmod or repair.
+
+Lexical references are explicitly NOT enforcement proof (comments or literals can
+also match). Missing references do not prove absence of checks delegated to helpers.
+Review summary before sharing. The summary cannot establish complete organiser
+control flow, indirect dependencies, safe Finish Round transitions, baseline data
+or rollback readiness; those remain separate review gates. Do not treat a successful
+LIVE catalog capture as permission to install any database change.
+
+Offline validation: 12 summary tests cover secret non-disclosure, null ACLs,
+non-authoritative reference flags, wrong identity/project, unknown names, incorrect
+boolean types, incomplete evidence, private files/symlinks, CLI output without
+modification and sanitised failure. No actual inspection evidence is in Git.
