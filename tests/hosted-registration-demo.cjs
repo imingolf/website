@@ -1,7 +1,7 @@
 // All HTTPS responses are fulfilled from a generated local artifact. No public host/database contacted.
 const {chromium}=require('playwright'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),{spawnSync}=require('node:child_process');
 (async()=>{
- const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'iig-hosted-demo-')),out=path.join(tmp,'site'),origin='https://fictional-usability.example.test';
+ const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'iig-hosted-demo-')),out=path.join(tmp,'site'),origin=process.env.IIG_DEMO_TEST_ORIGIN||'https://fictional-usability.example.test';
  const build=spawnSync('python3',['tools/registration-demo/build_static.py','--out',out,'--origin',origin],{encoding:'utf8'});assert.equal(build.status,0,build.stderr);
  const browser=await chromium.launch({executablePath:process.env.TEST_BROWSER||'/usr/bin/chromium',headless:true});
  try{
