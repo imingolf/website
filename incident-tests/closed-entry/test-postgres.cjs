@@ -81,6 +81,8 @@ const base=(scored=false)=>({roundId:'round-old',roundOpen:true,course:'Fictiona
   }
   await seed('wrong-player');let wrong=base();wrong.players[1].stableford=35;
   await reject(()=>save(wrong,0,'fixture_a','wrong-player'),/NOT_AUTHORISED/);
+  await seed('missing-revision');
+  await reject(()=>save(base(),null,'fixture_admin','missing-revision'),/STALE/);
   // Protected correction can clear a score without clearing the closure latch.
   await seed('correction',true);
   await as('fixture_admin',()=>db.query('SELECT iig_entry_prototype.correct_score($1,$2,$3,$4,$5)',['correction','round-old',0,'a',null]));

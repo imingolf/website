@@ -49,7 +49,8 @@ npm ci --ignore-scripts --no-audit --no-fund
 npm test
 ```
 
-39 checks passed in embedded PostgreSQL (PGlite). It runs in memory without a network
+40 core checks passed in embedded PostgreSQL (PGlite). A new fictional legacy
+adapter adds 33 checks; see legacy-adapter.sql and test-legacy-adapter.cjs. It runs in memory without a network
 client/URL. Cases cover fictional 1010 and 1260, 3 paid entrants and a fourth late
 attempt, Admin and player callers, £30 retained pot, legitimate scoring, history,
 metadata, authority failures, finish/start, stale requests, zero/Net/NR/pair scores,
@@ -72,12 +73,14 @@ It never pulls automatically or uses an existing Supabase container. If absent,
 STOP. Do not substitute a database connection. This development environment fetched
 that public image and then ran SQL only in the network-disabled fictional fixture.
 
-Seven REAL independent-session lock-contention checks passed on PostgreSQL 17.6:
+Ten REAL independent-session lock-contention checks passed on PostgreSQL 17.6:
 score-first rejects the blocked stale entry after commit; entry-first permits that
 legitimate entry and rejects the blocked stale score snapshot after commit. The
 harness observes an actual lock wait before releasing the winning transaction.
 Further cases cover finish versus entry, finish versus score, score versus finish,
-simultaneous finish and new-round start versus delayed payment return. Each archive
+simultaneous finish and new-round start versus delayed payment return. Three more
+cases use the legacy-shaped RPC adapter: score/entry, finish/entry and start/return.
+Each archive
 is checked against the exact expected committed snapshot. Six actual local-login
 checks also cover role escalation, direct table/authority mutation, player finish
 denial, Admin late-entry denial and legitimate organiser finish. These tests use
@@ -138,7 +141,7 @@ Before turning this into an installable migration:
 8. Extend tests against a faithful isolated legacy schema/roles/triggers and both old
    and new clients. Remaining real concurrency coverage includes simultaneous starts and cross-group
    lock isolation, transaction failure/retry and protected organiser session revocation.
-   The seven current real-session scenarios cover both score/entry orderings plus
+   The current real-session scenarios cover both score/entry orderings plus
    finish/entry/score/start-return interactions and simultaneous finish.
 
 ## Migration, rollback and recovery requirements
@@ -174,3 +177,14 @@ Group 1010 does not prove every other group is quiet. Install only when old-clie
 scoring and organiser lifecycle remain compatible. Apple delivery/caching is still
 unverified; server protection must cover old clients regardless. No online test,
 installation, publication or deployment is authorised by these offline tests.
+
+
+## Current legacy-shaped integration stage
+
+See [current integration progress](../../docs/incident-closed-entry/LEGACY-INTEGRATION-PROGRESS.md).
+The additional adapter, private organiser capability and synthetic triggers are test
+code only, not the actual LIVE definitions or an installable migration. Package
+npm test runs both core and adapter tests. No platform-owner code is used as group
+organiser authority. Existing production calculations, history and application
+files remain unchanged. Actual trigger/helper compatibility, capability issuance
+and complete legacy UI/Trip integration remain mandatory release blockers.

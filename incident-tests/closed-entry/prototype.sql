@@ -141,7 +141,7 @@ BEGIN
  a:=iig_entry_prototype.actor(g);
  SELECT * INTO row FROM iig_entry_prototype.groups WHERE id=g FOR UPDATE;
  IF NOT FOUND THEN RAISE EXCEPTION 'NOT_AUTHORISED'; END IF;
- IF row.phase<>'open' OR row.state->>'roundId' IS DISTINCT FROM expected_round
+ IF expected_round IS NULL OR expected_revision IS NULL OR row.phase<>'open' OR row.state->>'roundId' IS DISTINCT FROM expected_round
     OR row.revision<>expected_revision THEN RAISE EXCEPTION 'STALE_ROUND_OR_REVISION'; END IF;
  PERFORM iig_entry_prototype.validate_snapshot(row.state,next_state,row.closed);
  -- Organiser capability never overrides entry closure. Ordinary players may alter
@@ -168,7 +168,7 @@ BEGIN
  a:=iig_entry_prototype.actor(g);
  IF NOT a.organiser THEN RAISE EXCEPTION 'ORGANISER_REQUIRED'; END IF;
  SELECT * INTO row FROM iig_entry_prototype.groups WHERE id=g FOR UPDATE;
- IF row.phase<>'open' OR row.state->>'roundId' IS DISTINCT FROM expected_round OR row.revision<>expected_revision
+ IF expected_round IS NULL OR expected_revision IS NULL OR row.phase<>'open' OR row.state->>'roundId' IS DISTINCT FROM expected_round OR row.revision<>expected_revision
     THEN RAISE EXCEPTION 'STALE_ROUND_OR_REVISION'; END IF;
  SELECT value,(ordinality-1)::integer INTO player,idx FROM jsonb_array_elements(row.state->'players') WITH ORDINALITY
    WHERE value->>'id'=player_id;
@@ -191,7 +191,7 @@ BEGIN
  a:=iig_entry_prototype.actor(g);
  IF NOT a.organiser THEN RAISE EXCEPTION 'ORGANISER_REQUIRED'; END IF;
  SELECT * INTO row FROM iig_entry_prototype.groups WHERE id=g FOR UPDATE;
- IF row.phase<>'open' OR row.state->>'roundId' IS DISTINCT FROM expected_round OR row.revision<>expected_revision
+ IF expected_round IS NULL OR expected_revision IS NULL OR row.phase<>'open' OR row.state->>'roundId' IS DISTINCT FROM expected_round OR row.revision<>expected_revision
     THEN RAISE EXCEPTION 'STALE_ROUND_OR_REVISION'; END IF;
  IF NOT (row.closed OR iig_entry_prototype.has_score(row.state)) THEN RAISE EXCEPTION 'NO_SUBMITTED_SCORE'; END IF;
  -- Archive exact committed data, including payment metadata; never client-provided history.
@@ -209,9 +209,9 @@ BEGIN
  a:=iig_entry_prototype.actor(g);
  IF NOT a.organiser THEN RAISE EXCEPTION 'ORGANISER_REQUIRED'; END IF;
  SELECT * INTO row FROM iig_entry_prototype.groups WHERE id=g FOR UPDATE;
- IF row.phase<>'finished' OR row.state->>'roundId' IS DISTINCT FROM expected_round OR row.revision<>expected_revision
+ IF expected_round IS NULL OR expected_revision IS NULL OR row.phase<>'finished' OR row.state->>'roundId' IS DISTINCT FROM expected_round OR row.revision<>expected_revision
     THEN RAISE EXCEPTION 'STALE_ROUND_OR_REVISION'; END IF;
- IF stake<0 OR stake IS NULL OR format NOT IN ('stableford','net') OR format IS NULL
+ IF stake<0 OR stake::text IN ('NaN','Infinity','-Infinity') OR stake IS NULL OR format NOT IN ('stableford','net') OR format IS NULL
     OR coalesce(btrim(course),'')='' OR coalesce(btrim(round_date),'')='' THEN RAISE EXCEPTION 'INVALID_SETUP'; END IF;
  IF row.state#>'{trip,active}'='true'::jsonb THEN RAISE EXCEPTION 'TRIP_TRANSITION_REQUIRES_ADAPTER'; END IF;
  next_id:=gen_random_uuid()::text;

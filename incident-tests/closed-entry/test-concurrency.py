@@ -150,6 +150,38 @@ def real_role_checks():
     if result.returncode or summary(g)['phase']!='finished':raise RuntimeError('Actual organiser finish failed')
     print('PASS — 6 actual local-login authority/permission checks (no impersonated session role)')
 
+def legacy_races():
+    cap='f'*64
+    for kind in ['legacy-score-entry','legacy-finish-entry','legacy-start-return']:
+        g='fictional-'+kind;pin='pin-'+kind;seed(g)
+        sql("INSERT INTO iig_legacy_fixture.tens_in_groups(id,group_pin,state) SELECT id,'"+pin+"',state FROM iig_entry_prototype.groups WHERE id='"+g+"';"
+            "INSERT INTO iig_legacy_fixture.organiser_capabilities VALUES('"+g+"',iig_legacy_fixture.token_hash('"+cap+"'),'2099-01-01',false,ARRAY['finish','start']);")
+        scored=fixture();scored['players'][0]['stableford']=32;scored['players'][0]['scoreSubmitted']=True
+        late=json.loads(json.dumps(scored));late['players'][3]['paid']=True
+        def legacy_save(state,rev):
+            payload=json.loads(json.dumps(state));payload['_entry_revision']=rev
+            return "SELECT iig_legacy_fixture.save_group_state('"+pin+"',"+quote_state(payload)+");"
+        finish_sql="SELECT iig_legacy_fixture.finish_round('"+pin+"','round-old',1,'"+cap+"');"
+        if kind=='legacy-score-entry':
+            entry=fixture();entry['players'][3]['paid']=True
+            contend(legacy_save(scored,0),legacy_save(entry,0))
+        elif kind=='legacy-finish-entry':
+            sql(legacy_save(scored,0));contend(finish_sql,legacy_save(late,1))
+        else:
+            sql(legacy_save(scored,0));sql(finish_sql)
+            start_sql="SELECT iig_legacy_fixture.start_round('"+pin+"','round-old',2,'"+cap+"','Next Fictional','2026-10-25',10,'net');"
+            contend(start_sql,legacy_save(late,2))
+        result=summary(g)
+        if kind=='legacy-score-entry':
+            if result['paid']!=3 or not result['closed']:raise RuntimeError('Legacy entry race failed')
+        else:
+            archive=json.loads(sql("SELECT snapshot::text FROM iig_entry_prototype.archives WHERE group_id='"+g+"';").stdout.strip())
+            if archive!=scored:raise RuntimeError('Legacy archive was altered')
+            if kind=='legacy-start-return' and (result['paid']!=0 or result['closed']):raise RuntimeError('Legacy new round incorrect')
+        projection=sql("SELECT g.state=l.state FROM iig_entry_prototype.groups g JOIN iig_legacy_fixture.tens_in_groups l ON l.id=g.id WHERE g.id='"+g+"';").stdout.strip()
+        if projection!='t':raise RuntimeError('Legacy projection mismatch')
+        print('PASS — real lock contention:',kind,'with guarded legacy RPC and synthetic triggers')
+
 def main():
     created=False
     try:
@@ -165,10 +197,12 @@ def main():
             if time.monotonic()>deadline:raise RuntimeError('Own fixture startup timed out')
             time.sleep(.1)
         sql((HERE/'prototype.sql').read_text())
+        sql((HERE/'legacy-adapter.sql').read_text())
         race('fictional-score-first',False);race('fictional-entry-first',True)
         for kind in ['finish-entry','finish-score','score-finish','double-finish','start-return']:
             lifecycle('fictional-'+kind,kind)
         real_role_checks()
+        legacy_races()
         ensure_isolated()
         print('PASS — PostgreSQL 17.6 independent-session races; network none, no ports/mounts, fictional data only.')
     finally:

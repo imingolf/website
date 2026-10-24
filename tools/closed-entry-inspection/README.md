@@ -159,3 +159,18 @@ Offline validation: 12 summary tests cover secret non-disclosure, null ACLs,
 non-authoritative reference flags, wrong identity/project, unknown names, incorrect
 boolean types, incomplete evidence, private files/symlinks, CLI output without
 modification and sanitised failure. No actual inspection evidence is in Git.
+
+
+## Classify unresolved calls from the existing saved evidence
+
+classify_saved_calls.py performs a NEW local-only classification rather than
+repeating the summary. It distinguishes documented built-in spellings, extensions,
+captured routine candidates and anonymous uncaptured calls, and reports anonymised
+write targets. Twelve offline tests cover now(), comments/literals, INSERT targets,
+qualified public versus catalog names, captured trigger helpers, dynamic SQL,
+side-effect functions, malformed input and private failure output. No call is
+marked resolution_proven; overload/search_path and authorisation review still apply.
+Run test_classify_saved_calls.py then classify_saved_calls.py, with no connection
+flag. It reads the latest existing private evidence folder; --folder selects an
+existing folder explicitly. Share ONLY the generated value-free JSON. No raw bodies,
+private names, secrets, writes, subprocess or network operations are involved.
