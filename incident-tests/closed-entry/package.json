@@ -1,0 +1,7 @@
+{
+  "name": "imingolf-closed-entry-offline-prototype",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {"test": "node test-postgres.cjs"},
+  "devDependencies": {"@electric-sql/pglite": "0.5.11"}
+}
