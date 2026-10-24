@@ -116,3 +116,10 @@ next offline-only Mac command. `--ca-file` selects an official CA for one run
 without editing the service. Explicit files are parsed and checked offline;
 verify-full and hostname checking remain mandatory. Inherited SSL_CERT_FILE and
 SSL_CERT_DIR no longer influence child clients. Do not reconnect until approval.
+
+## Identity confirmation after successful TLS negotiation
+
+For `TLS/read-only server confirmation failed`, use the
+[offline identity-evidence inspection](IDENTITY-CONFIRMATION.md) before any retry.
+Database-side SSL, transaction mode and session-default mode now have separate
+mandatory checks. The inspection command reads existing Mac evidence only.

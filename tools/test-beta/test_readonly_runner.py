@@ -221,6 +221,46 @@ class RunnerTests(unittest.TestCase):
         for field,value in [('database','other'),('role','supabase_admin'),('session_role','other'),('version_num','170012'),('ssl',False),('transaction_read_only','off'),('default_transaction_read_only','off'),('project_setting','another-project')]:
             changed=identity();changed[field]=value
             with self.subTest(field=field),self.assertRaises(m.StopReview):m.verify_identity(changed)
+    def test_identity_confirmation_failures_are_distinct_and_block_all_later_queries(self):
+        for field,value,label in [('ssl',False,'Database-side TLS'),('ssl',None,'Database-side TLS'),
+                                  ('ssl','true','Database-side TLS'),('transaction_read_only','off','Explicit transaction_read_only'),
+                                  ('default_transaction_read_only','off','Session default_transaction_read_only')]:
+            changed=identity();changed[field]=value;events=[];report={'checks':{}}
+            class Fake:
+                def execute(self,key):events.append(key);return [changed]
+            with self.subTest(field=field,value=value),self.assertRaisesRegex(m.StopReview,label):m.online_review(Fake(),baseline(),audit(),compare,report)
+            self.assertEqual(events,['identity'])
+            self.assertEqual(report['checks']['server_identity']['diagnostics'],m.identity_diagnostics(changed))
+    def test_identity_diagnostics_are_strictly_allowlisted_and_sanitised(self):
+        changed={k:SECRET for k in identity()};changed.update(private_rows=[SECRET],password=SECRET)
+        result=m.identity_diagnostics(changed);text=json.dumps(result)
+        self.assertNotIn(SECRET,text);self.assertNotIn('password',text);self.assertNotIn('private_rows',text)
+        self.assertEqual(result['transaction_read_only'],'UNEXPECTED');self.assertEqual(result['backend_ssl'],'UNEXPECTED')
+        self.assertEqual(m.identity_diagnostics({})['backend_ssl'],'MISSING')
+        self.assertEqual(m.identity_diagnostics({})['transaction_read_only'],'MISSING')
+    def test_existing_identity_inspection_uses_only_local_files_and_preserves_them(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d);changed=identity();changed['default_transaction_read_only']='off';changed['private_probe']=SECRET
+            files={root/'01-identity.json':json.dumps([changed]),root/'01-identity.client.json':json.dumps({'exit_code':0,'stderr':SECRET})}
+            for p,text in files.items():p.write_text(text)
+            with patch.object(m.subprocess,'run') as command,patch.object(m.getpass,'getpass') as prompt,patch.object(m,'read_service') as service:
+                result=m.inspect_identity_evidence(root)
+                command.assert_not_called();prompt.assert_not_called();service.assert_not_called()
+            self.assertEqual(result['database_connections_attempted'],0);self.assertTrue(result['existing_client_exit_success'])
+            self.assertEqual(result['identity']['default_transaction_read_only'],'off');self.assertNotIn(SECRET,json.dumps(result))
+            for p,text in files.items():self.assertEqual(p.read_text(),text)
+    def test_identity_inspector_cli_never_prints_private_content_or_retries(self):
+        spec=importlib.util.spec_from_file_location('offline_identity_inspector',HERE/'inspect-identity.py');inspector=importlib.util.module_from_spec(spec)
+        with patch.dict(sys.modules,{'readonly_runner':m}):spec.loader.exec_module(inspector)
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d);(root/'01-identity.json').write_text(SECRET)
+            with patch.object(m.subprocess,'run') as command,patch('builtins.print') as output:
+                self.assertEqual(inspector.main(['--evidence',str(root)]),1);command.assert_not_called()
+                self.assertNotIn(SECRET,str(output.call_args_list))
+            (root/'01-identity.json').write_text(json.dumps([identity()]))
+            (root/'01-identity.client.json').write_text(json.dumps({'exit_code':0}))
+            with patch.object(m.subprocess,'run') as command,patch('builtins.print'):
+                self.assertEqual(inspector.main(['--evidence',str(root)]),0);command.assert_not_called()
     def test_changed_baseline_stops_before_assessment(self):
         events=[]
         class Fake:

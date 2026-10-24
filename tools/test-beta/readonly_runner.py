@@ -305,10 +305,40 @@ class Reader:
         return values
 
 
+def identity_diagnostics(value):
+    """Allowlisted flags only: never echo a returned credential/string/row."""
+    def switch(key):
+        item=value.get(key)
+        return item if type(item) is str and item in ('on','off') else 'MISSING' if key not in value else 'UNEXPECTED'
+    ssl_value=value.get('ssl')
+    return {
+        'database_matches':value.get('database')=='postgres',
+        'execution_role_matches':value.get('role')=='postgres',
+        'session_role_matches':value.get('session_role')=='postgres',
+        'server_version_matches':value.get('version_num')=='170011',
+        'project_setting_allowed':value.get('project_setting') in (None,'',PROJECT),
+        'backend_ssl':ssl_value if type(ssl_value) is bool else 'MISSING' if 'ssl' not in value else 'UNEXPECTED',
+        'transaction_read_only':switch('transaction_read_only'),
+        'default_transaction_read_only':switch('default_transaction_read_only'),
+        'limit':'backend_ssl describes the database-side connection; through a pooler it is not the client-to-pooler TLS observation.'}
+
+
+def inspect_identity_evidence(folder):
+    """Existing Mac files only; no service parsing, password prompt or client call."""
+    values=json_file(folder/'01-identity.json')
+    require(isinstance(values,list) and len(values)==1 and isinstance(values[0],dict),'Existing identity evidence has unexpected structure; no raw contents printed')
+    client=json_file(folder/'01-identity.client.json')
+    require(isinstance(client,dict),'Existing identity client evidence has unexpected structure')
+    return {'database_connections_attempted':0,'existing_client_exit_success':type(client.get('exit_code')) is int and client['exit_code']==0,
+            'identity':identity_diagnostics(values[0]),'action':'STOP: review diagnostics before any new connection; no safeguards bypassed'}
+
+
 def verify_identity(value):
     require(value.get('database')=='postgres' and value.get('role')=='postgres' and value.get('session_role')=='postgres','Server database/execution identity mismatch')
     require(value.get('version_num')=='170011','Server version differs from reviewed TEST 17.11; STOP for review')
-    require(value.get('ssl') is True and value.get('transaction_read_only')=='on' and value.get('default_transaction_read_only')=='on','TLS/read-only server confirmation failed')
+    require(value.get('ssl') is True,'Database-side TLS confirmation failed (pg_stat_ssl); client-to-pooler TLS is a separate observation. STOP; no TLS bypass')
+    require(value.get('transaction_read_only')=='on','Explicit transaction_read_only confirmation failed; STOP before application queries')
+    require(value.get('default_transaction_read_only')=='on','Session default_transaction_read_only confirmation failed; STOP before application queries')
     require(value.get('project_setting') in (None,'',PROJECT),'Server project setting contradicts TEST binding')
 
 
@@ -356,7 +386,9 @@ def authority(d):
 
 def online_review(reader,before,local_audit,compare,report):
     report['checks']['server_identity']={'status':'RUNNING'}
-    verify_identity(reader.execute('identity')[0]);report['checks']['server_identity']={'status':'PASS'}
+    identity=reader.execute('identity')[0]
+    report['checks']['server_identity']['diagnostics']=identity_diagnostics(identity)
+    verify_identity(identity);report['checks']['server_identity']['status']='PASS'
     report['checks']['original_baseline']={'status':'RUNNING'}
     current=reader.execute('capture')[0]
     compare.compare_baseline(before,current);report['checks']['original_baseline']={'status':'PASS'}
