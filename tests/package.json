@@ -5,7 +5,9 @@
     "self-service-browser": "cd .. && node tests/self-service.cjs",
     "test": "node run.cjs",
     "onboarding": "node onboarding-offline.cjs",
-    "local-demo": "node local-registration-demo.cjs"
+    "local-demo": "node local-registration-demo.cjs",
+    "test-beta-build": "python3 ../tools/test-beta/test_build.py",
+    "test-beta-browser": "cd .. && node tests/test-beta-isolation.cjs"
   },
   "devDependencies": {
     "linkedom": "0.18.14",

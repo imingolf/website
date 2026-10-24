@@ -126,3 +126,12 @@ filtered copies of these actual screens with fictional in-memory responses,
 without changing this application's real host guards or connecting to any online
 project. Follow its single Mac launch block to review on the Mac and an iPhone
 on the same trusted Wi-Fi. This does not deploy or approve production release.
+
+## Step 1: isolated beta build preparation
+
+See [the TEST beta build review](../../tools/test-beta/README.md). A separate,
+unpublished build strips legacy database clients and production configuration,
+requires explicit TEST-only settings and blocks unapproved endpoints. The shared
+development config is now blank by default. The local demonstration remains
+separate and mocked. No database installation, permission change or publication
+is authorised by this step; the earlier safety and server-validation gaps remain.

@@ -1,7 +1,6 @@
-window.TENS_IN_CONFIG = {
-  supabaseUrl: "https://kzzzputsqxdntfqpprnz.supabase.co",
-  supabaseKey: atob("c2JfcHVibGlzaGFibGVfOF9zT2drVGJUaUt5"+"SnFvMHpqaEhCUV9HcVRNRWJTeg==")
-};
+// Development branch: legacy database access is deliberately unconfigured.
+// Build tools/test-beta for verified TEST access. Never restore a LIVE fallback here.
+window.TENS_IN_CONFIG = Object.freeze({supabaseUrl:"",supabaseKey:""});
 
 (function(){
   function applyPaymentWording(){

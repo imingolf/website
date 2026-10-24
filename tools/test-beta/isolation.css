@@ -1,0 +1,7 @@
+:root{--iig-beta-top:48px}
+body{padding-top:var(--iig-beta-top)!important}
+#setupOverlay,#openingSplash,body>[role="dialog"]{top:var(--iig-beta-top)!important}
+.iig-beta-pending body>*{visibility:hidden!important}
+.iig-beta-blocked body>*:not(#iig-beta-status){display:none!important}
+#iig-beta-status{position:fixed;left:0;right:0;top:0;z-index:2147483647;background:#fff0b3;color:#352800;border-bottom:2px solid #aa7900;padding:8px 12px;font:12px/1.4 system-ui;overflow-wrap:anywhere}
+.iig-beta-blocked #iig-beta-status{padding:24px;font-size:18px;visibility:visible!important}
