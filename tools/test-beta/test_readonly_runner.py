@@ -78,6 +78,58 @@ class RunnerTests(unittest.TestCase):
         path=root/'service.conf';path.write_text('[iig-test-only]\n'+''.join(k+'='+v+'\n' for k,v in c.items())+extra);path.chmod(0o600);return path
     def reader(self,root,approval=m.PROJECT):
         return m.Reader(m.Target(m.POOLER,'postgres.'+m.PROJECT),SECRET,m.query_registry(),m.Tools('/offline/psql','/offline/pg_restore'),root,approval)
+    def test_explicit_valid_ca_retains_hostname_verification_and_service_bytes(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d);service=self.service(root);original=service.read_bytes()
+            ca=(HERE/'fixtures/offline-ca.crt').resolve()
+            with patch.object(m.subprocess,'run') as command:
+                target,secret=m.read_service(service,ca)
+                self.assertIsNone(secret)
+                self.assertEqual(target.rootcert,str(ca))
+                self.assertIn("sslrootcert='"+str(ca)+"'",m.conninfo(target))
+                self.assertIn("sslmode='verify-full'",m.conninfo(target))
+                command.assert_not_called()
+            self.assertEqual(service.read_bytes(),original)
+    def test_missing_invalid_empty_and_private_key_ca_fail_offline(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d);service=self.service(root)
+            for name,data in [('empty',b''),('invalid',b'not a certificate'),('key',b'-----BEGIN PRIVATE KEY-----')]:
+                ca=root/name;ca.write_bytes(data)
+                with patch.object(m.subprocess,'run') as command,self.assertRaises(m.StopReview):m.read_service(service,ca)
+                command.assert_not_called()
+            for ca in (root/'missing',Path('relative.crt'),Path('system')):
+                with patch.object(m.subprocess,'run') as command,self.assertRaises(m.StopReview):m.read_service(service,ca)
+                command.assert_not_called()
+    def test_service_ca_also_validated_and_unsafe_ca_rejected(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d);ca=root/'ca.crt';ca.write_bytes((HERE/'fixtures/offline-ca.crt').read_bytes())
+            target,_=m.read_service(self.service(root,{'sslrootcert':str(ca)}));self.assertEqual(target.rootcert,str(ca))
+            ca.chmod(0o666)
+            with self.assertRaises(m.StopReview):m.read_service(self.service(root),ca)
+    def test_openssl_trust_environment_cannot_redirect_ca_selection(self):
+        with patch.dict(os.environ,{'SSL_CERT_FILE':'/unreviewed/ca','SSL_CERT_DIR':'/unreviewed/directory'}):
+            env=m.clean_env();self.assertNotIn('SSL_CERT_FILE',env);self.assertNotIn('SSL_CERT_DIR',env)
+            self.assertEqual(os.environ['SSL_CERT_FILE'],'/unreviewed/ca')
+    def test_certificate_failures_never_retry_or_downgrade(self):
+        for message,label in [('SSL error: certificate verify failed','TLS_CERTIFICATE_ERROR'),
+                              ('server certificate does not match host name','TLS_HOSTNAME_MISMATCH'),
+                              ('certificate has expired','TLS_CERTIFICATE_EXPIRED'),
+                              ('unable to get local issuer certificate','TLS_CA_CHAIN_ERROR')]:
+            with tempfile.TemporaryDirectory() as d:
+                root=Path(d);r=self.reader(root)
+                with patch.object(m.subprocess,'run',return_value=subprocess.CompletedProcess([],2,stdout='',stderr=message+' '+SECRET)) as command:
+                    with self.assertRaisesRegex(m.StopReview,label):r.execute('identity')
+                    command.assert_called_once();info=command.call_args.args[0][command.call_args.args[0].index('--dbname')+1]
+                    self.assertIn("sslmode='verify-full'",info)
+                for p in root.iterdir():self.assertNotIn(SECRET,p.read_text());self.assertNotIn(message,p.read_text())
+    def test_removed_ca_stops_before_client_and_has_no_system_fallback(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d);ca=root/'ca.crt';ca.write_bytes((HERE/'fixtures/offline-ca.crt').read_bytes())
+            target=m.Target(m.POOLER,'postgres.'+m.PROJECT,m.ca_file(ca))
+            r=m.Reader(target,SECRET,m.query_registry(),m.Tools('/offline/psql','/offline/pg_restore'),root,m.PROJECT)
+            ca.unlink()
+            with patch.object(m.subprocess,'run') as command,self.assertRaises(m.StopReview):r.execute('identity')
+            command.assert_not_called()
     def test_exact_test_targets_only(self):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d)
@@ -290,7 +342,7 @@ class RunnerTests(unittest.TestCase):
             raise AssertionError('Unknown external command blocked in offline test')
         return events,run
     def test_default_and_offline_cli_cannot_connect_or_prompt_and_preserve_evidence(self):
-        for mode in ([],['--offline']):
+        for mode in ([],['--offline'],['--offline','--ca-file',str((HERE/'fixtures/offline-ca.crt').resolve())]):
             with self.subTest(mode=mode),tempfile.TemporaryDirectory() as d:
                 root=Path(d);capture,rollback,archive,rehearsal=self.write_evidence(root);service=self.service(root)
                 original={p:p.read_bytes() for p in [capture,rollback,archive]}
@@ -303,6 +355,8 @@ class RunnerTests(unittest.TestCase):
                 self.assertFalse(any(args[0]=='/offline/psql' and args[-1]!='--version' for args,_ in events))
                 report=json.loads(next((root/'Documents/ImInGolf-TEST-Installation').glob('*/report.json')).read_text())
                 self.assertEqual(report['connections_attempted'],0);self.assertFalse(report['sql_executed']);self.assertFalse(report['installation_authorised'])
+                if '--ca-file' in mode:
+                    self.assertEqual(report['checks']['tls_configuration']['explicit_ca_sha256'],m.digest(HERE/'fixtures/offline-ca.crt'))
                 for p,value in original.items():self.assertEqual(p.read_bytes(),value)
     def test_wrong_approval_cannot_even_start_preflight(self):
         with patch.object(m,'offline_preflight') as preflight,patch.object(m.subprocess,'run') as command,patch('builtins.print'):

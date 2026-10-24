@@ -108,3 +108,11 @@ The runner has no mechanism to grant privileges or override this gate.
 A future read-only PASS still never authorises installation, emails or publication.
 The report always retains installation_authorised=false and release NO-GO.
 Review the offline report first and obtain approval before the first connection.
+
+## Explicit CA review after the Mac TLS failure
+
+See [TLS-REVIEW.md](TLS-REVIEW.md) for official guidance, limitations and the exact
+next offline-only Mac command. `--ca-file` selects an official CA for one run
+without editing the service. Explicit files are parsed and checked offline;
+verify-full and hostname checking remain mandatory. Inherited SSL_CERT_FILE and
+SSL_CERT_DIR no longer influence child clients. Do not reconnect until approval.

@@ -15,6 +15,7 @@ from pathlib import Path
 import re
 import shutil
 import stat
+import ssl
 import subprocess
 import sys
 import warnings
@@ -81,7 +82,28 @@ def pgpass_password(path,target):
     return password_text(entries[0])
 
 
-def read_service(path):
+def ca_file(path):
+    """Offline parsing only; never fetch, learn or automatically trust a server certificate."""
+    path=Path(path).expanduser()
+    require(path.is_absolute() and path.is_file(),'Explicit trusted CA file is missing or not an absolute file')
+    path=path.resolve()
+    info=path.stat()
+    require(info.st_uid in (0,os.getuid()) and info.st_mode&0o022==0,'CA file is not safely owned or is writable by others')
+    require(0<info.st_size<=5*1024*1024,'CA file is empty or unexpectedly large')
+    try:
+        raw=path.read_bytes()
+        require(b'PRIVATE KEY' not in raw,'CA file must not contain private keys')
+        # Empty context: no implicit Python/system trust added. This is format validation,
+        # not proof of the independent libpq backend or the remote certificate chain.
+        context=ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+        context.load_verify_locations(cafile=str(path))
+        require(context.cert_store_stats()['x509_ca']>0,'Certificate file contains no recognised CA certificates')
+    except (ssl.SSLError,UnicodeError,OSError):
+        raise StopReview('Invalid or unreadable CA certificate file; stopped offline') from None
+    return str(path)
+
+
+def read_service(path,explicit_ca=None):
     private_file(path,credential=False)
     parser=configparser.ConfigParser(interpolation=None,strict=True)
     try:parser.read_string(path.read_text())
@@ -98,9 +120,9 @@ def read_service(path):
     require(c.get('port','5432')=='5432' and c.get('dbname','postgres')=='postgres','Only postgres on direct/session port 5432 is permitted')
     require(c.get('sslmode') in ('require','verify-ca','verify-full'),'SSL configuration must require TLS; no plaintext or fallback')
     if 'connect_timeout' in c:require(re.fullmatch(r'[0-9]{1,2}',c['connect_timeout']) and 1<=int(c['connect_timeout'])<=30,'Ambiguous connection timeout')
-    root=c.get('sslrootcert','system')
-    if root!='system':
-        ca=Path(root).expanduser();require(ca.is_absolute() and ca.is_file(),'Explicit trusted CA file is missing');root=str(ca)
+    root=str(explicit_ca) if explicit_ca is not None else c.get('sslrootcert','system')
+    if root!='system':root=ca_file(root)
+    require(explicit_ca is None or root!='system','Explicit CA option requires an actual absolute certificate file')
     target=Target(host,user,root)
     inline=c.get('password') or None;passfile=c.get('passfile') or None
     require(not (inline and passfile),'Both password and passfile specified; refuse ambiguous credentials')
@@ -115,6 +137,7 @@ def conninfo(target):
     # Revalidate even manually constructed Target objects; no caller-controlled host escape.
     require((target.host=='db.'+PROJECT+'.supabase.co' and target.user in ('postgres','postgres.'+PROJECT))
             or (target.host==POOLER and target.user=='postgres.'+PROJECT),'Invalid TEST target')
+    if target.rootcert!='system':ca_file(target.rootcert)
     fields={'host':target.host,'port':'5432','dbname':'postgres','user':target.user,
             'sslmode':'verify-full','sslrootcert':target.rootcert,'gssencmode':'disable',
             'connect_timeout':'10','passfile':os.devnull,'application_name':'iig-step2-readonly',
@@ -124,7 +147,7 @@ def conninfo(target):
 
 
 def clean_env(secret=None):
-    env={k:v for k,v in os.environ.items() if not k.upper().startswith('PG')}
+    env={k:v for k,v in os.environ.items() if not k.upper().startswith('PG') and k.upper() not in ('SSL_CERT_FILE','SSL_CERT_DIR')}
     env['PGOPTIONS']='-c default_transaction_read_only=on'
     env['PGPASSFILE']=os.devnull
     if secret is not None:env['PGPASSWORD']=password_text(secret)
@@ -211,7 +234,7 @@ def offline_preflight(args,report=None):
     # NO connection or psql query can occur on this path.
     require(subprocess.run(['git','-C',str(REPO),'branch','--show-current'],capture_output=True,text=True,check=True).stdout.strip()=='improve-new-user-registration','Wrong development branch')
     require(not subprocess.run(['git','-C',str(REPO),'status','--porcelain','--untracked-files=no'],capture_output=True,text=True,check=True).stdout.strip(),'Tracked changes need review before using this runner')
-    target,secret=read_service(args.service_file);conninfo(target)
+    target,secret=read_service(args.service_file,args.ca_file);conninfo(target)
     if report is not None:report['checks']['target_binding']={'status':'PASS','host':target.host,'user':target.user,'effective_sslmode':'verify-full','fallback':'none'}
     queries=query_registry()
     if report is not None:report['checks']['query_integrity']={'status':'PASS'}
@@ -243,6 +266,9 @@ def diagnostic_category(stderr):
     for code,label in [('42501','DATABASE_PERMISSION_DENIED'),('28P01','AUTHENTICATION_FAILED'),('57014','QUERY_TIMEOUT'),('P0001','REVIEW_GUARD_REJECTED')]:
         if re.search(r'\b'+code+r'\b',stderr):return label
     lower=stderr.lower()
+    if 'does not match host name' in lower or 'hostname mismatch' in lower:return 'TLS_HOSTNAME_MISMATCH'
+    if 'certificate has expired' in lower or 'certificate expired' in lower:return 'TLS_CERTIFICATE_EXPIRED'
+    if 'unable to get local issuer' in lower or 'self-signed certificate' in lower:return 'TLS_CA_CHAIN_ERROR'
     for needle,label in [('no password supplied','PASSWORD_MISSING'),('password authentication failed','AUTHENTICATION_FAILED'),
                          ('root certificate','TLS_CA_ERROR'),('certificate verify','TLS_CERTIFICATE_ERROR'),
                          ('ssl error','TLS_ERROR'),('permission denied','DATABASE_PERMISSION_DENIED'),
@@ -261,6 +287,7 @@ class Reader:
     def execute(self,name):
         # Check registry again immediately before each process; no arbitrary SQL/paths/psql flags.
         require(name in self.queries and self.queries==query_registry(),'Unreviewed query or changed manifest; stopped')
+        self.info=conninfo(self.target) # Revalidate explicit CA before every process.
         item=self.queries[name];self.count+=1
         args=[self.tools.psql,'-X','-w','-qAt','--dbname',self.info,'-v','ON_ERROR_STOP=1','-v','VERBOSITY=sqlstate','--file=-']
         if self.report is not None:
@@ -361,6 +388,7 @@ def online_review(reader,before,local_audit,compare,report):
 def main(argv=None):
     parser=argparse.ArgumentParser(description=__doc__)
     mode=parser.add_mutually_exclusive_group();mode.add_argument('--offline',action='store_true');mode.add_argument('--connect-test-readonly',metavar='EXACT_TEST_REFERENCE')
+    parser.add_argument('--ca-file',type=Path,help='Explicit official CA file for this run only; does not edit the service')
     parser.add_argument('--service-file',type=Path,default=Path.home()/'.pg_service.conf')
     parser.add_argument('--capture',type=Path,default=REPO/'docs/pr6-test-rollback-preparation/capture.json')
     parser.add_argument('--rollback',type=Path,default=REPO/'docs/pr6-test-rollback-preparation/rollback.TEST.sql')
@@ -378,6 +406,7 @@ def main(argv=None):
         require(REPO.resolve() not in base.resolve().parents and not base.is_symlink() and base.stat().st_uid==os.getuid() and stat.S_IMODE(base.stat().st_mode)&0o077==0,'Private evidence directory is not securely owned/mode 0700')
         folder=base/('step2-'+dt.datetime.now(dt.timezone.utc).strftime('%Y%m%dT%H%M%S.%fZ'));folder.mkdir(mode=0o700)
         target,secret,queries,g,compare,before,audit,tools,backup=offline_preflight(args,report)
+        report['checks']['tls_configuration']={'status':'PASS','sslmode':'verify-full','hostname_verification':True,'ca_source':target.rootcert,'explicit_ca_sha256':digest(Path(target.rootcert)) if target.rootcert!='system' else None,'limit':'Offline CA parsing is not libpq/server-chain validation'}
         report['checks']['offline_evidence']={'status':'PASS','original_rollback_unchanged':True,'local_pass_revalidated':True}
         report['checks']['backup_evidence']=backup
         report['checks']['target_binding']={'status':'PASS','host':target.host,'user':target.user,'effective_sslmode':'verify-full','fallback':'none'}
