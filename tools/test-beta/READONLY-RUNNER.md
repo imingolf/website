@@ -123,3 +123,10 @@ For `TLS/read-only server confirmation failed`, use the
 [offline identity-evidence inspection](IDENTITY-CONFIRMATION.md) before any retry.
 Database-side SSL, transaction mode and session-default mode now have separate
 mandatory checks. The inspection command reads existing Mac evidence only.
+
+## Confirmed session-pooler findings
+
+[POOLER-REVIEW.md](POOLER-REVIEW.md) separates verified client TLS from backend
+TLS and explains the observed transaction/default modes. Every registered
+transaction now establishes and verifies transaction-local safeguards. Backend
+SSL=false remains a blocker: no connection retry is authorised by offline PASS.

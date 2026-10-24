@@ -39,6 +39,8 @@ If the transaction is on but the default is off, that distinguishes session-defa
 propagation from transaction protection. This is a hypothesis until existing
 evidence is inspected. Do not alter database/role defaults, insert new SET commands,
 remove the default-mode check or change pooler endpoints to make the test pass.
+The subsequently reviewed transaction-local correction and remaining backend-TLS
+blocker are documented in [POOLER-REVIEW.md](POOLER-REVIEW.md).
 
 See [Supabase connection guidance](https://supabase.com/docs/guides/database/connecting-to-postgres),
 [PostgreSQL SSL statistics](https://www.postgresql.org/docs/18/monitoring-stats.html#MONITORING-PG-STAT-SSL-VIEW)

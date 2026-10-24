@@ -24,8 +24,10 @@ HERE=Path(__file__).resolve().parent
 REPO=HERE.parents[1]
 PROJECT='nyavvwrsrxqfyhiygkgw'
 POOLER='aws-0-eu-west-1.pooler.supabase.com'
-QUERY_HASH='7e5c5ded21f3180ee743438ea7e61630c43d0e1b8bd7e4c918950f90633bd3ed'
+QUERY_HASH='9f9768b4eefd0249b21c34cb56f70b46b2e172c1f8b2e2beb8d4307fb98a9fc5'
 PASS_RUN='automated-rehearsal-20261023T115001.671715Z'
+
+TRANSACTION_GUARD="-- Transaction-local safeguards: never ALTER ROLE/DATABASE or persist settings.\nSET LOCAL search_path = pg_catalog;\nSET LOCAL default_transaction_read_only = on;\nSET LOCAL statement_timeout = '60s';\nSET LOCAL lock_timeout = '5s';\nSET LOCAL idle_in_transaction_session_timeout = '60s';\nDO $iig_readonly_guard$\nBEGIN\n IF pg_catalog.current_setting('transaction_read_only') <> 'on' THEN\n  RAISE EXCEPTION USING ERRCODE='PIG02', MESSAGE='Explicit read-only transaction not established';\n END IF;\n IF pg_catalog.current_setting('default_transaction_read_only') <> 'on' THEN\n  RAISE EXCEPTION USING ERRCODE='PIG03', MESSAGE='Transaction-local read-only default not established';\n END IF;\n IF (SELECT ssl FROM pg_catalog.pg_stat_ssl WHERE pid=pg_catalog.pg_backend_pid()) IS DISTINCT FROM true THEN\n  RAISE EXCEPTION USING ERRCODE='PIG01', MESSAGE='Database-side TLS not established';\n END IF;\nEND;\n$iig_readonly_guard$;\n"
 
 class StopReview(Exception): pass
 
@@ -161,6 +163,8 @@ def query_registry():
     require(m['project']==PROJECT and set(m['queries'])=={'identity','capture','assessment','audit'},'Unreviewed query IDs')
     for item in m['queries'].values():
         require(hashlib.sha256(item['sql'].encode()).hexdigest()==item['sha256'],'Read-only query changed')
+        starts=list(re.finditer(r'(?m)^BEGIN[^;\n]*READ ONLY;\n',item['sql']))
+        require(starts and all(item['sql'][m.end():].startswith(TRANSACTION_GUARD) for m in starts),'Every transaction must establish and check its local safeguards')
         require('READ ONLY' in item['sql'] and not re.search(r'^\s*\\',item['sql'],re.M),'Unreviewed psql metacommand or transaction')
     return m['queries']
 
@@ -263,7 +267,7 @@ def redacted(value,secret):
 
 def diagnostic_category(stderr):
     # Whitelisted labels only: libpq/server raw diagnostics are never saved.
-    for code,label in [('42501','DATABASE_PERMISSION_DENIED'),('28P01','AUTHENTICATION_FAILED'),('57014','QUERY_TIMEOUT'),('P0001','REVIEW_GUARD_REJECTED')]:
+    for code,label in [('PIG01','DATABASE_SIDE_TLS_REQUIRED'),('PIG02','EXPLICIT_READ_ONLY_REQUIRED'),('PIG03','TRANSACTION_LOCAL_DEFAULT_REQUIRED'),('42501','DATABASE_PERMISSION_DENIED'),('28P01','AUTHENTICATION_FAILED'),('57014','QUERY_TIMEOUT'),('P0001','REVIEW_GUARD_REJECTED')]:
         if re.search(r'\b'+code+r'\b',stderr):return label
     lower=stderr.lower()
     if 'does not match host name' in lower or 'hostname mismatch' in lower:return 'TLS_HOSTNAME_MISMATCH'
@@ -320,6 +324,7 @@ def identity_diagnostics(value):
         'backend_ssl':ssl_value if type(ssl_value) is bool else 'MISSING' if 'ssl' not in value else 'UNEXPECTED',
         'transaction_read_only':switch('transaction_read_only'),
         'default_transaction_read_only':switch('default_transaction_read_only'),
+        'scope_note':'Historical unguarded evidence reflects the backend session default; guarded query packets establish this default transaction-locally. No persistent settings change.',
         'limit':'backend_ssl describes the database-side connection; through a pooler it is not the client-to-pooler TLS observation.'}
 
 
@@ -338,7 +343,7 @@ def verify_identity(value):
     require(value.get('version_num')=='170011','Server version differs from reviewed TEST 17.11; STOP for review')
     require(value.get('ssl') is True,'Database-side TLS confirmation failed (pg_stat_ssl); client-to-pooler TLS is a separate observation. STOP; no TLS bypass')
     require(value.get('transaction_read_only')=='on','Explicit transaction_read_only confirmation failed; STOP before application queries')
-    require(value.get('default_transaction_read_only')=='on','Session default_transaction_read_only confirmation failed; STOP before application queries')
+    require(value.get('default_transaction_read_only')=='on','Transaction-local default_transaction_read_only confirmation failed; STOP before application queries')
     require(value.get('project_setting') in (None,'',PROJECT),'Server project setting contradicts TEST binding')
 
 

@@ -224,7 +224,7 @@ class RunnerTests(unittest.TestCase):
     def test_identity_confirmation_failures_are_distinct_and_block_all_later_queries(self):
         for field,value,label in [('ssl',False,'Database-side TLS'),('ssl',None,'Database-side TLS'),
                                   ('ssl','true','Database-side TLS'),('transaction_read_only','off','Explicit transaction_read_only'),
-                                  ('default_transaction_read_only','off','Session default_transaction_read_only')]:
+                                  ('default_transaction_read_only','off','Transaction-local default_transaction_read_only')]:
             changed=identity();changed[field]=value;events=[];report={'checks':{}}
             class Fake:
                 def execute(self,key):events.append(key);return [changed]
@@ -261,6 +261,36 @@ class RunnerTests(unittest.TestCase):
             (root/'01-identity.client.json').write_text(json.dumps({'exit_code':0}))
             with patch.object(m.subprocess,'run') as command,patch('builtins.print'):
                 self.assertEqual(inspector.main(['--evidence',str(root)]),0);command.assert_not_called()
+    def test_every_registered_transaction_has_its_own_local_guards(self):
+        import re
+        for name,item in m.query_registry().items():
+            starts=list(re.finditer(r'(?m)^BEGIN[^;\n]*READ ONLY;\n',item['sql']))
+            self.assertGreater(len(starts),0)
+            for begin in starts:self.assertTrue(item['sql'][begin.end():].startswith(m.TRANSACTION_GUARD),name)
+            self.assertEqual(item['sql'].count(m.TRANSACTION_GUARD),len(starts))
+            self.assertNotRegex(item['sql'],r'(?mi)^\s*(ALTER ROLE|ALTER DATABASE|SET SESSION|SET default_transaction_read_only)')
+        for setting in ('default_transaction_read_only = on',"statement_timeout = '60s'","lock_timeout = '5s'"):
+            self.assertIn('SET LOCAL '+setting,m.TRANSACTION_GUARD)
+        self.assertIn("current_setting('transaction_read_only') <> 'on'",m.TRANSACTION_GUARD)
+        self.assertIn('IS DISTINCT FROM true',m.TRANSACTION_GUARD)
+    def test_guard_addition_preserves_all_original_query_bodies(self):
+        blob=subprocess.run(['git','-C',str(m.REPO),'show','5657b40af3693982a3d66f3fa48a8782cc6aa05c:tools/test-beta/readonly-queries.json'],capture_output=True,text=True,check=True).stdout
+        original=json.loads(blob)
+        for name,item in m.query_registry().items():
+            self.assertEqual(item['sql'].replace(m.TRANSACTION_GUARD,''),original['queries'][name]['sql'])
+    def test_pooler_failure_codes_stop_after_identity_without_application_queries(self):
+        for code,label in [('PIG01','DATABASE_SIDE_TLS_REQUIRED'),('PIG02','EXPLICIT_READ_ONLY_REQUIRED'),('PIG03','TRANSACTION_LOCAL_DEFAULT_REQUIRED')]:
+            with tempfile.TemporaryDirectory() as d:
+                root=Path(d);reader=self.reader(root);report={'checks':{}}
+                with patch.object(m.subprocess,'run',return_value=subprocess.CompletedProcess([],2,stdout='',stderr='ERROR: '+code+' '+SECRET)) as command:
+                    with self.assertRaisesRegex(m.StopReview,label):m.online_review(reader,baseline(),audit(),compare,report)
+                    command.assert_called_once()
+                    self.assertEqual(command.call_args.kwargs['input'],m.query_registry()['identity']['sql'])
+                for p in root.iterdir():self.assertNotIn(SECRET,p.read_text())
+    def test_backend_tls_remains_required_when_both_readonly_values_are_on(self):
+        value=identity();value['ssl']=False
+        self.assertEqual(value['transaction_read_only'],'on');self.assertEqual(value['default_transaction_read_only'],'on')
+        with self.assertRaisesRegex(m.StopReview,'Database-side TLS'):m.verify_identity(value)
     def test_changed_baseline_stops_before_assessment(self):
         events=[]
         class Fake:
