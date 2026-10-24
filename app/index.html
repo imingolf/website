@@ -915,6 +915,32 @@ function roundLocked(){
   );
 }
 
+function sameEntryRound(a,b){
+  const key=x=>JSON.stringify([x.roundId||"",x.course||"",x.date||"",Number(x.stake||0),x.gameType||"",x.trip?.currentRound||null]);
+  return key(a)===key(b);
+}
+function entryClosed(){return !roundOpenNow() || roundLocked();}
+function entryClosedMessage(){
+  clearPaymentJourney();
+  showAppToast("Entries Closed","Entry and payment status cannot change after scoring starts.",4200);
+}
+async function refreshEntryState(){
+  const requestPin=pin,requestState=state;
+  try{
+    const {data,error}=await db.rpc("get_group_state",{p_pin:requestPin});
+    if(error || !data || !Array.isArray(data.players) || pin!==requestPin || !sameEntryRound(data,requestState)){
+      showAppToast("Entry not saved","Couldn’t verify the current competition. Reload and try again.",4200);
+      return false;
+    }
+    state=data;
+    if(entryClosed()){entryClosedMessage();render();return false;}
+    return true;
+  }catch(error){
+    showAppToast("Entry not saved","Couldn’t verify the current competition. Please try again.",4200);
+    return false;
+  }
+}
+
 function roundOpenNow(){
   if(state.roundOpen===false)return false;
   if(state.roundOpen===true)return true;
@@ -1529,8 +1555,10 @@ async function enterNormalPointsGame(){
   const player=latestState.players?.find(p=>p.id===myPlayerId);
   if(!player)return;
 
-  player.playingThisRound=true;
+  if(!sameEntryRound(state,latestState)){entryClosedMessage();return;}
   state=latestState;
+  if(entryClosed()){entryClosedMessage();render();return;}
+  player.playingThisRound=true;
   await save();
 
   const {data:verifiedState,error:verifyError}=await db.rpc("get_group_state",{p_pin:pin});
@@ -2991,6 +3019,10 @@ function pay(){
  const sortedPlayers=[...currentRoundPlayers()]
    .sort((a,b)=>a.name.localeCompare(b.name));
  const me=state.players.find(p=>p.id===myPlayerId);
+ if(!isAdmin && !me?.paid && entryClosed()){
+   $("screen").innerHTML='<div class="card"><h2>Entries Closed</h2><div class="notice">You are not entered in this competition. Entry and payment confirmation are closed.</div><button class="secondary full" onclick="show(\'round\')">Back to Round</button></div>';
+   return;
+ }
 
  if(state.trip?.active && me && !tripPlayerIsPlaying(me) && !isAdmin){
    if(state.gameType==="points" || Number(state.stake||0)<=0){
@@ -3011,6 +3043,7 @@ function pay(){
  $("screen").innerHTML=`
  <div class="card">
    <h2>💷 ${isAdmin ? "Manage Payments" : (me?.paid ? "Payments" : "Pay & Join")}</h2>
+   ${entryClosed()?'<div class="notice"><b>Entries Closed</b> — payment status is locked. Existing entrants can still submit scores.</div>':""}
    <div class="notice">${isAdmin
      ? "<b>Players pay you directly.</b><br>I'm In Golf does not receive, hold or manage your group's money."
      : "<b>Pay your Group Admin directly.</b><br>I'm In Golf does not receive or hold your money."
@@ -3031,7 +3064,7 @@ function pay(){
      </div>
    ` : ``}
 
-   <div class="muted" style="margin-top:8px;">Full pot if everyone enters: £${potentialPot()} • Entry: £${state.stake}</div>
+   <div class="muted" style="margin-top:8px;">${entryClosed()?`Entry: £${state.stake}`:`Full pot if everyone enters: £${potentialPot()} • Entry: £${state.stake}`}</div>
  </div>
 
  <div class="card">
@@ -3050,7 +3083,7 @@ function pay(){
            ${isAdmin
              ? (Number(state.stake||0)<=0
                 ? `<span class="pill paid">No payment required</span>`
-                : `<button class="${p.paid?'secondary':'primary'} small" onclick="togglePaid(${i})">${p.paid?'✓ Paid':'Mark paid'}</button>`)
+                : `<button class="${p.paid?'secondary':'primary'} small" onclick="togglePaid(${i})" ${entryClosed()?"disabled":""}>${p.paid?'✓ Paid':'Mark paid'}</button>`)
              : (Number(state.stake||0)<=0
                 ? `<span class="pill paid">No payment required</span>`
                 : `<span class="pill ${p.paid?'paid':'pending'}">${p.paid?'✓ Paid':'Not paid'}</span>`)
@@ -3074,7 +3107,7 @@ function pay(){
    }
  </div>
 
- ${!isAdmin && Number(state.stake||0)>0 && !(me && me.paid) ? `
+ ${!isAdmin && !entryClosed() && Number(state.stake||0)>0 && !(me && me.paid) ? `
    <div class="pay-screen-spacer"></div>
    <div class="pay-sticky">
      ${pin==="2026"
@@ -3170,7 +3203,9 @@ async function adminSelfEnter(){
     return;
   }
 
+  if(!sameEntryRound(state,latestState)){entryClosedMessage();return;}
   state=latestState;
+  if(entryClosed()){entryClosedMessage();render();return;}
   latestPlayer.paid=true;
   latestPlayer.paymentMarkedAt=new Date().toISOString();
   latestPlayer.paymentMarkMethod="admin-self-entry";
@@ -3199,7 +3234,7 @@ async function adminSelfEnter(){
 
 let paymentLaunchBusy=false;
 
-function beginPlayerPayment(){
+async function beginPlayerPayment(){
   console.count("IIG PAYMENT BUTTON FIRED");
   if(paymentLaunchBusy)return;
   paymentLaunchBusy=true;
@@ -3209,6 +3244,10 @@ function beginPlayerPayment(){
   const me=state.players.find(p=>p.id===myPlayerId);
   if(!me)return;
   if(me.paid){alert("You're already marked paid.");return;}
+  if(entryClosed()){entryClosedMessage();return;}
+  if(!await refreshEntryState())return;
+  const latestMe=state.players.find(p=>p.id===myPlayerId);
+  if(!latestMe || latestMe.paid)return;
   const savedLink=String(state.paymentLink||"").trim();
   if(!savedLink){alert("Your Group Admin hasn't added a payment link yet.");return;}
   const link=paymentLinkForStake(savedLink,state.stake);
@@ -3337,7 +3376,10 @@ const sameRound=
   const player=state.players.find(p=>p.id===journey.playerId);
   if(!player){clearPaymentJourney();return;}
   if(player.paid){clearPaymentJourney();return;}
+  if(entryClosed()){entryClosedMessage();return;}
   paymentReturnBusy=true;
+  if(!await refreshEntryState()){paymentReturnBusy=false;return;}
+  if(state.players.find(p=>p.id===journey.playerId)?.paid){clearPaymentJourney();paymentReturnBusy=false;return;}
   const confirmed=await new Promise(resolve=>{
     const overlay=document.createElement("div");
     overlay.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.42);z-index:11000;display:flex;align-items:center;justify-content:center;padding:20px;";
@@ -3388,7 +3430,13 @@ const sameRound=
     return;
   }
 
+  const entryRoundChanged=!sameEntryRound(state,latestState);
   state=latestState;
+  if(entryRoundChanged || entryClosed()){
+    paymentReturnBusy=false;
+    if(pollingWasActive)startPolling();
+    entryClosedMessage();render();return;
+  }
   latestPlayer.paid=true;
   latestPlayer.paymentMarkedAt=new Date().toISOString();
   latestPlayer.paymentMarkMethod="player-confirmed-payment-return";
@@ -3434,13 +3482,17 @@ async function togglePaid(i){
 
   if(!demoCanEdit())return;
 
-  const p=state.players[i];
+  const playerId=state.players[i]?.id;
 
  if(!isAdmin){
    alert("Only the Group Admin can change payment status.");
    return;
  }
 
+ if(entryClosed()){entryClosedMessage();return;}
+ if(!await refreshEntryState())return;
+ const p=state.players.find(player=>player.id===playerId);
+ if(!p)return;
  p.paid=!p.paid;
  p.paymentMarkedAt=p.paid ? new Date().toISOString() : null;
  p.paymentMarkMethod=p.paid ? "admin-confirmed" : null;
