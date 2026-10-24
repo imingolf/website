@@ -12,16 +12,14 @@
 3. Rehearse and review any expanded migration/ACL bundle, remaining registration
    implementation, hosted email/JWT and iPhone verification before beta publication.
 
-## Separate upcoming task: fictional-data iPhone demonstration
+## Completed separate demonstration
 
-Prepared on this development branch: a separate static HTTPS demonstration,
-novice tasks, fictional scoring/results and manual feedback. See
-[hosting and review instructions](../../tools/registration-demo/HOSTED-DEMO.md).
-Publication and physical iPhone testing await separate approval. Keep it separate
-from real TEST integration; the security/recovery tasks above remain open.
-Use fictional data, permanent DEMONSTRATION labelling and mocked verification,
-group/invitation/competition/returning-user scenarios. Preserve handicap typing
-and paste checks. No real Supabase, Auth, email, payment or WhatsApp sending; no
-public tunnel or deployment. The remaining task is approving the isolated publication, then observing the
-independent iPhone usability session. It does not bypass the security/recovery
-gates for the real beta.
+The owner reports successful independent novice iPhone testing. The fictional
+experience is approved and frozen; no redesign or redeployment is planned.
+Its approved source is 6c5ce02. Keep it separate from TEST integration.
+
+## Next offline implementation review
+
+See [detailed remaining-feature plan](REMAINING-REGISTRATION-PLAN.md) and
+[unsent SU-521759 follow-up](SU-521759-FOLLOWUP-DRAFT.md). Further feature
+implementation and all online actions require separate approval.

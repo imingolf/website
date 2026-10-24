@@ -1,10 +1,10 @@
 {
   "source_commit": "a5b1b6a125f0609dfe8827136a8ef0c7857e6819",
   "sha256": {
-    "index.html": "77cd100e8c1b83e1505a3337da0ba82245d9f0aa06cd453725669ad321ea9154",
+    "index.html": "12f3150a6ec5ee3a74a452001e17101013620c3cfb628350b7bcd7e9befb0ca5",
     "owner-dashboard.html": "108cea7d9f8e9aa1f1380aa636c37e874fd4225a70d08b2e63f21f6b21ce4d00",
     "handicap-input.js": "bab76d80b75533a36209fc47372c182ef3af9a4a6d6fd022768c52cb10617b1e",
-    "secure-organiser.js": "419b2352c84d9f36e4210b2406ed95e538c5c158186b094dd989e31b9d232c77",
+    "secure-organiser.js": "551ece9f1665bef193ca87053b5a80d381813d85f56e35ac98677e62dfb173b9",
     "secure-player.js": "1b8c91c5cf5bf09021abb408b9963399d22c9294eae2ca774e14693ba339d585",
     "account-controls.js": "bc292e2f1a55f7e14d77cc3636ba791aae85d545a48200b464ea7fb2dab75f69",
     "self-service.js": "5e5fcfff7a348c58c03265de2092a9c511873b1c2a32a6c506e57dfade750b88",

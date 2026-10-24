@@ -1852,7 +1852,7 @@ function sideGameAgreedInPerson(playerId,mode="in_person"){
         class="${savedFormat==="stableford" ? "primary" : "secondary"} full"
         onclick="sideGameSelectFormat(${escAttr(JSON.stringify(player.id))},'stableford')"
         ${formatLocked ? "disabled" : ""}>
-        Stableford
+        Stableford — Final points total
       </button>
 
       <button
@@ -1860,7 +1860,7 @@ function sideGameAgreedInPerson(playerId,mode="in_person"){
         class="${savedFormat==="net" ? "primary" : "secondary"} full"
         onclick="sideGameSelectFormat(${escAttr(JSON.stringify(player.id))},'net')"
         ${formatLocked ? "disabled" : ""}>
-        Net
+        Net — Final net score
       </button>
 
       <div class="muted" style="margin-top:10px;">
@@ -7197,7 +7197,7 @@ function settingsPage(){
       <b>${state.pointsCompetition==="net" ? "⛳ Net" : "🏆 Stableford"}</b>
     </div>
     <button class="secondary full" onclick="changeCurrentRoundCompetition()">
-      🔄 Change to ${state.pointsCompetition==="net" ? "Stableford" : "Net"}
+      🔄 Change to ${state.pointsCompetition==="net" ? "Stableford — Final points total" : "Net — Final net score"}
     </button>
 
     ${state.gameType==="money" ? `
@@ -8475,12 +8475,10 @@ function chooseRoundCompetition(title="Choose competition"){
         <h2 style="margin:0 0 6px;text-align:center;">${title}</h2>
         <p class="muted" style="margin:0 0 20px;text-align:center;">How are you scoring this round?</p>
         <button id="roundCompStableford" class="primary" style="width:100%;padding:15px 16px;margin:0 0 10px;text-align:left;">
-          <span style="display:block;font-size:17px;font-weight:800;">🏆 Stableford</span>
-          <span style="display:block;font-size:13px;font-weight:500;margin-top:3px;">Enter your Stableford points.</span>
+          <span style="display:block;font-size:17px;font-weight:800;">🏆 Stableford — Final points total</span>
         </button>
         <button id="roundCompNet" class="primary" style="width:100%;padding:15px 16px;margin:0 0 12px;text-align:left;">
-          <span style="display:block;font-size:17px;font-weight:800;">⛳ Net</span>
-          <span style="display:block;font-size:13px;font-weight:500;margin-top:3px;">Enter your net score.</span>
+          <span style="display:block;font-size:17px;font-weight:800;">⛳ Net — Final net score</span>
         </button>
         <button id="roundCompCancel" class="secondary" style="width:100%;">Cancel</button>
       </div>`;
@@ -8608,8 +8606,8 @@ function tripSetupScreen(){
         <div style="margin-bottom:8px;font-weight:800;">Main Trip scoring</div>
         <div class="muted" style="margin-bottom:10px;">Choose the golf score everyone will follow each day and across the whole Trip.</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
-          <button id="tripCompStableford" class="primary">🏆 Stableford</button>
-          <button id="tripCompNet" class="secondary">⛳ Net</button>
+          <button id="tripCompStableford" class="primary">🏆 Stableford — Final points total</button>
+          <button id="tripCompNet" class="secondary">⛳ Net — Final net score</button>
         </div>
 
         <div style="margin-bottom:8px;font-weight:800;">Optional Trip points</div>
@@ -9051,8 +9049,8 @@ if(tripDate===null)return;
 
   const competition=prompt(
     "Choose Trip Championship Competition:\n\n" +
-    "1. 🏆 Stableford\n" +
-    "2. ⛳ Net\n\n" +
+    "1. 🏆 Stableford — Final points total\n" +
+    "2. ⛳ Net — Final net score\n\n" +
     "Enter 1 or 2"
   );
 
