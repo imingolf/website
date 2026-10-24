@@ -7,7 +7,7 @@ const {chromium}=require('playwright'),assert=require('node:assert/strict'),fs=r
  try{
  for(const width of [320,390]){
   const format=width===390?'net':'stableford';
-  const context=await browser.newContext({viewport:{width,height:844},reducedMotion:'reduce'}),page=await context.newPage(),external=[],errors=[],requests=[],popups=[];
+  const context=await browser.newContext({viewport:{width,height:width===320?568:844},reducedMotion:'reduce'}),page=await context.newPage(),external=[],errors=[],requests=[],popups=[];
   page.on('pageerror',e=>errors.push(e.message));context.on('page',p=>{if(p!==page)popups.push(p.url());});
   const csp=fs.readFileSync(path.join(out,'_headers'),'utf8').match(/Content-Security-Policy: (.*)/)[1];
   await context.route('**/*',route=>{
@@ -19,7 +19,11 @@ const {chromium}=require('playwright'),assert=require('node:assert/strict'),fs=r
   });
   await context.addInitScript(()=>{localStorage.setItem('existing-golf-data','untouched');sessionStorage.setItem('existing-session','untouched');});
   async function verify(){await page.locator('#regCode').fill('123456');await page.locator('#regVerify').click();}
-  await page.goto(origin);await page.getByRole('link',{name:'Try being the organiser'}).click();await page.locator('#openingSplash').waitFor({state:'detached'});
+  await page.goto(origin);await page.locator('#openingSplash').waitFor({state:'detached'});
+  await page.getByRole('heading',{name:"Welcome to I'm In Golf",exact:true}).waitFor();assert.equal(await page.locator('#demo-practice-tasks').isVisible(),false);
+  const compact=await page.locator('#iig-demo-banner').boundingBox();assert(compact.height<=48);assert(compact.y===0);
+  await page.locator('#iig-demo-toggle').click();await page.getByRole('dialog',{name:'Demonstration explanation'}).waitFor();await page.keyboard.press('Escape');assert.equal(await page.locator('#iig-demo-toggle').getAttribute('aria-expanded'),'false');assert.equal(await page.locator('#iig-demo-toggle').evaluate(el=>el===document.activeElement),true);
+  await page.locator('#demo-welcome-start').click();await page.getByRole('link',{name:'Try being the organiser'}).click();await page.locator('#openingSplash').waitFor({state:'detached'});
   await page.locator('#demo-task-guide').waitFor();assert.equal(await page.locator('#regName').inputValue(),'');
   await page.getByRole('button',{name:'Start a golf group',exact:false}).first().click();
   await page.locator('#regName').fill('Alex Taylor');await page.locator('#regGroupName').fill('Weekend Fictional Golfers');await page.locator('#regSetupEmail').fill('alex@example.test');

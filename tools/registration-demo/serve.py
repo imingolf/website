@@ -74,7 +74,7 @@ def build_assets():
     html = inputs['index.html'].decode()
     html = replace_once(html, "<title>I'm In Golf</title>", "<title>DEMONSTRATION — I'm In Golf (local)</title>")
     html = replace_once(html, '<head>', '<head>\n<meta name="iig-local-demo" content="isolated-v1">\n'
-                        '<script src="/demo/review.js"></script><link rel="stylesheet" href="/demo/review.css">')
+                        '<script src="/demo/notice.js"></script><link rel="stylesheet" href="/demo/notice.css"><script src="/demo/review.js"></script><link rel="stylesheet" href="/demo/review.css">')
     for tag in ('<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>',
                 '<script src="./config.js"></script>', '<link rel="manifest" href="manifest.webmanifest">'):
         html = replace_once(html, tag, '')
@@ -107,7 +107,7 @@ def build_assets():
         assets['/app/'+name] = ('application/javascript; charset=utf-8',source.encode())
     for name in ('icon-192.png','apple-touch-icon.png'):
         assets['/app/'+name] = ('image/png',inputs[name])
-    for name,content_type in (('review.js','application/javascript; charset=utf-8'),('review.css','text/css; charset=utf-8')):
+    for name,content_type in (('notice.js','application/javascript; charset=utf-8'),('notice.css','text/css; charset=utf-8'),('review.js','application/javascript; charset=utf-8'),('review.css','text/css; charset=utf-8')):
         assets['/demo/'+name] = (content_type,read_approved(HERE,name))
     # No config.js, manifests, service workers, database files, repo tree or directory listing.
     for _, body in assets.values():

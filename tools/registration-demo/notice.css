@@ -1,0 +1,21 @@
+:root{--iig-demo-safe-top:env(safe-area-inset-top,0px);--iig-demo-top:calc(44px + var(--iig-demo-safe-top));--iig-demo-viewport-height:100vh}
+@supports(height:100dvh){:root{--iig-demo-viewport-height:100dvh}}
+html{scroll-padding-top:calc(var(--iig-demo-top) + 12px)}
+body{padding-top:var(--iig-demo-top)!important}
+#setupOverlay,#openingSplash,body>[role="dialog"]{top:var(--iig-demo-top)!important}
+#iig-demo-banner,#iig-demo-banner *,#iig-demo-panel{box-sizing:border-box}
+#iig-demo-banner{position:fixed;inset:0 0 auto;z-index:2147483647;padding-top:var(--iig-demo-safe-top);background:#fff0b3;border-bottom:1px solid #a47b19;color:#352800}
+#iig-demo-toggle{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:44px;min-height:44px;margin:0;padding:0 max(8px,env(safe-area-inset-right)) 0 max(8px,env(safe-area-inset-left));border:0;border-radius:0;background:transparent;color:inherit;font:600 14px/20px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;cursor:pointer;white-space:nowrap}
+#iig-demo-toggle:focus-visible{outline:3px solid #174b2b;outline-offset:-4px}
+#iig-demo-panel{position:fixed;inset:calc(var(--iig-demo-top) + 8px) 0 auto;margin:0 auto;width:min(430px,calc(100% - 16px - env(safe-area-inset-left) - env(safe-area-inset-right)));max-height:calc(var(--iig-demo-viewport-height) - var(--iig-demo-top) - 16px - env(safe-area-inset-bottom));min-height:0;overflow:auto;overscroll-behavior:contain;padding:16px;border:1px solid #a47b19;border-radius:16px;background:white;color:#193b27;box-shadow:0 8px 30px #0004;font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+#iig-demo-panel::backdrop{background:#0005}
+#iig-demo-panel[hidden]{display:none!important}
+.demo-notice-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;position:sticky;top:0;background:white;padding:4px 0;z-index:1}
+#iig-demo-panel .demo-notice-heading h2{font-size:20px;margin:0}
+#iig-demo-panel .demo-notice-heading button{width:auto;min-width:60px;min-height:44px;margin:0;padding:8px 12px;background:#edf4ef;color:#174b2b;border:1px solid #bad0bf;border-radius:10px;font:600 15px system-ui;cursor:pointer}
+@media(max-width:340px){#iig-demo-toggle{gap:6px;font-size:13px}}
+
+/* The notice already reserves the safe top edge; avoid a second native-header inset. */
+#setupOverlay{padding-top:20px!important}
+html.iig-ios-fullscreen .app{padding-top:0!important}
+html.iig-ios-fullscreen body::before{display:none!important}

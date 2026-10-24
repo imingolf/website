@@ -6,6 +6,7 @@
     "test": "node run.cjs",
     "onboarding": "node onboarding-offline.cjs",
     "hosted-demo-build": "python3 ../tools/registration-demo/test_static.py",
+    "demo-notice-layout": "cd .. && node tests/demo-notice-layout.cjs",
     "hosted-demo-browser": "cd .. && node tests/hosted-registration-demo.cjs",
     "local-demo": "node local-registration-demo.cjs",
     "test-beta-build": "python3 ../tools/test-beta/test_build.py",

@@ -58,7 +58,18 @@ def assets(origin):
     bootstrap="'use strict';\nconst allowed=location.origin==="+json.dumps(origin)+"&&location.protocol==='https:';\nObject.defineProperty(window,'IIG_HOSTED_DEMO_ALLOWED',{value:allowed,writable:false,configurable:false});\nif(!allowed)document.addEventListener('DOMContentLoaded',()=>{document.body.textContent='DEMONSTRATION unavailable: this is not the approved isolated HTTPS site. No account or database connection is available.';});\n"
     result['demo/host-boundary.js']=bootstrap.encode()
     for name in ('hosted-review.js','hosted-review.css'):result['demo/'+name]=(GUARD if name.endswith('.js') else '').encode()+demo.read_approved(HERE,name)
+    # Reuse only the actual opening artwork/animation, never released PIN/config code.
+    app=demo.read_approved(demo.REPO/'app','index.html').decode()
+    start=app.index('<div id="openingSplash"');end=app.index('</script>',start)+len('</script>')
+    splash=app[start:end]
+    css_start=app.index('#openingSplash{');css_end=app.index('@media (prefers-reduced-motion:reduce){#openingSplash{transition:none}}')+len('@media (prefers-reduced-motion:reduce){#openingSplash{transition:none}}')
+    splash_css=app[css_start:css_end]
+    if hashlib.sha256(splash.encode()).hexdigest()!='df383076505ebc1e98d962e42dfaac7c0b6d1d69c0c72732aefc0b628418b43c' or hashlib.sha256(splash_css.encode()).hexdigest()!='9f40d9465be517b3da4e167fe3843364e01f11b78de8a621e86270fdc721c951':
+        raise ValueError('Released opening reference changed; review before building')
+    result['demo/welcome.js']=GUARD.encode()+demo.read_approved(HERE,'welcome.js')
     landing=demo.read_approved(HERE,'landing.html').decode().replace('<head>','<head><meta http-equiv="Content-Security-Policy" content="'+CSP.replace("frame-ancestors 'none'; ",'')+'">',1)
+    landing=landing.replace('<!--RELEASED_SPLASH-->',splash).replace('<!--RELEASED_SPLASH_CSS-->',splash_css)
+    landing=re.sub(r'(<script\b(?![^>]*\bsrc=)[^>]*>)([\s\S]*?)(</script>)',lambda m:m[1]+GUARD+m[2]+m[3],landing)
     result['index.html']=landing.encode()
     result['404.html']=b'<!doctype html><meta name="robots" content="noindex,nofollow"><title>Demonstration only</title><p>This page is not part of the fictional demonstration.</p>'
     result['robots.txt']=b'User-agent: *\nDisallow: /\n'

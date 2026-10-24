@@ -1,0 +1,11 @@
+{
+  "reference_kind": "repository web-app source; not an App Store binary or live-site attestation",
+  "reference_commit": "94318ca5a6d5774923e61df1bd6b6bed2f82d15a",
+  "reference_path": "app/index.html",
+  "approved_demo_app_commit": "a5b1b6a125f0609dfe8827136a8ef0c7857e6819",
+  "opening_markup_sha256": "df383076505ebc1e98d962e42dfaac7c0b6d1d69c0c72732aefc0b628418b43c",
+  "opening_css_sha256": "9f40d9465be517b3da4e167fe3843364e01f11b78de8a621e86270fdc721c951",
+  "welcome_heading": "Welcome to I'm In Golf",
+  "tagline": "Golf. Mates. You're In.",
+  "reuse": "Existing logo, exact golf-ball opening markup/animation/CSS and source welcome wording before fictional tasks. Legacy PIN/configuration code is excluded."
+}

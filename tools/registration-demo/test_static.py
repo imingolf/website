@@ -14,7 +14,7 @@ spec=importlib.util.spec_from_file_location('static_demo',HERE/'build_static.py'
 class StaticDemoTests(unittest.TestCase):
  def test_allowlist_no_credentials_database_or_repository_files(self):
   files=m.assets('https://iig-demo.example.test')
-  self.assertEqual(set(files),{'index.html','404.html','robots.txt','_headers','_redirects','app/index.html','app/handicap-input.js','app/secure-organiser.js','app/secure-player.js','app/account-controls.js','app/self-service.js','app/icon-192.png','app/apple-touch-icon.png','demo/review.js','demo/review.css','demo/host-boundary.js','demo/hosted-review.js','demo/hosted-review.css'})
+  self.assertEqual(set(files),{'index.html','404.html','robots.txt','_headers','_redirects','app/index.html','app/handicap-input.js','app/secure-organiser.js','app/secure-player.js','app/account-controls.js','app/self-service.js','app/icon-192.png','app/apple-touch-icon.png','demo/notice.js','demo/notice.css','demo/welcome.js','demo/review.js','demo/review.css','demo/host-boundary.js','demo/hosted-review.js','demo/hosted-review.css'})
   for name,body in files.items():
    for token in (b'sb_publishable_',b'sb_secret_',b'nyavvwrsrxqfyhiygkgw',b'kzzzputsqxdntfqpprnz',b'imingolf.co.uk',b'super-quokka-51747d'):
     self.assertNotIn(token,body,name)
@@ -61,10 +61,23 @@ class StaticDemoTests(unittest.TestCase):
    self.assertFalse(out.exists())
    with patch.object(m.demo,'build_assets',side_effect=ValueError('source drift')),self.assertRaises(ValueError):m.build(out,'https://demo.example.test')
    self.assertFalse(out.exists())
+ def test_compact_notice_and_source_welcome_precede_hidden_practice_tasks(self):
+  files=m.assets('https://demo.example.test');html=files['index.html'].decode();notice=files['demo/notice.js'].decode()
+  self.assertIn('DEMO MODE — Fictional data only',notice);self.assertIn('panel.showModal()',notice)
+  self.assertIn("event.key!=='Tab'",notice);self.assertIn("event.preventDefault();close()",notice)
+  self.assertIn('demo-first-launch',html);self.assertIn('id="demo-practice-tasks" hidden',html)
+  self.assertIn('id="openingSplash"',html);self.assertNotIn('<!--RELEASED_SPLASH',html)
+  self.assertNotIn('<aside class="notice">',html)
+  reference=json.loads((HERE/'welcome-reference.json').read_text())
+  self.assertIn(reference['tagline'],html);self.assertIn(reference['welcome_heading'],html)
+  self.assertIn(reference['opening_markup_sha256'],(HERE/'build_static.py').read_text())
+  self.assertIn(reference['opening_css_sha256'],(HERE/'build_static.py').read_text())
+  self.assertNotIn('id="pinInput"',html);self.assertNotIn('config.js',html)
+  self.assertIn('window.visualViewport',notice);self.assertIn('ResizeObserver',notice)
  def test_landing_is_fictional_and_feedback_is_manual(self):
   files=m.assets('https://demo.example.test')
   self.assertIn(b'@example.test',files['index.html']);self.assertIn(b'123456',files['index.html'])
-  self.assertIn(b'/app/?scenario=friend',files['index.html']);self.assertIn(b'DEMONSTRATION',files['index.html'])
+  self.assertIn(b'/app/?scenario=friend',files['index.html']);self.assertIn(b'demo/notice.js',files['index.html']);self.assertIn(b'DEMO MODE',files['demo/notice.js'])
   self.assertIn(b'Nothing here is sent or saved online',files['demo/hosted-review.js'])
   self.assertNotIn(b'data-netlify',files['demo/hosted-review.js'])
 

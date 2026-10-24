@@ -1,4 +1,9 @@
-# Confirmed fictional demo destination — upload NOT authorised
+# Original b9765e5 upload review — historical layout
+
+The owner subsequently reported uploading that original package. A new compact
+notice/welcome revision is now prepared but NOT uploaded. See
+[the current replacement review](../../tools/registration-demo/COMPACT-NOTICE-REVIEW.md).
+The commands and 19-file count below document the old package, not the new revision.
 
 The owner reports creating this separate empty Netlify Free project:
 
@@ -16,7 +21,7 @@ for full safety requirements and tester instructions.
 
 ## Verified package
 
-All actual build/demo source files remain byte-identical to approved b9765e5.
+At this original review, all build/demo source files were byte-identical to b9765e5.
 The test harness additionally accepts IIG_DEMO_TEST_ORIGIN to run its locally
 fulfilled browser journeys using the confirmed origin. This changes no generated
 application file. The original app assets remain pinned to a5b1b6a.

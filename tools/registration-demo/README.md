@@ -45,8 +45,8 @@ or reloading a tab starts a fresh simulation. Mac and iPhone data are separate.
 
 ## What to review
 
-The permanent yellow DEMONSTRATION banner remains above the real app screens and
-dialogs. Use **Review controls** to select a scenario and reset, fill fictional
+The compact **DEMO MODE — Fictional data only** button stays at the top. Tap it
+for the full explanation and **Review controls** to select a scenario and reset, fill fictional
 details, or fill the demonstration email code. Close the controls to use the
 actual app buttons. Nothing is automatically submitted by the fill buttons.
 
@@ -104,7 +104,7 @@ allocation; it is not a registered TEST/LIVE group. Do not use 1010/1260/3520/50
   copies with an in-memory map. Existing browser stores are neither read nor
   cleared. No cookies, service worker, local database or demo data file is created.
   A fresh random server port reduces accidental reuse of other local app origins.
-- The HTTP server exposes a fixed in-memory allowlist of 11 routes/assets only.
+- The HTTP server exposes a fixed in-memory allowlist of 13 routes/assets only.
   It does not serve the repository root, directories, .git, documentation, backups,
   original captures/rollbacks, config.js, manifests or service-worker scripts.
   Symlink asset files are rejected. Unknown paths get 404; writable methods get

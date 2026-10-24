@@ -11,7 +11,9 @@ handicap, competition, scoring, leaderboard and previous-results screens. The
 original app files remain untouched and SHA-256-pinned to approved a5b1b6a.
 Only generated copies receive demo isolation and wording changes.
 
-A short introduction gives two independent tasks:
+The original golf-ball opening animation, app logo and source welcome wording
+(“Welcome to I'm In Golf”, “Golf. Mates. You're In.”) appear before the tasks.
+Get started then reveals two independent tasks:
 
 1. **Organiser:** use made-up details (Alex Taylor, Weekend Demo Golfers,
    alex@example.test), request simulated verification, enter 123456, create a
@@ -30,7 +32,10 @@ The task guide changes as progress is made. The original Review controls also
 retain returning-organiser, failed-creation, failed-readback and handicap practice
 scenarios. Only @example.test addresses are accepted. No inbox is required.
 
-A permanent DEMONSTRATION banner stays above app dialogs. Invitations are text
+A compact, single-line **DEMO MODE — Fictional data only** button stays visible.
+Tap it for a keyboard-accessible, scrollable explanation dialog. Closed height
+is about 45 CSS pixels plus any real safe top inset, rather than a paragraph-sized
+warning. Content and overlays reserve its measured height. Invitations are text
 previews: WhatsApp, copying, popups, payment navigation and sharing are simulated.
 No real invitation is opened or sent. Optional payment/advanced first-competition
 controls and account-lifecycle buttons are hidden from the core practice tasks.
@@ -151,3 +156,10 @@ Do not interpret the demo as release approval or security validation of real TES
 The existing server-side bulk-handicap validation gap remains a separate database
 review; browser restrictions and this mock do not close it. Saved real golf groups,
 scores and history are never loaded or changed.
+
+## Compact layout revision — not deployed
+
+See [COMPACT-NOTICE-REVIEW.md](COMPACT-NOTICE-REVIEW.md) for the new phone layout,
+source provenance and pending replacement approval. This changes the generated
+package to 22 files. Existing b9765e5 folders contain the old layout and will not
+verify against this revision. Do not overwrite or upload an old folder.
