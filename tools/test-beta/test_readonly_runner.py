@@ -85,7 +85,7 @@ class RunnerTests(unittest.TestCase):
             with patch.object(m.subprocess,'run') as command:
                 target,secret=m.read_service(service,ca)
                 self.assertIsNone(secret)
-                self.assertEqual(target.rootcert,str(ca))
+                self.assertEqual(Path(target.rootcert).resolve(),ca.resolve())
                 self.assertIn("sslrootcert='"+str(ca)+"'",m.conninfo(target))
                 self.assertIn("sslmode='verify-full'",m.conninfo(target))
                 command.assert_not_called()
@@ -103,7 +103,10 @@ class RunnerTests(unittest.TestCase):
     def test_service_ca_also_validated_and_unsafe_ca_rejected(self):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d);ca=root/'ca.crt';ca.write_bytes((HERE/'fixtures/offline-ca.crt').read_bytes())
-            target,_=m.read_service(self.service(root,{'sslrootcert':str(ca)}));self.assertEqual(target.rootcert,str(ca))
+            target,_=m.read_service(self.service(root,{'sslrootcert':str(ca)}));self.assertEqual(Path(target.rootcert).resolve(),ca.resolve())
+            alias=root/'ca-alias.crt';alias.symlink_to(ca)
+            target,_=m.read_service(self.service(root,{'sslrootcert':str(alias)}))
+            self.assertEqual(Path(target.rootcert).resolve(),alias.resolve())
             ca.chmod(0o666)
             with self.assertRaises(m.StopReview):m.read_service(self.service(root),ca)
     def test_openssl_trust_environment_cannot_redirect_ca_selection(self):
