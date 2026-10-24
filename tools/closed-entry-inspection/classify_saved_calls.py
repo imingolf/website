@@ -76,13 +76,44 @@ def extract_calls(text):
         effects.append((operation,normalise(match[2])))
     return calls,effects,dynamic,bool(re.search(r'\bexecute\b',source,re.I))
 
+def search_path_summary(configuration):
+    values=[] if configuration is None else configuration
+    if not isinstance(values,list):raise ValueError('Invalid routine configuration')
+    matches=[x.split('=',1)[1] for x in values if isinstance(x,str) and x.startswith('search_path=')]
+    if not matches:return {'fixed_path_present':False,'catalog_precedence':'caller_inherited_unverified','resolution_verified':False}
+    if len(matches)!=1:raise ValueError('Ambiguous routine configuration')
+    names=[normalise(x.strip()) for x in matches[0].split(',')]
+    # Never reflect arbitrary schema names or any other configuration values.
+    if 'pg_catalog' not in names:mode='implicit_catalog_first'
+    elif all(x=='pg_temp' for x in names[:names.index('pg_catalog')]):mode='explicit_catalog_first_for_functions'
+    else:mode='other_schema_precedes_catalog'
+    return {'fixed_path_present':True,'catalog_precedence':mode,
+            'has_nonstandard_schema':any(x not in {'pg_catalog','public','pg_temp','iig_private'} for x in names),
+            'resolution_verified':False}
+
+def target_metadata(rows,key):
+    matches=[x for section in rows if section.get('section')=='relations' for x in section.get('items',[])
+             if normalise(x.get('schema','')+'.'+x.get('name',''))==key]
+    if len(matches)!=1:return {'relation_metadata_available':False,'constraint_index_evidence_available':False}
+    table=matches[0];columns={x.get('name','').lower() for x in table.get('columns',[])}
+    return {'relation_metadata_available':True,'owner_is_postgres':table.get('owner')=='postgres',
+            'rls_enabled':table.get('rls') is True,'force_rls':table.get('force_rls') is True,
+            'column_count':len(columns),
+            'notification_column_pattern_NOT_proof':{'title','body'} <= columns,
+            'status_column_pattern_NOT_proof':bool(columns & {'enabled','status'}),
+            'payment_column_pattern_NOT_proof':bool(columns & {'amount','paid','payment_status'}),
+            'history_column_pattern_NOT_proof':bool(columns & {'history','round_id','round_state'}),
+            'captured_noninternal_trigger_count':sum(1 for section in rows if section.get('section')=='triggers'
+              for t in section.get('items',[]) if normalise(t.get('schema','')+'.'+t.get('table',''))==key),
+            'constraint_index_evidence_available':False}
+
 def captured(rows):
     result=[]
     for section in rows:
         if section['section']=='functions':
             for f in section['items']:
                 if f['name'] not in summarise.NAMES:raise ValueError('Unexpected routine')
-                result.append((f['schema']+'.'+f['name'],f['name'],f['definition']))
+                result.append((f['schema']+'.'+f['name'],f['name'],f['definition'],f.get('configuration')))
         elif section['section']=='triggers':
             counter=0
             for t in section['items']:
@@ -90,13 +121,13 @@ def captured(rows):
                 counter+=1;definition=t['function_definition']
                 header=re.search(r'\bFUNCTION\s+('+ID+r')\s*\(',definition,re.I)
                 if not header:raise ValueError('Missing function header')
-                result.append((normalise(header[1]),'group_trigger_'+str(counter),definition))
+                result.append((normalise(header[1]),'group_trigger_'+str(counter),definition,t.get('configuration')))
     return result
 
 def classify(rows):
     entries=captured(rows);index={};unknown={};targets={};output=[]
-    for name,alias,text in entries:index.setdefault(normalise(name),[]).append(alias)
-    for name,alias,text in entries:
+    for name,alias,text,configuration in entries:index.setdefault(normalise(name),[]).append(alias)
+    for name,alias,text,configuration in entries:
         calls,effects,quoted,dynamic=extract_calls(text);classified=[]
         for call in calls:
             qualified=call if '.' in call else 'public.'+call
@@ -110,8 +141,8 @@ def classify(rows):
             elif '.' not in call and call in BUILTINS:
                 classified.append({'kind':'unqualified_builtin_spelling','name':call,
                                    'side_effect_possible':call in SIDE_EFFECT_BUILTINS,'resolution_proven':False})
-            elif call in {'crypt','public.crypt','extensions.crypt'}:
-                classified.append({'kind':'extension_candidate','name':'crypt','resolution_proven':False})
+            elif call in {prefix+name for name in ('crypt','gen_salt','digest') for prefix in ('','public.','extensions.')} :
+                classified.append({'kind':'extension_candidate','name':call.split('.')[-1],'resolution_proven':False})
             else:
                 node=unknown.setdefault(call,'uncaptured_call_'+str(len(unknown)+1))
                 classified.append({'kind':'unresolved_not_in_saved_routine_index','alias':node,'resolution_proven':False})
@@ -119,8 +150,9 @@ def classify(rows):
         for operation,target in effects:
             key=target if '.' in target else 'public.'+target
             label='public.tens_in_groups' if key=='public.tens_in_groups' else targets.setdefault(key,'private_target_'+str(len(targets)+1))
-            writes.append({'operation':operation,'target':label})
-        output.append({'routine':alias,'calls':classified,'write_targets_NOT_complete':writes,
+            writes.append({'operation':operation,'target':label,'schema_qualified_in_source':'.' in target,
+                           'saved_metadata':target_metadata(rows,key)})
+        output.append({'routine':alias,'search_path':search_path_summary(configuration),'calls':classified,'write_targets_NOT_complete':writes,
                        'quoted_sql_unreviewed':quoted,'execute_keyword_present':dynamic})
     return {'status':'SAVED EVIDENCE ONLY — lexical classification, not authorisation proof',
             'database_connections':0,'routines':output,'uncaptured_call_count':len(unknown),

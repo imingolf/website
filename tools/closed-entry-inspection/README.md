@@ -174,3 +174,11 @@ Run test_classify_saved_calls.py then classify_saved_calls.py, with no connectio
 flag. It reads the latest existing private evidence folder; --folder selects an
 existing folder explicitly. Share ONLY the generated value-free JSON. No raw bodies,
 private names, secrets, writes, subprocess or network operations are involved.
+
+
+The current classifier adds fixed search_path precedence, gen_salt/digest extension
+candidates and anonymous write-target linkage to saved column/RLS metadata. Twenty
+offline tests passed. It does not report actual overload/extension resolution as
+verified because the original capture lacks that complete catalog. Constraint/index
+and downstream effects still need exact review. No raw configuration/schema names,
+private literals or credentials are emitted.

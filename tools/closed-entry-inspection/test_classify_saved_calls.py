@@ -39,4 +39,25 @@ class Calls(unittest.TestCase):
  def test_private_failure_output(self):
   with contextlib.redirect_stderr(io.StringIO()) as out:self.assertEqual(c.main(['--folder','/SECRET_MISSING']),1)
   self.assertNotIn('SECRET',out.getvalue())
+class ResolutionEvidence(unittest.TestCase):
+ def test_implicit_catalog_first(self):
+  v=c.search_path_summary(['search_path=public','PRIVATE=SECRET_VALUE']);self.assertEqual(v['catalog_precedence'],'implicit_catalog_first');self.assertNotIn('SECRET',str(v))
+ def test_unsafe_catalog_order_not_approved(self):
+  v=c.search_path_summary(['search_path=public, pg_catalog']);self.assertEqual(v['catalog_precedence'],'other_schema_precedes_catalog');self.assertFalse(v['resolution_verified'])
+ def test_unknown_schema_hidden(self):
+  v=c.search_path_summary(['search_path=SECRET_SCHEMA,pg_catalog']);self.assertTrue(v['has_nonstandard_schema']);self.assertNotIn('SECRET',str(v))
+ def test_missing_path_unverified(self):
+  self.assertEqual(c.search_path_summary(None)['catalog_precedence'],'caller_inherited_unverified')
+ def test_temp_not_function_shadow(self):
+  self.assertEqual(c.search_path_summary(['search_path=pg_temp,pg_catalog,public'])['catalog_precedence'],'explicit_catalog_first_for_functions')
+ def test_extension_gen_salt_not_proven(self):
+  out=c.classify(rows("AS $$ SELECT public.gen_salt('SECRET_VALUE'); $$"));self.assertEqual(out['uncaptured_call_count'],0)
+  v=out['routines'][0]['calls'][0];self.assertEqual(v['name'],'gen_salt');self.assertFalse(v['resolution_proven']);self.assertNotIn('SECRET',str(out))
+ def test_target_metadata_no_private_names(self):
+  data=rows('AS $$ INSERT INTO public.SECRET_TARGET(a) VALUES(1); $$')
+  data.append({'section':'relations','items':[{'schema':'public','name':'secret_target','owner':'SECRET_OWNER','rls':True,'columns':[{'name':'title'},{'name':'body'},{'name':'SECRET_COLUMN'}]}]})
+  out=c.classify(data);self.assertNotIn('SECRET',str(out));meta=out['routines'][0]['write_targets_NOT_complete'][0]['saved_metadata']
+  self.assertTrue(meta['notification_column_pattern_NOT_proof']);self.assertFalse(meta['constraint_index_evidence_available'])
+ def test_missing_target_evidence_is_not_success(self):
+  m=c.target_metadata([], 'public.missing');self.assertFalse(m['relation_metadata_available'])
 if __name__=='__main__':unittest.main()

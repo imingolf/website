@@ -51,7 +51,7 @@ BEGIN
     OR new_s->>'roundId' IS NULL OR new_s->>'roundId'='' THEN
    RAISE EXCEPTION 'INVALID_STATE'; END IF;
  -- Reject forged identity/reset/history/stake/game type/team eligibility changes.
- IF (old_s-'players'-'trip') IS DISTINCT FROM (new_s-'players'-'trip')
+ IF (old_s-'players'-'trip'-'lastActivityAt') IS DISTINCT FROM (new_s-'players'-'trip'-'lastActivityAt')
     OR (coalesce(old_s->'trip','{}'::jsonb)-'currentTeamScores') IS DISTINCT FROM
        (coalesce(new_s->'trip','{}'::jsonb)-'currentTeamScores') THEN
    RAISE EXCEPTION 'PROTECTED_ROUND_FIELDS'; END IF;
@@ -147,7 +147,7 @@ BEGIN
  -- Organiser capability never overrides entry closure. Ordinary players may alter
  -- only their own existing player record; pair score is organiser-only in this lab.
  IF NOT a.organiser THEN
-   IF (row.state-'players') IS DISTINCT FROM (next_state-'players') THEN RAISE EXCEPTION 'NOT_AUTHORISED'; END IF;
+   IF (row.state-'players'-'lastActivityAt') IS DISTINCT FROM (next_state-'players'-'lastActivityAt') THEN RAISE EXCEPTION 'NOT_AUTHORISED'; END IF;
    IF jsonb_array_length(row.state->'players')<>jsonb_array_length(next_state->'players') THEN RAISE EXCEPTION 'NOT_AUTHORISED'; END IF;
    FOR p IN SELECT value FROM jsonb_array_elements(row.state->'players') LOOP
      SELECT value INTO n FROM jsonb_array_elements(next_state->'players') WHERE value->>'id'=p->>'id';

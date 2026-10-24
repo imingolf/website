@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "test": "node test-postgres.cjs && node test-legacy-adapter.cjs"
+    "test": "node test-postgres.cjs && node test-legacy-adapter.cjs && node test-source-finish.cjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.11"

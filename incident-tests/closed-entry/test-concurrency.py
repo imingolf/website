@@ -182,6 +182,38 @@ def legacy_races():
         if projection!='t':raise RuntimeError('Legacy projection mismatch')
         print('PASS — real lock contention:',kind,'with guarded legacy RPC and synthetic triggers')
 
+def source_result_races():
+    # Source-produced fictional finish/setup payloads; Node executes extracted app
+    # functions with mocked I/O. No existing DB/evidence files or real credentials.
+    emitted=subprocess.run(['node',str(HERE/'test-source-finish.cjs'),'--emit-concurrency-fixture'],
+        env=ENV,text=True,capture_output=True,timeout=15)
+    if emitted.returncode:raise RuntimeError('Cannot generate fictional source payload')
+    data=json.loads(emitted.stdout);cap='e'*64;round_id=data['before']['roundId']
+    for kind in ['source-finish-entry','source-start-return']:
+        g='fictional-'+kind;pin='pin-'+kind
+        sql("INSERT INTO iig_entry_prototype.groups(id,phase,state) VALUES('"+g+"','open',"+quote_state(data['before'])+");"
+            "INSERT INTO iig_legacy_fixture.tens_in_groups(id,group_pin,state) VALUES('"+g+"','"+pin+"',"+quote_state(data['before'])+");"
+            "INSERT INTO iig_entry_prototype.principals VALUES('postgres','"+g+"','a',true);"
+            "INSERT INTO iig_legacy_fixture.organiser_capabilities VALUES('"+g+"',iig_legacy_fixture.token_hash('"+cap+"'),'2099-01-01',false,ARRAY['finish','start']);")
+        finish_sql="SELECT iig_legacy_fixture.finish_with_result('"+pin+"','"+round_id+"',0,'"+cap+"',"+quote_state(data['after'])+");"
+        late=json.loads(json.dumps(data['before']));late['players'][-1]['paid']=True;late['_entry_revision']=0
+        if kind=='source-finish-entry':
+            contend(finish_sql,"SELECT iig_legacy_fixture.save_group_state('"+pin+"',"+quote_state(late)+");")
+        else:
+            sql(finish_sql);late['_entry_revision']=1
+            start_sql="SELECT iig_legacy_fixture.start_with_setup('"+pin+"','"+round_id+"',1,'"+cap+"',"+quote_state(data['setup'])+");"
+            contend(start_sql,"SELECT iig_legacy_fixture.save_group_state('"+pin+"',"+quote_state(late)+");")
+        archived=json.loads(sql("SELECT snapshot::text FROM iig_entry_prototype.archives WHERE group_id='"+g+"';").stdout.strip())
+        if archived!=data['before']:raise RuntimeError('Actual-source archive changed')
+        state=json.loads(sql("SELECT state::text FROM iig_entry_prototype.groups WHERE id='"+g+"';").stdout.strip())
+        if kind=='source-finish-entry':
+            expected=dict(data['after']);expected.pop('_entry_revision',None)
+            if state!=expected:raise RuntimeError('Actual-source result payload changed')
+        else:
+            expected=dict(data['setup']);expected.pop('_entry_revision',None);expected['roundId']=state['roundId']
+            if state!=expected or state['roundId']==round_id:raise RuntimeError('Actual-source setup payload changed')
+        print('PASS — real lock contention:',kind,'with actual app history/payout payload preserved')
+
 def main():
     created=False
     try:
@@ -198,11 +230,14 @@ def main():
             time.sleep(.1)
         sql((HERE/'prototype.sql').read_text())
         sql((HERE/'legacy-adapter.sql').read_text())
+        sql((HERE/'legacy-finish-result.sql').read_text())
+        sql((HERE/'legacy-start-result.sql').read_text())
         race('fictional-score-first',False);race('fictional-entry-first',True)
         for kind in ['finish-entry','finish-score','score-finish','double-finish','start-return']:
             lifecycle('fictional-'+kind,kind)
         real_role_checks()
         legacy_races()
+        source_result_races()
         ensure_isolated()
         print('PASS — PostgreSQL 17.6 independent-session races; network none, no ports/mounts, fictional data only.')
     finally:

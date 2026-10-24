@@ -188,3 +188,19 @@ npm test runs both core and adapter tests. No platform-owner code is used as gro
 organiser authority. Existing production calculations, history and application
 files remain unchanged. Actual trigger/helper compatibility, capability issuance
 and complete legacy UI/Trip integration remain mandatory release blockers.
+
+
+## Source-produced finish and setup payloads
+
+The package now also runs test-source-finish.cjs with legacy-finish-result.sql and
+legacy-start-result.sql. These execute the original app functions on fictional data
+and persist 23 normal/Trip individual/pair finish-and-next-setup outputs through a
+capability-gated fixture, preserving existing payouts, League history and standings.
+Seventeen tampering cases and 23 delayed saves are rejected. Actual LIVE triggers,
+all malicious payloads and production client routing are NOT covered by that result.
+See [current migration/rollback and compatibility plan](../../docs/incident-closed-entry/SOURCE-COMPATIBILITY-AND-MIGRATION.md).
+The independent-session harness adds actual-source finish/entry and setup/return
+races, for twelve total real lock-contention scenarios. No SQL file here is a LIVE
+or online TEST migration. Old statements above about unsupported active Trip starts
+refer to the original basic start fixture; the new source-setup fixture handles the
+tested planned Trip advancement, not unplanned legacy Trips or new Trip creation.
