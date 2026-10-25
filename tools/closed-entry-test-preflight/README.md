@@ -202,3 +202,27 @@ Expected: original TEST sslmode displayed, followed by OFFLINE PASS and a NEW pr
 package path, with zero database connections. Stop there for separate connection
 approval. Additional offline service tests bring the preflight suite to 61 tests;
 all 153 existing inspection tests also pass. No SQL is executed by those tests.
+
+## Existing failed connection: offline diagnosis only
+
+`diagnose-offline.py --package /FULL/PRIVATE/PACKAGE/PATH` reads the existing package,
+input/query/code hashes, local TEST service/CA and attempt marker. It prints only a
+fixed failure category. It never runs subprocesses, resolves DNS, opens sockets,
+executes SQL, requests passwords, changes files or retries the consumed package.
+The connection runner and its hash stay unchanged, retaining the old package's
+integrity and no-retry safeguard.
+
+Important limitation: the current runner discards psql stdout/stderr on a nonzero
+exit, retaining only its attempt marker. This means that with valid local inputs,
+`UNDETERMINED_ORIGINAL_ERROR_NOT_RETAINED` is the honest result. A parsed CA cannot
+prove that the server accepted the certificate, network connectivity succeeded,
+authentication passed, or the read-only query succeeded. The failure could also be
+a SQL/catalog/permission error rather than TLS. The attempt count is not a count of
+successful authenticated sessions. No missing error is reconstructed or invented.
+
+A local validation category describes **current** local evidence, not proof of the
+cause of the earlier remote failure. Further connection/error collection, if needed,
+requires a separately reviewed diagnostic improvement and fresh explicit approval;
+it is not authorised by running this offline tool. Keep the failed package intact.
+
+Verified: 74 preflight/diagnostic tests and 153 existing inspection tests pass offline.
