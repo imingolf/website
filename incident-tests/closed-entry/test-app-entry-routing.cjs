@@ -7,6 +7,9 @@ vm.runInNewContext(js,sandbox);assert.equal(requests,0);assert.ok(sandbox.IIGEnt
 for(const match of html.matchAll(/<script>([\s\S]*?)<\/script>/g))new vm.Script(match[1]);
 for(const name of ['finishRoundImpl','finishTripBetterBallRound']){assert.match(extract(name),/save\("finish"\)/);assert.doesNotMatch(extract(name),/await save\(\)/);}
 for(const name of ['setupFirstRound','newRound','nextTripRound']){assert.match(extract(name),/save\("start"\)/);assert.doesNotMatch(extract(name),/await save\(\)/);}
+for(const name of ['adminEditSubmittedScore','editTripTeamScore']){assert.match(extract(name),/save\(\"correct\"\)/);assert.doesNotMatch(extract(name),/await save\(\)/);}
+for(const name of ['changeAdminPin','changeGroupName'])assert.match(extract(name),/save\(\"settings\"\)/);
+assert.match(extract('cancelCurrentRound'),/save\(\"cancel\"\)/);
 assert.match(extract('save'),/capture\(sourceState,pin\)/);assert.match(extract('save'),/commit\(operation/);
 const connect=extract('connect');assert.ok(connect.indexOf('validateBuild')<connect.indexOf('createClient'));
 assert.match(connect,/db=iigEntryBridge\?iigEntryBridge.db:rawDb/);

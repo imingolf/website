@@ -58,6 +58,7 @@ def main(argv=None):
     parser=prep.QuietParser(description=__doc__)
     for arg in ('saved-folder','package','out'):parser.add_argument('--'+arg,type=Path)
     args=parser.parse_args(argv)
+    stage='saved_evidence_validation'
     try:
         base=Path.home()/'Documents/ImInGolf-LIVE-Inspection'
         source=args.saved_folder.expanduser() if args.saved_folder else driver.latest(base,r'readonly-\d{8}T\d{6}Z')
@@ -67,11 +68,16 @@ def main(argv=None):
         functions=[f for section in original if section['section']=='functions' for f in section['items'] if f['schema']=='public' and f['name']=='get_group_state']
         tables=[t for section in original if section['section']=='relations' for t in section['items'] if t['schema']=='public' and t['name']=='tens_in_groups']
         prep.require(len(functions)==len(tables)==1)
+        stage='supported_getter_derivation'
         sql,manifest=build(functions[0],tables[0])
         from datetime import datetime,timezone
         out=args.out.expanduser() if args.out else base/('pin-binding-review-'+datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S.%fZ'))
+        stage='new_private_output'
         prep.write_new(out,{'resolver.PRIVATE.REVIEW.sql':sql,'manifest.SANITISED.json':json.dumps(manifest,indent=2)+'\n'})
-        print('PASS — private PIN binding prepared OFFLINE; not installed. Database connections: 0');return 0
+        print('PASS — private PIN binding prepared OFFLINE; not installed. Database connections: 0')
+        print('Private review folder: '+str(out))
+        print('Share only manifest.SANITISED.json; keep resolver.PRIVATE.REVIEW.sql on your Mac.')
+        return 0
     except Exception:
-        print('STOP — saved getter shape/path/type unsupported or private validation failed; no SQL/values displayed. Database connections: 0',file=sys.stderr);return 1
+        print('STOP — '+stage+' failed; no SQL/values displayed. Database connections: 0',file=sys.stderr);return 1
 if __name__=='__main__':sys.exit(main())

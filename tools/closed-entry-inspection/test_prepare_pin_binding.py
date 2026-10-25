@@ -1,7 +1,9 @@
 import contextlib
 import io
+import json
 from pathlib import Path
 import sys
+import tempfile
 import unittest
 from unittest.mock import patch
 sys.path.insert(0,str(Path(__file__).resolve().parent))
@@ -38,4 +40,29 @@ class Binding(unittest.TestCase):
   with patch.object(p.driver,'load_package',side_effect=ValueError('SECRET')),patch.object(p.driver.subprocess,'run',side_effect=AssertionError('No process')),patch('socket.socket',side_effect=AssertionError('No network')),contextlib.redirect_stderr(io.StringIO()) as out:
    self.assertEqual(p.main(['--saved-folder','s','--package','p']),1)
   self.assertNotIn('SECRET',out.getvalue())
+  self.assertIn('saved_evidence_validation',out.getvalue())
+ def test_success_cli_private_new_output_no_network_or_sql_execution(self):
+  f,t=self.fixture()
+  with tempfile.TemporaryDirectory() as directory:
+   outpath=Path(directory)/'new-private-binding'
+   rows=[{'section':'functions','items':[f]},{'section':'relations','items':[t]}]
+   with patch.object(p.driver,'load_package'),patch.object(p.summarise,'read_private',return_value=rows),patch('socket.socket',side_effect=AssertionError('No network')),patch.object(p.driver.subprocess,'run',side_effect=AssertionError('No process')),contextlib.redirect_stdout(io.StringIO()) as out:
+    self.assertEqual(p.main(['--saved-folder','s','--package','p','--out',str(outpath)]),0)
+   self.assertNotIn('SECRET_FILTER',out.getvalue());self.assertIn('Share only manifest.SANITISED.json',out.getvalue())
+   self.assertEqual(outpath.stat().st_mode & 0o777,0o700)
+   for name in ['resolver.PRIVATE.REVIEW.sql','manifest.SANITISED.json']:
+    self.assertEqual((outpath/name).stat().st_mode & 0o777,0o600)
+   manifest=json.loads((outpath/'manifest.SANITISED.json').read_text())
+   self.assertFalse(manifest['sql_execution_authorised']);self.assertNotIn('SECRET_FILTER',str(manifest))
+   # A second attempt may not overwrite the original private output.
+   original=(outpath/'resolver.PRIVATE.REVIEW.sql').read_bytes()
+   with patch.object(p.driver,'load_package'),patch.object(p.summarise,'read_private',return_value=rows),contextlib.redirect_stderr(io.StringIO()) as err:
+    self.assertEqual(p.main(['--saved-folder','s','--package','p','--out',str(outpath)]),1)
+   self.assertIn('new_private_output',err.getvalue());self.assertEqual((outpath/'resolver.PRIVATE.REVIEW.sql').read_bytes(),original)
+ def test_derivation_error_reports_only_stage(self):
+  f,t=self.fixture();f['definition']='SECRET_UNSUPPORTED'
+  rows=[{'section':'functions','items':[f]},{'section':'relations','items':[t]}]
+  with patch.object(p.driver,'load_package'),patch.object(p.summarise,'read_private',return_value=rows),contextlib.redirect_stderr(io.StringIO()) as err:
+   self.assertEqual(p.main(['--saved-folder','s','--package','p']),1)
+  self.assertIn('supported_getter_derivation',err.getvalue());self.assertNotIn('SECRET',err.getvalue())
 if __name__=='__main__':unittest.main()

@@ -235,7 +235,7 @@ def canonical_candidate_races():
     cap='a'*64
     def seed_candidate(g,state):
         sql("INSERT INTO public.tens_in_groups(id,fixture_pin,state) VALUES('"+g+"','"+g+"',"+quote_state(state)+");"
-            "SELECT iig_closed_entry.provision('"+g+"','"+cap+"',clock_timestamp()+interval '30 days',ARRAY['finish','start']);")
+            "SELECT iig_closed_entry.provision('"+g+"','"+cap+"',clock_timestamp()+interval '30 days',ARRAY['finish','start','correct','cancel']);")
         return json.loads(sql("SELECT public.iig_entry_read('"+g+"')->'context';").stdout.strip())
     def write_candidate(g,c,op,state,nonce=None):
         nonce=nonce or str(uuid.uuid4())
@@ -268,6 +268,38 @@ def canonical_candidate_races():
             contend("SELECT iig_closed_entry.revoke('"+g+"','"+cap+"');",finish,'ORGANISER_CREDENTIAL_REQUIRED')
             if meta(g)['revision']!=0:raise RuntimeError('Revoked candidate committed a finish')
         print('PASS — canonical guard race:',kind)
+    for kind in ['correction-entry','correction-finish','cancel-entry','double-cancel','revoke-correction','replace-correction','replace-replace']:
+        g='candidate-'+kind;c=seed_candidate(g,source['before'])
+        corrected=copy.deepcopy(source['before']);corrected['players'][0]['stableford']=31
+        correction=write_candidate(g,c,'correct',corrected)
+        late=copy.deepcopy(source['before']);late['players'][-1]['paid']=True
+        cancelled=copy.deepcopy(source['before'])
+        cancelled.update(course='',date='',gameType='money',pointsCompetition='stableford',pointsValue=10,roundOpen=False)
+        for player in cancelled['players']:
+            player.update(paid=False,competition=None,stableford=None,netScore=None,noReturn=False,scoreSubmitted=False)
+        cancel=write_candidate(g,c,'cancel',cancelled)
+        if kind=='correction-entry':contend(correction,write_candidate(g,c,'save',late))
+        elif kind=='correction-finish':contend(correction,write_candidate(g,c,'finish',source['after']))
+        elif kind=='cancel-entry':contend(cancel,write_candidate(g,c,'save',late))
+        elif kind=='double-cancel':
+            contend(cancel,cancel,None)
+            n=sql("SELECT count(*) FROM iig_closed_entry.archives WHERE group_id='"+g+"';").stdout.strip()
+            effects=sql("SELECT n FROM public.fixture_after_effects WHERE group_id='"+g+"';").stdout.strip()
+            if n!='1' or effects!='1':raise RuntimeError('Duplicate cancellation archive/AFTER effect')
+        elif kind=='revoke-correction':
+            contend("SELECT iig_closed_entry.revoke('"+g+"','"+cap+"');",correction,'ORGANISER_CREDENTIAL_REQUIRED')
+            if meta(g)['revision']!=0:raise RuntimeError('Revoked correction committed')
+        else:
+            def replace(token):
+                return "SELECT iig_closed_entry.replace_credentials('"+g+"',ARRAY[iig_closed_entry.token_hash('"+cap+"')],'"+token+"',clock_timestamp()+interval '1 day',ARRAY['finish','start','correct','cancel']);"
+            if kind=='replace-correction':contend(replace('b'*64),correction,'ORGANISER_CREDENTIAL_REQUIRED')
+            else:contend(replace('b'*64),replace('c'*64),'CREDENTIAL_SET_CHANGED')
+            if meta(g)['revision']!=0:raise RuntimeError('Replacement changed competition revision')
+        if kind in ['cancel-entry','double-cancel']:
+            archived=json.loads(sql("SELECT state FROM iig_closed_entry.archives WHERE group_id='"+g+"';").stdout.strip())
+            if archived!=source['before']:raise RuntimeError('Cancellation archive mismatch')
+        if not meta(g)['closed']:raise RuntimeError('Maintenance reopened entries')
+        print('PASS — canonical guard maintenance race:',kind)
 
 
 def main():

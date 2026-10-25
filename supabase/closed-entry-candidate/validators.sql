@@ -106,6 +106,109 @@ BEGIN
  THEN RAISE EXCEPTION 'PAIR_SCORE_REMOVAL'; END IF;
 END $$;
 
+-- Narrow non-financial group settings; never score, entry or payout changes.
+CREATE FUNCTION iig_closed_entry.validate_settings(old_s jsonb,new_s jsonb)
+RETURNS void LANGUAGE plpgsql SET search_path=pg_catalog AS $$
+BEGIN
+ IF jsonb_typeof(new_s) IS DISTINCT FROM 'object'
+ OR (old_s-ARRAY['groupName','adminPin','lastActivityAt']) IS DISTINCT FROM (new_s-ARRAY['groupName','adminPin','lastActivityAt'])
+ THEN RAISE EXCEPTION 'SETTINGS_CHANGED_PROTECTED_FIELDS';END IF;
+ IF old_s->'groupName' IS DISTINCT FROM new_s->'groupName' AND
+  (jsonb_typeof(new_s->'groupName') IS DISTINCT FROM 'string' OR length(btrim(new_s->>'groupName')) NOT BETWEEN 1 AND 80)
+ THEN RAISE EXCEPTION 'INVALID_GROUP_NAME';END IF;
+ IF old_s->'adminPin' IS DISTINCT FROM new_s->'adminPin' AND
+  (jsonb_typeof(new_s->'adminPin') IS DISTINCT FROM 'string' OR new_s->>'adminPin' !~ '^[0-9]{4}$')
+ THEN RAISE EXCEPTION 'INVALID_ADMIN_PIN';END IF;
+END $$;
+
+-- An explicit scoped correction changes ONLY an existing submitted score. It
+-- never clears the server closure latch or edits entry/payment/eligibility data.
+CREATE FUNCTION iig_closed_entry.validate_correction(old_s jsonb,new_s jsonb)
+RETURNS void LANGUAGE plpgsql SET search_path=pg_catalog AS $$
+DECLARE scores text[]:=ARRAY['stableford','netScore','noReturn','scoreSubmitted'];
+ p jsonb; n jsonb; team jsonb; key text; v jsonb; old_v jsonb; changed boolean:=false;
+BEGIN
+ IF jsonb_typeof(new_s) IS DISTINCT FROM 'object'
+ OR jsonb_typeof(new_s->'players') IS DISTINCT FROM 'array'
+ OR (old_s-ARRAY['players','trip','lastActivityAt']) IS DISTINCT FROM (new_s-ARRAY['players','trip','lastActivityAt'])
+ OR (coalesce(old_s->'trip','{}')-'currentTeamScores') IS DISTINCT FROM (coalesce(new_s->'trip','{}')-'currentTeamScores')
+ OR jsonb_array_length(old_s->'players')<>jsonb_array_length(new_s->'players')
+ THEN RAISE EXCEPTION 'CORRECTION_CHANGED_PROTECTED_FIELDS';END IF;
+ -- Preserve order as well as identities: a correction is not player maintenance.
+ FOR key IN SELECT generate_series(0,jsonb_array_length(old_s->'players')-1)::text LOOP
+  p:=old_s#>ARRAY['players',key];n:=new_s#>ARRAY['players',key];
+  IF (p-scores) IS DISTINCT FROM (n-scores) THEN RAISE EXCEPTION 'CORRECTION_CHANGED_PROTECTED_FIELDS';END IF;
+  IF p IS NOT DISTINCT FROM n THEN CONTINUE;END IF;
+  changed:=true;
+  IF NOT iig_closed_entry.eligible(old_s,p)
+  OR NOT iig_closed_entry.has_score(jsonb_build_object('players',jsonb_build_array(p)))
+  OR n->'scoreSubmitted' IS DISTINCT FROM 'true'::jsonb
+  OR jsonb_typeof(n->'noReturn') IS DISTINCT FROM 'boolean'
+  THEN RAISE EXCEPTION 'CORRECTION_REQUIRES_EXISTING_SUBMITTED_SCORE';END IF;
+  IF old_s->>'pointsCompetition'='stableford' THEN
+   v:=n->'stableford';
+   IF n->'netScore' IS DISTINCT FROM 'null'::jsonb OR n->'noReturn' IS DISTINCT FROM 'false'::jsonb
+    OR jsonb_typeof(v) IS DISTINCT FROM 'number' OR v::text !~ '^[0-9]{1,2}$'
+   THEN RAISE EXCEPTION 'INVALID_CORRECTED_SCORE';END IF;
+  ELSIF old_s->>'pointsCompetition'='net' THEN
+   IF n->'stableford' IS DISTINCT FROM 'null'::jsonb THEN RAISE EXCEPTION 'INVALID_CORRECTED_SCORE';END IF;
+   IF n->'noReturn'='true'::jsonb THEN
+    IF n->'netScore' IS DISTINCT FROM 'null'::jsonb THEN RAISE EXCEPTION 'INVALID_CORRECTED_SCORE';END IF;
+   ELSE
+    v:=n->'netScore';
+    IF jsonb_typeof(v) IS DISTINCT FROM 'number' OR v::text !~ '^[0-9]{1,3}$'
+    THEN RAISE EXCEPTION 'INVALID_CORRECTED_SCORE';END IF;
+   END IF;
+  ELSE RAISE EXCEPTION 'UNSUPPORTED_CORRECTION_FORMAT';END IF;
+ END LOOP;
+ IF (SELECT coalesce(jsonb_agg(e.key ORDER BY e.key),'[]') FROM jsonb_each(coalesce(old_s#>'{trip,currentTeamScores}','{}')) e)
+  IS DISTINCT FROM
+  (SELECT coalesce(jsonb_agg(e.key ORDER BY e.key),'[]') FROM jsonb_each(coalesce(new_s#>'{trip,currentTeamScores}','{}')) e)
+ THEN RAISE EXCEPTION 'CORRECTION_CHANGED_TEAM_KEYS';END IF;
+ FOR key,v IN SELECT * FROM jsonb_each(coalesce(new_s#>'{trip,currentTeamScores}','{}')) LOOP
+  old_v:=old_s#>ARRAY['trip','currentTeamScores',key];
+  IF v IS NOT DISTINCT FROM old_v THEN CONTINUE;END IF;
+  changed:=true;
+  IF old_v IS NULL OR old_v='null'::jsonb OR old_v='""'::jsonb
+   OR jsonb_typeof(v) IS DISTINCT FROM 'number' OR v::text !~ '^[0-9]+$' OR v::text::numeric>1998
+  THEN RAISE EXCEPTION 'INVALID_PAIR_CORRECTION';END IF;
+  SELECT value INTO team FROM jsonb_array_elements(coalesce(old_s#>'{trip,currentTeams}','[]')) t WHERE t->>'id'=key;
+  IF team IS NULL OR jsonb_array_length(team->'playerIds')<>2
+   OR EXISTS(SELECT 1 FROM jsonb_array_elements_text(team->'playerIds') member WHERE NOT EXISTS(
+    SELECT 1 FROM jsonb_array_elements(old_s->'players') person WHERE person->>'id'=member AND iig_closed_entry.eligible(old_s,person)))
+  THEN RAISE EXCEPTION 'INELIGIBLE_PAIR';END IF;
+ END LOOP;
+ IF NOT changed THEN RAISE EXCEPTION 'NO_CORRECTED_SCORE';END IF;
+END $$;
+
+-- Matches the actual non-Trip cancelCurrentRound reset. Exact old state is archived
+-- by the boundary, without erasing result history, League totals or payment evidence.
+CREATE FUNCTION iig_closed_entry.validate_cancellation(old_s jsonb,new_s jsonb)
+RETURNS void LANGUAGE plpgsql SET search_path=pg_catalog AS $$
+DECLARE p jsonb;n jsonb;key text;
+ reset text[]:=ARRAY['paid','competition','stableford','netScore','noReturn','scoreSubmitted'];
+BEGIN
+ IF old_s#>'{trip,active}'='true'::jsonb THEN RAISE EXCEPTION 'TRIP_CANCELLATION_REQUIRES_REVIEW';END IF;
+ IF jsonb_typeof(new_s) IS DISTINCT FROM 'object' OR jsonb_typeof(new_s->'players') IS DISTINCT FROM 'array'
+ OR (old_s-ARRAY['players','course','date','gameType','pointsCompetition','pointsValue','roundOpen','lastActivityAt'])
+  IS DISTINCT FROM (new_s-ARRAY['players','course','date','gameType','pointsCompetition','pointsValue','roundOpen','lastActivityAt'])
+ OR new_s->'course' IS DISTINCT FROM '""'::jsonb OR new_s->'date' IS DISTINCT FROM '""'::jsonb
+ OR new_s->'gameType' IS DISTINCT FROM '"money"'::jsonb OR new_s->'pointsCompetition' IS DISTINCT FROM '"stableford"'::jsonb
+ OR new_s->'pointsValue' IS DISTINCT FROM '10'::jsonb OR new_s->'roundOpen' IS DISTINCT FROM 'false'::jsonb
+ OR jsonb_array_length(old_s->'players')<>jsonb_array_length(new_s->'players')
+ THEN RAISE EXCEPTION 'INVALID_CANCELLATION';END IF;
+ FOR key IN SELECT generate_series(0,jsonb_array_length(old_s->'players')-1)::text LOOP
+  p:=old_s#>ARRAY['players',key];n:=new_s#>ARRAY['players',key];
+  IF (p-reset) IS DISTINCT FROM (n-reset)
+   OR n->'paid' IS DISTINCT FROM 'false'::jsonb OR n->'competition' IS DISTINCT FROM 'null'::jsonb
+   OR n->'stableford' IS DISTINCT FROM 'null'::jsonb OR n->'netScore' IS DISTINCT FROM 'null'::jsonb
+   OR n->'noReturn' IS DISTINCT FROM 'false'::jsonb OR n->'scoreSubmitted' IS DISTINCT FROM 'false'::jsonb
+  THEN RAISE EXCEPTION 'INVALID_CANCELLATION_RESET';END IF;
+ END LOOP;
+END $$;
+
+
+
 CREATE FUNCTION iig_closed_entry.validate_finished_result(old_s jsonb,new_s jsonb)
 RETURNS void LANGUAGE plpgsql SET search_path=pg_catalog AS $$
 DECLARE is_trip boolean; old_records jsonb; new_records jsonb; record jsonb;
@@ -305,4 +408,4 @@ BEGIN
       OR setup_state#>'{trip,active}'='true'::jsonb THEN RAISE EXCEPTION 'NEW_TRIP_CREATION_REQUIRES_REVIEW'; END IF;
  END IF;
 END $$;
-REVOKE ALL ON ALL FUNCTIONS IN SCHEMA iig_closed_entry FROM PUBLIC;
+REVOKE ALL ON ALL FUNCTIONS IN SCHEMA iig_closed_entry FROM PUBLIC,anon,authenticated,service_role;

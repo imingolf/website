@@ -48,7 +48,7 @@
    secret={groupId:c.groupId,token};return token;
   }
   async function commit(operation,pin,state,captured,source){
-   if(busy||!['save','finish','start'].includes(operation))return error();
+   if(busy||!['save','finish','start','correct','cancel','settings'].includes(operation))return error();
    let sent=false;const epoch=generation;let request;
    try{
     if(!captured||captured.generation!==generation||captured.pin!==pin||current?.groupId!==captured.groupId)throw Error('GROUP_CHANGED');

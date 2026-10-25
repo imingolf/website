@@ -112,11 +112,11 @@ There is no online database URL/container argument, image pull or Supabase conne
    matching saved package and derives PRIVATE REVIEW SQL for a narrowly supported
    single-table SQL getter, preserving its exact predicate/path and changing only
    the state projection to id::text. Unsupported shapes stop; no SQL is executed.
-   Six offline tests and a real local generated-resolver execution test cover it.
+   Eight offline tests and a real local generated-resolver execution test cover it.
    The candidate default remains intentionally unbound until that local review.
    Resolution is rechecked after locking, including concurrent PIN rotation.
-2. Complete and test all operations before activation: protected score correction,
-   cancellation, existing group/player/settings/owner/history and payout-settlement maintenance; Side Game
+2. Complete and test all operations before activation: remaining resets/history corrections,
+   Trip cancellation, existing player/settings/owner/history and payout-settlement maintenance; Side Game
    writes; new Trip creation and older unplanned Trip setup. Current validators
    conservatively reject unsupported operations, so installation would break them.
    Complete adversarial ranking/tie/payout/team/champion checks, legacy optional-field/
@@ -144,8 +144,35 @@ integration. Organiser transitions independently require the private credential.
 
 Passed: full incident npm suite; 62 canonical boundary/actual app checks; three
 adapter session checks; inert-load/config/routing/script syntax checks; transaction
-DDL rollback and post-runtime fail-closed retention; 108 Python safety/reviewer/
-binding checks; 18 real independent-session PostgreSQL 17.6 races and six local-login
+DDL rollback and post-runtime fail-closed retention; 148 Python safety/reviewer/
+binding checks; 25 real independent-session PostgreSQL 17.6 races and six local-login
 role checks. These ran only in fresh embedded databases or the runner's own
 network-none Docker instance. No Supabase project was contacted. Real REST/Auth,
 hosted ownership/grants, physical iPhone and deployed wrapper behaviour remain untested.
+
+## Controlled follow-up after 5bec83f
+
+See [controlled offline completion](../../docs/incident-closed-entry/CONTROLLED-OFFLINE-COMPLETION.md)
+for the operation matrix, private Mac PIN-binding step, organiser verification and
+baseline-bound TEST package requirements. The actual private capture is NOT present
+in this workspace: the real resolver has not been generated/certified here.
+
+Added explicit correct/cancel/settings operations with group-scoped permissions:
+individual/NR and pair score corrections; exact non-Trip cancellation with the old
+canonical state archived; group-name/Admin-PIN edits without financial/history/entry
+changes. Actual app correction/cancellation/settings functions route explicitly.
+Closure stays latched; stale saves, missing scope and revoked receipt replay reject.
+Existing legitimate source Finish/League/payout/history behaviour remains covered.
+Unsupported player/Side Game/settlement/Trip/maintenance controls are still gates.
+
+Private operator-only replace_credentials adds atomic compare-and-swap recovery or
+rotation without deleting old credentials/receipts. It cannot verify an organiser's
+identity, arrange delivery or authorise itself through a group PIN. API roles cannot
+call it. Independent owner verification and recovery UX are NOT complete.
+
+Passed in this follow-up: 61 added embedded PostgreSQL/actual app operation and
+credential checks; the full incident npm suite; all 148 inspection-tool Python
+tests, including eight PIN-binder tests; 25 real PostgreSQL 17.6 independent-session
+races and six local-login role checks. No real PIN binding, exact TEST object/data
+baseline, installable migration/rollback or hosted/native test is claimed. Candidate
+and guarded mode remain disabled and NOT installable. No online project was contacted.

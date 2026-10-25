@@ -3599,7 +3599,7 @@ async function editTripTeamScore(teamId){
   const value=Number(String(answer).trim());
   if(!Number.isFinite(value)||value<0){alert("Please enter a valid score.");return;}
   state.trip.currentTeamScores[teamId]=value;
-  render();await save();
+  render();await save("correct");
 }
 function scores(){
 
@@ -4054,7 +4054,7 @@ async function adminEditSubmittedScore(i,type){
     p.noReturn=true;
     p.scoreSubmitted=true;
     render();
-    await save();
+    await save("correct");
     return;
   }
 
@@ -4078,7 +4078,7 @@ async function adminEditSubmittedScore(i,type){
   p.scoreSubmitted=true;
 
   render();
-  await save();
+  await save("correct");
 }
 
 function resolveTripTeamTie(teams,score){
@@ -6993,7 +6993,7 @@ async function changeAdminPin(){
   if(!clean)return;
   const previous=state.adminPin;
   state.adminPin=clean;
-  const ok=await save();
+  const ok=await save("settings");
   if(!ok){
     state.adminPin=previous;
     showAppToast("PIN not changed","Please try again.",3000);
@@ -7025,7 +7025,7 @@ async function changeGroupName(){
   }
   const previousName=state.groupName;
   state.groupName=clean;
-  const ok=await save();
+  const ok=await save("settings");
   if(!ok){
     state.groupName=previousName;
     alert("The group name could not be saved. Please try again.");
@@ -8387,7 +8387,7 @@ async function cancelCurrentRound(){
 
   scoreDraftActive=false;
 
-  const ok=await save();
+  const ok=await save("cancel");
   if(!ok){
     alert("The current round could not be cancelled. Please try again.");
     return;

@@ -49,6 +49,18 @@ BEGIN
   ELSE PERFORM iig_closed_entry.validate_snapshot(OLD.state,NEW.state,m.closed);END IF;
   UPDATE iig_closed_entry.rounds SET revision=revision+1,
    closed=closed OR iig_closed_entry.has_score(OLD.state) OR iig_closed_entry.has_score(NEW.state) WHERE group_id=g;
+ ELSIF p.operation='settings' THEN
+  PERFORM iig_closed_entry.validate_settings(OLD.state,NEW.state);
+  UPDATE iig_closed_entry.rounds SET revision=revision+1 WHERE group_id=g;
+ ELSIF p.operation='correct' THEN
+  IF m.phase<>'open' OR NOT m.closed THEN RAISE EXCEPTION 'NO_OPEN_SCORED_ROUND';END IF;
+  PERFORM iig_closed_entry.validate_correction(OLD.state,NEW.state);
+  UPDATE iig_closed_entry.rounds SET revision=revision+1,closed=true WHERE group_id=g;
+ ELSIF p.operation='cancel' THEN
+  IF m.phase<>'open' THEN RAISE EXCEPTION 'NO_OPEN_ROUND';END IF;
+  PERFORM iig_closed_entry.validate_cancellation(OLD.state,NEW.state);
+  INSERT INTO iig_closed_entry.archives VALUES(g,m.round_id,OLD.state);
+  UPDATE iig_closed_entry.rounds SET phase='finished',closed=true,revision=revision+1 WHERE group_id=g;
  ELSIF p.operation='finish' THEN
   IF m.phase<>'open' OR NOT (m.closed OR iig_closed_entry.has_score(OLD.state)) THEN RAISE EXCEPTION 'NO_OPEN_SCORED_ROUND';END IF;
   PERFORM iig_closed_entry.validate_finished_result(OLD.state,NEW.state);
@@ -88,7 +100,7 @@ LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE row public.tens_in_groups; m iig_closed_entry.rounds; prior iig_closed_entry.receipts;
  hashed text;credential_hash text;next_state jsonb;outcome jsonb;
 BEGIN
- IF p_operation IS NULL OR p_operation NOT IN ('save','finish','start') OR p_round IS NULL OR p_revision IS NULL
+ IF p_operation IS NULL OR p_operation NOT IN ('save','finish','start','correct','cancel','settings') OR p_round IS NULL OR p_revision IS NULL
  OR p_request IS NULL OR jsonb_typeof(p_state) IS DISTINCT FROM 'object' THEN RAISE EXCEPTION 'INVALID_REQUEST';END IF;
  row:=iig_closed_entry.lock_group(p_pin);
  IF row.id::text IS DISTINCT FROM p_group THEN RAISE EXCEPTION 'GROUP_CHANGED';END IF;
