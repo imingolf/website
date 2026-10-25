@@ -87,3 +87,12 @@ claiming completed private verification or faithful LIVE integration would be fa
 Status: reported-pattern failure consistency and client authority boundaries tested;
 private semantic verification and faithful production integration remain incomplete.
 TEST/LIVE installation: NO-GO.
+
+## Superseded assumptions after full report upload
+
+The owner supplied the complete sanitised UPDATE JSON. Its two scopes are sibling
+conversion handlers, and it shows four metadata INSERTs outside them. The five-path
+fixture above remains adversarial, not an actual legacy contract. Do not continue
+requesting that upload or impose its invented five-row result requirement. See
+[the corrected assessment](UPLOADED-UPDATE-EVIDENCE-ASSESSMENT.md) for the concrete
+handler/event/constraint findings and the narrower remaining integration gates.

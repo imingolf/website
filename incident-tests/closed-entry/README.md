@@ -241,3 +241,13 @@ fictional organiser credential uses independent CSPRNG bytes, stored hashed only
 the shared fixture role cannot change credentials or bypass the outer RPC. This is
 NOT production credential issuance or a faithful copy of the private LIVE trigger.
 See [the exact evidence and integration gate](../../docs/incident-closed-entry/TWO-HANDLER-FIVE-PATH-GATE.md).
+
+## Full uploaded UPDATE report supersedes the headline-count model
+
+The uploaded symbolic report shows sibling conversion-only exception scopes and
+four metadata INSERTs, not nested history-writer handlers/five result INSERTs.
+Earlier swallowing/five-path fixtures remain adversarial examples, not representations
+of LIVE. test-observed-update-pattern.cjs follows the actual observed structure with
+explicitly fictional names/types/constants, and checks downstream failures propagate
+outside those handlers. See
+[the corrected evidence assessment](../../docs/incident-closed-entry/UPLOADED-UPDATE-EVIDENCE-ASSESSMENT.md).

@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "test": "node test-postgres.cjs && node test-legacy-adapter.cjs && node test-source-finish.cjs && node test-followup-packet.cjs && node test-client-contract.cjs && node test-sql-syntax.cjs && node test-exception-case.cjs && node test-finish-receipts.cjs && node test-five-path-contract.cjs"
+    "test": "node test-postgres.cjs && node test-legacy-adapter.cjs && node test-source-finish.cjs && node test-followup-packet.cjs && node test-client-contract.cjs && node test-sql-syntax.cjs && node test-exception-case.cjs && node test-finish-receipts.cjs && node test-five-path-contract.cjs && node test-observed-update-pattern.cjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.11"
