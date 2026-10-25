@@ -1,5 +1,9 @@
 # Controlled offline completion — installation remains NO-GO
 
+Later member/Side Game/payout/Trip and confirmed Mac PIN-derivation progress is recorded
+in [secure operation progress](SECURE-OPERATION-PROGRESS.md), which supersedes the
+corresponding outstanding items below.
+
 This work follows 5bec83f on fix-closed-competition-entry. No existing Supabase
 project, deployment or group record was accessed. The registration branch and
 completed fictional demonstration are outside this change.

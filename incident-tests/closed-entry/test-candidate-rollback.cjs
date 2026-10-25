@@ -19,7 +19,7 @@ const {PGlite}=require('@electric-sql/pglite');const fs=require('node:fs'),asser
   await db.exec('BEGIN');await db.exec(sql);await assert.rejects(()=>db.exec('SELECT 1/0'),/division by zero/);await db.exec('ROLLBACK');
   assert.deepEqual(await before(),baseline);
   assert.equal((await db.query("SELECT count(*)::int AS n FROM pg_namespace WHERE nspname='iig_closed_entry'")).rows[0].n,0);
-  assert.equal((await db.query("SELECT count(*)::int AS n FROM pg_proc WHERE proname IN ('iig_entry_read','iig_entry_write','iig_entry_receipt')")).rows[0].n,0);
+  assert.equal((await db.query("SELECT count(*)::int AS n FROM pg_proc WHERE proname IN ('iig_entry_read','iig_entry_write','iig_entry_receipt','iig_entry_check_credential','iig_entry_check_member')")).rows[0].n,0);
   console.log('PASS: candidate installation error rolls back new schema/RPCs/trigger/grants while preserving original JSON/history, RLS, ownership and function ACL/config/definition. Local fictional DDL only.');
  }finally{await db.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});

@@ -37,23 +37,26 @@
     current=c;versions.set(result.data.state,c);return {data:result.data.state,error:null};
    }catch(_){return error();}
   }
-  async function credential(pin,c){
-   if(secret&&secret.groupId===c.groupId)return secret.token;
+  async function credential(pin,c,operation){
+   const kind=['profile','sidegame','claim'].includes(operation)?'player':'organiser';
+   if(secret&&secret.groupId===c.groupId&&secret.kind===kind)return secret.token;
    if(typeof promptCredential!=='function')throw Error('ORGANISER_CREDENTIAL_REQUIRED');
    const epoch=generation;
-   const token=await promptCredential();
+   const token=await promptCredential({kind,operation});
    if(epoch!==generation||typeof token!=='string'||!/^[a-f0-9]{64}$/.test(token))throw Error('ORGANISER_CREDENTIAL_REQUIRED');
-   const checked=await raw.rpc('iig_entry_check_credential',{p_pin:pin,p_group:c.groupId,p_credential:token});
-   if(epoch!==generation||checked.error||checked.data!==true)throw Error('ORGANISER_CREDENTIAL_REQUIRED');
-   secret={groupId:c.groupId,token};return token;
+   const checked=kind==='player'
+    ? await raw.rpc('iig_entry_check_member',{p_pin:pin,p_group:c.groupId,p_credential:token,p_scope:operation})
+    : await raw.rpc('iig_entry_check_credential',{p_pin:pin,p_group:c.groupId,p_credential:token});
+   if(epoch!==generation||checked.error||(kind==='player'?typeof checked.data?.playerId!=='string':checked.data!==true))throw Error('CREDENTIAL_REQUIRED');
+   secret={groupId:c.groupId,token,kind};return token;
   }
   async function commit(operation,pin,state,captured,source){
-   if(busy||!['save','finish','start','correct','cancel','settings'].includes(operation))return error();
+   if(busy||!['save','finish','start','correct','cancel','settings','members','settle','profile','sidegame','claim'].includes(operation))return error();
    let sent=false;const epoch=generation;let request;
    try{
     if(!captured||captured.generation!==generation||captured.pin!==pin||current?.groupId!==captured.groupId)throw Error('GROUP_CHANGED');
     busy=true;
-    const token=operation==='save'?null:await credential(pin,captured);
+    const token=operation==='save'?null:await credential(pin,captured,operation);
     if(epoch!==generation)throw Error('GROUP_CHANGED');
     request={operation,pin,...context(captured),requestId:uuid()};
     sent=true;
@@ -86,7 +89,7 @@
    const p={...pending},epoch=generation;
    try{
     busy=true;
-    const token=p.operation==='save'?null:await credential(p.pin,p);
+    const token=p.operation==='save'?null:await credential(p.pin,p,p.operation);
     const receipt=await raw.rpc('iig_entry_receipt',{p_pin:p.pin,p_group:p.groupId,p_request:p.requestId,p_credential:token});
     const ack=receipt.data?.response;
     if(epoch!==generation||receipt.error||receipt.data?.status!=='committed'||ack?.ok!==true||ack.requestId!==p.requestId||ack.groupId!==p.groupId||

@@ -49,6 +49,19 @@ BEGIN
   ELSE PERFORM iig_closed_entry.validate_snapshot(OLD.state,NEW.state,m.closed);END IF;
   UPDATE iig_closed_entry.rounds SET revision=revision+1,
    closed=closed OR iig_closed_entry.has_score(OLD.state) OR iig_closed_entry.has_score(NEW.state) WHERE group_id=g;
+ ELSIF p.operation IN ('members','profile') THEN
+  PERFORM iig_closed_entry.validate_players(OLD.state,NEW.state,m.closed OR iig_closed_entry.has_score(OLD.state),p.actor_id);
+  IF p.operation='members' THEN
+   UPDATE iig_closed_entry.member_credentials c SET revoked=true WHERE group_id=g
+    AND NOT EXISTS(SELECT 1 FROM jsonb_array_elements(NEW.state->'players') person WHERE person->>'id'=c.player_id);
+  END IF;
+  UPDATE iig_closed_entry.rounds SET revision=revision+1 WHERE group_id=g;
+ ELSIF p.operation IN ('settle','claim') THEN
+  PERFORM iig_closed_entry.validate_payout(OLD.state,NEW.state,p.actor_id);
+  UPDATE iig_closed_entry.rounds SET revision=revision+1 WHERE group_id=g;
+ ELSIF p.operation='sidegame' THEN
+  PERFORM iig_closed_entry.validate_sidegame(OLD.state,NEW.state,p.actor_id);
+  UPDATE iig_closed_entry.rounds SET revision=revision+1 WHERE group_id=g;
  ELSIF p.operation='settings' THEN
   PERFORM iig_closed_entry.validate_settings(OLD.state,NEW.state);
   UPDATE iig_closed_entry.rounds SET revision=revision+1 WHERE group_id=g;
@@ -94,17 +107,29 @@ BEGIN
  PERFORM iig_closed_entry.authorise(p_group,p_credential,'finish');
  PERFORM iig_closed_entry.authorise(p_group,p_credential,'start');RETURN true;
 END $$;
+CREATE FUNCTION public.iig_entry_check_member(p_pin text,p_group text,p_credential text,p_scope text) RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
+DECLARE row public.tens_in_groups;actor text;
+BEGIN
+ row:=iig_closed_entry.lock_group(p_pin);
+ IF row.id::text IS DISTINCT FROM p_group THEN RAISE EXCEPTION 'GROUP_CHANGED';END IF;
+ actor:=iig_closed_entry.authorise_member(p_group,p_credential,p_scope);
+ RETURN jsonb_build_object('playerId',actor);
+END $$;
 CREATE FUNCTION public.iig_entry_write(p_pin text,p_group text,p_round uuid,p_revision bigint,
  p_operation text,p_state jsonb,p_credential text,p_request uuid) RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE row public.tens_in_groups; m iig_closed_entry.rounds; prior iig_closed_entry.receipts;
- hashed text;credential_hash text;next_state jsonb;outcome jsonb;
+ hashed text;credential_hash text;next_state jsonb;outcome jsonb;actor text;
 BEGIN
- IF p_operation IS NULL OR p_operation NOT IN ('save','finish','start','correct','cancel','settings') OR p_round IS NULL OR p_revision IS NULL
+ IF p_operation IS NULL OR p_operation NOT IN ('save','finish','start','correct','cancel','settings','members','settle','profile','sidegame','claim') OR p_round IS NULL OR p_revision IS NULL
  OR p_request IS NULL OR jsonb_typeof(p_state) IS DISTINCT FROM 'object' THEN RAISE EXCEPTION 'INVALID_REQUEST';END IF;
  row:=iig_closed_entry.lock_group(p_pin);
  IF row.id::text IS DISTINCT FROM p_group THEN RAISE EXCEPTION 'GROUP_CHANGED';END IF;
- IF p_operation<>'save' THEN
+ IF p_operation IN ('profile','sidegame','claim') THEN
+  actor:=iig_closed_entry.authorise_member(p_group,p_credential,p_operation);
+  credential_hash:=iig_closed_entry.token_hash(p_credential);
+ ELSIF p_operation<>'save' THEN
   PERFORM iig_closed_entry.authorise(p_group,p_credential,p_operation);
   credential_hash:=iig_closed_entry.token_hash(p_credential);
  END IF;
@@ -122,9 +147,9 @@ BEGIN
  next_state:=p_state;
  IF p_operation='start' THEN next_state:=jsonb_set(next_state,'{roundId}',to_jsonb(gen_random_uuid()::text)); END IF;
  INSERT INTO iig_closed_entry.permits VALUES(pg_backend_pid(),p_group,pg_current_xact_id()::text,p_operation,
-  p_revision,iig_closed_entry.digest(next_state),true)
+  p_revision,iig_closed_entry.digest(next_state),true,actor)
  ON CONFLICT(backend,group_id) DO UPDATE SET transaction_id=excluded.transaction_id,operation=excluded.operation,
- expected_revision=excluded.expected_revision,state_digest=excluded.state_digest,available=true;
+ expected_revision=excluded.expected_revision,state_digest=excluded.state_digest,available=true,actor_id=excluded.actor_id;
  UPDATE public.tens_in_groups SET state=next_state,updated_at=clock_timestamp() WHERE id=row.id;
  -- Existing AFTER hooks execute normally. No invented five-result ledger or
  -- duplicate League/payout calculations. Any downstream error aborts this RPC.
@@ -148,13 +173,18 @@ BEGIN
  IF row.id::text IS DISTINCT FROM p_group THEN RAISE EXCEPTION 'GROUP_CHANGED'; END IF;
  SELECT * INTO r FROM iig_closed_entry.receipts WHERE group_id=p_group AND request_id=p_request;
  IF NOT FOUND THEN RETURN '{"status":"not_found"}'::jsonb;END IF;
- IF r.operation<>'save' THEN
+ IF r.operation IN ('profile','sidegame','claim') THEN
+  PERFORM iig_closed_entry.authorise_member(p_group,p_credential,r.operation);
+  IF r.credential_hash IS DISTINCT FROM iig_closed_entry.token_hash(p_credential) THEN RAISE EXCEPTION 'MEMBER_CREDENTIAL_REQUIRED';END IF;
+ ELSIF r.operation<>'save' THEN
   PERFORM iig_closed_entry.authorise(p_group,p_credential,r.operation);
   IF r.credential_hash IS DISTINCT FROM iig_closed_entry.token_hash(p_credential) THEN RAISE EXCEPTION 'ORGANISER_CREDENTIAL_REQUIRED';END IF;
  END IF;
  RETURN jsonb_build_object('status','committed','response',r.outcome);
 END $$;
 REVOKE ALL ON ALL FUNCTIONS IN SCHEMA iig_closed_entry FROM PUBLIC,anon,authenticated,service_role;
+REVOKE ALL ON FUNCTION public.iig_entry_check_member(text,text,text,text) FROM PUBLIC,anon,authenticated,service_role;
+GRANT EXECUTE ON FUNCTION public.iig_entry_check_member(text,text,text,text) TO anon,authenticated;
 REVOKE ALL ON FUNCTION public.iig_entry_read(text),public.iig_entry_check_credential(text,text,text),
  public.iig_entry_write(text,text,uuid,bigint,text,jsonb,text,uuid),public.iig_entry_receipt(text,text,uuid,text) FROM PUBLIC,anon,authenticated,service_role;
 GRANT EXECUTE ON FUNCTION public.iig_entry_read(text),public.iig_entry_check_credential(text,text,text),

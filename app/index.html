@@ -541,6 +541,8 @@ function showFirstWelcome(role){
 }
 
 function selectMyPlayer(id){
+  // A device name selection never transfers another player's authority.
+  if(typeof iigEntryBridge!=="undefined" && iigEntryBridge)iigEntryBridge.clearCredential();
   const player=state.players.find(p=>p.id===id);
   if(!player)return;
 
@@ -602,7 +604,7 @@ async function connect(){
   const rawDb=supabase.createClient(TENS_IN_CONFIG.supabaseUrl,TENS_IN_CONFIG.supabaseKey);
   iigEntryBridge=guarded?IIGEntryGuard.create(rawDb,{
    uuid:()=>crypto.randomUUID(),
-   promptCredential:()=>appPrompt('Secure organiser access','Enter the private credential issued for this group.','',{type:'password',maxlength:64,okLabel:'Unlock'})
+   promptCredential:({kind})=>appPrompt(kind==='player'?'Secure player access':'Secure organiser access','Enter the private credential issued for this group and identity.','',{type:'password',maxlength:64,okLabel:'Unlock'})
   }):null;
   db=iigEntryBridge?iigEntryBridge.db:rawDb;
  }catch(_){db=null;$("connectMsg").textContent="The guarded TEST build is not configured correctly.";return;}
@@ -1895,7 +1897,7 @@ function sideGameUpdateConfirm(playerId){
   }
 }
 
-function sideGameConfirmBet(playerId){
+async function sideGameConfirmBet(playerId){
   const me=state.players.find(p=>p.id===myPlayerId);
   const player=state.players.find(p=>p.id===playerId);
   const stake=Number($("sideGameStake")?.value||0);
@@ -1917,7 +1919,7 @@ function sideGameConfirmBet(playerId){
   let bets=[];
 
   try{
-    bets=JSON.parse(localStorage.getItem(key)||"[]");
+    bets=iigEntryBridge?[]:JSON.parse(localStorage.getItem(key)||"[]");
     if(!Array.isArray(bets))bets=[];
   }catch{
     bets=[];
@@ -1947,7 +1949,7 @@ function sideGameConfirmBet(playerId){
     setup:"in_person"
   });
 
-  localStorage.setItem(key,JSON.stringify(bets));
+  if(!iigEntryBridge)localStorage.setItem(key,JSON.stringify(bets));
   localStorage.setItem("iig_sidegame_stake_"+myPlayerId,String(stake));
   localStorage.setItem("iig_sidegame_format_"+myPlayerId,format);
 
@@ -1978,13 +1980,13 @@ function sideGameConfirmBet(playerId){
       createdAt:new Date().toISOString()
     });
 
-    save();
+    if(!await save("sidegame"))return;
   }
 
   sideGameHome();
 }
 
-function sideGameSendChallenge(playerId){
+async function sideGameSendChallenge(playerId){
   const stakeInput=$("sideGameStake");
 
   if(!stakeInput){
@@ -2044,13 +2046,13 @@ function sideGameSendChallenge(playerId){
   localStorage.setItem("iig_sidegame_stake_"+myPlayerId,String(stake));
   localStorage.setItem("iig_sidegame_format_"+myPlayerId,format);
 
-  save();
+  if(!await save("sidegame"))return;
   sideGameHome();
 
   alert(`Challenge sent to ${player.name}.`);
 }
 
-function sideGameAcceptChallenge(betId){
+async function sideGameAcceptChallenge(betId){
   ensureSideGameState();
 
   const bet=state.sideGame.bets.find(b=>
@@ -2088,13 +2090,13 @@ function sideGameAcceptChallenge(betId){
   bet.status="active";
   bet.acceptedAt=new Date().toISOString();
 
-  save();
+  if(!await save("sidegame"))return;
   sideGameHome();
 
   alert(`Challenge with ${bet.player1Name} accepted.`);
 }
 
-function sideGameDeclineChallenge(betId){
+async function sideGameDeclineChallenge(betId){
   ensureSideGameState();
 
   const bet=state.sideGame.bets.find(b=>
@@ -2113,7 +2115,7 @@ function sideGameDeclineChallenge(betId){
   bet.status="declined";
   bet.declinedAt=new Date().toISOString();
 
-  save();
+  if(!await save("sidegame"))return;
   sideGameHome();
 
   alert(`Challenge from ${bet.player1Name} declined.`);
@@ -2203,7 +2205,7 @@ async function sideGameSaveScore(format){
 
   sideGameResolveBetsForToday();
 
-  const ok=await save();
+  const ok=await save("sidegame");
 
   if(!ok){
     alert("Your Side Game score could not be saved. Please try again.");
@@ -2273,7 +2275,7 @@ function sideGameScoreEntry(){
   window.scrollTo(0,0);
 }
 
-function sideGameRequestSettlement(otherPlayerId, amount){
+async function sideGameRequestSettlement(otherPlayerId, amount){
   ensureSideGameState();
 
   const otherPlayer=state.players.find(p=>p.id===otherPlayerId);
@@ -2303,13 +2305,13 @@ function sideGameRequestSettlement(otherPlayerId, amount){
     requestedAt:new Date().toISOString()
   });
 
-  save();
+  if(!await save("sidegame"))return;
   sideGameHome();
 
   alert(`Settlement sent to ${otherPlayer.name} for confirmation.`);
 }
 
-function sideGameConfirmSettlement(settlementId){
+async function sideGameConfirmSettlement(settlementId){
   ensureSideGameState();
 
   const settlement=state.sideGame.settlements.find(x=>
@@ -2327,7 +2329,7 @@ function sideGameConfirmSettlement(settlementId){
   settlement.status="confirmed";
   settlement.confirmedAt=new Date().toISOString();
 
-  save();
+  if(!await save("sidegame"))return;
   sideGameHome();
 
   alert(`Settlement with ${settlement.debtorName} confirmed.`);
@@ -2360,7 +2362,7 @@ function sideGameSettlementConfirmationsHtml(){
   </div>`;
 }
 
-function sideGameHome(){
+async function sideGameHome(){
   sideGameOpen=true;
   sideGameHomeOpen=true;
 
@@ -2383,7 +2385,7 @@ function sideGameHome(){
   sideGameResolveBetsForToday();
 
   if(hadActiveCompletedBet){
-    save();
+    if(!await save("sidegame"))return;
   }
   if(!myPlayerId){
     alert("Please select who you are first.");
@@ -2513,12 +2515,12 @@ function sideGameHome(){
                 </div>
 
                 <button class="primary full" style="margin-top:12px;"
-                  onclick="sideGameAcceptChallenge('${b.id}')">
+                  onclick="sideGameAcceptChallenge(${escAttr(JSON.stringify(b.id))})">
                   ✓ Accept
                 </button>
 
                 <button class="secondary full" style="margin-top:8px;"
-                  onclick="sideGameDeclineChallenge('${b.id}')">
+                  onclick="sideGameDeclineChallenge(${escAttr(JSON.stringify(b.id))})">
                   Decline
                 </button>
               `).join("")}
@@ -5046,7 +5048,7 @@ async function claimWinnerPrize(historyIndex,payoutId){
     payout.paymentProvider="Private bank transfer";
     payout.status="bank_details_needed";
     payout.claimedAt=new Date().toISOString();
-    if(await save()){
+    if(await save("claim")){
       show("round");
       window.scrollTo(0,0);
     }
@@ -5062,7 +5064,7 @@ async function claimWinnerPrize(historyIndex,payoutId){
   payout.paymentProvider=provider;
   payout.status="ready";
   payout.claimedAt=new Date().toISOString();
-  if(await save()){
+  if(await save("claim")){
     show("round");
     window.scrollTo(0,0);
   }
@@ -5088,7 +5090,7 @@ if(!allowed.includes(payout.status))return;
   if(!confirm(`Confirm that £${moneyText(payout.amount)} has been sent to ${payout.winnerName}?`))return;
   payout.status="paid";
   payout.paidAt=new Date().toISOString();
-  if(await save())showRoundHistory(historyIndex);
+  if(await save("settle"))showRoundHistory(historyIndex);
 }
 
 function resultCompetition(record){
@@ -6624,7 +6626,7 @@ if(!validGolfHandicap(handicapText)){
 p.handicap=newHandicap;
 
  render();
- await save();
+ await save(isAdmin?"members":"profile");
 }
 function playerJoinForm(){
   return new Promise(resolve=>{
@@ -6723,13 +6725,13 @@ async function adminAddPlayer(){
     netWinnings:0
   });
 
-  await save();
+  if(!await save("members"))return;
   render();
   alert("✅ " + cleanName + " added to the group.");
 }
 
-async function editPlayer(i){const p=state.players[i];const name=prompt("Player name",p.name);if(!name)return;const h=prompt("Handicap",p.handicap);if(h===null)return;const handicapText=String(h).trim();if(!validGolfHandicap(handicapText)){alert("Enter a handicap between -10 and 60, with up to 1 decimal place.");return}p.name=name.trim();p.handicap=Number(handicapText);render();await save()}
-async function removePlayer(i){const p=state.players[i];if(!p)return;if(!await appConfirm("Remove Player","Remove "+p.name+" from this group? Their past round history will stay saved.","Remove Player",true))return;state.players.splice(i,1);render();await save()}
+async function editPlayer(i){const p=state.players[i];const name=prompt("Player name",p.name);if(!name)return;const h=prompt("Handicap",p.handicap);if(h===null)return;const handicapText=String(h).trim();if(!validGolfHandicap(handicapText)){alert("Enter a handicap between -10 and 60, with up to 1 decimal place.");return}p.name=name.trim();p.handicap=Number(handicapText);render();await save("members")}
+async function removePlayer(i){const p=state.players[i];if(!p)return;if(!await appConfirm("Remove Player","Remove "+p.name+" from this group? Their past round history will stay saved.","Remove Player",true))return;state.players.splice(i,1);render();await save("members")}
 
 
 let isAdmin=false;

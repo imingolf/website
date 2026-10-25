@@ -10,6 +10,10 @@ for(const name of ['setupFirstRound','newRound','nextTripRound']){assert.match(e
 for(const name of ['adminEditSubmittedScore','editTripTeamScore']){assert.match(extract(name),/save\(\"correct\"\)/);assert.doesNotMatch(extract(name),/await save\(\)/);}
 for(const name of ['changeAdminPin','changeGroupName'])assert.match(extract(name),/save\(\"settings\"\)/);
 assert.match(extract('cancelCurrentRound'),/save\(\"cancel\"\)/);
+for(const name of ['adminAddPlayer','editPlayer','removePlayer'])assert.match(extract(name),/save\(\"members\"\)/);
+for(const name of ['sideGameConfirmBet','sideGameSendChallenge','sideGameAcceptChallenge','sideGameDeclineChallenge','sideGameSaveScore','sideGameRequestSettlement','sideGameConfirmSettlement','sideGameHome'])assert.match(extract(name),/save\(\"sidegame\"\)/);
+assert.match(extract('claimWinnerPrize'),/save\(\"claim\"\)/);assert.match(extract('markWinnerPaid'),/save\(\"settle\"\)/);
+assert.match(extract('selectMyPlayer'),/clearCredential\(\)/);
 assert.match(extract('save'),/capture\(sourceState,pin\)/);assert.match(extract('save'),/commit\(operation/);
 const connect=extract('connect');assert.ok(connect.indexOf('validateBuild')<connect.indexOf('createClient'));
 assert.match(connect,/db=iigEntryBridge\?iigEntryBridge.db:rawDb/);

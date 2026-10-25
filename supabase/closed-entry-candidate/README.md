@@ -176,3 +176,22 @@ tests, including eight PIN-binder tests; 25 real PostgreSQL 17.6 independent-ses
 races and six local-login role checks. No real PIN binding, exact TEST object/data
 baseline, installable migration/rollback or hosted/native test is claimed. Candidate
 and guarded mode remain disabled and NOT installable. No online project was contacted.
+
+## Member/Side Game/payout/Trip creation extension after 920ae95
+
+See [secure operation progress](../../docs/incident-closed-entry/SECURE-OPERATION-PROGRESS.md)
+for the implemented identity-bound operations, confirmed Mac PIN derivation and
+specific remaining gates. That report supersedes earlier *derivation not run* and
+unimplemented-member-route statements above. Private SQL remains on the owner's Mac.
+
+Adds a sixth private RLS table for hashed member credentials and a fifth public RPC
+for member credential checks. Operator-only member provisioning/replacement/revocation
+is separate from organiser authority. Browser name selection is never used as proof.
+Actual profile/membership, Side Game, payout claim/settlement and new/older Trip setup
+routes are covered by additional fictional tests. These do not certify all operations,
+existing data shapes, real verified identities or current TEST baseline/recovery.
+
+New offline prepare_guard_review.py only checks private binding hashes and creates a
+review inventory. It cannot connect, execute SQL, activate guarded mode or produce a
+ready installer. Exact target-bound migration/rollback remains a release gate. The
+candidate stays NOT INSTALLABLE and is outside automatic Supabase migrations.

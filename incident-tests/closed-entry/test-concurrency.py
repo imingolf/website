@@ -235,7 +235,7 @@ def canonical_candidate_races():
     cap='a'*64
     def seed_candidate(g,state):
         sql("INSERT INTO public.tens_in_groups(id,fixture_pin,state) VALUES('"+g+"','"+g+"',"+quote_state(state)+");"
-            "SELECT iig_closed_entry.provision('"+g+"','"+cap+"',clock_timestamp()+interval '30 days',ARRAY['finish','start','correct','cancel']);")
+            "SELECT iig_closed_entry.provision('"+g+"','"+cap+"',clock_timestamp()+interval '30 days',ARRAY['finish','start','correct','cancel','members','settle']);")
         return json.loads(sql("SELECT public.iig_entry_read('"+g+"')->'context';").stdout.strip())
     def write_candidate(g,c,op,state,nonce=None):
         nonce=nonce or str(uuid.uuid4())
@@ -300,6 +300,31 @@ def canonical_candidate_races():
             if archived!=source['before']:raise RuntimeError('Cancellation archive mismatch')
         if not meta(g)['closed']:raise RuntimeError('Maintenance reopened entries')
         print('PASS — canonical guard maintenance race:',kind)
+
+    for kind in ['member-profile-entry','member-revoke-profile','double-settlement','member-remove-profile','member-profile-remove']:
+        g='candidate-'+kind
+        base=copy.deepcopy(source['after'] if kind=='double-settlement' else source['before'])
+        c=seed_candidate(g,base)
+        if kind=='double-settlement':
+            proposed=copy.deepcopy(base);proposed['history'][0]['payouts'][0].update(status='paid',paidAt='2099-01-01T00:00:00Z')
+            settled=write_candidate(g,c,'settle',proposed)
+            contend(settled,settled,None)
+        else:
+            member='b'*64
+            sql("SELECT iig_closed_entry.provision_member('"+g+"','d','"+member+"',clock_timestamp()+interval '1 day',ARRAY['profile','sidegame','claim']);")
+            proposed=copy.deepcopy(base);proposed['players'][3]['handicap']=12.3
+            profile=write_candidate(g,c,'profile',proposed).replace("'"+cap+"'","'"+member+"'")
+            if kind=='member-profile-entry':
+                late=copy.deepcopy(base);late['players'][3]['paid']=True
+                contend(profile,write_candidate(g,c,'save',late))
+            elif kind=='member-revoke-profile':
+                contend("SELECT iig_closed_entry.revoke_member('"+g+"','"+member+"');",profile,'MEMBER_CREDENTIAL_REQUIRED')
+            else:
+                removed=copy.deepcopy(base);removed['players'].pop(3)
+                removal=write_candidate(g,c,'members',removed)
+                if kind=='member-remove-profile':contend(removal,profile,'MEMBER_CREDENTIAL_REQUIRED')
+                else:contend(profile,removal)
+        print('PASS — canonical member/payout race:',kind)
 
 
 def main():
