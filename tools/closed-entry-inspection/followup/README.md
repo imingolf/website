@@ -82,3 +82,14 @@ has passed. It reports handler return/rethrow/message references and write/confl
 checks, omitting completed source/index/declaration sketches. It does not verify
 runtime reachability. See
 [receipt contracts and four remaining private facts](../../../docs/incident-closed-entry/RESULT-RECEIPTS-AND-PRIVATE-GATES.md).
+
+## Candidate PIN resolver (OFFLINE derivation, not installation)
+
+prepare_pin_binding.py validates the original matching source/export package and
+supports only the saved public.get_group_state(text) single-table SQL SELECT form
+with fixed safe search_path, postgres ownership/SECURITY DEFINER, canonical id/state
+types and no extra statements/joins/subqueries. It preserves the predicate and path,
+changes the state projection to id::text, and writes a NEW private review-only SQL/
+manifest folder outside Git. It never invokes SQL or connects. Unsupported source
+forms stop and need offline parser review, not another inspection or guessed hashing.
+No installation command is authorised; see the candidate README before any use.

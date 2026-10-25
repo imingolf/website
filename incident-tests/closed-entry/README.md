@@ -251,3 +251,13 @@ of LIVE. test-observed-update-pattern.cjs follows the actual observed structure 
 explicitly fictional names/types/constants, and checks downstream failures propagate
 outside those handlers. See
 [the corrected evidence assessment](../../docs/incident-closed-entry/UPLOADED-UPDATE-EVIDENCE-ASSESSMENT.md).
+
+## Canonical-row candidate + actual app bridge
+
+The new supabase/closed-entry-candidate files operate on ONE public group-state row,
+not the old lab-role/projection fixture. test-canonical-boundary.cjs tests these SQL
+files with a deliberately fictional PIN resolver and exercises actual repository
+save/finish/setup functions through app/entry-guard-client.js. No online activation
+configuration exists. test-candidate-rollback.cjs rehearses local DDL failure while
+preserving original ACL/RLS/ownership/JSON. The local network-none concurrency runner
+adds five canonical races. See the [candidate safety/readiness gates](../../supabase/closed-entry-candidate/README.md).

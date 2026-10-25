@@ -290,8 +290,10 @@ if(/iPhone|iPod/.test(navigator.userAgent) &&
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="./config.js"></script>
+<script src="./entry-guard-client.js"></script>
 <script>
 let db=null, pin="", page="round", poller=null, groupPlanType="";
+let iigEntryBridge=null;
 let leagueView="points";
 let selectedPastTripIndex=0;
 
@@ -590,7 +592,20 @@ async function connect(){
  if(!configured()){ $("connectMsg").textContent="Please complete the one-time database setup first."; return; }
  pin=$("pinInput").value.trim(); if(!pin){$("connectMsg").textContent="Enter your group PIN.";return}
  $("connectMsg").textContent="Opening shared group…";
- db=supabase.createClient(TENS_IN_CONFIG.supabaseUrl,TENS_IN_CONFIG.supabaseKey);
+ try{
+  const guarded=window.IIG_CLOSED_ENTRY_BUILD!==undefined;
+  if(guarded){
+   if(!window.IIGEntryGuard)throw Error('Guard client missing');
+   IIGEntryGuard.validateBuild(window.IIG_CLOSED_ENTRY_BUILD,TENS_IN_CONFIG,location.origin);
+  }
+  if(iigEntryBridge)iigEntryBridge.clear();
+  const rawDb=supabase.createClient(TENS_IN_CONFIG.supabaseUrl,TENS_IN_CONFIG.supabaseKey);
+  iigEntryBridge=guarded?IIGEntryGuard.create(rawDb,{
+   uuid:()=>crypto.randomUUID(),
+   promptCredential:()=>appPrompt('Secure organiser access','Enter the private credential issued for this group.','',{type:'password',maxlength:64,okLabel:'Unlock'})
+  }):null;
+  db=iigEntryBridge?iigEntryBridge.db:rawDb;
+ }catch(_){db=null;$("connectMsg").textContent="The guarded TEST build is not configured correctly.";return;}
 
  const {data:accessRows,error:accessError}=await db.rpc(
    "get_group_access_status",
@@ -756,17 +771,23 @@ let saveQueue=Promise.resolve();
 let stateSaveVersion=0;
 let refreshRequestVersion=0;
 
-async function save(){
+async function save(operation="save"){
   if(!db)return false;
   if(demoReadOnly()){
     $("syncText").textContent="Demo • read only";
     return false;
   }
   state.lastActivityAt=new Date().toISOString();
+  const sourceState=state;
+  let entryCapture=null;
+  const savedBridge=typeof iigEntryBridge!=="undefined"?iigEntryBridge:null;
+  if(savedBridge){
+    try{entryCapture=savedBridge.capture(sourceState,pin);}catch(_){$("syncText").textContent="Reload the group before saving";return false;}
+  }
   const savedState=JSON.parse(JSON.stringify(state));
   const savedPin=pin;
   const savedDb=db;
-  stateSaveVersion++;
+  const savedVersion=++stateSaveVersion;
   savePending++;
   saveActive=true;
   $("syncText").textContent="Saving…";
@@ -775,8 +796,18 @@ async function save(){
   const request=saveQueue.then(async()=>{
     let ok=false;
     try{
-      const {data,error}=await savedDb.rpc("save_group_state",{p_pin:savedPin,p_state:savedState});
+      const {data,error}=entryCapture
+        ? await savedBridge.commit(operation,savedPin,savedState,entryCapture,sourceState)
+        : await savedDb.rpc("save_group_state",{p_pin:savedPin,p_state:savedState});
       ok=!error && data!==false;
+      if(!ok && savedBridge && iigEntryBridge===savedBridge && pin===savedPin && stateSaveVersion===savedVersion){
+        // Restore authoritative display after a rejected/ambiguous save, never
+        // replay or attach a new revision to this phone's stale proposal.
+        const latest=await savedBridge.db.rpc("get_group_state",{p_pin:savedPin});
+        if(!latest.error && latest.data && iigEntryBridge===savedBridge && pin===savedPin && stateSaveVersion===savedVersion){
+          state=latest.data;render();
+        }
+      }
       return ok;
     }catch(error){
       return false;
@@ -790,6 +821,14 @@ async function save(){
   });
   saveQueue=request.catch(()=>false);
   return request;
+}
+
+async function recoverGuardedSave(){
+  if(!iigEntryBridge || !iigEntryBridge.hasPending())return;
+  const recovered=await iigEntryBridge.recover();
+  if(recovered.error){alert("The last save could not be confirmed. Do not repeat it yet; reload and check the latest group.");return;}
+  state=recovered.data;render();
+  $("syncText").textContent="Shared • confirmed";
 }
 
 function refreshBlocked(){
@@ -908,6 +947,7 @@ function render(){
   if(page==="adminhelp")adminHelpPage();
 }
 function roundLocked(){
+  if(typeof iigEntryBridge!=="undefined" && iigEntryBridge && iigEntryBridge.entryStatus(state,pin).closed)return true;
   return Object.values(state.trip?.currentTeamScores||{}).some(v=>v!=null && v!=="") || state.players.some(p=>
     p.stableford!=null ||
     p.netScore!=null ||
@@ -942,6 +982,7 @@ async function refreshEntryState(){
 }
 
 function roundOpenNow(){
+  if(typeof iigEntryBridge!=="undefined" && iigEntryBridge)return iigEntryBridge.entryStatus(state,pin).open;
   if(state.roundOpen===false)return false;
   if(state.roundOpen===true)return true;
 
@@ -1024,9 +1065,9 @@ async function setupFirstRound(){
   state.roundId=createRoundId();
   state.players.forEach(p=>{
     p.paid=false; p.competition=null; p.stableford=null; p.netScore=null;
-    p.noReturn=false; p.scoreSubmitted=false;
+    p.noReturn=false; p.scoreSubmitted=false; p.playingThisRound=false;
   });
-  await save();
+  if(!await save("start")){alert("The first round was not confirmed. Reload the group before continuing.");return;}
   render();
 }
 
@@ -4100,7 +4141,7 @@ async function finishTripBetterBallRound(){
   state.trip.currentTeamScores={};
   if(state.trip.currentRound<state.trip.totalRounds){state.trip.currentRound+=1;state.roundOpen=false;}
   else{state.trip.completed=true;state.trip.active=false;setTripChampion();}
-  await save();
+  if(!await save("finish")){alert("The finished round was not confirmed. Reload the group before continuing.");return;}
   if(state.trip?.completed)showTripSummary();else showTripBetterBallResult(record);
 }
 
@@ -4464,7 +4505,7 @@ if(isTrip){
     setTripChampion();
   }
 }
-        const finishSaved=await save();
+        const finishSaved=await save("finish");
         if(!finishSaved){
           alert("The finished round could not be saved. Please check your connection and try again.");
           return;
@@ -4796,7 +4837,7 @@ if(isTrip){
     setTripChampion();
   }
 }
-  const moneyFinishSaved=await save();
+  const moneyFinishSaved=await save("finish");
   if(!moneyFinishSaved){
     alert("The finished round could not be saved. Please check your connection and try again.");
     return;
@@ -6723,6 +6764,7 @@ function saveAdminForGroup(){
 }
 
 function clearAdminForGroup(){
+  if(typeof iigEntryBridge!=="undefined" && iigEntryBridge)iigEntryBridge.clearCredential();
   if(pin)sessionStorage.removeItem(adminSessionKey(pin));
   isAdmin=false;
 }
@@ -6770,6 +6812,7 @@ function openAdminFromPlayers(){
 }
 
 function returnToPlayerView(){
+  if(typeof iigEntryBridge!=="undefined" && iigEntryBridge)iigEntryBridge.clearCredential();
   isAdmin=false;
   isOwner=false;
   ownerCreationCode="";
@@ -6959,6 +7002,7 @@ async function changeAdminPin(){
   showAppToast("✅ Admin PIN changed","Your new 4-digit PIN is ready to use.",3000);
 }
 function adminLogout(){
+  if(typeof iigEntryBridge!=="undefined" && iigEntryBridge)iigEntryBridge.clearCredential();
  isAdmin=false;
  isOwner=false;
  ownerCreationCode="";
@@ -7104,6 +7148,13 @@ async function changeCurrentPrizePayout(){
 }
 
 function settingsPage(){
+  if(typeof iigEntryBridge!=="undefined" && iigEntryBridge && iigEntryBridge.hasPending()){
+    if(!document.getElementById("guardRecoveryButton")){
+      const button=document.createElement("button");button.id="guardRecoveryButton";
+      button.textContent="Check last save";button.onclick=recoverGuardedSave;
+      document.getElementById("app").prepend(button);
+    }
+  }
  if(!isAdmin){adminLogin();return}
  $("screen").innerHTML=`<div class="card"><h2>⚙️ Admin / Settings</h2>
  <div class="muted">Shared controls for your golf group.</div>
@@ -8904,7 +8955,7 @@ async function newRound(){
       p.paid=false;p.stableford=null;p.netScore=null;p.noReturn=false;p.scoreSubmitted=false;p.competition=null;
       p.tripNotPlayingToday=!daySetup.playingIds.includes(p.id);
     });
-    await save();
+    if(!await save("start")){alert("The new round was not confirmed. Reload the group before continuing.");return;}
     show('round');
     return;
   }
@@ -8932,7 +8983,7 @@ async function newRound(){
     p.paid=false;p.stableford=null;p.netScore=null;p.noReturn=false;p.scoreSubmitted=false;p.competition=null;
     p.playingThisRound=false;
   });
-  await save();
+  if(!await save("start")){alert("The new round was not confirmed. Reload the group before continuing.");return;}
   show('round');
 }
 async function nextTripRound(){
@@ -8975,7 +9026,7 @@ async function nextTripRound(){
       p.competition=null;
       p.tripNotPlayingToday=!daySetup.playingIds.includes(p.id);
     });
-    await save();
+    if(!await save("start")){alert("The new round was not confirmed. Reload the group before continuing.");return;}
     show("round");
     return;
   }
@@ -9106,7 +9157,7 @@ if(tripDate===null)return;
     p.competition=null;
   });
 
-  await save();
+  if(!await save("start")){alert("The new round was not confirmed. Reload the group before continuing.");return;}
   show("round");
 }
 async function deletePastTrip(){

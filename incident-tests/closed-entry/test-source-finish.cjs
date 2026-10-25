@@ -35,15 +35,22 @@ function fixture({game='money',format='stableford',trip=false,last=false,pair=nu
  }
  return state;
 }
-async function originalFinish(before){
+async function originalFinish(before,options={}){
  let saved;
  const c={console,Number,String,Boolean,JSON,Object,Array,Math,Date,Promise,crypto:require('node:crypto').webcrypto,
-  pin:'fictional-pin',state:clone(before),isAdmin:true,myPlayerId:'a',finishRoundActive:false,normalFinishInProgress:false,
+  pin:options.pin||'fictional-pin',state:options.bridge?before:clone(before),isAdmin:true,myPlayerId:'a',finishRoundActive:false,normalFinishInProgress:false,
   scoreDraftActive:false,saveActive:false,savePending:0,saveQueue:Promise.resolve(),stateSaveVersion:0,page:'round',demoReadOnly:()=>false,demoCanEdit:()=>true,
   showAppToast(){},render(){},showWinnerScreen(){},showTripSummary(){},showTripBetterBallResult(){},
   alert(message){throw Error('Unexpected app alert: '+message);},appPrompt:async()=> '1',
   appConfirm:async()=>true,$:()=>({textContent:''})};
  c.db={rpc:async(name,args)=>{if(name==='get_group_state')return {data:clone(c.state)};assert.equal(name,'save_group_state');saved=clone(args.p_state);return {data:true};}};
+ if(options.bridge){
+  c.db=options.bridge.db;
+  c.iigEntryBridge={...options.bridge,commit:async(...args)=>{
+   if(options.operations)options.operations.push(args[0]);
+   const result=await options.bridge.commit(...args);if(result.data===true)saved=clone(c.state);return result;
+  }};
+ }
  vm.createContext(c);
  for(const name of ['save','finishRound','finishRoundImpl','createWinnerPayouts','currentRoundPlayers','tripPlayingIds','tripPlayerIsPlaying',
   'tripRoundFormat','tripBetterBallActive','tripPairsAggregateActive','tripTeamRoundActive','tripFormatLabel','paidCount','pot',
@@ -52,10 +59,10 @@ async function originalFinish(before){
   vm.runInContext(extract(name),c);
  await c.finishRound();assert.ok(saved,'Original app must finish and save');return saved;
 }
-async function originalSetup(after,format){
+async function originalSetup(after,format,options={}){
  let saved;
- const c={state:clone(after),isAdmin:true,Number,String,Boolean,Array,Object,Math,Date,JSON,
-  pin:'fictional-pin',saveActive:false,savePending:0,saveQueue:Promise.resolve(),stateSaveVersion:0,
+ const c={state:options.bridge?after:clone(after),isAdmin:true,Number,String,Boolean,Array,Object,Math,Date,JSON,
+  pin:options.pin||'fictional-pin',saveActive:false,savePending:0,saveQueue:Promise.resolve(),stateSaveVersion:0,
   demoReadOnly:()=>false,$:()=>({textContent:''}),
   createRoundId:()=> 'client-generated-setup-id',
   chooseNewRoundGameType:async()=>after.gameType==='points'?'2':'1',
@@ -65,6 +72,13 @@ async function originalSetup(after,format){
   alert(message){throw Error('Unexpected setup alert: '+message);},show(){},
   };
  c.db={rpc:async(name,args)=>{assert.equal(name,'save_group_state');saved=clone(args.p_state);return {data:true};}};
+ if(options.bridge){
+  c.db=options.bridge.db;
+  c.iigEntryBridge={...options.bridge,commit:async(...args)=>{
+   if(options.operations)options.operations.push(args[0]);
+   const result=await options.bridge.commit(...args);if(result.data===true)saved=clone(c.state);return result;
+  }};
+ }
  vm.createContext(c);
  for(const name of ['save','newRound','nextTripRound'])vm.runInContext(extract(name),c);
  await (after.trip?.active?c.nextTripRound():c.newRound());
@@ -163,7 +177,7 @@ async function run(){
   console.log(`PASS: ${count} actual-source finish AND next-setup scenarios persisted JSON-equivalent results through fictional protected boundary: Money/Points, Stableford/Net, ties, NR, Trip individual/pair/final, payouts and League payloads. 17 tampering cases and 23 delayed old-round saves rejected. Actual LIVE triggers NOT tested.`);
  }finally{await db.close();}
 }
-module.exports={fixture,originalFinish,originalSetup,leagueMoney};
+module.exports={fixture,originalFinish,originalSetup,leagueMoney,extract};
 if(require.main===module){
  const action=process.argv.includes('--emit-concurrency-fixture')?(async()=>{
   const before=fixture({game:'money',format:'stableford'});

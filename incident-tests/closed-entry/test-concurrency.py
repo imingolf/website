@@ -62,7 +62,7 @@ def blocked(pid):
         time.sleep(.05)
     raise RuntimeError('Expected independent-session lock wait not observed')
 
-def contend(winner_sql,loser_sql):
+def contend(winner_sql,loser_sql,expected_error='STALE_ROUND_OR_REVISION'):
     # Session A holds actual row lock across its save and commit; no network socket.
     a=subprocess.Popen(command(),stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,env=ENV,text=True)
     b=None
@@ -82,7 +82,9 @@ def contend(winner_sql,loser_sql):
         a_out,a_err=a.communicate(timeout=10)
         if a.returncode:raise RuntimeError('Winner fixture failed')
         b.stdin.close();b.stdin=None;b_out,b_err=b.communicate(timeout=10)
-        if b.returncode==0 or 'STALE_ROUND_OR_REVISION' not in b_err:raise RuntimeError('Stale racing writer was not rejected')
+        if expected_error is None:
+            if b.returncode or '"replayed": true' not in b_out:raise RuntimeError('Racing receipt replay failed')
+        elif b.returncode==0 or expected_error not in b_err:raise RuntimeError('Racing writer was not rejected as expected')
     finally:
         for process in [a,b]:
             if process and process.poll() is None:process.kill();process.communicate(timeout=5)
@@ -214,6 +216,60 @@ def source_result_races():
             if state!=expected or state['roundId']==round_id:raise RuntimeError('Actual-source setup payload changed')
         print('PASS — real lock contention:',kind,'with actual app history/payout payload preserved')
 
+def canonical_candidate_races():
+    # OWN disposable local PG only. No real PIN resolver or private evidence.
+    import copy
+    sql("CREATE ROLE anon;CREATE ROLE authenticated;CREATE ROLE service_role;"
+        "CREATE TABLE public.tens_in_groups(id text PRIMARY KEY,fixture_pin text UNIQUE,state jsonb NOT NULL,updated_at timestamptz DEFAULT now());"
+        "CREATE TABLE public.fixture_after_effects(group_id text PRIMARY KEY,n integer NOT NULL);"
+        "CREATE FUNCTION public.fixture_after_hook() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN "
+        "INSERT INTO public.fixture_after_effects VALUES(NEW.id,1) ON CONFLICT(group_id) DO UPDATE SET n=public.fixture_after_effects.n+1;RETURN NEW;END $$;"
+        "CREATE TRIGGER fixture_after AFTER UPDATE ON public.tens_in_groups FOR EACH ROW EXECUTE FUNCTION public.fixture_after_hook();")
+    candidate=HERE.parents[1]/'supabase/closed-entry-candidate'
+    for name in ['core.sql','validators.sql','boundary.sql']:sql((candidate/name).read_text())
+    sql("CREATE OR REPLACE FUNCTION iig_closed_entry.resolve_pin(p_pin text) RETURNS text LANGUAGE sql SECURITY DEFINER SET search_path=pg_catalog AS $$ SELECT id FROM public.tens_in_groups WHERE fixture_pin=p_pin $$;REVOKE ALL ON FUNCTION iig_closed_entry.resolve_pin(text) FROM PUBLIC;")
+    emitted=subprocess.run(['node',str(HERE/'test-source-finish.cjs'),'--emit-concurrency-fixture'],env=ENV,text=True,capture_output=True,timeout=15)
+    if emitted.returncode:raise RuntimeError('Cannot generate candidate source fixture')
+    source=json.loads(emitted.stdout)
+    for v in source.values():v.pop('_entry_revision',None)
+    cap='a'*64
+    def seed_candidate(g,state):
+        sql("INSERT INTO public.tens_in_groups(id,fixture_pin,state) VALUES('"+g+"','"+g+"',"+quote_state(state)+");"
+            "SELECT iig_closed_entry.provision('"+g+"','"+cap+"',clock_timestamp()+interval '30 days',ARRAY['finish','start']);")
+        return json.loads(sql("SELECT public.iig_entry_read('"+g+"')->'context';").stdout.strip())
+    def write_candidate(g,c,op,state,nonce=None):
+        nonce=nonce or str(uuid.uuid4())
+        return "SELECT public.iig_entry_write('"+g+"','"+g+"','"+c['roundId']+"',"+str(c['revision'])+",'"+op+"',"+quote_state(state)+",'"+cap+"','"+nonce+"');"
+    def meta(g):return json.loads(sql("SELECT iig_closed_entry.envelope('"+g+"');").stdout.strip())
+    g='candidate-score-entry';before=fixture();c=seed_candidate(g,before)
+    score=copy.deepcopy(before);score['players'][0]['stableford']=32;score['players'][0]['scoreSubmitted']=True
+    late=copy.deepcopy(before);late['players'][3]['paid']=True
+    contend(write_candidate(g,c,'save',score),write_candidate(g,c,'save',late))
+    if not meta(g)['closed']:raise RuntimeError('Candidate closure not latched')
+    print('PASS — canonical guard race: first score blocks stale payment')
+    g='candidate-pin-rotation';seed_candidate(g,fixture())
+    contend("UPDATE public.tens_in_groups SET fixture_pin='rotated-fictional-pin' WHERE id='"+g+"';",
+            "SELECT public.iig_entry_read('"+g+"');",'GROUP_NOT_FOUND')
+    print('PASS — canonical guard race: PIN predicate rechecked after group lock')
+    for kind in ['finish-entry','double-finish','start-return','revoke-finish']:
+        g='candidate-'+kind;c=seed_candidate(g,source['before']);nonce=str(uuid.uuid4())
+        finish=write_candidate(g,c,'finish',source['after'],nonce)
+        if kind=='finish-entry':
+            late=copy.deepcopy(source['before']);late['players'][-1]['paid']=True
+            contend(finish,write_candidate(g,c,'save',late))
+        elif kind=='double-finish':
+            contend(finish,finish,None)
+            n=sql("SELECT n FROM public.fixture_after_effects WHERE group_id='"+g+"';").stdout.strip()
+            if n!='1':raise RuntimeError('Duplicate candidate AFTER side effect')
+        elif kind=='start-return':
+            sql(finish);c=meta(g);late=copy.deepcopy(source['before']);late['players'][-1]['paid']=True
+            contend(write_candidate(g,c,'start',source['setup']),write_candidate(g,c,'save',late))
+        else:
+            contend("SELECT iig_closed_entry.revoke('"+g+"','"+cap+"');",finish,'ORGANISER_CREDENTIAL_REQUIRED')
+            if meta(g)['revision']!=0:raise RuntimeError('Revoked candidate committed a finish')
+        print('PASS — canonical guard race:',kind)
+
+
 def main():
     created=False
     try:
@@ -238,6 +294,7 @@ def main():
         real_role_checks()
         legacy_races()
         source_result_races()
+        canonical_candidate_races()
         ensure_isolated()
         print('PASS — PostgreSQL 17.6 independent-session races; network none, no ports/mounts, fictional data only.')
     finally:

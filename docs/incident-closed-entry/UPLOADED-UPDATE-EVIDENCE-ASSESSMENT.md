@@ -90,3 +90,11 @@ Receipt/closure/revocation data must survive rollback. No CASCADE, old group-sta
 restore, vulnerable fallback, migration or deployment is authorised by this report.
 Release: NO-GO; the broad trigger-exception blocker has been narrowed substantially,
 not converted into a blanket production compatibility approval.
+
+## Subsequent canonical-row implementation
+
+See [closed-entry-candidate](../../supabase/closed-entry-candidate/README.md) for the
+new private-metadata/table-boundary implementation and actual app adapter tests.
+It leaves the existing AFTER hooks unchanged. It is deliberately NOT installable:
+PIN binding, full operation/result validation, credential/client readiness and exact
+hosted recovery/activation guards remain unfinished. No new inspection is requested.
