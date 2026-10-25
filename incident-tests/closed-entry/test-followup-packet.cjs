@@ -19,7 +19,7 @@ const root=path.resolve(__dirname,'../..');
    CREATE FUNCTION public.fixture_salt(value integer) RETURNS text LANGUAGE sql AS $$ SELECT value::text $$;
    CREATE FUNCTION public.create_golf_group() RETURNS text LANGUAGE sql SECURITY DEFINER SET search_path=public AS $$ SELECT public.fixture_salt('fictional') $$;
    CREATE FUNCTION public.fixture_hook() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public AS $$
-    BEGIN PERFORM sum(x) FROM generate_series(1,2) x; INSERT INTO iig_private.fixture_events(id,kind) VALUES(NEW.id,'fictional') ON CONFLICT DO NOTHING; RETURN NEW; END $$;
+    BEGIN CASE WHEN TG_OP='UPDATE' THEN BEGIN PERFORM sum(x) FROM generate_series(1,2) x; INSERT INTO iig_private.fixture_events(id,kind) VALUES(NEW.id,'fictional') ON CONFLICT DO NOTHING; EXCEPTION WHEN unique_violation THEN RAISE; END; ELSE RETURN NEW; END CASE; RETURN NEW; END $$;
    CREATE TRIGGER fixture_hook AFTER UPDATE ON public.tens_in_groups FOR EACH ROW EXECUTE FUNCTION public.fixture_hook();`);
   await db.exec('REVOKE EXECUTE ON FUNCTION public.save_group_state(text,jsonb) FROM PUBLIC; GRANT EXECUTE ON FUNCTION public.save_group_state(text,jsonb) TO anon,authenticated,service_role; GRANT SELECT,UPDATE ON public.tens_in_groups TO service_role;');
   const original=fs.readFileSync(path.join(root,'tools/closed-entry-inspection/inspection.sql'),'utf8');
@@ -68,11 +68,13 @@ const root=path.resolve(__dirname,'../..');
    captured_function_attributes_trigger_definitions_target_fingerprints_match:true,server_version_matches_saved_capture:true
   }),{mode:0o600});
   const semantic=spawnSync('python3',[path.join(root,'tools/closed-entry-inspection/semantic_saved.py'),
-   '--saved-folder',saved,'--package',out,'--folder',savedFollowup],{encoding:'utf8',timeout:10000});
+   '--saved-folder',saved,'--package',out,'--folder',savedFollowup,'--after-update-only'],{encoding:'utf8',timeout:10000});
   assert.equal(semantic.status,0,semantic.stderr);
-  const review=JSON.parse(semantic.stdout);assert.equal(review.database_connections,0);
+  const review=JSON.parse(semantic.stdout);assert.equal(review.database_connections,0);assert.equal(review.scope,'AFTER_UPDATE_ONLY');
   assert.equal(review.triggers.length,1);
   assert.equal(review.triggers[0].status,'STRUCTURAL_PATHS_EXTRACTED_NOT_SEMANTIC_PROOF');
+  assert.equal(review.triggers[0].statement_cases.length,1);
+  assert.equal(review.triggers[0].exception_blocks.filter(x=>x.handlers.length).length,1);
   assert.ok(review.triggers[0].events.some(x=>x.kind==='write'&&x.conflict.targetless));
   for(const privateText of ['fixture_events','fixture_hook','fictional','iig_private','generate_series'])assert.equal(semantic.stdout.includes(privateText),false);
 

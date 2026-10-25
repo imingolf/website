@@ -25,7 +25,7 @@ Do not share catalog files, SQL, private paths, credentials or records.
 - Triggers have anonymous numbers tied to anonymous target numbers, exact event/
   timing flags and a symbolic clause (including any WHEN/UPDATE OF condition).
 - Supported IF/ELSIF/ELSE branches retain predicate tokens and prior false branches.
-  FOR/FOREACH/WHILE/LOOP nesting is retained. Branch paths describe source nesting,
+  FOR/FOREACH/WHILE/LOOP nesting is retained. Supported BEGIN/EXCEPTION handlers and simple/searched statement CASE branches are now retained separately. Branch paths describe source nesting,
   not an assertion that the write executes: preceding return/raise event references,
   helper calls and iteration effects must also be reviewed.
 - Writes retain operation, target candidates, branch/iteration paths and symbolic
@@ -46,7 +46,7 @@ Do not share catalog files, SQL, private paths, credentials or records.
   indexes, null semantics, inherited objects, statement filters, deferral and actual
   inserted values still require review. PostgreSQL is NOT invoked to resolve them.
 
-Unsupported dynamic SQL, exception/statement-CASE handlers, complex conflict forms,
+Unsupported dynamic SQL, unrecognised handler statements, complex conflict forms,
 labels or unrecognised PL/pgSQL statements do not produce a partial success claim.
 The trigger is marked UNSUPPORTED_REQUIRES_PRIVATE_REVIEW with a fixed reason code.
 Malformed metadata, missing private files, inconsistent bodies or drifted packages
@@ -75,3 +75,11 @@ routing, and synthetic triggers are not replacements for actual side effects.
 Production binding, group-scoped authority, client/retry integration, complete
 operation coverage, faithful rollback/recovery and separately approved TEST preflight
 remain release gates. No production migration is supplied by this tool.
+
+
+## Focused AFTER UPDATE exception/CASE review
+
+Use `--after-update-only` to avoid repeating the completed INSERT-trigger analysis.
+This filters output only; the existing package/source/follow-up guards still validate
+all captured scope. Read [UPDATE-EXCEPTION-CASE-REVIEW.md](UPDATE-EXCEPTION-CASE-REVIEW.md)
+for the supported grammar, exception transaction rules and bounded private checklist.

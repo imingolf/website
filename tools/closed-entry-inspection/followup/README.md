@@ -70,3 +70,9 @@ saved package and outputs only symbolic branch paths, write targets and conflict
 constraint links. It never connects or executes SQL. Unsupported constructs remain
 explicitly unresolved, not skipped. See
 [safety, interpretation and limitations](../../../docs/incident-closed-entry/SAVED-SEMANTIC-REVIEW.md).
+
+For the remaining UPDATE-trigger blocker, run the semantic reviewer with
+`--after-update-only`. Supported exception scopes/handlers and simple/searched
+statement CASE arms are now distinct in the redacted output. This does not assert
+runtime effects are verified. See the bounded private checklist in
+[UPDATE-EXCEPTION-CASE-REVIEW.md](../../../docs/incident-closed-entry/UPDATE-EXCEPTION-CASE-REVIEW.md).

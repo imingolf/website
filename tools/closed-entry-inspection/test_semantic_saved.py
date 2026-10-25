@@ -51,10 +51,10 @@ class Semantic(unittest.TestCase):
   events=result['triggers'][0]['events'];write=next(x for x in events if x['kind']=='write')
   self.assertEqual(len(write['iteration_context']),1);self.assertIn('else_of',write['branch_path'][0])
   nested=[x for x in events if len(x['branch_path'])==2];self.assertEqual(len(nested),2)
- def test_exception_dynamic_and_statement_case_not_silently_skipped(self):
+ def test_dynamic_and_unsupported_handlers_not_silently_skipped(self):
   for body in ["BEGIN EXECUTE 'SECRET_SQL'; RETURN NEW; END;",
-    'BEGIN RETURN NEW; EXCEPTION WHEN others THEN RETURN OLD; END;',
-    'BEGIN CASE WHEN true THEN RETURN NEW; END CASE; END;']:
+    'BEGIN RETURN NEW; EXCEPTION WHEN others THEN GET STACKED DIAGNOSTICS x = MESSAGE_TEXT; END;',
+    'BEGIN CASE WHEN true THEN RETURN NEW; END;']:
    result=s.analyse(*self.fixture(body));self.assertEqual(result['triggers'][0]['status'],'UNSUPPORTED_REQUIRES_PRIVATE_REVIEW')
    self.assertNotIn('events',result['triggers'][0])
  def test_sql_case_in_guard_preserves_outer_then(self):
@@ -108,6 +108,52 @@ class Semantic(unittest.TestCase):
   original,rows,report,params=self.fixture();rows[2]['items'][0]['type_bits']=5
   result=s.analyse(original,rows,report,params)['triggers'][0]
   self.assertTrue(result['insert_event']);self.assertFalse(result['update_event']);self.assertTrue(result['after'])
+ def test_exception_body_and_handler_have_separate_scopes(self):
+  result=s.analyse(*self.fixture("BEGIN INSERT INTO private_schema.private_ledger VALUES (1,2); EXCEPTION WHEN unique_violation THEN RETURN NEW; WHEN OTHERS THEN RAISE; END;"))['triggers'][0]
+  self.assertEqual(result['status'],'STRUCTURAL_PATHS_EXTRACTED_NOT_SEMANTIC_PROOF')
+  block=result['exception_blocks'][0]
+  self.assertEqual(block['protected_event_numbers'],[1])
+  self.assertEqual(len(block['handlers']),2)
+  self.assertTrue(block['handlers'][0]['condition_flags']['unique_violation'])
+  self.assertTrue(block['database_changes_in_protected_block_rolled_back_before_matching_handler'])
+  self.assertTrue(block['plpgsql_local_variables_not_rewound'])
+  self.assertFalse(result['events'][0]['exception_handler_path'])
+  self.assertEqual(result['events'][1]['exception_handler_path'],[{'block_number':1,'handler_number':1}])
+ def test_nested_exception_scope_and_handler_write(self):
+  body="BEGIN BEGIN INSERT INTO private_schema.private_ledger VALUES (1,2); EXCEPTION WHEN SQLSTATE '23505' OR foreign_key_violation THEN UPDATE private_schema.private_ledger SET round_key=3; END; RETURN NEW; EXCEPTION WHEN OTHERS THEN RAISE; END;"
+  trigger=s.analyse(*self.fixture(body))['triggers'][0]
+  inner=trigger['exception_blocks'][1]
+  self.assertEqual(inner['parent_block'],1)
+  self.assertTrue(inner['handlers'][0]['condition_flags']['unique_violation'])
+  self.assertTrue(inner['handlers'][0]['condition_flags']['foreign_key_violation'])
+  update=next(e for e in trigger['events'] if e.get('operation')=='update')
+  self.assertEqual(update['block_scope_path'],[1,2]);self.assertEqual(update['exception_handler_path'][0]['block_number'],2)
+ def test_searched_statement_case_missing_else_has_exception(self):
+  trigger=s.analyse(*self.fixture('BEGIN CASE WHEN true THEN RETURN NEW; WHEN false THEN RETURN OLD; END CASE; END;'))['triggers'][0]
+  case=trigger['statement_cases'][0]
+  self.assertEqual(case['kind'],'searched');self.assertTrue(case['raises_case_not_found_when_no_match'])
+  self.assertEqual(trigger['events'][-1]['symbolic_expression'],['IMPLICIT_CASE_NOT_FOUND'])
+  self.assertEqual(len(trigger['events'][1]['branch_path'][0]['earlier_whens_not_matched']),1)
+ def test_simple_case_else_and_event_values(self):
+  trigger=s.analyse(*self.fixture("BEGIN CASE TG_OP WHEN 'UPDATE','INSERT' THEN RETURN NEW; ELSE RETURN OLD; END CASE; END;"))['triggers'][0]
+  case=trigger['statement_cases'][0];self.assertEqual(case['kind'],'simple');self.assertTrue(case['has_else'])
+  self.assertFalse(case['raises_case_not_found_when_no_match']);self.assertIn('EVENT:UPDATE',json.dumps(trigger))
+ def test_case_in_exception_handler_and_nested_if(self):
+  trigger=s.analyse(*self.fixture("BEGIN IF true THEN BEGIN RETURN NEW; EXCEPTION WHEN OTHERS THEN CASE WHEN true THEN RAISE; ELSE RETURN OLD; END CASE; END; END IF; END;"))['triggers'][0]
+  self.assertEqual(trigger['status'],'STRUCTURAL_PATHS_EXTRACTED_NOT_SEMANTIC_PROOF')
+  self.assertEqual(len(trigger['statement_cases']),1)
+  raises=[e for e in trigger['events'] if e.get('symbolic_expression')==['RAISE']]
+  self.assertEqual(len(raises),1);self.assertEqual(len(raises[0]['branch_path']),3)
+ def test_exception_names_and_sqlstate_redacted(self):
+  result=s.analyse(*self.fixture("BEGIN RETURN NEW; EXCEPTION WHEN SECRET_HANDLER OR SQLSTATE 'P4321' THEN RAISE EXCEPTION 'SECRET_MESSAGE'; END;"))
+  raw=json.dumps(result);self.assertNotIn('SECRET',raw);self.assertNotIn('P4321',raw)
+ def test_invalid_exception_grammar_and_case_ending_not_supported(self):
+  for body in ["BEGIN RETURN NEW; EXCEPTION WHEN SQLSTATE 'SECRET' THEN RETURN OLD; END;",'BEGIN CASE WHEN true THEN RETURN NEW; END IF; END;', 'BEGIN RETURN NEW; EXCEPTION WHEN others OR THEN RETURN OLD; END;']:
+   self.assertEqual(s.analyse(*self.fixture(body))['triggers'][0]['status'],'UNSUPPORTED_REQUIRES_PRIVATE_REVIEW')
+ def test_update_only_excludes_completed_insert_analysis(self):
+  original,rows,report,params=self.fixture();rows[2]['items'].append({**rows[2]['items'][0],'type_bits':5})
+  result=s.analyse(original,rows,report,params,after_update_only=True)
+  self.assertEqual(result['scope'],'AFTER_UPDATE_ONLY');self.assertEqual(len(result['triggers']),1)
  def test_missing_body_explicit(self):
   original,rows,report,params=self.fixture();original=[]
   result=s.analyse(original,rows,report,params)

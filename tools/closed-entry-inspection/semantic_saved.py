@@ -13,7 +13,7 @@ import prepare_followup as prep
 import review_followup as reviewer
 import summarise
 
-SAFE_WORDS=set('and or not is distinct from null true false exists new old tg_op coalesce nullif greatest least select where in as into values set excluded on conflict do nothing update insert delete returning join left right inner outer full lateral case when then else end any all array begin count sum filter over partition by order group having limit offset asc desc found'.split())|classifier.BUILTINS
+SAFE_WORDS=set('return raise sqlstate and or not is distinct from null true false exists new old tg_op coalesce nullif greatest least select where in as into values set excluded on conflict do nothing update insert delete returning join left right inner outer full lateral case when then else end any all array begin count sum filter over partition by order group having limit offset asc desc found'.split())|classifier.BUILTINS
 TOPICS={
  'history':{'history','rounds','roundhistory','round_history'},
  'payment_snapshot':{'paid','payment','payments','paymentmarkedat','payment_status','stake','pot','payouts','payout','payment_snapshot','payment_snapshots'},
@@ -99,7 +99,7 @@ def comma_names(tokens):
     return result
 
 class Review:
-    def __init__(self,tokens,symbols,tables):self.tokens=tokens;self.i=0;self.symbols=symbols;self.tables=tables;self.events=[]
+    def __init__(self,tokens,symbols,tables):self.tokens=tokens;self.i=0;self.symbols=symbols;self.tables=tables;self.events=[];self.blocks=[];self.active_blocks=[];self.handlers=[];self.cases=[]
     def at(self,*values):return all(self.i+n<len(self.tokens) and word(self.tokens[self.i+n],v) for n,v in enumerate(values))
     def take(self,terminator):
         start=self.i;depth=0;cases=0
@@ -114,11 +114,93 @@ class Review:
             if depth<0:raise Unsupported('unbalanced_expression')
             self.i+=1
         raise Unsupported('missing_terminator')
+    def emit(self,event):
+        if len(self.events)>=160:raise Unsupported('event_limit')
+        event['block_scope_path']=list(self.active_blocks)
+        event['exception_handler_path']=[dict(x) for x in self.handlers]
+        self.events.append(event)
+    def exception_conditions(self,tokens):
+        # PL/pgSQL condition-name or SQLSTATE literal, separated by OR. Do not
+        # infer an arbitrary name's class or output private SQLSTATE values.
+        i=0;flags={'others':False,'unique_violation':False,'foreign_key_violation':False}
+        while i<len(tokens):
+            t=tokens[i]
+            if word(t,'sqlstate'):
+                if i+1>=len(tokens) or tokens[i+1][0]!='literal' or not re.fullmatch(r'[0-9A-Z]{5}',tokens[i+1][1]):raise Unsupported('exception_condition')
+                if tokens[i+1][1]=='23505':flags['unique_violation']=True
+                if tokens[i+1][1]=='23503':flags['foreign_key_violation']=True
+                i+=2
+            elif t[0]=='word':
+                if t[1] in flags:flags[t[1]]=True
+                i+=1
+            else:raise Unsupported('exception_condition')
+            if i<len(tokens):
+                if not word(tokens[i],'or') or i+1==len(tokens):raise Unsupported('exception_condition')
+                i+=1
+        if not tokens:raise Unsupported('exception_condition')
+        return flags
+    def block(self,guards,loops):
+        if len(self.active_blocks)>=24:raise Unsupported('block_nesting_limit')
+        if len(self.blocks)>=64:raise Unsupported('block_count_limit')
+        ident=len(self.blocks)+1
+        block={'block_number':ident,'parent_block':self.active_blocks[-1] if self.active_blocks else None,'handlers':[]}
+        self.blocks.append(block);self.active_blocks.append(ident)
+        self.i+=1;start=len(self.events);self.sequence(guards,loops)
+        block['protected_event_numbers']=list(range(start+1,len(self.events)+1))
+        if self.at('exception'):
+            self.i+=1
+            if not self.at('when'):raise Unsupported('exception_handler_structure')
+            while self.at('when'):
+                if len(block['handlers'])>=32:raise Unsupported('handler_count_limit')
+                self.i+=1;conditions=self.take('then');flags=self.exception_conditions(conditions)
+                number=len(block['handlers'])+1;start=len(self.events)
+                handler={'block_number':ident,'handler_number':number}
+                self.handlers.append(handler)
+                gate={'exception_handler':handler,'conditions':self.symbols.render(conditions),'condition_flags':flags}
+                self.sequence(guards+[gate],loops);self.handlers.pop()
+                block['handlers'].append({'handler_number':number,'conditions':self.symbols.render(conditions),
+                    'condition_flags':flags,'event_numbers':list(range(start+1,len(self.events)+1))})
+        if not self.at('end') or self.at('end','if') or self.at('end','loop') or self.at('end','case'):raise Unsupported('block_structure')
+        self.i+=1
+        if self.i<len(self.tokens) and self.tokens[self.i]==('operator',';'):self.i+=1
+        self.active_blocks.pop()
+        block['database_changes_in_protected_block_rolled_back_before_matching_handler']=bool(block['handlers'])
+        block['plpgsql_local_variables_not_rewound']=bool(block['handlers'])
+        block['handler_effects_and_error_propagation_verified']=False
+    def statement_case(self,guards,loops):
+        if len(self.cases)>=64:raise Unsupported('case_count_limit')
+        self.i+=1;selector=self.take('when');prior=[]
+        info={'case_number':len(self.cases)+1,'kind':'simple' if selector else 'searched',
+              'selector':self.symbols.render(selector),'has_else':False}
+        self.cases.append(info)
+        while True:
+            if len(prior)>=64:raise Unsupported('case_arm_limit')
+            condition=self.take('then')
+            gate={'case_number':info['case_number'],'case_selector':self.symbols.render(selector),
+                  'when_expression':self.symbols.render(condition),
+                  'earlier_whens_not_matched':[self.symbols.render(x) for x in prior],
+                  'topics_NOT_effect_proof':topics(selector+condition)}
+            self.sequence(guards+[gate],loops);prior.append(condition)
+            if self.at('when'):self.i+=1;continue
+            break
+        if self.at('else'):
+            info['has_else']=True;self.i+=1
+            self.sequence(guards+[{'case_number':info['case_number'],'no_when_matched':[self.symbols.render(x) for x in prior]}],loops)
+        if not self.at('end','case'):raise Unsupported('statement_case_structure')
+        self.i+=2
+        if self.i>=len(self.tokens) or self.tokens[self.i]!=('operator',';'):raise Unsupported('statement_case_terminator')
+        self.i+=1
+        info['raises_case_not_found_when_no_match']=not info['has_else']
+        if not info['has_else']:
+            self.emit({'kind':'control_transfer','symbolic_expression':['IMPLICIT_CASE_NOT_FOUND'],
+                'branch_path':guards+[{'case_number':info['case_number'],'no_when_matched':[self.symbols.render(x) for x in prior]}],
+                'iteration_context':loops,'topics_NOT_effect_proof':[]})
     def sequence(self,guards,loops):
         if len(guards)+len(loops)>24:raise Unsupported('nesting_limit')
         while self.i<len(self.tokens):
-            if self.at('end') or self.at('else') or self.at('elsif'):return
-            if self.at('exception') or self.at('case'):raise Unsupported('exception_or_statement_case')
+            if self.at('end') or self.at('else') or self.at('elsif') or self.at('exception') or self.at('when'):return
+            if self.at('case'):
+                self.statement_case(guards,loops);continue
             if self.at('if'):
                 self.i+=1;condition=self.take('then');prior=[]
                 while True:
@@ -141,20 +223,16 @@ class Review:
                 if self.i>=len(self.tokens) or self.tokens[self.i]!=('operator',';'):raise Unsupported('loop_label_or_terminator')
                 self.i+=1;continue
             if self.at('begin'):
-                self.i+=1;self.sequence(guards,loops)
-                if not self.at('end') or self.at('end','if') or self.at('end','loop'):raise Unsupported('block_structure')
-                self.i+=1
-                if self.i<len(self.tokens) and self.tokens[self.i]==('operator',';'):self.i+=1
-                continue
+                self.block(guards,loops);continue
             statement=self.take(';')
             if not statement:continue
             if any(word(t,'execute') for t in statement):raise Unsupported('dynamic_sql')
             first=statement[0]
             if word(first,'with'):raise Unsupported('cte_requires_review')
             if first[0]=='word' and first[1] in ('insert','update','delete'):
-                self.events.append(self.write(statement,guards,loops))
+                self.emit(self.write(statement,guards,loops))
             elif ('operator',':=') in statement or word(first,'select') or word(first,'perform') or word(first,'return') or word(first,'raise'):
-                self.events.append({'kind':'control_transfer' if first[1] in ('return','raise') else 'dataflow_or_control','topics_NOT_effect_proof':topics(statement),
+                self.emit({'kind':'control_transfer' if first[1] in ('return','raise') else 'dataflow_or_control','topics_NOT_effect_proof':topics(statement),
                   'symbolic_expression':self.symbols.render(statement),'branch_path':guards,'iteration_context':loops})
             else:raise Unsupported('unrecognised_statement')
             if len(self.events)>160:raise Unsupported('event_limit')
@@ -208,7 +286,7 @@ class Review:
         return result
 
 
-def analyse(original,rows,report,params):
+def analyse(original,rows,report,params,after_update_only=False):
     reviewer.review(rows,report,params)
     parts={r['section']:r for r in rows};tables=parts['target_constraints_indexes']['items'];symbols=Symbols()
     bodies={}
@@ -226,6 +304,7 @@ def analyse(original,rows,report,params):
     output=[]
     for trigger in parts['target_trigger_dependencies']['items']:
         if trigger['internal']:continue
+        if after_update_only and (not int(trigger['type_bits'])&16 or int(trigger['type_bits'])&(2|64)):continue
         oid=prep.oid(trigger['function_oid'])
         if trigger.get('definition_body') is not None:remember(oid,trigger['definition_body'])
         item={'trigger_number':len(output)+1,'target_number':next(i for i,t in enumerate(tables,1) if prep.oid(t['table_oid'])==prep.oid(trigger['table_oid'])),
@@ -234,6 +313,7 @@ def analyse(original,rows,report,params):
           'before':bool(int(trigger['type_bits'])&2),'after':not bool(int(trigger['type_bits'])&(2|64)),'instead_of':bool(int(trigger['type_bits'])&64),
           'enabled_normal_or_always':trigger['enabled'] in ('O','A'),
           'trigger_clause_symbolic':symbols.render(lex(trigger['definition']))}
+        review=None
         try:
             if oid not in bodies:raise Unsupported('missing_saved_body')
             body=classifier.review_saved.body(bodies[oid]);tokens=lex(body)
@@ -246,10 +326,14 @@ def analyse(original,rows,report,params):
             item.update(status='STRUCTURAL_PATHS_EXTRACTED_NOT_SEMANTIC_PROOF',
               body_topic_references_NOT_effect_proof=topics(tokens),
               topic_event_index_NOT_effect_proof={topic:[i for i,event in enumerate(review.events,1) if topic in event.get('topics_NOT_effect_proof',[]) or any(topic in gate.get('topics_NOT_effect_proof',[]) for gate in event.get('branch_path',[]))] for topic in TOPICS},
-              declarations=symbols.render(declarations),events=review.events)
+              declarations=symbols.render(declarations),events=review.events,
+              exception_blocks=review.blocks,statement_cases=review.cases)
         except Unsupported as error:
             # Reasons are exclusively fixed codes created in this module.
             item.update(status='UNSUPPORTED_REQUIRES_PRIVATE_REVIEW',reason=error.args[0])
+            if review is not None:
+                item['private_review_location']={'body_token_number':review.i+1,'completed_event_count':len(review.events),
+                    'block_scope_path':list(review.active_blocks),'exception_handler_path':[dict(x) for x in review.handlers]}
         output.append(item)
     constraints=[]
     for i,t in enumerate(tables,1):
@@ -262,18 +346,25 @@ def analyse(original,rows,report,params):
             'ready':prep.boolean(x['ready']),'partial':x['predicate'] is not None,
             'symbolic_definition':symbols.render(lex(x['definition']))} for j,x in enumerate(t['indexes'],1)]})
     return {'project':prep.PROJECT,'database_connections':0,'group_records_read':0,
-      'saved_collection_guards_passed':True,'triggers':output,'target_constraints':constraints,
+      'saved_collection_guards_passed':True,'scope':'AFTER_UPDATE_ONLY' if after_update_only else 'SAVED_TARGET_TRIGGERS','triggers':output,'target_constraints':constraints,
       'limitations':['Symbolic constants hide values; matching symbols mean identical token values, not proven expression equivalence.',
         'Topic matches are references only: they do not prove an award/payment write or legitimate round transition.',
         'Branch paths are lexical nesting, not reachability: preceding returns/raises, loop iterations and helper calls can change execution; review control-event references.',
         'SELECT/RETURN/PERFORM expressions may invoke helpers; this is not a transitive side-effect or PostgreSQL binding proof.',
         'Conflict matches are structural candidates only; no runtime conflict arbitration or exactly-once guarantee is claimed.'],
+      'private_review_checklist':['For each exception block, identify protected writes and handler writes separately; handler writes are not rolled back by entering that handler.',
+        'Check whether handlers return normally, rethrow or raise a new error, including helper failures; absence of a direct RAISE is not proof of swallowing.',
+        'Verify enclosing exception scopes and local variables surviving rollback; check original SQLSTATE privately without sharing it.',
+        'For simple CASE, verify selector types, equality/null semantics and WHEN order; for searched CASE verify true/not-true branches.',
+        'A statement CASE without ELSE raises CASE_NOT_FOUND on no match; review which enclosing handler can catch it.',
+        'Map actual history/payment/League/Trip/payout writes to saved targets, keys, conflict actions, defaults and transaction outcomes before building faithful fixtures.'],
       'release_decision':'NO-GO pending private semantic review and faithful integration'}
 
 
 def main(argv=None):
     p=prep.QuietParser(description=__doc__)
     for arg in ('folder','saved-folder','package'):p.add_argument('--'+arg,type=Path)
+    p.add_argument('--after-update-only',action='store_true')
     args=p.parse_args(argv)
     try:
         base=Path.home()/'Documents/ImInGolf-LIVE-Inspection'
@@ -283,7 +374,7 @@ def main(argv=None):
         _,params=driver.load_package(source,package);prep.private_directory(folder)
         result=analyse(summarise.read_private(source/'catalog-private.json'),
           summarise.read_private(folder/'catalog-followup.PRIVATE.json'),
-          summarise.read_private(folder/'report.SANITISED.json'),params)
+          summarise.read_private(folder/'report.SANITISED.json'),params,after_update_only=args.after_update_only)
         print(json.dumps(result,indent=2,sort_keys=True));return 0
     except Exception:
         print('STOP — saved semantic review incompatible or non-private; no raw contents displayed. Database connections: 0',file=sys.stderr);return 1
