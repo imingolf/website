@@ -209,12 +209,15 @@ all 153 existing inspection tests also pass. No SQL is executed by those tests.
 input/query/code hashes, local TEST service/CA and attempt marker. It prints only a
 fixed failure category. It never runs subprocesses, resolves DNS, opens sockets,
 executes SQL, requests passwords, changes files or retries the consumed package.
-The connection runner and its hash stay unchanged, retaining the old package's
-integrity and no-retry safeguard.
+Package code/query hashes must still match. Keep historical packages intact; a
+code mismatch is not permission to rewrite their manifest or attempt marker.
 
-Important limitation: the current runner discards psql stdout/stderr on a nonzero
-exit, retaining only its attempt marker. This means that with valid local inputs,
-`UNDETERMINED_ORIGINAL_ERROR_NOT_RETAINED` is the honest result. A parsed CA cannot
+Before 8eda5d8 the runner discarded psql stdout/stderr on a nonzero exit, retaining
+only its attempt marker. Those discarded errors cannot be recovered. For matching
+packages with no retained diagnostic, `UNDETERMINED_ORIGINAL_ERROR_NOT_RETAINED`
+remains the honest result. Since 8eda5d8, new failed attempts retain only a strict
+allowlisted, package-bound category in `failure.SANITISED.json`; raw stdout/stderr
+and credentials are never saved. Ambiguous evidence stays undetermined. A parsed CA cannot
 prove that the server accepted the certificate, network connectivity succeeded,
 authentication passed, or the read-only query succeeded. The failure could also be
 a SQL/catalog/permission error rather than TLS. The attempt count is not a count of
@@ -225,4 +228,30 @@ cause of the earlier remote failure. Further connection/error collection, if nee
 requires a separately reviewed diagnostic improvement and fresh explicit approval;
 it is not authorised by running this offline tool. Keep the failed package intact.
 
-Verified: 74 preflight/diagnostic tests and 153 existing inspection tests pass offline.
+## Successful saved TEST capture: next review is offline
+
+After a successful bounded read-only collection, run the new `review-saved.py`
+against that exact existing package. Do not prepare another inspection package or
+run the connection command again. The reviewer does not call psql, pg_restore,
+subprocesses, DNS, database clients or any online service.
+
+```sh
+python3 -B tools/closed-entry-test-preflight/review-saved.py --package "/FULL/EXISTING/SUCCESSFUL/PACKAGE/PATH"
+```
+
+It validates the saved report/catalog and original evidence, reuses the existing
+local PIN binding when found, and creates a NEW private review folder. The three
+collector files covered by the successful manifest are unchanged. The output is a
+baseline-bound non-executable installation/retaining rollback plan and a fixed-label
+sanitised blocker summary. Original files and the consumed attempt marker stay intact.
+Only the printed sanitised summary is intended for sharing. No raw catalog, resolver,
+baseline or private plan should be uploaded.
+
+PASS means offline review preparation succeeded, not installation approval. Missing
+bindings, exact-hook/dependency review, faithful installer/rollback and recovery
+rehearsal, writer/client cutover and identity arrangements remain explicit gates.
+Saved outputs are hashed now, not retrospectively authenticated at collection time.
+See [the plan and evidence limits](../../docs/incident-closed-entry/SAVED-TEST-INSTALL-ROLLBACK-PLAN.md).
+
+Verified: 124 preflight/diagnostic/saved-review tests pass offline. Existing inspection
+tests remain separate; no new collection or SQL execution is authorised by review.
