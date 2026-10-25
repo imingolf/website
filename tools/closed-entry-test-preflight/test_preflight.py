@@ -50,7 +50,7 @@ class Safety(unittest.TestCase):
         'authority':{'section':'authority','database_create':True,'guard_schema_exists':False,'schemas':[{**s,'create':True} for s in c['inventory']['schemas']]},
         'platform':{'section':'platform','default_acl':[]},'writers':{'section':'writers','items':[]},
         'fingerprints':{'section':'fingerprints','items':c['fingerprints']}}
-    def output(self,d=None):return '1\n1\n'+'\n'.join(json.dumps(v) for v in (d or self.data()).values())+'\n'
+    def output(self,d=None):return '\n'.join(p.GUARD_OUTPUT)+'\n'+'\n'.join(json.dumps(v) for v in (d or self.data()).values())+'\n'
     def test_exact_scope_no_Auth_rows_or_RPC_calls(self):
         sql=p.build_sql(self.capture());self.assertIn('READ ONLY',sql);self.assertIn('pg_stat_ssl',sql)
         self.assertNotIn('auth.users',sql);self.assertNotIn('auth.identities',sql);self.assertNotIn('PRIVATE fictional',sql)
@@ -213,7 +213,8 @@ class Safety(unittest.TestCase):
         self.assertTrue((out/'report.SANITISED.json').exists())
     def test_timeout_no_retry_no_raw_diagnostic(self):
         out=self.prepare()
-        with patch.object(p.ssl,'create_default_context'),patch.object(p.subprocess,'run',side_effect=p.subprocess.TimeoutExpired('SECRET',1)) as run,self.assertRaises(p.subprocess.TimeoutExpired):p.connect(out,'secret','psql')
+        with patch.object(p.ssl,'create_default_context'),patch.object(p.subprocess,'run',side_effect=p.subprocess.TimeoutExpired('SECRET',1)) as run,self.assertRaises(p.DiagnosticStop) as error:p.connect(out,'secret','psql')
+        self.assertEqual(error.exception.category,'CONNECTION_TIMEOUT_UNDETERMINED')
         self.assertEqual(run.call_count,1);self.assertTrue((out/'connection-attempt.json').exists())
         self.assertFalse((out/'catalog.PRIVATE.json').exists())
     def test_schema_and_default_grant_drift(self):
@@ -231,5 +232,172 @@ class Safety(unittest.TestCase):
         with patch.object(p.sys.stdin,'isatty',return_value=False),patch.object(p.subprocess,'run') as run,contextlib.redirect_stdout(io.StringIO()) as out:
             self.assertEqual(p.main([]),1)
         run.assert_not_called();self.assertIn('attempted: 0',out.getvalue())
+
+    def test_all_guard_predicates_and_order_preserved(self):
+        sql=p.build_sql(self.capture())
+        labels=['IIG_PREFLIGHT_SERVER_IDENTITY','IIG_PREFLIGHT_READ_ONLY_TRANSACTION',
+                'IIG_PREFLIGHT_TLS','IIG_PREFLIGHT_RELATION_GUARD']
+        positions=[sql.index("SELECT '"+name+"';") for name in labels]
+        self.assertEqual(positions,sorted(positions))
+        self.assertLess(positions[2],sql.index('LOCK TABLE ONLY'))
+        self.assertLess(sql.index('LOCK TABLE ONLY'),positions[3])
+        self.assertLess(positions[3],sql.index("'section','identity'"))
+        for predicate in ["current_database()='postgres'","current_user='postgres'","session_user='postgres'",
+                "current_setting('transaction_read_only')='on'","current_setting('default_transaction_read_only')='on'",
+                "current_setting('server_version_num')::integer BETWEEN 170000 AND 179999",
+                "coalesce(current_setting('supabase.project_ref',true),'') IN ('','"+p.PROJECT+"')",
+                'FROM pg_catalog.pg_stat_ssl WHERE pid=pg_backend_pid() AND ssl']:
+            self.assertIn(predicate,sql)
+        self.assertEqual(sql.count('SELECT 1 / CASE WHEN'),4)
+        self.assertNotIn('\\',sql)
+
+    def test_guard_failures_require_exact_progress_and_SQLSTATE(self):
+        expected=['SERVER_IDENTITY_FAILURE','READ_ONLY_TRANSACTION_FAILURE','TLS_FAILURE','RELATION_GUARD_FAILURE']
+        for index,category in enumerate(expected):
+            raw='\n'.join(p.GUARD_OUTPUT[:2*index+1])+'\n'
+            for stderr in ['ERROR:  22012\n','psql:<stdin>:17: ERROR:  22012\n']:
+                with self.subTest(category=category,stderr=stderr):
+                    self.assertEqual(p.failure_category(raw,stderr),category)
+            self.assertEqual(p.failure_category(raw,'ERROR:  42501\n'),'SQL_OR_PERMISSION_FAILURE')
+            self.assertEqual(p.failure_category(raw,'PRIVATE_SECRET'),'UNDETERMINED_CONNECTION_FAILURE')
+            self.assertEqual(p.failure_category('PRIVATE_SECRET\n'+raw,'ERROR:  22012\n'),'SQL_OR_PERMISSION_FAILURE')
+        self.assertEqual(p.failure_category(self.output(),'ERROR:  22012\n'),'SQL_OR_PERMISSION_FAILURE')
+
+    def test_connection_error_classification_does_not_reflect_private_text(self):
+        prefix='psql: error: connection to server at "PRIVATE_HOST" (192.0.2.1), port 5432 failed: '
+        examples=[
+            ('SSL error: certificate verify failed','TLS_FAILURE'),
+            ('server certificate for "PRIVATE_CERT" does not match host name "PRIVATE_HOST"','TLS_FAILURE'),
+            ('server does not support SSL, but SSL was required','TLS_FAILURE'),
+            ('root certificate file "/PRIVATE_PATH" does not exist','TLS_FAILURE'),
+            ('Network is unreachable','NETWORK_FAILURE'),('No route to host','NETWORK_FAILURE'),
+            ('Connection refused','NETWORK_FAILURE'),('timeout expired','NETWORK_FAILURE'),
+            ('Connection timed out','NETWORK_FAILURE'),
+            ('FATAL:  password authentication failed for user "PRIVATE_USER"','AUTHENTICATION_FAILURE'),
+            ('FATAL:  no pg_hba.conf entry for host "PRIVATE_HOST", user "PRIVATE_USER", database "PRIVATE_DB", SSL encryption','AUTHENTICATION_FAILURE'),
+            ('FATAL:  database "PRIVATE_DB" does not exist','SERVER_IDENTITY_FAILURE'),
+            ('SSL SYSCALL error: EOF detected','UNDETERMINED_CONNECTION_FAILURE'),
+            ('PRIVATE_SECRET','UNDETERMINED_CONNECTION_FAILURE')]
+        for message,category in examples:
+            with self.subTest(message=message):
+                self.assertEqual(p.failure_category('',prefix+message+'\n'),category)
+        self.assertEqual(p.failure_category('','psql: error: could not translate host name "PRIVATE_HOST" to address: nodename nor servname provided, or not known\n'),'NETWORK_FAILURE')
+        for code,category in [('28P01','AUTHENTICATION_FAILURE'),('28000','AUTHENTICATION_FAILURE'),
+                ('25006','READ_ONLY_TRANSACTION_FAILURE'),('3D000','SERVER_IDENTITY_FAILURE'),
+                ('42501','SQL_OR_PERMISSION_FAILURE'),('57014','SQL_OR_PERMISSION_FAILURE'),
+                ('08006','UNDETERMINED_CONNECTION_FAILURE')]:
+            self.assertEqual(p.failure_category('','FATAL:  '+code+': PRIVATE_SECRET\n'),category)
+
+    def test_ambiguous_unrecognised_and_oversize_errors_never_guess(self):
+        for stderr in ['SSL error: certificate verify failed\nFATAL: password authentication failed for user "secret"',
+                'SSL error: certificate verify failed\nFATAL: unknown private failure',
+                'DETAIL: password authentication failed for user "SECRET"',
+                'NOTICE: SSL error: certificate verify failed',
+                'PRIVATE_SECRET 25006 28P01 TLS NETWORK READ_ONLY', '']:
+            self.assertEqual(p.failure_category('',stderr),'UNDETERMINED_CONNECTION_FAILURE')
+        with patch.object(p,'LIMIT',8):
+            self.assertEqual(p.failure_category('','ERROR:  25006'),'UNDETERMINED_CONNECTION_FAILURE')
+        for invalid in [None,b'SECRET',{}]:
+            self.assertEqual(p.failure_category('',invalid),'UNDETERMINED_CONNECTION_FAILURE')
+
+    def test_retained_failure_single_attempt_private_no_partial_catalog(self):
+        out=self.prepare()
+        result=SimpleNamespace(returncode=2,stdout='PRIVATE_BODY',
+            stderr='psql: error: connection to server at "PRIVATE_HOST" (192.0.2.1), port 5432 failed: SSL error: certificate verify failed PRIVATE_SECRET')
+        with patch('socket.socket',side_effect=AssertionError('NO NETWORK')),patch('socket.getaddrinfo',side_effect=AssertionError('NO DNS')),patch.object(p.ssl,'create_default_context'),patch.object(p.subprocess,'run',return_value=result) as run,self.assertRaises(p.DiagnosticStop) as error:
+            p.connect(out,'PASSWORD_SECRET','/approved/psql')
+        self.assertEqual(error.exception.category,'TLS_FAILURE')
+        self.assertNotIn('PRIVATE',str(error.exception).replace('private',''))
+        self.assertEqual(run.call_count,1)
+        args,kw=run.call_args
+        self.assertEqual(args[0],['/approved/psql','-X','-w','-qAt','-v','ON_ERROR_STOP=1','-v','VERBOSITY=sqlstate'])
+        self.assertEqual(kw['timeout'],120);self.assertEqual(kw['env']['PGCONNECT_TIMEOUT'],'8')
+        self.assertEqual(kw['env']['PGSSLMODE'],'verify-full');self.assertEqual(kw['env']['PGHOST'],p.HOST)
+        self.assertEqual(kw['env']['PGSSLROOTCERT'],str(self.root/'ca.crt'))
+        self.assertEqual(kw['input'],p.build_sql(self.capture()))
+        saved=json.loads((out/p.FAILURE_FILE).read_text())
+        self.assertEqual(saved,p.failure_record(out,'TLS_FAILURE'))
+        self.assertEqual((out/p.FAILURE_FILE).stat().st_mode&0o777,0o600)
+        for f in out.iterdir():
+            for secret in ['PASSWORD_SECRET','PRIVATE_BODY','PRIVATE_HOST','PRIVATE_SECRET']:
+                self.assertNotIn(secret,f.read_text())
+        self.assertFalse((out/'catalog.PRIVATE.json').exists())
+        self.assertFalse((out/'report.SANITISED.json').exists())
+        before={f.name:f.read_bytes() for f in out.iterdir()}
+        with patch.object(p.ssl,'create_default_context'),patch.object(p.subprocess,'run') as run,self.assertRaises(p.Stop):p.connect(out,'PASSWORD_SECRET','psql')
+        run.assert_not_called()
+        self.assertEqual(before,{f.name:f.read_bytes() for f in out.iterdir()})
+
+    def test_each_guard_failure_saved_instead_of_partial_stdout(self):
+        for index,name in enumerate(p.GUARDS):
+            with self.subTest(name=name),tempfile.TemporaryDirectory() as tmp:
+                self.root=Path(tmp);out=self.prepare()
+                result=SimpleNamespace(returncode=3,stdout='\n'.join(p.GUARD_OUTPUT[:2*index+1])+'\n',stderr='ERROR:  22012\n')
+                with patch.object(p.ssl,'create_default_context'),patch.object(p.subprocess,'run',return_value=result) as run,self.assertRaises(p.DiagnosticStop) as error:p.connect(out,'SECRET','psql')
+                self.assertEqual(error.exception.category,name+'_FAILURE');self.assertEqual(run.call_count,1)
+                self.assertEqual(json.loads((out/p.FAILURE_FILE).read_text())['category'],name+'_FAILURE')
+                self.assertFalse((out/'catalog.PRIVATE.json').exists())
+
+    def test_response_mismatches_and_malformed_data_are_saved_safely(self):
+        cases=[('database','other','SERVER_IDENTITY_FAILURE'),('role','anon','SERVER_IDENTITY_FAILURE'),
+            ('session_role','other','SERVER_IDENTITY_FAILURE'),('project','other','SERVER_IDENTITY_FAILURE'),
+            ('version','SECRET','SERVER_IDENTITY_FAILURE'),('version','180000','SERVER_IDENTITY_FAILURE'),
+            ('transaction_read_only','off','READ_ONLY_TRANSACTION_FAILURE'),
+            ('default_transaction_read_only','off','READ_ONLY_TRANSACTION_FAILURE'),('backend_ssl',False,'TLS_FAILURE')]
+        for key,value,category in cases:
+            with self.subTest(key=key,value=value),tempfile.TemporaryDirectory() as tmp:
+                self.root=Path(tmp);out=self.prepare();data=self.data();data['identity'][key]=value
+                result=SimpleNamespace(returncode=0,stdout=self.output(data),stderr='SECRET')
+                with patch.object(p.ssl,'create_default_context'),patch.object(p.subprocess,'run',return_value=result),self.assertRaises(p.DiagnosticStop) as error:p.connect(out,'SECRET','psql')
+                self.assertEqual(error.exception.category,category)
+                self.assertEqual(json.loads((out/p.FAILURE_FILE).read_text())['category'],category)
+                self.assertFalse((out/'catalog.PRIVATE.json').exists())
+        data=self.data();data['identity']['role']='other';data['identity']['backend_ssl']=False
+        with self.assertRaises(p.DiagnosticStop) as error:p.parse(self.output(data))
+        self.assertEqual(error.exception.category,'RESPONSE_VALIDATION_FAILURE')
+        with tempfile.TemporaryDirectory() as tmp:
+            self.root=Path(tmp);out=self.prepare()
+            with patch.object(p.ssl,'create_default_context'),patch.object(p.subprocess,'run',return_value=SimpleNamespace(returncode=0,stdout='PRIVATE_BODY',stderr='SECRET')),self.assertRaises(p.DiagnosticStop) as error:p.connect(out,'SECRET','psql')
+            self.assertEqual(error.exception.category,'RESPONSE_VALIDATION_FAILURE')
+            self.assertNotIn('PRIVATE_BODY',(out/p.FAILURE_FILE).read_text())
+
+    def test_timeout_and_client_errors_retained_without_raw_exception(self):
+        cases=[(p.subprocess.TimeoutExpired('PRIVATE_COMMAND',120,output=b'PRIVATE_BODY',stderr=b'SECRET'),'CONNECTION_TIMEOUT_UNDETERMINED'),
+            (FileNotFoundError('PRIVATE_PATH'),'LOCAL_CLIENT_EXECUTION_FAILURE'),
+            (UnicodeError('PRIVATE_BODY'),'UNDETERMINED_CONNECTION_FAILURE')]
+        for exception,category in cases:
+            with self.subTest(category=category),tempfile.TemporaryDirectory() as tmp:
+                self.root=Path(tmp);out=self.prepare()
+                with patch.object(p.ssl,'create_default_context'),patch.object(p.subprocess,'run',side_effect=exception) as run,self.assertRaises(p.DiagnosticStop) as error:p.connect(out,'PASSWORD_SECRET','psql')
+                self.assertEqual(run.call_count,1);self.assertEqual(error.exception.category,category)
+                self.assertEqual(json.loads((out/p.FAILURE_FILE).read_text())['category'],category)
+                for f in out.iterdir():
+                    for secret in ['PRIVATE_COMMAND','PRIVATE_PATH','PRIVATE_BODY','PASSWORD_SECRET']:
+                        self.assertNotIn(secret,f.read_text())
+
+    def test_diagnostic_write_failure_still_consumes_package(self):
+        out=self.prepare();original_write=p.write_new
+        def fail_diagnostic(path,text):
+            if path.name==p.FAILURE_FILE:raise OSError('PRIVATE_DISK_ERROR')
+            return original_write(path,text)
+        with patch.object(p,'write_new',side_effect=fail_diagnostic),patch.object(p.ssl,'create_default_context'),patch.object(p.subprocess,'run',return_value=SimpleNamespace(returncode=1,stdout='',stderr='SECRET')) as run,self.assertRaises(OSError):p.connect(out,'SECRET','psql')
+        self.assertEqual(run.call_count,1);self.assertTrue((out/'connection-attempt.json').exists())
+        with patch.object(p.ssl,'create_default_context'),patch.object(p.subprocess,'run') as run,self.assertRaises(p.Stop):p.connect(out,'SECRET','psql')
+        run.assert_not_called()
+
+    def test_diagnostic_alone_or_dangling_marker_blocks_connection(self):
+        out=self.prepare();p.write_new(out/p.FAILURE_FILE,'{}')
+        for name in [p.FAILURE_FILE,'connection-attempt.json']:
+            (out/p.FAILURE_FILE).unlink(missing_ok=True)
+            marker=out/name;marker.symlink_to(self.root/'missing')
+            with patch.object(p.ssl,'create_default_context'),patch.object(p.subprocess,'run') as run,self.assertRaises(p.Stop):p.connect(out,'SECRET','psql')
+            run.assert_not_called();marker.unlink()
+
+    def test_failed_CLI_only_prints_category_and_attempt_count(self):
+        out=self.prepare()
+        with patch.object(p.sys.stdin,'isatty',return_value=True),patch('builtins.input',return_value=p.PROJECT),patch.object(p.getpass,'getpass',return_value='PASSWORD_SECRET'),patch.object(p.shutil,'which',return_value='/approved/psql'),patch.object(p.ssl,'create_default_context'),patch.object(p.subprocess,'run',return_value=SimpleNamespace(returncode=1,stdout='PRIVATE_BODY',stderr='FATAL: password authentication failed for user "PRIVATE_USER"')) as run,contextlib.redirect_stdout(io.StringIO()) as printed:
+            self.assertEqual(p.main(['--package',str(out),'--connect-test-readonly',p.PROJECT]),1)
+        self.assertEqual(run.call_count,1)
+        self.assertEqual(printed.getvalue(),'FAIL — connection: AUTHENTICATION_FAILURE; no retry; private error withheld. Database connections attempted: 1\n')
 
 if __name__=='__main__':unittest.main()

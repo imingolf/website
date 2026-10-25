@@ -23,9 +23,28 @@ POOLER = 'aws-0-eu-west-1.pooler.supabase.com'
 SERVICE = 'iig-test-only'
 SECTIONS = {'identity','functions','tables','triggers','policies','authority','platform','writers','fingerprints'}
 LIMIT = 32 * 1024 * 1024
+FAILURE_FILE = 'failure.SANITISED.json'
+FAILURE_CATEGORIES = frozenset({
+    'TLS_FAILURE', 'NETWORK_FAILURE', 'AUTHENTICATION_FAILURE',
+    'SERVER_IDENTITY_FAILURE', 'READ_ONLY_TRANSACTION_FAILURE',
+    'RELATION_GUARD_FAILURE', 'SQL_OR_PERMISSION_FAILURE',
+    'CONNECTION_TIMEOUT_UNDETERMINED', 'LOCAL_CLIENT_EXECUTION_FAILURE',
+    'RESPONSE_VALIDATION_FAILURE', 'UNDETERMINED_CONNECTION_FAILURE',
+})
+# Fixed progress labels precede each fail-closed guard. A label alone is NOT
+# evidence that its check passed, nor permission to continue after an error.
+GUARDS = ('SERVER_IDENTITY', 'READ_ONLY_TRANSACTION', 'TLS', 'RELATION_GUARD')
+GUARD_OUTPUT = tuple(value for name in GUARDS for value in ('IIG_PREFLIGHT_'+name, '1'))
 
 class Stop(Exception):
     pass
+
+class DiagnosticStop(Stop):
+    def __init__(self, category):
+        if category not in FAILURE_CATEGORIES:
+            category = 'UNDETERMINED_CONNECTION_FAILURE'
+        self.category = category
+        super().__init__('connection: '+category+'; no retry; private error withheld')
 
 def require(ok, label):
     if not ok:
@@ -118,11 +137,17 @@ SET LOCAL row_security = off;
 SET LOCAL statement_timeout = '8s';
 SET LOCAL lock_timeout = '500ms';
 SET LOCAL idle_in_transaction_session_timeout = '15s';
+SELECT 'IIG_PREFLIGHT_SERVER_IDENTITY';
 SELECT 1 / CASE WHEN current_database()='postgres' AND current_user='postgres' AND session_user='postgres'
- AND current_setting('transaction_read_only')='on' AND current_setting('default_transaction_read_only')='on'
  AND current_setting('server_version_num')::integer BETWEEN 170000 AND 179999
  AND coalesce(current_setting('supabase.project_ref',true),'') IN ('','nyavvwrsrxqfyhiygkgw')
- AND EXISTS(SELECT 1 FROM pg_catalog.pg_stat_ssl WHERE pid=pg_backend_pid() AND ssl)
+ THEN 1 ELSE 0 END;
+SELECT 'IIG_PREFLIGHT_READ_ONLY_TRANSACTION';
+SELECT 1 / CASE WHEN current_setting('transaction_read_only')='on'
+ AND current_setting('default_transaction_read_only')='on'
+ THEN 1 ELSE 0 END;
+SELECT 'IIG_PREFLIGHT_TLS';
+SELECT 1 / CASE WHEN EXISTS(SELECT 1 FROM pg_catalog.pg_stat_ssl WHERE pid=pg_backend_pid() AND ssl)
  THEN 1 ELSE 0 END;
 '''
     # Fail before application reads if a table became a view/foreign table,
@@ -139,7 +164,7 @@ SELECT 1 / CASE WHEN current_database()='postgres' AND current_user='postgres' A
     # explicitly before the kind/type guard so concurrent DDL cannot swap a scoped
     # relation into a foreign table between validation and fingerprint selection.
     locks=''.join('LOCK TABLE ONLY "'+s+'"."'+t+'" IN ACCESS SHARE MODE;\n' for s,t in names)
-    sql += locks+'SELECT 1 / CASE WHEN true'+relation_guard+' THEN 1 ELSE 0 END;\n'
+    sql += locks+"SELECT 'IIG_PREFLIGHT_RELATION_GUARD';\nSELECT 1 / CASE WHEN true"+relation_guard+' THEN 1 ELSE 0 END;\n'
 
     sql += approved_template()
     # Only validated identifiers from the original TEST inventory are interpolated.
@@ -221,20 +246,30 @@ def package(folder):
     sql=build_sql(capture)
     require(private_file(folder/'inspection.READONLY.sql','query').read_text()==sql and hashlib.sha256(sql.encode()).hexdigest()==m['sql_sha256'],
             'package: query drift')
-    require(not (folder/'catalog.PRIVATE.json').exists() and not (folder/'connection-attempt.json').exists(), 'package: already attempted; no automatic retry')
+    require(not any((folder/n).exists() or (folder/n).is_symlink()
+                    for n in ('catalog.PRIVATE.json','connection-attempt.json',FAILURE_FILE)),
+            'package: already attempted; no automatic retry')
     return folder,m,capture,ca,sql
 
 def parse(raw):
     require(len(raw.encode())<=LIMIT,'response: bounded output exceeded')
     lines=raw.strip().splitlines()
-    require(len(lines)>1 and lines[:2]==['1','1'],'response: server TLS/read-only/relation guard failed')
-    rows=[json.loads(x) for x in lines[2:]]
+    require(tuple(lines[:len(GUARD_OUTPUT)])==GUARD_OUTPUT,'response: server TLS/read-only/relation guard failed')
+    rows=[json.loads(x) for x in lines[len(GUARD_OUTPUT):]]
     require(len(rows)==len(SECTIONS) and {r.get('section') for r in rows}==SECTIONS,'response: missing/duplicate section')
     data={r['section']:r for r in rows};i=data['identity']
-    require(i.get('database')=='postgres' and i.get('role')=='postgres' and i.get('session_role')=='postgres'
-            and i.get('transaction_read_only')=='on' and i.get('default_transaction_read_only')=='on'
-            and i.get('backend_ssl') is True and i.get('project') in (None,'',PROJECT)
-            and 170000<=int(i.get('version',0))<180000,'response: identity/TLS/read-only mismatch')
+    failures=set()
+    version=i.get('version')
+    if not (i.get('database')=='postgres' and i.get('role')=='postgres' and i.get('session_role')=='postgres'
+            and i.get('project') in (None,'',PROJECT) and isinstance(version,str)
+            and re.fullmatch(r'17[0-9]{4}',version)):
+        failures.add('SERVER_IDENTITY_FAILURE')
+    if i.get('transaction_read_only')!='on' or i.get('default_transaction_read_only')!='on':
+        failures.add('READ_ONLY_TRANSACTION_FAILURE')
+    if i.get('backend_ssl') is not True:
+        failures.add('TLS_FAILURE')
+    if failures:
+        raise DiagnosticStop(next(iter(failures)) if len(failures)==1 else 'RESPONSE_VALIDATION_FAILURE')
     for s in SECTIONS-{'identity','authority','platform','fingerprints'}:
         require(isinstance(data[s].get('items'),list) and len(data[s]['items'])<=512,'response: missing/oversize inventory')
     require(isinstance(data['fingerprints'].get('items'),dict),'response: missing fingerprints')
@@ -290,14 +325,83 @@ def report(capture,data,manifest):
             'credential_issuance':'NOT performed; trusted TEST operator and fictional identities required',
             'owner_whole_state_and_delete':'not exempt; keep disabled until compatible protected route reviewed'}
 
+def failure_category(stdout, stderr):
+    """Classify in memory only. Unknown/ambiguous evidence never guesses TLS.
+
+    psql SQL errors use VERBOSITY=sqlstate. libpq connection errors do not
+    consistently include SQLSTATE, so recognise only anchored C-locale messages.
+    Neither input, SQLSTATE nor a substring of a private message is persisted.
+    """
+    unknown='UNDETERMINED_CONNECTION_FAILURE'
+    if not all(isinstance(s,str) and len(s.encode())<=LIMIT for s in (stdout,stderr)):
+        return unknown
+    categories=set()
+    for line in stderr.splitlines():
+        message=re.sub(r'^psql: (?:error: )?', '', line)
+        message=re.sub(r'^connection to server at "[^"\r\n]+"(?: \([^\r\n)]*\))?, port [0-9]+ failed: ', '', message)
+        state=re.fullmatch(r'(?:psql:<stdin>:[0-9]+: )?(?:ERROR|FATAL|PANIC):[ \t]+([0-9A-Z]{5})(?::[^\r\n]*)?[ \t]*',message)
+        if state:
+            code=state[1]
+            if code=='22012':
+                # Only the exact prefix ending at an unfinished guard identifies
+                # that guard. A later catalog division error is not a TLS error.
+                prefix=tuple(stdout.strip().splitlines())
+                matches=[name+'_FAILURE' for n,name in enumerate(GUARDS)
+                         if prefix==GUARD_OUTPUT[:2*n+1]]
+                categories.add(matches[0] if matches else 'SQL_OR_PERMISSION_FAILURE')
+            elif code in ('28000','28P01'):
+                categories.add('AUTHENTICATION_FAILURE')
+            elif code=='25006':
+                categories.add('READ_ONLY_TRANSACTION_FAILURE')
+            elif code=='3D000':
+                categories.add('SERVER_IDENTITY_FAILURE')
+            else:
+                categories.add(unknown if code.startswith('08') else 'SQL_OR_PERMISSION_FAILURE')
+        elif re.match(r'FATAL:[ \t]+(?:password authentication failed for user |no pg_hba.conf entry for host |pg_hba.conf rejects connection for host )',message):
+            categories.add('AUTHENTICATION_FAILURE')
+        elif re.fullmatch(r'FATAL:[ \t]+database "[^"\r\n]+" does not exist',message):
+            categories.add('SERVER_IDENTITY_FAILURE')
+        elif re.match(r'(?:SSL error: |server certificate (?:for |does not match host name )|server does not support SSL, but SSL was required|root certificate file |could not read root certificate file )',message):
+            categories.add('TLS_FAILURE')
+        elif re.match(r'(?:could not translate host name "[^"\r\n]+" to address: |Connection refused(?:$|[ \t])|Network is unreachable(?:$|[ \t])|No route to host(?:$|[ \t])|(?:Connection|Operation) timed out(?:$|[ \t])|timeout expired(?:$|[ \t]))',message):
+            categories.add('NETWORK_FAILURE')
+        elif re.match(r'(?:ERROR|FATAL|PANIC):',message) or line.startswith('psql: error:'):
+            categories.add(unknown)
+    return next(iter(categories)) if len(categories)==1 else unknown
+
+def failure_record(folder, category):
+    require(isinstance(category,str) and category in FAILURE_CATEGORIES,'diagnostic: invalid category')
+    return {'format':1,'project':PROJECT,'connections_attempted':1,'category':category,
+            'manifest_sha256':digest(private_file(folder/'manifest.PRIVATE.json','manifest'))}
+
+def stop_with_failure(folder, category):
+    # Exclusive creation preserves earlier evidence; the attempt marker is never
+    # removed even if writing this additional record fails. No retry is possible.
+    write_new(folder/FAILURE_FILE,json.dumps(failure_record(folder,category),sort_keys=True)+'\n')
+    raise DiagnosticStop(category) from None
+
 def connect(folder,password,executable):
     folder,m,capture,ca,sql=package(folder)
     require(password,'password: empty')
     write_new(folder/'connection-attempt.json',json.dumps({'project':PROJECT,'connections_attempted':1}))
-    result=subprocess.run([executable,'-X','-w','-qAt','-v','ON_ERROR_STOP=1','-v','VERBOSITY=terse'],
-        input=sql,capture_output=True,text=True,timeout=120,env=environment(ca,password))
-    require(result.returncode==0,'connection: TLS/server/read-only failure; no retry; private error withheld')
-    data=parse(result.stdout)
+    try:
+        result=subprocess.run([executable,'-X','-w','-qAt','-v','ON_ERROR_STOP=1','-v','VERBOSITY=sqlstate'],
+            input=sql,capture_output=True,text=True,timeout=120,env=environment(ca,password))
+    except subprocess.TimeoutExpired:
+        # Timeout may occur during DNS, TLS, authentication or SQL; do not guess.
+        stop_with_failure(folder,'CONNECTION_TIMEOUT_UNDETERMINED')
+    except OSError:
+        stop_with_failure(folder,'LOCAL_CLIENT_EXECUTION_FAILURE')
+    except Exception:
+        stop_with_failure(folder,'UNDETERMINED_CONNECTION_FAILURE')
+    if result.returncode!=0:
+        stop_with_failure(folder,failure_category(result.stdout,result.stderr))
+    try:
+        data=parse(result.stdout)
+    except DiagnosticStop as e:
+        stop_with_failure(folder,e.category)
+    except Exception:
+        stop_with_failure(folder,'RESPONSE_VALIDATION_FAILURE')
     write_new(folder/'catalog.PRIVATE.json',json.dumps(data,indent=2)+'\n')
     summary=report(capture,data,m)
     write_new(folder/'report.SANITISED.json',json.dumps(summary,indent=2)+'\n')

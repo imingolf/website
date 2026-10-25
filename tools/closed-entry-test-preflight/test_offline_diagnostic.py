@@ -76,4 +76,70 @@ class OfflineDiagnostic(unittest.TestCase):
         self.folder.chmod(0o755)
         self.assertEqual(self.run_diagnostic(),'LOCAL_PACKAGE_OR_INPUT_VALIDATION_FAILED')
 
+    def test_all_retained_categories_read_without_process_network_or_writes(self):
+        for category in p.FAILURE_CATEGORIES:
+            with self.subTest(category=category):
+                (self.folder/p.FAILURE_FILE).unlink(missing_ok=True)
+                with self.assertRaises(p.DiagnosticStop):p.stop_with_failure(self.folder,category)
+                before={str(x):x.read_bytes() for x in self.root.rglob('*') if x.is_file()}
+                self.assertEqual(self.run_diagnostic(),category)
+                self.assertEqual(before,{str(x):x.read_bytes() for x in self.root.rglob('*') if x.is_file()})
+
+    def test_rejects_unknown_category_extra_fields_and_wrong_binding(self):
+        valid=p.failure_record(self.folder,'TLS_FAILURE')
+        cases=[{**valid,'category':'PRIVATE_SECRET'}, {**valid,'stderr':'PRIVATE_SECRET'},
+            {**valid,'manifest_sha256':'f'*64}, {**valid,'project':'other'},
+            {**valid,'format':True}, {**valid,'connections_attempted':True},
+            {**valid,'connections_attempted':2}, {**valid,'format':2},
+            {k:v for k,v in valid.items() if k!='manifest_sha256'},[],None]
+        for value in cases:
+            with self.subTest(value=value):
+                self.write(p.FAILURE_FILE,value)
+                self.assertEqual(self.run_diagnostic(),'LOCAL_ATTEMPT_EVIDENCE_INVALID')
+
+    def test_rejects_malformed_oversized_and_public_failure_file(self):
+        self.write(p.FAILURE_FILE,p.failure_record(self.folder,'TLS_FAILURE'))
+        path=self.folder/p.FAILURE_FILE
+        for value in ['PRIVATE_SECRET','x'*4097]:
+            path.write_text(value)
+            self.assertEqual(self.run_diagnostic(),'LOCAL_ATTEMPT_EVIDENCE_INVALID')
+        self.write(p.FAILURE_FILE,p.failure_record(self.folder,'TLS_FAILURE'));path.chmod(0o644)
+        self.assertEqual(self.run_diagnostic(),'LOCAL_ATTEMPT_EVIDENCE_INVALID')
+
+    def test_rejects_symlinked_failure_or_attempt_evidence(self):
+        for name in [p.FAILURE_FILE,'connection-attempt.json']:
+            with self.subTest(name=name):
+                path=self.folder/name;path.unlink(missing_ok=True);path.symlink_to(self.root/'absent')
+                self.assertEqual(self.run_diagnostic(),'LOCAL_ATTEMPT_EVIDENCE_INVALID')
+                path.unlink()
+        self.write('connection-attempt.json',{'project':p.PROJECT,'connections_attempted':True})
+        self.assertEqual(self.run_diagnostic(),'LOCAL_ATTEMPT_EVIDENCE_INVALID')
+
+    def test_missing_attempt_with_diagnostic_is_invalid(self):
+        self.write(p.FAILURE_FILE,p.failure_record(self.folder,'TLS_FAILURE'))
+        (self.folder/'connection-attempt.json').unlink()
+        self.assertEqual(self.run_diagnostic(),'LOCAL_ATTEMPT_EVIDENCE_INVALID')
+
+    def test_conflicting_collection_or_report_not_treated_as_TLS(self):
+        self.write(p.FAILURE_FILE,p.failure_record(self.folder,'TLS_FAILURE'))
+        for name in ['catalog.PRIVATE.json','report.SANITISED.json']:
+            self.write(name,{'private':'PRIVATE_SECRET'})
+            self.assertEqual(self.run_diagnostic(),'LOCAL_ATTEMPT_EVIDENCE_INVALID')
+            (self.folder/name).unlink()
+
+    def test_retained_category_does_not_bypass_code_input_or_query_integrity(self):
+        self.write(p.FAILURE_FILE,p.failure_record(self.folder,'TLS_FAILURE'))
+        self.manifest['code_hashes']['preflight.py']='old-runner-hash'
+        self.write('manifest.PRIVATE.json',self.manifest)
+        self.assertEqual(self.run_diagnostic(),'LOCAL_PACKAGE_OR_INPUT_VALIDATION_FAILED')
+        self.manifest['code_hashes']=p.code_hashes();self.write('manifest.PRIVATE.json',self.manifest)
+        (self.folder/'inspection.READONLY.sql').write_text('PRIVATE_QUERY_DRIFT')
+        self.assertEqual(self.run_diagnostic(),'LOCAL_QUERY_OR_BASELINE_VALIDATION_FAILED')
+
+    def test_saved_record_cannot_be_overwritten(self):
+        self.write(p.FAILURE_FILE,p.failure_record(self.folder,'TLS_FAILURE'))
+        before=(self.folder/p.FAILURE_FILE).read_bytes()
+        with self.assertRaises(FileExistsError):p.stop_with_failure(self.folder,'AUTHENTICATION_FAILURE')
+        self.assertEqual((self.folder/p.FAILURE_FILE).read_bytes(),before)
+
 if __name__=='__main__':unittest.main()

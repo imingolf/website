@@ -39,16 +39,31 @@ def diagnose(folder):
         return 'LOCAL_QUERY_OR_BASELINE_VALIDATION_FAILED'
     try:
         marker=folder/'connection-attempt.json'
-        if not marker.exists():return 'NO_RECORDED_CONNECTION_ATTEMPT'
+        failure=folder/p.FAILURE_FILE
+        has_failure=failure.exists() or failure.is_symlink()
+        if not marker.exists() and not marker.is_symlink():
+            return 'LOCAL_ATTEMPT_EVIDENCE_INVALID' if has_failure else 'NO_RECORDED_CONNECTION_ATTEMPT'
         attempt=p.read_json(marker,'attempt')
-        p.require(attempt=={'project':p.PROJECT,'connections_attempted':1},'attempt mismatch')
+        p.require(attempt=={'project':p.PROJECT,'connections_attempted':1}
+                  and type(attempt['connections_attempted']) is int,'attempt mismatch')
+        if has_failure:
+            p.require(not (folder/'catalog.PRIVATE.json').exists()
+                      and not (folder/'catalog.PRIVATE.json').is_symlink()
+                      and not (folder/'report.SANITISED.json').exists()
+                      and not (folder/'report.SANITISED.json').is_symlink(),'conflicting evidence')
+            p.require(p.private_file(failure,'failure').stat().st_size<=4096,'failure size')
+            saved=p.read_json(failure,'failure')
+            p.require(isinstance(saved,dict) and type(saved.get('format')) is int
+                      and type(saved.get('connections_attempted')) is int
+                      and saved==p.failure_record(folder,saved.get('category')),'failure mismatch')
+            return saved['category']
         if (folder/'catalog.PRIVATE.json').exists():
             return 'POST_COLLECTION_FAILURE_REQUIRES_SAVED_REPORT_REVIEW'
     except Exception:
         return 'LOCAL_ATTEMPT_EVIDENCE_INVALID'
-    # preflight.connect discarded stderr/stdout on nonzero psql exit. A marker
-    # confirms an attempted command, not successful transport, authentication or TLS.
-    # Local CA parsing cannot reconstruct a remote handshake/authentication outcome.
+    # Missing retained diagnostics cannot be reconstructed from a marker or CA.
+    # Historical packages still require their matching code/query hashes; never
+    # rewrite old evidence or relax package validation to manufacture a diagnosis.
     return 'UNDETERMINED_ORIGINAL_ERROR_NOT_RETAINED'
 
 
