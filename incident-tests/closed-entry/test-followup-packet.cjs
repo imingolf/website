@@ -60,10 +60,26 @@ const root=path.resolve(__dirname,'../..');
   const parsed=spawnSync('python3',['-c',"import sys,json;sys.path.insert(0,sys.argv[1]);import followup_runner as r;print(len(r.parse(open(sys.argv[3]).read(),json.load(open(sys.argv[2])))))",path.join(root,'tools/closed-entry-inspection'),path.join(out,'request-parameters.PRIVATE.json'),rawFile],{encoding:'utf8',timeout:10000});
   assert.equal(parsed.status,0,parsed.stderr);assert.equal(parsed.stdout.trim(),'3');
 
+  // Full offline reviewer path: real generated package + synthetic saved catalog.
+  const savedFollowup=path.join(dir,'saved-followup');fs.mkdirSync(savedFollowup,{mode:0o700});
+  fs.writeFileSync(path.join(savedFollowup,'catalog-followup.PRIVATE.json'),JSON.stringify(sections),{mode:0o600});
+  fs.writeFileSync(path.join(savedFollowup,'report.SANITISED.json'),JSON.stringify({
+   project:'kzzzputsqxdntfqpprnz',connections_attempted:1,group_records_read:0,
+   captured_function_attributes_trigger_definitions_target_fingerprints_match:true,server_version_matches_saved_capture:true
+  }),{mode:0o600});
+  const semantic=spawnSync('python3',[path.join(root,'tools/closed-entry-inspection/semantic_saved.py'),
+   '--saved-folder',saved,'--package',out,'--folder',savedFollowup],{encoding:'utf8',timeout:10000});
+  assert.equal(semantic.status,0,semantic.stderr);
+  const review=JSON.parse(semantic.stdout);assert.equal(review.database_connections,0);
+  assert.equal(review.triggers.length,1);
+  assert.equal(review.triggers[0].status,'STRUCTURAL_PATHS_EXTRACTED_NOT_SEMANTIC_PROOF');
+  assert.ok(review.triggers[0].events.some(x=>x.kind==='write'&&x.conflict.targetless));
+  for(const privateText of ['fixture_events','fixture_hook','fictional','iig_private','generate_series'])assert.equal(semantic.stdout.includes(privateText),false);
+
   // A changed original definition stops the packet before new collection.
   await db.exec(`CREATE OR REPLACE FUNCTION public.get_group_state(p_pin text) RETURNS jsonb LANGUAGE sql SECURITY DEFINER SET search_path=public AS $$ SELECT '{}'::jsonb $$;`);
   await db.exec('BEGIN READ ONLY; SET LOCAL search_path=pg_catalog;');
   await assert.rejects(()=>db.exec(afterGuard),/division by zero/);await db.exec('ROLLBACK');
-  console.log('PASS: generated metadata packet syntax, source/config/ACL/column fingerprints, two overload candidates, uniqueness/FK/index evidence and drift rejection in local fictional PostgreSQL. Online TLS/identity guard retained; no online connections.');
+  console.log('PASS: generated metadata packet syntax, source/config/ACL/column fingerprints, two overload candidates, uniqueness/FK/index evidence, sanitised semantic review and drift rejection in local fictional PostgreSQL. Online TLS/identity guard retained; no online connections.');
  }finally{await db.close();fs.rmSync(dir,{recursive:true,force:true});}
 })().catch(e=>{console.error(e);process.exitCode=1;});

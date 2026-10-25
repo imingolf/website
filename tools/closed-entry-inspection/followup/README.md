@@ -61,3 +61,12 @@ The same optional --saved-folder/--package/--folder paths select matching eviden
 It is offline, does not invoke any routine, writes no files and prints only sanitised
 facts/explicit limitations. Competing overloads are not resolved by a schema-name
 shortcut. See [integration gates and migration/rollback proposal](../../../docs/incident-closed-entry/FOLLOWUP-INTEGRATION-GATES.md).
+
+## Local trigger/constraint semantic aid
+
+Run `python3 -B tools/closed-entry-inspection/test_semantic_saved.py` then
+`python3 -B tools/closed-entry-inspection/semantic_saved.py`. This reuses the matching
+saved package and outputs only symbolic branch paths, write targets and conflict/
+constraint links. It never connects or executes SQL. Unsupported constructs remain
+explicitly unresolved, not skipped. See
+[safety, interpretation and limitations](../../../docs/incident-closed-entry/SAVED-SEMANTIC-REVIEW.md).
