@@ -91,3 +91,7 @@ operation checks, 61 maintenance checks and 62 canonical boundary checks); all 1
 inspection Python tests PASS; 38 independent-session PostgreSQL races and six actual
 local-login authority/permission checks PASS. Installation-error rollback is fictional
 transactional DDL coverage, not a claim of a generated operational TEST rollback.
+
+The next bounded preflight is now prepared in
+[TEST read-only preparation](TEST-READONLY-PREFLIGHT.md). It remains offline by default;
+no authenticated TEST connection has been performed or authorised by that preparation.
