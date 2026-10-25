@@ -51,3 +51,13 @@ defaults/generated values and lifecycle authority are accounted for. Extend fict
 fixtures with those verified behaviours; test first-score closure, stale payments,
 Admin late entry, legitimate scoring, exact-once Finish Round/League/Trip/payouts,
 new-round revisions and completed history before proposing installable SQL.
+
+## Join definitions to the completed metadata (no repeat inspection)
+
+Run `python3 tools/closed-entry-inspection/test_analyse_followup.py` followed by
+`python3 tools/closed-entry-inspection/analyse_followup.py`. This joins the saved
+source to candidate schemas, target identities and trigger event/timing groups.
+The same optional --saved-folder/--package/--folder paths select matching evidence.
+It is offline, does not invoke any routine, writes no files and prints only sanitised
+facts/explicit limitations. Competing overloads are not resolved by a schema-name
+shortcut. See [integration gates and migration/rollback proposal](../../../docs/incident-closed-entry/FOLLOWUP-INTEGRATION-GATES.md).

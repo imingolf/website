@@ -185,3 +185,11 @@ Then review the exact bounded scope/hash and seek approval for ONE authenticated
 metadata follow-up. Do not run a connection flag now. Afterwards resolve real
 bindings/constraints/side effects, complete the adapter and TEST/recovery review,
 then seek separate installation and deployment approval. Current release: NO-GO.
+
+## Superseding status after completed follow-up
+
+The owner has completed the bounded LIVE supplement and offline reviewer. Do NOT
+repeat the inspection requested earlier in this document. See
+[FOLLOWUP-INTEGRATION-GATES.md](FOLLOWUP-INTEGRATION-GATES.md) for established facts,
+remaining private semantic review, an offline metadata/source join, and the current
+non-executable migration and rollback proposal. No further connection is authorised.

@@ -22,7 +22,11 @@ const CAP='a'.repeat(64),OTHER='b'.repeat(64),EXPIRED='c'.repeat(64),REVOKED='d'
    const before=(await db.query('SELECT id,revision,closed,phase,state FROM iig_entry_prototype.groups ORDER BY id')).rows;
    const projection=(await db.query('SELECT id,state FROM iig_legacy_fixture.tens_in_groups ORDER BY id')).rows;
    const ledgers=(await db.query('SELECT * FROM iig_legacy_fixture.history_payment_events ORDER BY group_id,round_id,phase,pot')).rows;
+   const archives=(await db.query('SELECT * FROM iig_entry_prototype.archives ORDER BY group_id,round_id')).rows;
+   const statuses=(await db.query('SELECT * FROM iig_legacy_fixture.enabled_status ORDER BY group_id')).rows;
    await assert.rejects(fn,pattern);
+   assert.deepEqual((await db.query('SELECT * FROM iig_entry_prototype.archives ORDER BY group_id,round_id')).rows,archives);
+   assert.deepEqual((await db.query('SELECT * FROM iig_legacy_fixture.enabled_status ORDER BY group_id')).rows,statuses);
    assert.deepEqual((await db.query('SELECT id,revision,closed,phase,state FROM iig_entry_prototype.groups ORDER BY id')).rows,before);
    assert.deepEqual((await db.query('SELECT * FROM iig_legacy_fixture.history_payment_events ORDER BY group_id,round_id,phase,pot')).rows,ledgers);
    assert.deepEqual((await db.query('SELECT id,state FROM iig_legacy_fixture.tens_in_groups ORDER BY id')).rows,projection);count++;
@@ -84,6 +88,19 @@ const CAP='a'.repeat(64),OTHER='b'.repeat(64),EXPIRED='c'.repeat(64),REVOKED='d'
    FOR EACH ROW EXECUTE FUNCTION iig_legacy_fixture.injected_failure();`);
   const other=await get('fictional-1260');other.players[0].stableford=32;other.players[0].scoreSubmitted=true;
   await reject(()=>save(other,'legacy_player','fictional-1260'),/FIXTURE_DOWNSTREAM_FAILURE/);
+  // Same late AFTER-trigger failure during protected finish/setup must also
+  // unwind archives, revision, closure, ledger and enabled-status writes.
+  await db.exec(`CREATE OR REPLACE FUNCTION iig_legacy_fixture.injected_failure() RETURNS trigger LANGUAGE plpgsql AS $$
+   BEGIN IF NEW.id='g2' AND NEW.state->'roundOpen'='false'::jsonb THEN RAISE EXCEPTION 'FIXTURE_FINISH_FAILURE'; END IF; RETURN NEW; END $$;`);
+  await save(other,'legacy_player','fictional-1260');count++;
+  const finishOther=()=>as('legacy_player',()=>db.query('SELECT iig_legacy_fixture.finish_round($1,$2,$3,$4)',
+    ['fictional-1260','round-old',1,OTHER]));
+  await reject(finishOther,/FIXTURE_FINISH_FAILURE/);
+  await db.exec(`CREATE OR REPLACE FUNCTION iig_legacy_fixture.injected_failure() RETURNS trigger LANGUAGE plpgsql AS $$
+   BEGIN IF NEW.id='g2' AND NEW.state->'roundOpen'='true'::jsonb THEN RAISE EXCEPTION 'FIXTURE_START_FAILURE'; END IF; RETURN NEW; END $$;`);
+  await finishOther();count++;
+  await reject(()=>as('legacy_player',()=>db.query('SELECT iig_legacy_fixture.start_round($1,$2,$3,$4,$5,$6,$7,$8)',
+   ['fictional-1260','round-old',2,OTHER,'Next Fictional Course','2026-10-25',10,'net'])),/FIXTURE_START_FAILURE/);
   console.log(`PASS: ${count} fictional legacy-adapter checks; versioned whole-state RPC, central projection guard, group-scoped capabilities, synthetic trigger atomicity. NOT actual LIVE trigger integration.`);
  }finally{await db.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});
