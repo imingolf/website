@@ -36,3 +36,9 @@ No credential issuance, writer pause or browser activation is performed by prefl
 
 Offline verification: 48 new safety tests plus all 153 existing inspection tests pass.
 All database subprocess calls are mocked. No SQL was executed or database contacted.
+
+If the existing TEST service lacks explicit verify-full, use the documented offline
+`prepare-service.py` helper. It reports the actual safe TLS-mode enum and creates a
+new private strict TEST direct profile/CA copy, preserving the original service and
+certificate. It cannot connect. This follow-up passes 61 preflight tests plus the
+existing 153 inspection tests; no Mac configuration state is claimed from development.

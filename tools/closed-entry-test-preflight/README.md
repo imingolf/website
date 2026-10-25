@@ -159,3 +159,46 @@ Successful collection: **PASS — bounded TEST read-only evidence collected.
 Installation NO-GO. Database connections attempted: 1**. The report retains UNVERIFIED
 writer control, recovery and new-target semantic review gates. Nothing in this
 command approves installation, credentials, deployment or guard activation.
+
+## Offline recovery when the existing service lacks verify-full
+
+The original runner deliberately requires an explicit `sslmode=verify-full` in the
+selected section. An older `require` setting encrypts but does not require hostname
+verification; `verify-ca` does not require hostname matching; a missing setting is
+not an explicit verification policy. The reported failure alone does **not** identify
+which of these is on the Mac. `prepare-service.py` inspects just the validated TEST
+section and prints only the recognised sslmode (or ABSENT), never the whole file.
+
+For the owner's confirmed TEST dashboard certificate path:
+
+```sh
+cd "$HOME/Downloads/imingolf-rollback" &&
+test "$(git branch --show-current)" = "fix-closed-competition-entry" &&
+git pull --ff-only origin fix-closed-competition-entry &&
+python3 -B -m unittest discover -s tools/closed-entry-test-preflight -p 'test_*.py' &&
+python3 -B tools/closed-entry-test-preflight/prepare-service.py --ca "$HOME/Downloads/prod-ca-2021 (1).crt"
+```
+
+This helper has **no connection mode** and asks for neither a certificate path nor a
+password. Quoting handles spaces/parentheses; accidental duplicate interactive path
+entry is avoided. The certificate's filename does not establish its project: its
+provenance is the owner's confirmation that it came from the TEST dashboard.
+
+The helper leaves `~/.pg_service.conf` and the downloaded certificate byte-for-byte
+unchanged. It creates a NEW owner-only TEST direct profile and CA copy in a private
+folder, then invokes the same offline package preparation with those explicit files.
+No LIVE profile/certificate is selected, no defaults or unsupported connection
+parameters are accepted, and the main runner's verify-full rule remains unchanged.
+The new profile pins the TEST direct hostname/user and explicit CA, with no fallback.
+
+A downloaded **public** CA may be world-readable, but must be owned by the user,
+not symlinked and not group/world-writable; private keys or invalid certificates
+stop. Its new copy is mode 600 and passes the runner's unchanged strict file/SSL
+parser checks. This does not install a system CA, edit service settings or downgrade
+TLS. Backup, baseline and rollback validation still run and can independently STOP.
+All input/evidence hashes and the original service's inspection summary stay local.
+
+Expected: original TEST sslmode displayed, followed by OFFLINE PASS and a NEW private
+package path, with zero database connections. Stop there for separate connection
+approval. Additional offline service tests bring the preflight suite to 61 tests;
+all 153 existing inspection tests also pass. No SQL is executed by those tests.

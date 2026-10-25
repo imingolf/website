@@ -50,7 +50,7 @@ def read_json(path, label):
     require(p.stat().st_size <= LIMIT, label + ': too large')
     return json.loads(p.read_text())
 
-def service(path):
+def service_identity(path):
     p = private_file(path, 'service')
     c = configparser.ConfigParser(interpolation=None, strict=True)
     c.read_string(p.read_text())
@@ -60,6 +60,11 @@ def service(path):
             'service: unsupported overrides or stored password')
     require(s.get('port','5432') == '5432' and s.get('dbname') == 'postgres', 'service: database/port mismatch')
     require((s.get('host'),s.get('user')) in [(HOST,'postgres'),(POOLER,'postgres.'+PROJECT)], 'service: TEST identity mismatch')
+    return s
+
+def service(path):
+    s = service_identity(path)
+    p = private_file(path, 'service')
     require(s.get('sslmode') == 'verify-full', 'service: verify-full required; settings not changed')
     return {'service_sha256':digest(p),'source_route':'direct' if s['host']==HOST else 'session_pooler',
             'selected_route':'explicit_direct_TEST_only'}
