@@ -19,9 +19,14 @@ LANGUAGE sql IMMUTABLE SET search_path=pg_catalog AS $$
    ELSE true END)
  AND CASE WHEN s->>'gameType'='money' AND (s->>'stake')::numeric>0
    THEN coalesce(p->'paid'='true'::jsonb,false)
-   WHEN s#>'{trip,active}'='true'::jsonb THEN true
+   WHEN s->>'gameType'='money' OR s#>'{trip,active}'='true'::jsonb THEN true
    ELSE coalesce(p->'playingThisRound'='true'::jsonb,false) END
 $$;
+
+CREATE FUNCTION iig_closed_entry.score_signature(p jsonb) RETURNS jsonb
+LANGUAGE sql IMMUTABLE SET search_path=pg_catalog AS $$
+ SELECT jsonb_build_array(coalesce(p->'stableford','null'),coalesce(p->'netScore','null'),
+  coalesce(nullif(p->'noReturn','null'),'false'),coalesce(nullif(p->'scoreSubmitted','null'),'false')) $$;
 
 CREATE FUNCTION iig_closed_entry.validate_snapshot(old_s jsonb,new_s jsonb,latched boolean)
 RETURNS void LANGUAGE plpgsql SET search_path=pg_catalog AS $$
@@ -38,8 +43,8 @@ BEGIN
    RAISE EXCEPTION 'PROTECTED_ROUND_FIELDS'; END IF;
  IF EXISTS (SELECT 1 FROM jsonb_array_elements(new_s->'players') x
    WHERE jsonb_typeof(x)<>'object' OR coalesce(x->>'id','')='' OR jsonb_typeof(x->'id')<>'string'
-     OR (x ? 'paid' AND jsonb_typeof(x->'paid') IS DISTINCT FROM 'boolean')
-     OR (x ? 'playingThisRound' AND jsonb_typeof(x->'playingThisRound') IS DISTINCT FROM 'boolean'))
+     OR (x ? 'paid' AND jsonb_typeof(x->'paid') IS DISTINCT FROM 'boolean' AND NOT (x->'paid'='null'::jsonb AND EXISTS(SELECT 1 FROM jsonb_array_elements(old_s->'players') prior WHERE prior->>'id'=x->>'id' AND prior->'paid' IS NOT DISTINCT FROM x->'paid')))
+     OR (x ? 'playingThisRound' AND jsonb_typeof(x->'playingThisRound') IS DISTINCT FROM 'boolean' AND NOT (x->'playingThisRound'='null'::jsonb AND EXISTS(SELECT 1 FROM jsonb_array_elements(old_s->'players') prior WHERE prior->>'id'=x->>'id' AND prior->'playingThisRound' IS NOT DISTINCT FROM x->'playingThisRound'))))
  OR (SELECT count(*) FROM jsonb_array_elements(new_s->'players')) <>
     (SELECT count(DISTINCT x->>'id') FROM jsonb_array_elements(new_s->'players') x) THEN
    RAISE EXCEPTION 'INVALID_PLAYERS'; END IF;
@@ -48,6 +53,15 @@ BEGIN
  FOR p IN SELECT value FROM jsonb_array_elements(old_s->'players') LOOP
    SELECT value INTO n FROM jsonb_array_elements(new_s->'players') WHERE value->>'id'=p->>'id';
    IF n IS NULL THEN RAISE EXCEPTION 'PLAYER_REMOVAL_REQUIRES_PROTECTED_OPERATION'; END IF;
+   IF (p-ARRAY['stableford','netScore','noReturn','scoreSubmitted','paid','playingThisRound','competition','paymentMarkedAt','paymentMarkMethod'])
+    IS DISTINCT FROM (n-ARRAY['stableford','netScore','noReturn','scoreSubmitted','paid','playingThisRound','competition','paymentMarkedAt','paymentMarkMethod'])
+   THEN RAISE EXCEPTION 'PROTECTED_PLAYER_FIELDS';END IF;
+   IF p->'paymentMarkedAt' IS DISTINCT FROM n->'paymentMarkedAt' AND
+    (n->'paymentMarkedAt' IS NULL OR jsonb_typeof(n->'paymentMarkedAt') NOT IN ('string','null')) THEN RAISE EXCEPTION 'INVALID_PAYMENT_METADATA';END IF;
+   IF p->'paymentMarkMethod' IS DISTINCT FROM n->'paymentMarkMethod' AND
+    (n->'paymentMarkMethod' IS NULL OR (n->'paymentMarkMethod'<>'null'::jsonb AND n->>'paymentMarkMethod' NOT IN ('admin-confirmed','admin-self-entry','player-confirmed-payment-return')))
+   THEN RAISE EXCEPTION 'INVALID_PAYMENT_METADATA';END IF;
+
    IF (locked OR first_score) AND (p-scores) IS DISTINCT FROM (n-scores) THEN
      RAISE EXCEPTION 'ENTRIES_CLOSED'; END IF;
    IF (p-scores) IS DISTINCT FROM (n-scores) AND iig_closed_entry.has_score(old_s) THEN
@@ -56,7 +70,7 @@ BEGIN
       p->keys.k IS NOT NULL AND p->keys.k<>'null'::jsonb AND p->keys.k<>'false'::jsonb
       AND p->keys.k IS DISTINCT FROM n->keys.k) THEN
       RAISE EXCEPTION 'SCORE_CORRECTION_REQUIRES_PROTECTED_OPERATION'; END IF;
-   IF (p-scores)=(n-scores) AND (p IS DISTINCT FROM n)
+   IF (p-scores)=(n-scores) AND (iig_closed_entry.score_signature(p) IS DISTINCT FROM iig_closed_entry.score_signature(n))
       AND NOT iig_closed_entry.eligible(old_s,p) THEN
       RAISE EXCEPTION 'INELIGIBLE_SCORER'; END IF;
    FOR key IN SELECT unnest(ARRAY['stableford','netScore']) LOOP
@@ -77,13 +91,11 @@ BEGIN
       jsonb_build_object('players',jsonb_build_array(n))) THEN RAISE EXCEPTION 'MISSING_SCORE'; END IF;
    -- Do not admit a previously ineligible scorer in the same ordinary save.
    IF NOT iig_closed_entry.eligible(old_s,p)
-      AND EXISTS (SELECT 1 FROM unnest(scores) AS keys(k) WHERE p->keys.k IS DISTINCT FROM n->keys.k) THEN
+      AND iig_closed_entry.score_signature(p) IS DISTINCT FROM iig_closed_entry.score_signature(n) THEN
       RAISE EXCEPTION 'INELIGIBLE_SCORER'; END IF;
  END LOOP;
  FOR n IN SELECT value FROM jsonb_array_elements(new_s->'players') LOOP
-   IF NOT EXISTS (SELECT 1 FROM jsonb_array_elements(old_s->'players') AS existing(value) WHERE existing.value->>'id'=n->>'id')
-      AND (iig_closed_entry.eligible(new_s,n) OR n->'paid'='true'::jsonb
-           OR iig_closed_entry.has_score(jsonb_build_object('players',jsonb_build_array(n)))) THEN
+   IF NOT EXISTS (SELECT 1 FROM jsonb_array_elements(old_s->'players') AS existing(value) WHERE existing.value->>'id'=n->>'id') THEN
      RAISE EXCEPTION 'NEW_MEMBER_MUST_NOT_ENTER_VIA_MEMBERSHIP_SAVE'; END IF;
  END LOOP;
  FOR key,v IN SELECT * FROM jsonb_each(coalesce(new_s#>'{trip,currentTeamScores}','{}'::jsonb)) LOOP
@@ -110,7 +122,7 @@ CREATE FUNCTION iig_closed_entry.validate_settings(old_s jsonb,new_s jsonb)
 RETURNS void LANGUAGE plpgsql SET search_path=pg_catalog AS $$
 BEGIN
  IF jsonb_typeof(new_s) IS DISTINCT FROM 'object'
- OR (old_s-ARRAY['groupName','adminPin','lastActivityAt']) IS DISTINCT FROM (new_s-ARRAY['groupName','adminPin','lastActivityAt'])
+ OR (old_s-ARRAY['groupName','adminPin','adminSetupToken','paymentLink','paymentProvider','lastActivityAt']) IS DISTINCT FROM (new_s-ARRAY['groupName','adminPin','adminSetupToken','paymentLink','paymentProvider','lastActivityAt'])
  THEN RAISE EXCEPTION 'SETTINGS_CHANGED_PROTECTED_FIELDS';END IF;
  IF old_s->'groupName' IS DISTINCT FROM new_s->'groupName' AND
   (jsonb_typeof(new_s->'groupName') IS DISTINCT FROM 'string' OR length(btrim(new_s->>'groupName')) NOT BETWEEN 1 AND 80)
@@ -118,6 +130,15 @@ BEGIN
  IF old_s->'adminPin' IS DISTINCT FROM new_s->'adminPin' AND
   (jsonb_typeof(new_s->'adminPin') IS DISTINCT FROM 'string' OR new_s->>'adminPin' !~ '^[0-9]{4}$')
  THEN RAISE EXCEPTION 'INVALID_ADMIN_PIN';END IF;
+ IF old_s->'adminSetupToken' IS DISTINCT FROM new_s->'adminSetupToken' AND
+  (new_s->'adminSetupToken' IS DISTINCT FROM '""'::jsonb OR new_s->>'adminPin' !~ '^[0-9]{4}$' OR new_s->>'adminPin' IS NULL)
+ THEN RAISE EXCEPTION 'INVALID_ADMIN_SETUP_COMPLETION';END IF;
+
+ IF old_s->'paymentLink' IS DISTINCT FROM new_s->'paymentLink' OR old_s->'paymentProvider' IS DISTINCT FROM new_s->'paymentProvider' THEN
+  IF NOT (new_s->>'paymentLink'='' AND new_s->>'paymentProvider'='') AND
+   NOT iig_closed_entry.safe_payment_link(new_s->>'paymentLink',CASE lower(new_s->>'paymentProvider') WHEN 'paypal' THEN 'PayPal' WHEN 'revolut' THEN 'Revolut' WHEN 'monzo' THEN 'Monzo' WHEN 'starling' THEN 'Starling' WHEN 'wise' THEN 'Wise' ELSE new_s->>'paymentProvider' END)
+  THEN RAISE EXCEPTION 'INVALID_PAYMENT_LINK';END IF;
+ END IF;
 END $$;
 
 -- An explicit scoped correction changes ONLY an existing submitted score. It
@@ -316,7 +337,7 @@ BEGIN
        (value ? 'id' AND value->>'id'=p->>'id') OR (NOT value ? 'id' AND value->>'name'=p->>'name');
      IF r IS NULL OR r->'name' IS DISTINCT FROM p->'name' OR r->'handicap' IS DISTINCT FROM p->'handicap'
         OR r->'stableford' IS DISTINCT FROM p->'stableford' OR r->'netScore' IS DISTINCT FROM p->'netScore'
-        OR coalesce(r->'noReturn','false') IS DISTINCT FROM coalesce(p->'noReturn','false')
+        OR coalesce(nullif(r->'noReturn','null'),'false') IS DISTINCT FROM coalesce(nullif(p->'noReturn','null'),'false')
      THEN RAISE EXCEPTION 'HISTORICAL_SCORE_CHANGED'; END IF;
    END IF;
  END LOOP;
@@ -389,9 +410,17 @@ BEGIN
     OR (setup_state->>'stake')::numeric<0 THEN RAISE EXCEPTION 'INVALID_SETUP'; END IF;
  IF setup_state->'firstPrize' IS DISTINCT FROM '0'::jsonb
     OR (setup_state->>'gameType'='points' AND
-       (setup_state->'stake' IS DISTINCT FROM '0'::jsonb OR setup_state->'splitPrizes' IS DISTINCT FROM 'false'::jsonb
+       ((setup_state->'stake' IS DISTINCT FROM '0'::jsonb AND NOT (is_trip AND old_s#>ARRAY['trip','plan',(((old_s#>>'{trip,currentRound}')::integer)-1)::text] IS NULL AND setup_state->'stake' IS NOT DISTINCT FROM old_s->'stake')) OR setup_state->'splitPrizes' IS DISTINCT FROM 'false'::jsonb
         OR setup_state->'secondPrize' IS DISTINCT FROM '0'::jsonb OR setup_state->'thirdPrize' IS DISTINCT FROM '0'::jsonb))
  THEN RAISE EXCEPTION 'INVALID_SETUP_FINANCES'; END IF;
+ IF jsonb_typeof(setup_state->'splitPrizes') IS DISTINCT FROM 'boolean'
+  OR jsonb_typeof(setup_state->'secondPrize') IS DISTINCT FROM 'number' OR setup_state->>'secondPrize' !~ '^[0-9]+$'
+  OR jsonb_typeof(setup_state->'thirdPrize') IS DISTINCT FROM 'number' OR setup_state->>'thirdPrize' !~ '^[0-9]+$'
+  OR (setup_state->'splitPrizes'='false'::jsonb AND (setup_state->'secondPrize'<>'0'::jsonb OR setup_state->'thirdPrize'<>'0'::jsonb))
+ THEN RAISE EXCEPTION 'INVALID_SETUP_FINANCES';END IF;
+ IF NOT (is_trip AND old_s#>ARRAY['trip','plan',(((old_s#>>'{trip,currentRound}')::integer)-1)::text] IS NULL)
+  AND setup_state->'pointsValue' IS DISTINCT FROM '10'::jsonb THEN RAISE EXCEPTION 'INVALID_SETUP_POINTS';END IF;
+
  IF jsonb_array_length(old_s->'players')<>jsonb_array_length(setup_state->'players')
     OR (SELECT count(DISTINCT x->>'id') FROM jsonb_array_elements(setup_state->'players') x)<>jsonb_array_length(old_s->'players')
  THEN RAISE EXCEPTION 'SETUP_PLAYERS_CHANGED'; END IF;
@@ -434,6 +463,9 @@ BEGIN
      OR setup_state->'splitPrizes' IS DISTINCT FROM to_jsonb(planned->>'gameType'='money' AND planned->'splitPrizes'='true'::jsonb)
      OR setup_state->>'pointsCompetition' IS DISTINCT FROM (CASE WHEN planned->>'format'='betterball' THEN 'stableford' ELSE coalesce(old_s#>>'{trip,competition}',planned->>'competition','stableford') END)
    THEN RAISE EXCEPTION 'SETUP_DIFFERS_FROM_TRIP_PLAN'; END IF;
+   IF setup_state->'secondPrize' IS DISTINCT FROM (CASE WHEN setup_state->'splitPrizes'='true'::jsonb THEN coalesce(planned->'secondPrize','0') ELSE '0'::jsonb END)
+    OR setup_state->'thirdPrize' IS DISTINCT FROM (CASE WHEN setup_state->'splitPrizes'='true'::jsonb THEN coalesce(planned->'thirdPrize','0') ELSE '0'::jsonb END)
+   THEN RAISE EXCEPTION 'SETUP_DIFFERS_FROM_TRIP_PLAN';END IF;
    playing:=setup_state#>'{trip,currentPlayingIds}';
    IF jsonb_typeof(playing) IS DISTINCT FROM 'array' OR EXISTS(SELECT 1 FROM jsonb_array_elements_text(playing) x
       WHERE NOT (old_s#>'{trip,playerIds}') ? x)
@@ -468,7 +500,7 @@ BEGIN
 END $$;
 
 -- OFFLINE candidate extensions. No actor identity is accepted from JSON/UI flags.
-CREATE FUNCTION iig_closed_entry.validate_players(old_s jsonb,new_s jsonb,locked boolean,actor text)
+CREATE FUNCTION iig_closed_entry.validate_players(old_s jsonb,new_s jsonb,locked boolean,actor text,frozen_ids jsonb DEFAULT NULL)
 RETURNS void LANGUAGE plpgsql SET search_path=pg_catalog AS $$
 DECLARE p jsonb;n jsonb;changed boolean; profile text[]:=ARRAY['name','handicap'];
 BEGIN
@@ -484,7 +516,7 @@ BEGIN
  FOR p IN SELECT value FROM jsonb_array_elements(old_s->'players') LOOP
   SELECT value INTO n FROM jsonb_array_elements(new_s->'players') x WHERE x->>'id'=p->>'id';
   IF n IS NULL THEN
-   IF actor IS NOT NULL OR (locked AND (iig_closed_entry.eligible(old_s,p) OR iig_closed_entry.has_score(jsonb_build_object('players',jsonb_build_array(p)))))
+   IF actor IS NOT NULL OR (locked AND ((CASE WHEN frozen_ids IS NOT NULL THEN frozen_ids ? (p->>'id') ELSE iig_closed_entry.eligible(old_s,p) END) OR iig_closed_entry.has_score(jsonb_build_object('players',jsonb_build_array(p)))))
    OR (coalesce(old_s#>'{trip,playerIds}','[]') ? (p->>'id') AND old_s#>'{trip,active}'='true'::jsonb)
    THEN RAISE EXCEPTION 'PROTECTED_PLAYER_REMOVAL';END IF;
    CONTINUE;
@@ -492,15 +524,20 @@ BEGIN
   IF (p-profile) IS DISTINCT FROM (n-profile) THEN RAISE EXCEPTION 'PROFILE_CHANGED_COMPETITION_FIELDS';END IF;
   changed:=p IS DISTINCT FROM n;
   IF changed AND actor IS NOT NULL AND p->>'id'<>actor THEN RAISE EXCEPTION 'WRONG_PLAYER';END IF;
-  IF changed AND locked AND iig_closed_entry.eligible(old_s,p) THEN RAISE EXCEPTION 'ENTERED_PROFILE_FROZEN';END IF;
-  IF changed AND (jsonb_typeof(n->'name') IS DISTINCT FROM 'string' OR length(btrim(n->>'name')) NOT BETWEEN 1 AND 100
+  -- Final totals are entered directly; profile maintenance changes no calculated
+  -- score/entry/payment field. Preserve identity, history and unique current names.
+  IF changed AND lower(btrim(p->>'name')) IS DISTINCT FROM lower(btrim(n->>'name')) AND EXISTS(
+   SELECT 1 FROM jsonb_array_elements(new_s->'players') other WHERE other->>'id'<>p->>'id' AND lower(btrim(other->>'name'))=lower(btrim(n->>'name')))
+  THEN RAISE EXCEPTION 'DUPLICATE_PLAYER_NAME';END IF;
+  IF changed AND (btrim(n->>'name') IN ('__proto__','constructor','prototype') OR jsonb_typeof(n->'name') IS DISTINCT FROM 'string' OR length(btrim(n->>'name')) NOT BETWEEN 1 AND 100
    OR jsonb_typeof(n->'handicap') IS DISTINCT FROM 'number' OR n->>'handicap' !~ '^-?[0-9]{1,2}(\.[0-9])?$'
    OR (n->>'handicap')::numeric NOT BETWEEN -10 AND 60)
   THEN RAISE EXCEPTION 'INVALID_PROFILE';END IF;
  END LOOP;
  FOR n IN SELECT value FROM jsonb_array_elements(new_s->'players') LOOP
   IF EXISTS(SELECT 1 FROM jsonb_array_elements(old_s->'players') x WHERE x->>'id'=n->>'id') THEN CONTINUE;END IF;
-  IF actor IS NOT NULL OR jsonb_typeof(n->'name') IS DISTINCT FROM 'string' OR length(btrim(n->>'name')) NOT BETWEEN 1 AND 100
+  IF EXISTS(SELECT 1 FROM jsonb_array_elements(new_s->'players') other WHERE other->>'id'<>n->>'id' AND lower(btrim(other->>'name'))=lower(btrim(n->>'name'))) THEN RAISE EXCEPTION 'DUPLICATE_PLAYER_NAME';END IF;
+  IF actor IS NOT NULL OR n->>'id' !~ '^[A-Za-z0-9_-]{1,100}$' OR n->>'id' IN ('__proto__','constructor','prototype') OR btrim(n->>'name') IN ('__proto__','constructor','prototype') OR jsonb_typeof(n->'name') IS DISTINCT FROM 'string' OR length(btrim(n->>'name')) NOT BETWEEN 1 AND 100
    OR jsonb_typeof(n->'handicap') IS DISTINCT FROM 'number' OR n->>'handicap' !~ '^-?[0-9]{1,2}(\.[0-9])?$'
    OR (n->>'handicap')::numeric NOT BETWEEN -10 AND 60
    OR (n-ARRAY['id','name','handicap','paid','playingThisRound','competition','stableford','netScore','noReturn','scoreSubmitted','wins','leaguePoints','netWinnings'])<>'{}'::jsonb
@@ -526,6 +563,74 @@ $$;
 
 -- Result economics and recipients are immutable. Claim authorises an identified
 -- player; settlement authorises the group's organiser, never client isAdmin.
+-- Deterministic compatibility for historical results, with no data backfill and
+-- no current-name matching. Ambiguous rounding/identity fails closed.
+-- Reproduce Number(value.toFixed(2)) for ordinary nonnegative money amounts.
+-- Integer quotient/remainder of the exact IEEE-754 bits avoids decimal half-cent
+-- guesses (e.g. JavaScript 1.005 -> 1.00, but 0.125 -> 0.13).
+CREATE FUNCTION iig_closed_entry.js_money_round(value double precision) RETURNS numeric
+LANGUAGE plpgsql IMMUTABLE SET search_path=pg_catalog AS $$
+DECLARE bytes bytea;exponent integer;mantissa numeric;fraction numeric;denominator numeric;numerator numeric;q numeric;i integer;
+BEGIN
+ IF value IS NULL OR value<0 OR value>=1000000000000 OR value='NaN'::double precision THEN RAISE EXCEPTION 'LEGACY_MONEY_RANGE_REVIEW_REQUIRED';END IF;
+ bytes:=float8send(value);exponent:=((get_byte(bytes,0)&127)<<4)|(get_byte(bytes,1)>>4);
+ fraction:=get_byte(bytes,1)&15;
+ FOR i IN 2..7 LOOP fraction:=fraction*256+get_byte(bytes,i);END LOOP;
+ IF exponent=0 THEN mantissa:=fraction;exponent:=-1074;
+ ELSE mantissa:=4503599627370496+fraction;exponent:=exponent-1075;END IF;
+ numerator:=mantissa*100;denominator:=1;
+ IF exponent>=0 THEN numerator:=numerator*power(2::numeric,exponent);ELSE denominator:=power(2::numeric,-exponent);END IF;
+ q:=div(numerator,denominator);IF mod(numerator,denominator)*2>=denominator THEN q:=q+1;END IF;
+ RETURN q/100;
+END $$;
+
+CREATE FUNCTION iig_closed_entry.legacy_payouts(record jsonb) RETURNS jsonb
+LANGUAGE plpgsql SET search_path=pg_catalog AS $$
+DECLARE result jsonb:='[]';comp text;names jsonb;name text;place jsonb;person jsonb;recipient jsonb;pot double precision;amount double precision;position integer;idx integer;
+BEGIN
+ IF record->>'gameType' IS DISTINCT FROM 'money' THEN RETURN result;END IF;
+ IF record->'splitPrizes'='true'::jsonb AND jsonb_array_length(coalesce(record->'prizePlaces','[]'))>0 THEN
+  comp:=CASE WHEN record->>'pointsCompetition'='net' THEN 'net' ELSE 'stableford' END;
+  pot:=coalesce((record->>(comp||'Pot'))::double precision,0);position:=0;
+  FOR place IN SELECT value FROM jsonb_array_elements(record->'prizePlaces') LIMIT 3 LOOP
+   position:=position+1;name:=place->>'name';
+   amount:=CASE position WHEN 1 THEN greatest(0,pot-coalesce((record->>'secondPrize')::double precision,0)-coalesce((record->>'thirdPrize')::double precision,0)) WHEN 2 THEN coalesce((record->>'secondPrize')::double precision,0) ELSE coalesce((record->>'thirdPrize')::double precision,0) END;
+   IF coalesce(name,'')='' OR amount<=0 THEN CONTINUE;END IF;
+   SELECT value INTO person FROM jsonb_array_elements(coalesce(record->'players','[]')) x WHERE x->>'name'=name;
+   IF (SELECT count(*) FROM jsonb_array_elements(coalesce(record->'players','[]')) x WHERE x->>'name'=name)<>1 THEN person:=NULL;END IF;
+   recipient:=coalesce(nullif(place->'playerId','null'),person->'id','null');
+   result:=result||jsonb_build_array(jsonb_build_object('id',comp||'-place-'||position||'-'||regexp_replace(lower(name),'[^a-z0-9]+','-','g'),
+    'competition',comp,'position',position,'winnerName',name,'winnerPlayerId',recipient,'amount',iig_closed_entry.js_money_round(amount),'status','awaiting_details','paymentProvider','','paymentLink','','claimedAt',NULL,'paidAt',NULL));
+  END LOOP;
+ ELSE
+  FOREACH comp IN ARRAY ARRAY['stableford','net'] LOOP
+   SELECT coalesce(jsonb_agg(x),'[]') INTO names FROM jsonb_array_elements(coalesce(record->(comp||'WinnerNames'),'[]')) x WHERE x<>'null'::jsonb AND x<>'""'::jsonb;
+   pot:=coalesce((record->>(comp||'Pot'))::double precision,0);IF jsonb_array_length(names)=0 OR pot<=0 THEN CONTINUE;END IF;
+   amount:=pot/jsonb_array_length(names);
+   idx:=0;
+   FOR name IN SELECT value FROM jsonb_array_elements_text(names) LOOP
+    SELECT value INTO person FROM jsonb_array_elements(coalesce(record->'players','[]')) x WHERE x->>'name'=name;
+    IF (SELECT count(*) FROM jsonb_array_elements(coalesce(record->'players','[]')) x WHERE x->>'name'=name)<>1 THEN person:=NULL;END IF;
+    result:=result||jsonb_build_array(jsonb_build_object('id',comp||'-'||idx||'-'||regexp_replace(lower(name),'[^a-z0-9]+','-','g'),
+     'competition',comp,'winnerName',name,'winnerPlayerId',coalesce(person->'id','null'),'amount',iig_closed_entry.js_money_round(amount),'status','awaiting_details','paymentProvider','','paymentLink','','claimedAt',NULL,'paidAt',NULL));idx:=idx+1;
+   END LOOP;
+  END LOOP;
+ END IF;
+ RETURN result;
+END $$;
+CREATE FUNCTION iig_closed_entry.historical_payout_actor(record jsonb,payout jsonb) RETURNS text
+LANGUAGE plpgsql SET search_path=pg_catalog AS $$
+DECLARE person jsonb;id text;
+BEGIN
+ id:=payout->>'winnerPlayerId';IF coalesce(id,'')<>'' THEN RETURN id;END IF;
+ IF (SELECT count(*) FROM jsonb_array_elements(coalesce(record->'players','[]')) x WHERE x->>'name'=payout->>'winnerName')<>1 THEN RETURN NULL;END IF;
+ SELECT value INTO person FROM jsonb_array_elements(record->'players') x WHERE x->>'name'=payout->>'winnerName';
+ id:=person->>'id';
+ IF coalesce(id,'')='' OR jsonb_typeof(person->'id')<>'string' OR
+  (SELECT count(*) FROM jsonb_array_elements(record->'players') x WHERE x->>'id'=id)<>1 THEN RETURN NULL;END IF;
+ RETURN id;
+END $$;
+
 CREATE FUNCTION iig_closed_entry.validate_payout(old_s jsonb,new_s jsonb,actor text)
 RETURNS void LANGUAGE plpgsql SET search_path=pg_catalog AS $$
 DECLARE i integer;j integer;o jsonb;n jsonb;p jsonb;q jsonb;player jsonb;changes integer:=0;allowed text[];
@@ -539,6 +644,7 @@ BEGIN
  FOR i IN SELECT generate_series(0,jsonb_array_length(old_s->'history')-1) LOOP
   o:=old_s->'history'->i;n:=new_s->'history'->i;
   IF o IS NOT DISTINCT FROM n THEN CONTINUE;END IF;
+  IF o->'payouts' IS NULL OR o->'payouts'='null'::jsonb THEN o:=jsonb_set(o,'{payouts}',iig_closed_entry.legacy_payouts(o));END IF;
   IF (o-'payouts') IS DISTINCT FROM (n-'payouts') OR jsonb_typeof(o->'payouts') IS DISTINCT FROM 'array'
    OR jsonb_typeof(n->'payouts') IS DISTINCT FROM 'array' OR jsonb_array_length(o->'payouts')<>jsonb_array_length(n->'payouts')
   THEN RAISE EXCEPTION 'PAYOUT_CHANGED_RESULT';END IF;
@@ -553,7 +659,7 @@ BEGIN
     THEN RAISE EXCEPTION 'INVALID_SETTLEMENT';END IF;
    ELSE
     -- Legacy name-only payouts are intentionally not guessed across identities.
-    IF player IS NULL OR p->>'winnerPlayerId' IS DISTINCT FROM actor
+    IF player IS NULL OR iig_closed_entry.historical_payout_actor(o,p) IS DISTINCT FROM actor
      OR p->>'status' NOT IN ('awaiting_details','ready','bank_details_needed') OR p->>'status' IS NULL
      OR jsonb_typeof(q->'claimedAt') IS DISTINCT FROM 'string'
     THEN RAISE EXCEPTION 'PAYOUT_IDENTITY_REQUIRED';END IF;
@@ -674,6 +780,122 @@ BEGIN
     WHEN x->>'debtorId'=b->>'creditorId' AND x->>'creditorId'=b->>'debtorId' THEN -(x->>'amount')::numeric ELSE 0 END),0)
    INTO balance FROM jsonb_array_elements(coalesce(o->'settlements','[]')) x WHERE x->>'status'='confirmed';
   IF (b->>'amount')::numeric>balance THEN RAISE EXCEPTION 'SIDEGAME_SETTLEMENT_EXCEEDS_DEBT';END IF;
+ END LOOP;
+END $$;
+
+
+-- Server derives protected maintenance. Browser proposals cannot invent resets,
+-- awards or restored fields. This is candidate code, NOT an installation script.
+CREATE FUNCTION iig_closed_entry.derive_operation(s jsonb,op text,selection integer DEFAULT NULL) RETURNS jsonb
+LANGUAGE plpgsql SET search_path=pg_catalog AS $$
+DECLARE result jsonb:=s;t jsonb:=s->'trip';backup jsonb;past jsonb;players jsonb:='[]';p jsonb;b jsonb;n jsonb;r jsonb;item jsonb;name text;key text;
+BEGIN
+ IF op IN ('tripreturn','tripcancel') THEN
+  IF (op='tripreturn' AND (t->'completed' IS DISTINCT FROM 'true'::jsonb OR t->'active'='true'::jsonb))
+   OR (op='tripcancel' AND t->'active' IS DISTINCT FROM 'true'::jsonb) THEN RAISE EXCEPTION 'INVALID_TRIP_RETURN_PHASE';END IF;
+  backup:=coalesce(nullif(t->'normalRoundBackup','null'),t#>'{pastTrips,0,normalRoundBackup}');
+  IF jsonb_typeof(backup) IS DISTINCT FROM 'object' OR jsonb_typeof(backup->'players') IS DISTINCT FROM 'array'
+   OR (SELECT count(*) FROM jsonb_array_elements(backup->'players'))<>(SELECT count(DISTINCT x->>'id') FROM jsonb_array_elements(backup->'players') x)
+  THEN RAISE EXCEPTION 'NORMAL_ROUND_BACKUP_REQUIRED';END IF;
+  IF op='tripcancel' AND jsonb_typeof(backup->'roundOpen') IS DISTINCT FROM 'boolean' THEN RAISE EXCEPTION 'AMBIGUOUS_ACTIVE_NORMAL_BACKUP';END IF;
+  IF op='tripcancel' AND backup->'roundOpen'='true'::jsonb AND
+   (backup->>'gameType' IS NULL OR backup->>'gameType' NOT IN ('money','points') OR backup->>'pointsCompetition' IS NULL OR backup->>'pointsCompetition' NOT IN ('stableford','net')
+    OR coalesce(btrim(backup->>'course'),'')='' OR coalesce(btrim(backup->>'date'),'')='') THEN RAISE EXCEPTION 'AMBIGUOUS_ACTIVE_NORMAL_BACKUP';END IF;
+  -- Keep the current membership/profile/order/unknown player fields. Never revive
+  -- deleted people or discard new members by replacing the roster with the backup.
+  FOR p IN SELECT value FROM jsonb_array_elements(s->'players') LOOP
+   SELECT value INTO b FROM jsonb_array_elements(backup->'players') x WHERE x->>'id'=p->>'id';
+   n:=p-'tripNotPlayingToday';
+   IF b IS NOT NULL THEN
+    FOREACH key IN ARRAY ARRAY['wins','leaguePoints','netWinnings'] LOOP
+     IF b ? key THEN n:=jsonb_set(n,ARRAY[key],b->key);END IF;
+    END LOOP;
+   END IF;
+   IF op='tripcancel' AND b IS NOT NULL THEN
+    IF backup->'roundOpen'='true'::jsonb AND
+     (NOT b ? 'stableford' OR NOT b ? 'netScore' OR NOT b ? 'noReturn'
+      OR (backup->>'gameType'='points' AND NOT b ? 'playingThisRound'))
+    THEN RAISE EXCEPTION 'AMBIGUOUS_ACTIVE_NORMAL_BACKUP';END IF;
+    FOREACH key IN ARRAY ARRAY['paid','playingThisRound','competition','stableford','netScore','noReturn','scoreSubmitted'] LOOP
+     IF b ? key THEN n:=jsonb_set(n,ARRAY[key],b->key);
+     ELSE n:=jsonb_set(n,ARRAY[key],CASE WHEN key IN ('paid','playingThisRound','noReturn','scoreSubmitted') THEN 'false'::jsonb ELSE 'null'::jsonb END);END IF;
+    END LOOP;
+   ELSE
+    n:=n||'{"paid":false,"playingThisRound":false,"competition":null,"stableford":null,"netScore":null,"noReturn":false,"scoreSubmitted":false}'::jsonb;
+   END IF;
+   players:=players||jsonb_build_array(n);
+  END LOOP;
+  FOREACH key IN ARRAY ARRAY['course','date','stake','gameType','splitPrizes','firstPrize','secondPrize','thirdPrize','pointsCompetition','pointsValue'] LOOP
+   IF backup ? key THEN result:=jsonb_set(result,ARRAY[key],backup->key);
+   ELSE result:=result-key;END IF;
+  END LOOP;
+  result:=result||jsonb_build_object('players',players,'roundOpen',CASE WHEN op='tripcancel' THEN coalesce(backup->'roundOpen','false') ELSE 'false'::jsonb END);
+  IF op='tripreturn' THEN result:=result||'{"date":"","roundOpen":false}'::jsonb;END IF;
+  past:=coalesce(t->'pastTrips','[]');
+  IF jsonb_typeof(past) IS DISTINCT FROM 'array' THEN RAISE EXCEPTION 'INVALID_PAST_TRIPS';END IF;
+  IF op='tripreturn' THEN past:=jsonb_build_array((t-'pastTrips')||'{"active":false,"completed":true}'::jsonb)||past;END IF;
+  result:=result||jsonb_build_object('trip',jsonb_build_object('active',false,'completed',false,'name','','totalRounds',0,'currentRound',0,
+   'competition',NULL,'tripPointsEnabled',true,'tripPointsValue',10,'rounds','[]'::jsonb,'standings','{}'::jsonb,'teamStandings','{}'::jsonb,
+   'champion',NULL,'tripTieNames','[]'::jsonb,'pointsChampion',NULL,'teamChampion',NULL,'pastTrips',past));
+ ELSIF op IN ('resetscores','resetpayments','clearleague','deletelast') THEN
+  r:=s#>'{history,0}';
+  IF op='deletelast' AND r IS NULL THEN RAISE EXCEPTION 'NO_HISTORY';END IF;
+  FOR p IN SELECT value FROM jsonb_array_elements(s->'players') LOOP
+   n:=p;
+   IF op='resetscores' THEN n:=n||'{"stableford":null,"netScore":null,"noReturn":false,"scoreSubmitted":false}'::jsonb;
+   ELSIF op='resetpayments' THEN n:=n||'{"paid":false}'::jsonb;
+   ELSIF op='clearleague' THEN n:=n||'{"wins":0,"leaguePoints":0,"netWinnings":0}'::jsonb;
+   ELSE
+    -- Match the existing explicit deleteLastRound arithmetic, including repeated
+    -- recorded names; no recalculation of unrelated rounds or financial payouts.
+    FOR name IN SELECT value FROM jsonb_array_elements_text(coalesce(r->'winners','[]')) LOOP
+     IF n->>'name'=name AND coalesce((n->>'wins')::numeric,0)>0 THEN n:=jsonb_set(n,'{wins}',to_jsonb((n->>'wins')::numeric-1));END IF;
+    END LOOP;
+    IF r->>'gameType'='points' THEN
+     FOR item IN SELECT value FROM jsonb_array_elements(coalesce(r->'pointsResults','[]')) LOOP
+      IF n->>'name'=item->>'name' THEN n:=jsonb_set(n,'{leaguePoints}',to_jsonb(greatest(0,coalesce((n->>'leaguePoints')::numeric,0)-coalesce((item->>'points')::numeric,0))));END IF;
+     END LOOP;
+    END IF;
+   END IF;
+   players:=players||jsonb_build_array(n);
+  END LOOP;
+  result:=jsonb_set(result,'{players}',players);
+  IF op='deletelast' THEN result:=jsonb_set(result,'{history}',(s->'history')-0);END IF;
+  IF op='clearleague' THEN result:=jsonb_set(result,'{history}','[]');END IF;
+ ELSIF op='deletepasttrip' THEN
+  past:=s#>'{trip,pastTrips}';
+  IF selection IS NULL OR jsonb_typeof(past) IS DISTINCT FROM 'array' OR selection<0 OR selection>=jsonb_array_length(past)
+  THEN RAISE EXCEPTION 'INVALID_TRIP_SELECTION';END IF;
+  result:=jsonb_set(result,'{trip,pastTrips}',past-selection);
+ ELSE RAISE EXCEPTION 'UNSUPPORTED_DERIVED_OPERATION';END IF;
+ RETURN result;
+END $$;
+
+
+CREATE FUNCTION iig_closed_entry.validate_configuration(o jsonb,n jsonb) RETURNS void
+LANGUAGE plpgsql SET search_path=pg_catalog AS $$
+DECLARE p jsonb;q jsonb;k text;i integer;
+BEGIN
+ IF (o-ARRAY['course','date','stake','pointsCompetition','splitPrizes','firstPrize','secondPrize','thirdPrize','players','lastActivityAt'])
+  IS DISTINCT FROM (n-ARRAY['course','date','stake','pointsCompetition','splitPrizes','firstPrize','secondPrize','thirdPrize','players','lastActivityAt'])
+ OR jsonb_typeof(n->'players') IS DISTINCT FROM 'array' OR jsonb_array_length(o->'players')<>jsonb_array_length(n->'players')
+ THEN RAISE EXCEPTION 'CONFIGURATION_CHANGED_UNRELATED_FIELDS';END IF;
+ IF o->'course' IS DISTINCT FROM n->'course' AND (jsonb_typeof(n->'course') IS DISTINCT FROM 'string' OR length(btrim(n->>'course')) NOT BETWEEN 1 AND 200)
+ THEN RAISE EXCEPTION 'INVALID_COURSE';END IF;
+ IF o->'date' IS DISTINCT FROM n->'date' THEN
+  IF n->>'date' IS NULL OR n->>'date' !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' THEN RAISE EXCEPTION 'INVALID_DATE';END IF;
+  PERFORM (n->>'date')::date;
+ END IF;
+ IF o->'pointsCompetition' IS DISTINCT FROM n->'pointsCompetition' AND (n->>'pointsCompetition' IS NULL OR n->>'pointsCompetition' NOT IN ('stableford','net')) THEN RAISE EXCEPTION 'INVALID_COMPETITION';END IF;
+ FOREACH k IN ARRAY ARRAY['stake','firstPrize','secondPrize','thirdPrize'] LOOP
+  IF o->k IS DISTINCT FROM n->k AND (jsonb_typeof(n->k) IS DISTINCT FROM 'number' OR (n->>k)::numeric<0
+   OR (k<>'stake' AND n->>k !~ '^[0-9]+$') OR (k='firstPrize' AND n->k<>'0'::jsonb)) THEN RAISE EXCEPTION 'INVALID_CONFIGURATION_FINANCES';END IF;
+ END LOOP;
+ IF o->'splitPrizes' IS DISTINCT FROM n->'splitPrizes' AND jsonb_typeof(n->'splitPrizes') IS DISTINCT FROM 'boolean' THEN RAISE EXCEPTION 'INVALID_PRIZE_SPLIT';END IF;
+ FOR i IN SELECT generate_series(0,jsonb_array_length(o->'players')-1) LOOP
+  p:=o->'players'->i;q:=n->'players'->i;
+  IF (p-'competition') IS DISTINCT FROM (q-'competition') OR (p->'competition' IS DISTINCT FROM q->'competition' AND q->'competition' IS DISTINCT FROM n->'pointsCompetition')
+  THEN RAISE EXCEPTION 'CONFIGURATION_CHANGED_PLAYER';END IF;
  END LOOP;
 END $$;
 

@@ -14,6 +14,8 @@ for(const name of ['adminAddPlayer','editPlayer','removePlayer'])assert.match(ex
 for(const name of ['sideGameConfirmBet','sideGameSendChallenge','sideGameAcceptChallenge','sideGameDeclineChallenge','sideGameSaveScore','sideGameRequestSettlement','sideGameConfirmSettlement','sideGameHome'])assert.match(extract(name),/save\(\"sidegame\"\)/);
 assert.match(extract('claimWinnerPrize'),/save\(\"claim\"\)/);assert.match(extract('markWinnerPaid'),/save\(\"settle\"\)/);
 assert.match(extract('selectMyPlayer'),/clearCredential\(\)/);
+for(const [name,op] of [['finishTrip','tripreturn'],['cancelTrip','tripcancel'],['resetScores','resetscores'],['resetPayments','resetpayments'],['deleteLastRound','deletelast'],['clearLeague','clearleague'],['deletePastTrip','deletepasttrip']])assert.ok(extract(name).includes('applyGuardedOperation("'+op+'"'));
+assert.match(extract('addPlayer'),/save\("join"\)/);
 assert.match(extract('save'),/capture\(sourceState,pin\)/);assert.match(extract('save'),/commit\(operation/);
 const connect=extract('connect');assert.ok(connect.indexOf('validateBuild')<connect.indexOf('createClient'));
 assert.match(connect,/db=iigEntryBridge\?iigEntryBridge.db:rawDb/);

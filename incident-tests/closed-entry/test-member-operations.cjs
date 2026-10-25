@@ -15,7 +15,7 @@ const {fixture,extract,originalFinish}=require('./test-source-finish.cjs'),guard
   for(const f of ['core.sql','validators.sql','boundary.sql'])await db.exec(fs.readFileSync(__dirname+'/../../supabase/closed-entry-candidate/'+f,'utf8'));
   await db.exec(`CREATE OR REPLACE FUNCTION iig_closed_entry.resolve_pin(p_pin text) RETURNS text LANGUAGE sql SECURITY DEFINER SET search_path=pg_catalog AS $$SELECT id FROM public.tens_in_groups WHERE fixture_pin=p_pin AND enabled$$;`);
   async function rpc(name,a){
-   const calls={iig_entry_read:['SELECT public.iig_entry_read($1) d',[a.p_pin]],iig_entry_write:['SELECT public.iig_entry_write($1,$2,$3,$4,$5,$6,$7,$8) d',[a.p_pin,a.p_group,a.p_round,a.p_revision,a.p_operation,a.p_state,a.p_credential,a.p_request]],
+   const calls={iig_entry_prepare:['SELECT public.iig_entry_prepare($1,$2,$3,$4,$5,$6,$7) d',[a.p_pin,a.p_group,a.p_round,a.p_revision,a.p_operation,a.p_credential,a.p_selection]],iig_entry_read:['SELECT public.iig_entry_read($1) d',[a.p_pin]],iig_entry_write:['SELECT public.iig_entry_write($1,$2,$3,$4,$5,$6,$7,$8) d',[a.p_pin,a.p_group,a.p_round,a.p_revision,a.p_operation,a.p_state,a.p_credential,a.p_request]],
     iig_entry_check_credential:['SELECT public.iig_entry_check_credential($1,$2,$3) d',[a.p_pin,a.p_group,a.p_credential]],
     iig_entry_check_member:['SELECT public.iig_entry_check_member($1,$2,$3,$4) d',[a.p_pin,a.p_group,a.p_credential,a.p_scope]],
     iig_entry_receipt:['SELECT public.iig_entry_receipt($1,$2,$3,$4) d',[a.p_pin,a.p_group,a.p_request,a.p_credential]]};
@@ -24,7 +24,7 @@ const {fixture,extract,originalFinish}=require('./test-source-finish.cjs'),guard
   async function seed(g,pin=g,patch={}){
    const state={...fixture({game:'money',format:'stableford'}),...patch};const admin=randomBytes(32).toString('hex'),tokens={};
    await db.query('INSERT INTO public.tens_in_groups(id,fixture_pin,state) VALUES($1,$2,$3)',[g,pin,state]);
-   await db.query("SELECT iig_closed_entry.provision($1,$2,clock_timestamp()+interval '1 day',ARRAY['start','finish','members','settle'])",[g,admin]);
+   await db.query("SELECT iig_closed_entry.provision($1,$2,clock_timestamp()+interval '1 day',ARRAY['start','finish','settings','members','settle','tripreturn','tripcancel','resetscores','resetpayments','deletelast','clearleague','deletepasttrip','configure'])",[g,admin]);
    for(const id of ['a','b','d']){tokens[id]=randomBytes(32).toString('hex');await db.query("SELECT iig_closed_entry.provision_member($1,$2,$3,clock_timestamp()+interval '1 day',ARRAY['profile','sidegame','claim'])",[g,id,tokens[id]]);}
    return {g,pin,state,admin,tokens};
   }
@@ -36,10 +36,10 @@ const {fixture,extract,originalFinish}=require('./test-source-finish.cjs'),guard
   async function run(name,x,token,args=[],extras={}){
    const failures=[];const bridge=guard.create({rpc:async(n,a)=>{const r=await rpc(n,a);if(n==='iig_entry_write'&&r.error)failures.push(r.error.message);return r;}},{uuid:randomUUID,promptCredential:async()=>token}),loaded=(await bridge.db.rpc('get_group_state',{p_pin:x.pin})).data;
    const memory=new Map([['iig_sidegame_format_a','stableford']]);
-   const c={state:loaded,pin:x.pin,db:bridge.db,iigEntryBridge:bridge,isAdmin:true,myPlayerId:'a',saveActive:false,savePending:0,saveQueue:Promise.resolve(),stateSaveVersion:0,
+   const c={state:loaded,pin:x.pin,db:bridge.db,iigEntryBridge:bridge,isAdmin:true,myPlayerId:'a',saveActive:false,savePending:0,saveQueue:Promise.resolve(),stateSaveVersion:0,scoreDraftActive:false,
     Date,JSON,Object,Array,String,Number,Boolean,Math,Promise,URL,demoCanEdit:()=>true,demoReadOnly:()=>false,$:()=>({value:'37',textContent:''}),render(){},show(){},showRoundHistory(){},sideGameHome(){},alert(){},confirm:()=>true,
     localStorage:{getItem:k=>memory.get(k)||null,setItem:(k,v)=>memory.set(k,v)},window:{scrollTo(){}},moneyText:String,appPrompt:async()=> '12.3',...extras};
-   vm.createContext(c);for(const f of ['save','ensureSideGameState','validGolfHandicap','validIndividualScore','sideGameResolveBetsForToday'])vm.runInContext(extract(f),c);
+   vm.createContext(c);for(const f of ['save','applyGuardedOperation','createWinnerPayouts','currentPlayerMatchesPayout','ensureSideGameState','validGolfHandicap','validIndividualScore','sideGameResolveBetsForToday'])vm.runInContext(extract(f),c);
    vm.runInContext(extract(name),c);await c[name](...args);assert.deepEqual(failures,[],name);return {state:await read(x),ctx:c,bridge};
   }
   const x=await seed('canonical-a','0007'),y=await seed('canonical-b','0099');
@@ -55,7 +55,8 @@ const {fixture,extract,originalFinish}=require('./test-source-finish.cjs'),guard
   const before=await read(inactive),other=structuredClone(before.state);other.players[0].handicap=12;
   await reject(()=>write(inactive,before,'profile',other,inactive.tokens.d),/WRONG_PLAYER/);
   const own=structuredClone(before.state);own.players[0].handicap=12;
-  await reject(()=>write(inactive,before,'profile',own,inactive.tokens.a),/ENTERED_PROFILE_FROZEN/);
+  const activeProfile=await seed('entered-profile'),apr=await read(activeProfile),aps=structuredClone(apr.state);aps.players[0].handicap=12.2;
+  assert.equal((await write(activeProfile,apr,'profile',aps,activeProfile.tokens.a)).error,null);const apAfter=await read(activeProfile);assert.equal(apAfter.context.closed,true);assert.equal(apAfter.state.players[0].paid,true);assert.equal(apAfter.state.players[0].stableford,apr.state.players[0].stableford);assert.deepEqual(apAfter.state.history,apr.state.history);checks++;
   const forged=structuredClone(before.state);forged.players[3].paid=true;
   await reject(()=>write(inactive,before,'profile',forged,inactive.tokens.d),/COMPETITION_FIELDS/);
   const invalid=structuredClone(before.state);invalid.players[3].handicap=112;
@@ -180,10 +181,11 @@ const {fixture,extract,originalFinish}=require('./test-source-finish.cjs'),guard
   }
   for(const game of ['money','points']){
    const old=fixture({trip:true,game,format:'stableford'});old.roundOpen=false;old.players.forEach(p=>Object.assign(p,{paid:false,stableford:null,netScore:null,noReturn:false,scoreSubmitted:false,competition:null}));
+   if(game==='points')old.stake=10;
    delete old.trip.plan;old.trip.currentFormat='individual';old.trip.currentRound=2;old.trip.rounds=[{id:'kept-legacy-day'}];
    const legacyTrip=await seed('unplanned-'+game,undefined,old),answers=['Legacy Fictional Course',game==='money'?'1':'2','2','10'];
    const started=await run('nextTripRound',legacyTrip,legacyTrip.admin,[],{prompt:()=>answers.shift(),pickTripDate:async()=> '2099-11-03',createRoundId:randomUUID});
-   assert.equal(started.state.context.phase,'open');assert.deepEqual(started.state.state.trip.rounds,old.trip.rounds);assert.equal(started.state.state.trip.competition,'net');checks++;
+   assert.equal(started.state.context.phase,'open');assert.deepEqual(started.state.state.trip.rounds,old.trip.rounds);assert.equal(started.state.state.trip.competition,'net');assert.equal(started.state.state.pointsCompetition,'net');checks++;
   }
   for(const [label,tamper] of [
    ['awards',s=>{s.trip.standings={a:99};}],['backup',s=>{s.trip.normalRoundBackup.players[0].wins=999;}],
@@ -195,6 +197,156 @@ const {fixture,extract,originalFinish}=require('./test-source-finish.cjs'),guard
    const base=await originalFinish(fixture({game:'money',format:'stableford'})),target=await seed('trip-tamper-'+label,undefined,base),readBefore=await read(target),bad=structuredClone(tripTemplate);tamper(bad);
    await reject(()=>write(target,readBefore,'start',bad),/INVALID_|SETUP_|TRIP_/);
   }
-  console.log(`PASS: ${checks} canonical member/Side Game/payout/legacy PIN checks; actual client source routes, independent identities, no entry/pot/result edits, immutable payouts, debt confirmation, revocation/replay and downstream rollback. Fictional only; not real owner/player verification.`);
+  // Lossless restoration uses actual guarded Trip controls, including legacy
+  // backups, new/deleted members, changed profiles and complete audit/receipt data.
+  for(const pair of [null,'betterball','pairsaggregate'])for(const action of ['cancelTrip','finishTrip']){
+   const beforeTrip=fixture({trip:true,last:true,pair,format:'stableford'});
+   const current=action==='finishTrip'?await originalFinish(beforeTrip):beforeTrip;
+   const normal=fixture({game:'money',format:'net'});
+   normal.course='Normal fictional course';normal.date='2099-11-01';
+   normal.players=current.players.map((p,i)=>({...p,name:'Original '+p.name,paid:i<3,playingThisRound:i<3,stableford:null,netScore:i<3?70+i:null,noReturn:false,scoreSubmitted:i<3,wins:7,leaguePoints:25,netWinnings:15}));
+   normal.roundOpen=true;normal.players[0].netScore=0;
+   current.trip.normalRoundBackup=structuredClone(normal);current.trip.pastTrips=[{name:'Older kept trip',rounds:[{id:'kept'}]}];
+   current.players[0].name='Renamed fictional golfer';current.players[0].handicap=8.5;current.players[0].opaque={keep:true};
+   current.players=current.players.filter(p=>p.id!=='c');
+   current.players.push({id:'new-member',name:'New fictional member',handicap:11.2,paid:false,playingThisRound:false,stableford:null,netScore:null,noReturn:false,scoreSubmitted:false,wins:0,leaguePoints:0,netWinnings:0});
+   const target=await seed('restore-'+pair+'-'+action,undefined,current),prior=await read(target);
+   const restored=await run(action,target,target.admin);
+   const out=restored.state.state;
+   assert.deepEqual(out.players.map(p=>p.id),current.players.map(p=>p.id));assert.equal(out.players[0].name,current.players[0].name);assert.equal(out.players[0].handicap,8.5);assert.deepEqual(out.players[0].opaque,{keep:true});
+   assert.equal(out.players[0].wins,7);assert.equal(out.players[0].leaguePoints,25);assert.equal(out.players[0].netWinnings,15);
+   assert.deepEqual(out.history,current.history);assert.deepEqual(out.sideGame,current.sideGame);assert.equal(out.splitPrizes,normal.splitPrizes);assert.equal(out.secondPrize,normal.secondPrize);
+   assert.equal(out.players.at(-1).paid,false);assert.notEqual(restored.state.context.roundId,prior.context.roundId);assert.equal(restored.state.context.closed,true);
+   if(action==='cancelTrip'){assert.equal(out.players[0].netScore,0);assert.equal(out.players[0].paid,true);assert.equal(restored.state.context.phase,'open');assert.deepEqual(out.trip.pastTrips,current.trip.pastTrips);}
+   else{assert.equal(out.players[0].netScore,null);assert.equal(out.roundOpen,false);assert.equal(out.date,'');assert.equal(out.trip.pastTrips.length,2);assert.deepEqual(out.trip.pastTrips[0].rounds,current.trip.rounds);assert.deepEqual(out.trip.pastTrips[0].normalRoundBackup,normal);}
+   assert.deepEqual((await db.query('SELECT state FROM iig_closed_entry.operation_audit WHERE group_id=$1',[target.g])).rows[0].state,current);checks++;
+   const stale=structuredClone(current);stale.players.at(-1).paid=true;
+   await reject(()=>write(target,prior,'save',stale,null),/STALE/);
+   if(action==='cancelTrip'){const latest=await read(target),late=structuredClone(latest.state);late.players.at(-1).paid=true;await reject(()=>write(target,latest,'save',late,null),/ENTRIES_CLOSED/);}
+  }
+  const reset=await seed('reset-controls'),oldReset=await read(reset);
+  const resetOut=await run('resetScores',reset,reset.admin);
+  assert.equal(resetOut.state.context.closed,true);assert.equal(resetOut.state.state.players[0].stableford,null);assert.equal(resetOut.state.state.players[0].paid,true);checks++;
+  const rr=await read(reset),lateAfterReset=structuredClone(rr.state);lateAfterReset.players.at(-1).paid=true;
+  await reject(()=>write(reset,rr,'save',lateAfterReset,null),/ENTRIES_CLOSED/);
+  await reject(()=>rpc('iig_entry_prepare',{p_pin:reset.pin,p_group:reset.g,p_round:rr.context.roundId,p_revision:rr.context.revision,p_operation:'resetpayments',p_credential:reset.admin,p_selection:null}),/ENTRIES_CLOSED/);
+  const noScores=fixture({game:'money'});noScores.players.forEach(p=>Object.assign(p,{stableford:null,netScore:null,noReturn:false,scoreSubmitted:false}));
+  const payReset=await seed('reset-before-score',undefined,noScores),payResetOut=await run('resetPayments',payReset,payReset.admin);assert.equal(payResetOut.state.state.players.filter(p=>p.paid).length,0);checks++;
+  const oldDelete=await seed('history-delete'),deletedRound=await run('deleteLastRound',oldDelete,oldDelete.admin,[],{formatDate:String});
+  assert.equal(deletedRound.state.state.history.length,0);assert.deepEqual(deletedRound.state.state.sideGame,oldDelete.state.sideGame);assert.deepEqual((await db.query('SELECT state FROM iig_closed_entry.operation_audit WHERE group_id=$1',[oldDelete.g])).rows[0].state.history,oldDelete.state.history);checks++;
+  const league=await seed('league-reset'),cleared=await run('clearLeague',league,league.admin);assert.equal(cleared.state.state.history.length,0);assert.ok(cleared.state.state.players.every(p=>p.wins===0&&p.leaguePoints===0&&p.netWinnings===0));assert.deepEqual(cleared.state.state.trip,league.state.trip);checks++;
+  const pastTarget=await seed('past-trip-delete',undefined,{trip:{active:false,pastTrips:[{name:'One'},{name:'Two'}]}});
+  const pastDeleted=await run('deletePastTrip',pastTarget,pastTarget.admin,[],{prompt:()=> '1'});assert.deepEqual(pastDeleted.state.state.trip.pastTrips,[{name:'Two'}]);checks++;
+  const denied=await seed('denied-maintenance'),deniedRead=await read(denied);
+  await reject(()=>rpc('iig_entry_prepare',{p_pin:denied.pin,p_group:denied.g,p_round:deniedRead.context.roundId,p_revision:deniedRead.context.revision,p_operation:'clearleague',p_credential:denied.tokens.a,p_selection:null}),/CREDENTIAL/);
+  const configure=await seed('configure-format',undefined,noScores);
+  const configured=await run('changeCurrentRoundCompetition',configure,configure.admin,[],{roundOpenNow:()=>true,roundLocked:()=>false,settingsPage(){}});
+  assert.equal(configured.state.state.pointsCompetition,'net');assert.ok(configured.state.state.players.every(p=>p.competition==='net'));assert.deepEqual(configured.state.state.history,configure.state.history);checks++;
+  const cr=await read(configure),badConfig=structuredClone(cr.state);badConfig.players.at(-1).paid=true;
+  await reject(()=>write(configure,cr,'configure',badConfig),/CONFIGURATION_CHANGED_PLAYER/);
+  const configuredScore=structuredClone(cr.state);configuredScore.players[0].netScore=70;configuredScore.players[0].scoreSubmitted=true;assert.equal((await write(configure,cr,'save',configuredScore,null)).error,null);
+  const scoredConfig=await read(configure),lateConfig=structuredClone(scoredConfig.state);lateConfig.stake=999;
+  await reject(()=>write(configure,scoredConfig,'configure',lateConfig),/ENTRIES_CLOSED/);
+  const linked=await run('changePaymentLink',configure,configure.admin,[],{detectPaymentProvider:()=>'',organiserPaymentSetup:async()=>({link:'https://paypal.me/FictionalGroup',provider:'paypal'}),paymentProviderLabel:()=> 'PayPal'});
+  assert.equal(linked.state.state.paymentLink,'https://paypal.me/FictionalGroup');assert.deepEqual(linked.state.state.players,scoredConfig.state.players);checks++;
+  // Historical snapshots can prove stable identity; matching a current name alone
+  // cannot. No economic backfill or recipient mutation is used.
+  const oldPayout={...payout,winnerPlayerId:null};
+  const historicPlayers=fixture({game:'money'}).players;
+  const legacyName=await seed('legacy-recipient',undefined,{history:[{id:'old-result',gameType:'money',players:historicPlayers,payouts:[oldPayout]}],roundOpen:false});
+  const legacyClaim=await run('claimWinnerPrize',legacyName,legacyName.tokens.a,[0,'p1'],{chooseWinnerPayoutMethod:async()=> 'bank_transfer'});
+  assert.equal(legacyClaim.state.state.history[0].payouts[0].status,'bank_details_needed');assert.equal(legacyClaim.state.state.history[0].payouts[0].winnerPlayerId,null);checks++;
+  const unproved=await seed('name-only-unproved',undefined,{history:[{id:'no-ids',gameType:'money',players:historicPlayers.map(({id,...p})=>p),payouts:[oldPayout]}],roundOpen:false});
+  const up=await read(unproved),upState=structuredClone(up.state);Object.assign(upState.history[0].payouts[0],{status:'bank_details_needed',paymentProvider:'Private bank transfer',claimedAt:'fictional'});
+  await reject(()=>write(unproved,up,'claim',upState,unproved.tokens.a),/PAYOUT_IDENTITY_REQUIRED/);
+  const manuallyPaid=await run('markWinnerPaid',unproved,unproved.admin,[0,'p1',true]);assert.equal(manuallyPaid.state.state.history[0].payouts[0].status,'paid');assert.equal(manuallyPaid.state.state.history[0].payouts[0].amount,30);checks++;
+  const materialRecord={id:'legacy-material',gameType:'money',pointsCompetition:'stableford',splitPrizes:false,stablefordPot:30,netPot:0,stablefordWinnerNames:['Fictional A'],netWinnerNames:[],players:historicPlayers};
+  const material=await seed('legacy-material',undefined,{history:[materialRecord],roundOpen:false});
+  const mc=await run('claimWinnerPrize',material,material.tokens.a,[0,'stableford-0-fictional-a'],{chooseWinnerPayoutMethod:async()=> 'bank_transfer'});
+  assert.equal(mc.state.state.history[0].payouts[0].amount,30);assert.equal(mc.state.state.history[0].payouts[0].status,'bank_details_needed');assert.deepEqual({...mc.state.state.history[0],payouts:null},{...materialRecord,payouts:null});checks++;
+  const half={...materialRecord,stablefordPot:2.01,stablefordWinnerNames:['Fictional A','Fictional B']};
+  const hp=(await db.query('SELECT iig_closed_entry.legacy_payouts($1) p',[half])).rows[0].p;assert.equal(hp[0].amount,Number((2.01/2).toFixed(2)));checks++;
+  for(const amount of [0,0.005,0.125,1.005,1.015,2.675,10.075,999999.995]){assert.equal(Number((await db.query('SELECT iig_closed_entry.js_money_round($1) m',[amount])).rows[0].m),Number(amount.toFixed(2)));checks++;}
+  const tripNormal=fixture({game:'money',format:'net'}),tripCurrent=fixture({trip:true});tripCurrent.trip.normalRoundBackup=tripNormal;tripCurrent.trip.pastTrips=[];
+  const previewOnly=await seed('trip-preview-only',undefined,tripCurrent),po=await read(previewOnly),beforePreview=await inventory();
+  const preview=await rpc('iig_entry_prepare',{p_pin:previewOnly.pin,p_group:previewOnly.g,p_round:po.context.roundId,p_revision:po.context.revision,p_operation:'tripcancel',p_credential:previewOnly.admin,p_selection:null});
+  assert.equal(preview.error,null);assert.deepEqual(await inventory(),beforePreview);checks++;
+  const invented=structuredClone(preview.data.state);invented.history=[];
+  await reject(()=>write(previewOnly,po,'tripcancel',invented),/INVALID_TRIP_RESTORE/);
+  const faulty=await seed('trip-downstream-fault',undefined,tripCurrent),fRead=await read(faulty);
+  const fp=(await db.query("SELECT iig_closed_entry.derive_operation($1,'tripcancel') p",[fRead.state])).rows[0].p;
+  await db.query('INSERT INTO fixture_faults VALUES($1)',[faulty.g]);await reject(()=>write(faulty,fRead,'tripcancel',fp),/FICTIONAL_AFTER_FAILURE/);
+  const auditFault=await seed('trip-audit-fault',undefined,tripCurrent),ar=await read(auditFault);
+  const ap=(await db.query("SELECT iig_closed_entry.derive_operation($1,'tripcancel') p",[ar.state])).rows[0].p;
+  await db.exec(`CREATE FUNCTION public.fixture_audit_failure() RETURNS trigger LANGUAGE plpgsql AS $$BEGIN IF NEW.group_id='trip-audit-fault' THEN RAISE EXCEPTION 'FICTIONAL_AUDIT_FAILURE';END IF;RETURN NEW;END$$;
+   CREATE TRIGGER fixture_audit_failure BEFORE INSERT ON iig_closed_entry.operation_audit FOR EACH ROW EXECUTE FUNCTION public.fixture_audit_failure();`);
+  await reject(()=>write(auditFault,ar,'tripcancel',ap),/FICTIONAL_AUDIT_FAILURE/);
+  const ackTrip=await seed('trip-lost-ack',undefined,tripCurrent);let tripSends=0;
+  const tripBridge=guard.create({rpc:async(n,a)=>{const out=await rpc(n,a);if(n==='iig_entry_write'){tripSends++;throw Error('LOST_ACK');}return out;}},{uuid:randomUUID,promptCredential:async()=>ackTrip.admin});
+  const tripRead=(await tripBridge.db.rpc('get_group_state',{p_pin:ackTrip.pin})).data;
+  const tripPrepared=await tripBridge.prepare('tripcancel',ackTrip.pin,tripRead);assert.equal(tripPrepared.error,null);
+  const tripCapture=tripBridge.capture(tripRead,ackTrip.pin);
+  for(const k of Object.keys(tripRead))if(!(k in tripPrepared.data))delete tripRead[k];Object.assign(tripRead,tripPrepared.data);
+  assert.ok((await tripBridge.commit('tripcancel',ackTrip.pin,structuredClone(tripRead),tripCapture,tripRead)).error);
+  const afterAckLoss=await inventory();const reconciled=await tripBridge.recover();assert.equal(reconciled.error,null);assert.equal(tripSends,1);assert.deepEqual(await inventory(),afterAckLoss);assert.equal(reconciled.data.players[0].netScore,tripNormal.players[0].netScore);checks++;
+  // Routine entry/scoring needs no organiser/member credential pairing prompt.
+  const simple=await seed('simple-scoring',undefined,noScores);let prompts=0;
+  const simpleBridge=guard.create({rpc},{uuid:randomUUID,promptCredential:async()=>{prompts++;throw Error('No extra step');}});
+  const simpleState=(await simpleBridge.db.rpc('get_group_state',{p_pin:simple.pin})).data;simpleState.players[0].stableford=31;simpleState.players[0].scoreSubmitted=true;
+  assert.equal((await simpleBridge.db.rpc('save_group_state',{p_pin:simple.pin,p_state:simpleState})).error,null);assert.equal(prompts,0);checks++;
+  const joinTarget=await seed('join-finished-round',undefined,{roundOpen:false}),joinBefore=await read(joinTarget);
+  const joined=await run('addPlayer',joinTarget,null,[],{myPlayerId:null,iigFreePlan:()=>false,playerJoinForm:async()=>({first:'Fictional',surname:'Joiner',handicap:11.2}),saveMyPlayerForGroup(){},clearMyPlayerForGroup(){},showInstallHelp(){},document:{querySelector:()=>({style:{}})}});
+  assert.equal(joined.state.state.players.length,joinBefore.state.players.length+1);assert.equal(joined.state.state.players.at(-1).paid,false);assert.deepEqual(joined.state.state.players.slice(0,-1),joinBefore.state.players);assert.deepEqual(joined.state.state.history,joinBefore.state.history);assert.equal(joined.state.context.phase,'finished');assert.equal(joined.state.context.closed,true);checks++;
+  const jv=await read(joinTarget),entryThroughJoin=structuredClone(jv.state);entryThroughJoin.players.push({id:'forged-new-entry',name:'Forged entrant',handicap:12,paid:true,playingThisRound:true,stableford:null,netScore:null,noReturn:false,scoreSubmitted:false,wins:0,leaguePoints:0,netWinnings:0});
+  await reject(()=>write(joinTarget,jv,'join',entryThroughJoin,null),/INVALID_NEW_MEMBER/);
+  const mixJoin=structuredClone(jv.state);mixJoin.players[0].paid=false;mixJoin.players.push({...mixJoin.players.at(-1),id:'another',name:'Another golfer'});
+  await reject(()=>write(joinTarget,jv,'join',mixJoin,null),/JOIN_MUST_ONLY_APPEND/);
+  const freeBase=fixture({game:'money',format:'stableford'});Object.assign(freeBase,{stake:0,splitPrizes:false,firstPrize:0,secondPrize:0,thirdPrize:0});freeBase.players.forEach(p=>Object.assign(p,{paid:false,playingThisRound:false,stableford:null,netScore:null,noReturn:false,scoreSubmitted:false}));
+  const free=await seed('free-entry-snapshot',undefined,freeBase),fr=await read(free),firstFree=structuredClone(fr.state);Object.assign(firstFree.players[0],{stableford:31,scoreSubmitted:true});
+  assert.equal((await write(free,fr,'save',firstFree,null)).error,null);let freeRead=await read(free);assert.deepEqual(freeRead.context.entrantIds,['a','b','c','d']);checks++;
+  const freeJoin=structuredClone(freeRead.state);freeJoin.players.push({id:'late-free',name:'Late fictional member',handicap:12,paid:false,playingThisRound:false,stableford:null,netScore:null,noReturn:false,scoreSubmitted:false,wins:0,leaguePoints:0,netWinnings:0});
+  assert.equal((await write(free,freeRead,'join',freeJoin,null)).error,null);freeRead=await read(free);assert.deepEqual(freeRead.context.entrantIds,['a','b','c','d']);checks++;
+  const lateFreeScore=structuredClone(freeRead.state);lateFreeScore.players.at(-1).stableford=40;lateFreeScore.players.at(-1).scoreSubmitted=true;
+  await reject(()=>write(free,freeRead,'save',lateFreeScore,null),/INELIGIBLE_SCORER/);
+  const existingFree=structuredClone(freeRead.state);for(const [i,p] of existingFree.players.entries())if(i>0&&i<4)Object.assign(p,{stableford:34-i,scoreSubmitted:true});
+  assert.equal((await write(free,freeRead,'save',existingFree,null)).error,null);checks++;
+  const freeBridge=app(free,free.admin),freeLoaded=(await freeBridge.db.rpc('get_group_state',{p_pin:free.pin})).data;
+  const nextCtx={state:freeLoaded,pin:free.pin,iigEntryBridge:freeBridge,isAdmin:false,demoReadOnly:()=>false,myPlayerId:'late-free',tripPlayerIsPlaying:()=>true,tripTeamRoundActive:()=>false,roundLocked:()=>true,esc:String};
+  vm.createContext(nextCtx);vm.runInContext(extract('playerNextActionHtml'),nextCtx);
+  assert.match(nextCtx.playerNextActionHtml(),/Entries Closed/);assert.doesNotMatch(nextCtx.playerNextActionHtml(),/Enter My Score|Pay .*Join/);checks++;
+  nextCtx.myPlayerId='a';assert.match(nextCtx.playerNextActionHtml(),/View Leaderboard/);checks++;
+  const freeFinished=await originalFinish(freeLoaded,{bridge:freeBridge,pin:free.pin});assert.equal((await read(free)).state.history.length,freeBase.history.length+1);assert.deepEqual(freeFinished.history[0].winners,['Fictional B']);assert.equal(freeFinished.history[0].stablefordPot,0);checks++;
+  const beforeStat=await read(simple),fakeStats=structuredClone(beforeStat.state);fakeStats.players[0].leaguePoints=99999;
+  await reject(()=>write(simple,beforeStat,'save',fakeStats,null),/PROTECTED_PLAYER_FIELDS/);
+  const unfinishedState=fixture({game:'money'});unfinishedState.players[1].stableford=null;unfinishedState.players[1].scoreSubmitted=false;
+  const unfinished=await seed('unfinished-round',undefined,unfinishedState),unr=await read(unfinished),premature=await originalFinish(fixture({game:'money'}));
+  await reject(()=>write(unfinished,unr,'finish',premature),/INCOMPLETE_ROUND/);
+  const reusedId=await read(deletion),reuse=structuredClone(reusedId.state);reuse.players.push({...freeBase.players[3],id:'d',name:'Different fictional person'});
+  await reject(()=>write(deletion,reusedId,'join',reuse,null),/MEMBER_ID_ALREADY_USED/);
+  const unsafeJoin=structuredClone(jv.state);unsafeJoin.players.push({...jv.state.players.at(-1),id:"x');injected()",name:'Unsafe fictional ID'});
+  await reject(()=>write(joinTarget,jv,'join',unsafeJoin,null),/INVALID_NEW_MEMBER/);
+  const duplicatePayment=await seed('duplicate-paid-return',undefined,noScores);let clearedJourney=0,raceFailure;
+  const yes={},no={},overlay={style:{},querySelector:selector=>selector==='#paymentReturnYes'?yes:no,remove(){}};
+  const documentStub={visibilityState:'visible',createElement:()=>overlay,body:{appendChild(){queueMicrotask(async()=>{
+   try{
+    let live=await read(duplicatePayment),paid=structuredClone(live.state);paid.players[3].paid=true;
+    assert.equal((await write(duplicatePayment,live,'save',paid,null)).error,null);
+    live=await read(duplicatePayment);const score=structuredClone(live.state);score.players[0].stableford=31;score.players[0].scoreSubmitted=true;
+    assert.equal((await write(duplicatePayment,live,'save',score,null)).error,null);yes.onclick();
+   }catch(e){raceFailure=e;no.onclick();}
+  });}}};
+  const duplicate=await run('recognisePaymentReturn',duplicatePayment,null,[],{paymentReturnBusy:false,poller:null,document:documentStub,
+   readPaymentJourney:()=>({playerId:'d',startedAt:Date.now()-5000,groupPin:duplicatePayment.pin,roundId:noScores.roundId,course:noScores.course,roundDate:noScores.date,stake:noScores.stake}),
+   clearPaymentJourney(){clearedJourney++;},entryClosed:()=>false,entryClosedMessage(){throw Error('Existing entrant must retain confirmation');},refreshEntryState:async()=>true,
+   sameEntryRound:(a,b)=>a.roundId===b.roundId,showAppToast(){},startPolling(){}});
+  assert.equal(raceFailure,undefined);assert.equal(duplicate.state.state.players[3].paid,true);assert.equal(duplicate.state.context.closed,true);assert.equal(duplicate.state.context.revision,2);assert.equal(clearedJourney,1);checks++;
+  const nullable=structuredClone(noScores);Object.assign(nullable.players[3],{paid:null,playingThisRound:null,noReturn:null,scoreSubmitted:null});
+  const legacyNull=await seed('legacy-null-flags',undefined,nullable),ln=await read(legacyNull),lnScore=structuredClone(ln.state);lnScore.players[0].stableford=31;lnScore.players[0].scoreSubmitted=true;
+  assert.equal((await write(legacyNull,ln,'save',lnScore,null)).error,null);assert.equal((await read(legacyNull)).state.players[3].paid,null);checks++;
+  const remainingNull=await read(legacyNull),lnRest=structuredClone(remainingNull.state);for(const i of [1,2])Object.assign(lnRest.players[i],{stableford:33-i,scoreSubmitted:true});
+  assert.equal((await write(legacyNull,remainingNull,'save',lnRest,null)).error,null);
+  const nullBridge=app(legacyNull,legacyNull.admin),nullLoaded=(await nullBridge.db.rpc('get_group_state',{p_pin:legacyNull.pin})).data;
+  await originalFinish(nullLoaded,{bridge:nullBridge,pin:legacyNull.pin});assert.equal((await read(legacyNull)).state.history.length,nullable.history.length+1);checks++;
+  console.log(`PASS: ${checks} canonical member/Side Game/payout/legacy PIN checks; actual client source routes, independent identities, frozen-entry protection, audited maintenance, immutable payouts, lossless Trip restoration, revocation/replay and rollback. Fictional only; not real owner/player verification.`);
  }finally{await db.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});

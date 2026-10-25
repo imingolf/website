@@ -6,16 +6,16 @@ CREATE SCHEMA iig_closed_entry;
 REVOKE ALL ON SCHEMA iig_closed_entry FROM PUBLIC,anon,authenticated,service_role;
 CREATE TABLE iig_closed_entry.rounds(
  group_id text PRIMARY KEY,round_id uuid NOT NULL DEFAULT gen_random_uuid(),revision bigint NOT NULL DEFAULT 0,
- phase text NOT NULL CHECK(phase IN ('open','finished')),closed boolean NOT NULL
+ phase text NOT NULL CHECK(phase IN ('open','finished')),closed boolean NOT NULL,entrant_ids jsonb
 );
 CREATE TABLE iig_closed_entry.credentials(
  group_id text NOT NULL,token_hash text NOT NULL,expires_at timestamptz NOT NULL,revoked boolean NOT NULL DEFAULT false,
- scopes text[] NOT NULL CHECK(scopes <@ ARRAY['finish','start','correct','cancel','settings','members','settle']::text[] AND cardinality(scopes)>0),
+ scopes text[] NOT NULL CHECK(scopes <@ ARRAY['finish','start','correct','cancel','settings','members','settle','tripreturn','tripcancel','resetscores','resetpayments','deletelast','clearleague','deletepasttrip','configure']::text[] AND cardinality(scopes)>0),
  PRIMARY KEY(group_id,token_hash)
 );
 CREATE TABLE iig_closed_entry.permits(
  backend integer NOT NULL,group_id text NOT NULL,transaction_id text NOT NULL,
- operation text NOT NULL CHECK(operation IN ('save','finish','start','correct','cancel','settings','members','settle','profile','sidegame','claim')),expected_revision bigint NOT NULL,
+ operation text NOT NULL CHECK(operation IN ('save','join','finish','start','correct','cancel','settings','members','settle','tripreturn','tripcancel','resetscores','resetpayments','deletelast','clearleague','deletepasttrip','configure','profile','sidegame','claim')),expected_revision bigint NOT NULL,
  state_digest text NOT NULL,available boolean NOT NULL,actor_id text,PRIMARY KEY(backend,group_id)
 );
 CREATE TABLE iig_closed_entry.receipts(
@@ -37,11 +37,29 @@ CREATE TABLE iig_closed_entry.member_credentials(
  PRIMARY KEY(group_id,token_hash)
 );
 ALTER TABLE iig_closed_entry.member_credentials ENABLE ROW LEVEL SECURITY;
+CREATE TABLE iig_closed_entry.operation_audit(
+ group_id text NOT NULL,revision bigint NOT NULL,operation text NOT NULL,state jsonb NOT NULL,
+ PRIMARY KEY(group_id,revision)
+);
+ALTER TABLE iig_closed_entry.operation_audit ENABLE ROW LEVEL SECURITY;
+CREATE TABLE iig_closed_entry.identity_ids(group_id text NOT NULL,identity_id text NOT NULL,PRIMARY KEY(group_id,identity_id));
+ALTER TABLE iig_closed_entry.identity_ids ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON ALL TABLES IN SCHEMA iig_closed_entry FROM PUBLIC,anon,authenticated,service_role;
 CREATE FUNCTION iig_closed_entry.digest(value jsonb) RETURNS text LANGUAGE sql IMMUTABLE SET search_path=pg_catalog AS $$
  SELECT encode(sha256(convert_to(value::text,'UTF8')),'hex') $$;
 CREATE FUNCTION iig_closed_entry.token_hash(token text) RETURNS text LANGUAGE sql IMMUTABLE SET search_path=pg_catalog AS $$
  SELECT encode(sha256(convert_to(token,'UTF8')),'hex') $$;
+-- IDs are opaque and never reissued. Include saved historical recipients, not
+-- current names, so a deleted winner's ID cannot be reused to claim an old prize.
+CREATE FUNCTION iig_closed_entry.reserve_identities(g text,s jsonb) RETURNS void
+LANGUAGE sql SET search_path=pg_catalog AS $$
+ INSERT INTO iig_closed_entry.identity_ids
+ SELECT g,value#>>'{}' FROM (
+  SELECT value FROM jsonb_path_query(s,'$.**.id') q(value)
+  UNION SELECT value FROM jsonb_path_query(s,'$.**.winnerPlayerId') q(value)
+  UNION SELECT value FROM jsonb_path_query(s,'$.**.playerId') q(value)
+  UNION SELECT value FROM jsonb_path_query(s,'$.**.playerIds[*]') q(value)
+ ) ids(value) WHERE jsonb_typeof(value)='string' AND value#>>'{}'<>'' ON CONFLICT DO NOTHING $$;
 CREATE FUNCTION iig_closed_entry.resolve_pin(p_pin text) RETURNS text
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
 BEGIN RAISE EXCEPTION 'PIN_RESOLVER_NOT_BOUND'; END $$;
@@ -58,7 +76,7 @@ CREATE FUNCTION iig_closed_entry.authorise(g text,token text,scope text) RETURNS
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE cap iig_closed_entry.credentials;
 BEGIN
- IF scope IS NULL OR scope NOT IN ('finish','start','correct','cancel','settings','members','settle') OR token IS NULL OR token !~ '^[a-f0-9]{64}$' THEN RAISE EXCEPTION 'ORGANISER_CREDENTIAL_REQUIRED'; END IF;
+ IF scope IS NULL OR scope NOT IN ('finish','start','correct','cancel','settings','members','settle','tripreturn','tripcancel','resetscores','resetpayments','deletelast','clearleague','deletepasttrip','configure') OR token IS NULL OR token !~ '^[a-f0-9]{64}$' THEN RAISE EXCEPTION 'ORGANISER_CREDENTIAL_REQUIRED'; END IF;
  SELECT * INTO cap FROM iig_closed_entry.credentials WHERE group_id=g AND token_hash=iig_closed_entry.token_hash(token) FOR SHARE;
  IF NOT FOUND OR cap.revoked OR cap.expires_at<=clock_timestamp() OR NOT scope=ANY(cap.scopes)
  THEN RAISE EXCEPTION 'ORGANISER_CREDENTIAL_REQUIRED'; END IF;

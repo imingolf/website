@@ -195,3 +195,12 @@ New offline prepare_guard_review.py only checks private binding hashes and creat
 review inventory. It cannot connect, execute SQL, activate guarded mode or produce a
 ready installer. Exact target-bound migration/rollback remains a release gate. The
 candidate stays NOT INSTALLABLE and is outside automatic Supabase migrations.
+
+## Lossless Trip and maintenance compatibility follow-up
+
+[Current readiness](../../docs/incident-closed-entry/CONTROLLED-TEST-READINESS.md)
+supersedes the older operation/inventory counts above: eight private RLS tables, six
+public RPCs, audited server-derived restoration/maintenance, frozen entrant identities,
+legacy payout materialisation and source client routing. Existing AFTER hooks remain.
+Identity issuance/recovery UX, exact TEST baseline-bound installation/rollback and
+writer/client cutover are still gates. NOT INSTALLABLE; no guarded activation.

@@ -1,3 +1,8 @@
+> Superseded compatibility status: see [controlled TEST readiness](CONTROLLED-TEST-READINESS.md)
+> for the follow-up after 6e2e467, completed Trip/maintenance/payout routes and remaining
+> credential, exact-target installation/rollback and writer-cutover gates. The historical
+> status below is retained for traceability; its unimplemented-operation list is older.
+
 # Offline operation integration after 920ae95
 
 Status: **NOT installable; guarded mode stays disabled.** No Supabase connection,

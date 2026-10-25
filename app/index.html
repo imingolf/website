@@ -410,7 +410,7 @@ function chooseMyPlayer(){
           <b>Already in the group?</b><br>Tap your name below.
         </div>
         ${[...state.players].sort((a,b)=>a.name.localeCompare(b.name)).map(p=>`
-          <button class="secondary full" onclick="selectMyPlayer('${p.id}')">
+          <button class="secondary full" onclick="selectMyPlayer(${escAttr(JSON.stringify(p.id))})">
             ${esc(p.name)}
           </button>
         `).join("")}
@@ -712,7 +712,7 @@ if(!state.adminPin && setupTokenFromUrl){
   // Keep the chosen display name in the shared group state immediately.
   // The Owner Dashboard reads this same live state, so the renamed group
   // appears everywhere without changing the permanent Group PIN.
-  const nameSaved=await save();
+  const nameSaved=await save("settings");
   if(!nameSaved){
     alert("The group name could not be saved. Please reopen the private setup link and try again.");
     return;
@@ -724,7 +724,7 @@ if(!state.adminPin && setupTokenFromUrl){
 
   state.adminPin=clean;
   state.adminSetupToken="";
-  const saved=await save();
+  const saved=await save("settings");
 
   if(!saved){
     state.adminPin="";
@@ -739,7 +739,7 @@ if(!state.adminPin && setupTokenFromUrl){
   if(setupPayment?.link){
     state.paymentLink=setupPayment.link;
     state.paymentProvider=setupPayment.provider;
-    await save();
+    await save("settings");
   }
   await organiserAdminSetupComplete(state.groupName||currentSetupName,pin);
 }
@@ -823,6 +823,20 @@ async function save(operation="save"){
   });
   saveQueue=request.catch(()=>false);
   return request;
+}
+
+async function applyGuardedOperation(operation,selection=null){
+  if(!isAdmin || !iigEntryBridge || saveActive || scoreDraftActive){
+    alert("Finish saving or submitting your current changes first.");return false;
+  }
+  const bridge=iigEntryBridge,source=state,groupPin=pin;
+  const proposal=await bridge.prepare(operation,groupPin,source,selection);
+  if(proposal.error || bridge!==iigEntryBridge || source!==state || pin!==groupPin){
+    alert(proposal.error?.message||"This change was not confirmed. Reload the latest group before continuing.");return false;
+  }
+  for(const key of Object.keys(source))if(!(key in proposal.data))delete source[key];
+  Object.assign(source,proposal.data);
+  return await save(operation);
 }
 
 async function recoverGuardedSave(){
@@ -1227,7 +1241,14 @@ function tripTeamRoundActive(){return tripBetterBallActive() || tripPairsAggrega
 function tripFormatLabel(format=tripRoundFormat()){
   return format==="betterball" ? "Better Ball" : format==="pairsaggregate" ? "Pairs Aggregate" : "Individual";
 }
-function currentRoundPlayers(){return state.players.filter(p=>tripPlayerIsPlaying(p));}
+function currentRoundPlayers(){
+  const players=state.players.filter(p=>tripPlayerIsPlaying(p));
+  if(typeof iigEntryBridge!=="undefined" && iigEntryBridge){
+    const status=iigEntryBridge.entryStatus(state,pin);
+    if(status.closed && Array.isArray(status.entrantIds))return players.filter(p=>status.entrantIds.includes(p.id));
+  }
+  return players;
+}
 function tripTeamName(team){
   return (team?.playerIds||[]).map(id=>state.players.find(p=>p.id===id)?.name).filter(Boolean).join(" & ") || team?.name || "Pair";
 }
@@ -1625,6 +1646,15 @@ function playerNextActionHtml(){
   if(!me)return "";
   if(state.trip?.active && !tripPlayerIsPlaying(me)){
     return `<div class="card" style="text-align:center;"><div class="muted">TODAY'S ROUND</div><div style="font-size:30px;margin:8px;">☕</div><b>Not playing today</b><div class="muted" style="margin-top:5px;">You are still part of the Trip and can follow today's result.</div></div>`;
+  }
+  if(iigEntryBridge){
+    const entry=iigEntryBridge.entryStatus(state,pin);
+    if(entry.closed && Array.isArray(entry.entrantIds)){
+      const ids=entry.entrantIds;
+      const team=tripTeamRoundActive() && (state.trip.currentTeams||[]).find(t=>(t.playerIds||[]).includes(me.id));
+      const entered=ids.includes(me.id) && (!tripTeamRoundActive() || (team && team.playerIds.length===2 && team.playerIds.every(id=>ids.includes(id))));
+      if(!entered)return `<div class="card" style="text-align:center;"><div class="muted">CURRENT ROUND</div><button class="secondary full" style="font-size:18px;margin-top:8px;" disabled>🔒 Entries Closed — Scoring Has Started</button></div>`;
+    }
   }
   if(tripTeamRoundActive()){
     const team=(state.trip.currentTeams||[]).find(t=>(t.playerIds||[]).includes(me.id));
@@ -2902,17 +2932,17 @@ $("screen").innerHTML=`
     <h2>Edit round details</h2>
 
       <label class="muted">Course</label>
-      <input value="${escAttr(state.course)}" onchange="state.course=this.value;save()">
+      <input value="${escAttr(state.course)}" onchange="state.course=this.value;save('configure')">
 
       <div>
         <label class="muted">Date</label>
-        <input type="date" value="${escAttr(state.date)}" onchange="state.date=this.value;save();render()">
+        <input type="date" value="${escAttr(state.date)}" onchange="state.date=this.value;save('configure');render()">
 
         <div class="notice"><b>Competition: ${tripTeamRoundActive()?`🤝 ${esc(tripFormatLabel())}`:(state.pointsCompetition==="stableford" ? "🏆 Stableford" : "⛳ Net")}</b></div>
 
         ${state.gameType==="money" ? `
           <label class="muted">Entry amount per player (£)</label>
-          <input type="number" min="0" step="1" value="${Number(state.stake||0)>0 ? state.stake : ""}" placeholder="No stake" onchange="state.stake=this.value==='' ? 0 : +this.value;save();render()">
+          <input type="number" min="0" step="1" value="${Number(state.stake||0)>0 ? state.stake : ""}" placeholder="No stake" onchange="state.stake=this.value==='' ? 0 : +this.value;save('configure');render()">
         ` : `
           <div class="notice">
             <b>${tripTeamRoundActive()?`🤝 ${esc(tripFormatLabel())}`:(state.pointsCompetition==="stableford" ? "🏆 Stableford" : "⛳ Net")}</b><br>
@@ -3475,6 +3505,12 @@ const sameRound=
 
   const entryRoundChanged=!sameEntryRound(state,latestState);
   state=latestState;
+  if(!entryRoundChanged && latestPlayer.paid){
+    clearPaymentJourney();paymentReturnBusy=false;
+    if(pollingWasActive)startPolling();
+    render();showAppToast("Entry already confirmed","Your saved payment status has been kept.",3000);
+    return;
+  }
   if(entryRoundChanged || entryClosed()){
     paymentReturnBusy=false;
     if(pollingWasActive)startPolling();
@@ -3725,7 +3761,7 @@ function scores(){
         <div class="player">
           <div>
             <b>${esc(p.name)}</b>
-            <div class="muted">HCP ${p.handicap}</div>
+            <div class="muted">HCP ${esc(String(p.handicap??"—"))}</div>
           </div>
 
           ${canControl ? `
@@ -4924,9 +4960,15 @@ function winnerPayouts(record){
   return Array.isArray(record?.payouts) ? record.payouts : createWinnerPayouts(record);
 }
 
-function currentPlayerMatchesPayout(payout){
+function currentPlayerMatchesPayout(payout,record){
   const me=(state.players||[]).find(p=>p.id===myPlayerId);
   if(!me)return false;
+  if(iigEntryBridge && !payout.winnerPlayerId){
+    const historic=Array.isArray(record?.players)?record.players:[];
+    const matches=historic.filter(p=>p.name===payout.winnerName);
+    if(matches.length!==1 || !matches[0].id || historic.filter(p=>p.id===matches[0].id).length!==1)return false;
+    return matches[0].id===me.id;
+  }
   return payout.winnerPlayerId
     ? String(payout.winnerPlayerId)===String(me.id)
     : String(payout.winnerName||"").trim().toLowerCase()===String(me.name||"").trim().toLowerCase();
@@ -4937,7 +4979,7 @@ function nextPrizeAction(){
   (state.history||[]).forEach((record,historyIndex)=>{
     winnerPayouts(record).forEach(payout=>{
       if(payout.status==="paid")return;
-      if(isAdmin || currentPlayerMatchesPayout(payout))candidates.push({record,historyIndex,payout});
+      if(isAdmin || currentPlayerMatchesPayout(payout,record))candidates.push({record,historyIndex,payout});
     });
   });
   if(isAdmin){
@@ -5019,7 +5061,7 @@ function chooseWinnerPayoutMethod(winnerName,amount){
 function payoutCardHtml(record,historyIndex){
   const payouts=winnerPayouts(record);
   if(!payouts.length)return "";
-  const visible=isAdmin ? payouts : payouts.filter(currentPlayerMatchesPayout);
+  const visible=isAdmin ? payouts : payouts.filter(p=>currentPlayerMatchesPayout(p,record));
   if(!visible.length)return "";
   return `<div class="card"><h2>💷 Result payment</h2>${visible.map(p=>{
     const key=escAttr(p.id);
@@ -5027,7 +5069,14 @@ function payoutCardHtml(record,historyIndex){
     if(p.status==="paid")return `<div class="notice"><b>✅ £${amount} paid to ${esc(p.winnerName)}</b><br><span class="muted">Paid ${esc(formatDate(String(p.paidAt||"").slice(0,10)))}</span></div>`;
     if(isAdmin && p.status==="ready")return `<div class="notice"><b>Payment details received from ${esc(p.winnerName)}</b><br>Payment: £${amount} via ${esc(p.paymentProvider)}</div><button class="primary full" onclick="openWinnerPaymentLink(${Number(historyIndex)},'${key}')">Pay ${esc(p.winnerName)} £${amount}</button><button class="secondary full" onclick="markWinnerPaid(${Number(historyIndex)},'${key}')">✅ Mark £${amount} as paid</button>`;
     if(isAdmin && p.status==="bank_details_needed")return `<div class="notice warning"><b>${esc(p.winnerName)} needs a private bank transfer</b><br>They have been asked to contact you privately with their bank details. Do not enter those details into I'm In Golf.</div><button class="secondary full" onclick="markWinnerPaid(${Number(historyIndex)},'${key}')">✅ Mark £${amount} as paid</button>`;
-    if(isAdmin)return `<div class="notice"><b>£${amount} owed to ${esc(p.winnerName)}</b><br>Waiting for the player to choose Monzo, Revolut, PayPal, Starling, Wise or a private bank transfer.</div><button class="secondary full" onclick="markWinnerPaid(${Number(historyIndex)},'${key}',true)">✅ Mark £${amount} as paid</button>`;
+    if(isAdmin){
+      const snapshots=(record.players||[]).filter(person=>person.name===p.winnerName);
+      const linked=p.winnerPlayerId || (snapshots.length===1 && snapshots[0].id);
+      const instruction=iigEntryBridge && !linked
+        ? "Arrange this older result payment privately with the player, then mark it paid."
+        : "Waiting for the player to choose Monzo, Revolut, PayPal, Starling, Wise or a private bank transfer.";
+      return `<div class="notice"><b>£${amount} owed to ${esc(p.winnerName)}</b><br>${instruction}</div><button class="secondary full" onclick="markWinnerPaid(${Number(historyIndex)},'${key}',true)">✅ Mark £${amount} as paid</button>`;
+    }
     if(p.status==="ready")return `<div class="notice"><b>✅ Payment details sent</b><br>Your Group Admin can now send your £${amount} payment.</div>`;
     if(p.status==="bank_details_needed")return `<div class="notice"><b>✅ Private bank transfer selected</b><br>Contact your Group Admin privately and send them your bank details. Never enter your bank details into I'm In Golf.</div>`;
     return `<div class="notice"><b>Result confirmed for ${esc(p.winnerName)} — £${amount} payment</b><br>Add a payment link only when a result payment is due. We do not ask every player for payment details.</div><button class="primary full" onclick="claimWinnerPrize(${Number(historyIndex)},'${key}')">Set up your £${amount} payment</button>`;
@@ -5040,7 +5089,7 @@ async function claimWinnerPrize(historyIndex,payoutId){
   if(!record)return;
   if(!Array.isArray(record.payouts))record.payouts=createWinnerPayouts(record);
   const payout=record.payouts.find(p=>p.id===payoutId);
-  if(!payout || !currentPlayerMatchesPayout(payout)){alert("This payment can only be set up by the named player.");return;}
+  if(!payout || !currentPlayerMatchesPayout(payout,record)){alert("This payment can only be set up by the named player.");return;}
   const method=await chooseWinnerPayoutMethod(payout.winnerName,payout.amount);
   if(method===null)return;
   if(method==="bank_transfer"){
@@ -6108,12 +6157,12 @@ ${leagueView==="points" ? `
       <div>
 <b>
   ${i===0 && Number(p.leaguePoints||0)>0 ? "👑 " : ""}
-  <span onclick="showPlayerStats('${p.id}')" style="cursor:pointer;text-decoration:underline;">
+  <span onclick="showPlayerStats(${escAttr(JSON.stringify(p.id))})" style="cursor:pointer;text-decoration:underline;">
     ${pointsPlayed(p.name)>0 ? (i+1)+". " : ""}${esc(p.name)}
   </span>
 </b>
                <div class="muted">
-          Handicap ${p.handicap}
+          Handicap ${esc(String(p.handicap??"—"))}
         </div>
       </div>
 
@@ -6135,13 +6184,13 @@ ${leagueView==="points" ? `
     <div class="player row">
       <div>
         <b>
-  <span onclick="showPlayerStats('${p.id}')" style="cursor:pointer;text-decoration:underline;">
+  <span onclick="showPlayerStats(${escAttr(JSON.stringify(p.id))})" style="cursor:pointer;text-decoration:underline;">
     ${moneyPlayed(p.name)>0 ? (i+1)+". " : ""}${esc(p.name)}
   </span>
 </b>
 
         <div class="muted">
-          Handicap ${p.handicap}
+          Handicap ${esc(String(p.handicap??"—"))}
         </div>
       </div>
 <div style="text-align:right;">
@@ -6180,7 +6229,7 @@ ${tripSorted.map((p,i)=>{
       </b>
 
       <div class="muted">
-        Handicap ${p.handicap}
+        Handicap ${esc(String(p.handicap??"—"))}
       </div>
     </div>
 
@@ -6400,7 +6449,7 @@ const bestNet=
       </h2>
 
       <div class="muted">
-        Handicap ${p.handicap}
+        Handicap ${esc(String(p.handicap??"—"))}
       </div>
     </div>
 
@@ -6548,7 +6597,7 @@ function playersPage(){
          <div class="row">
            <div>
              <b>${esc(p.name)}</b>
-             <div class="muted">Handicap ${p.handicap}</div>
+             <div class="muted">Handicap ${esc(String(p.handicap??"—"))}</div>
            </div>
 
            ${isAdmin ? `
@@ -6672,7 +6721,7 @@ async function addPlayer(){
   const newPlayer={id:Date.now().toString(36),name:cleanName,handicap:details.handicap,competition:null,paid:false,stableford:null,netScore:null,noReturn:false,scoreSubmitted:false,wins:0,leaguePoints:0,netWinnings:0};
   state.players.push(newPlayer); myPlayerId=newPlayer.id; saveMyPlayerForGroup();
   pendingFirstWelcome=isAdmin?"admin":"player";
-  render(); await save(); document.querySelector("nav").style.display=""; showInstallHelp(newPlayer.name);
+  render(); if(!await save("join")){myPlayerId=null;clearMyPlayerForGroup();render();return;} document.querySelector("nav").style.display=""; showInstallHelp(newPlayer.name);
 }
 
 async function adminAddPlayer(){
@@ -7059,7 +7108,7 @@ async function changeCurrentRoundCompetition(){
       p.competition=next;
     }
   });
-  await save();
+  if(!await save("configure"))return;
   alert(`✅ Competition changed to ${nextLabel}.`);
   settingsPage();
 }
@@ -7097,7 +7146,7 @@ async function changeCurrentPrizePayout(){
     state.secondPrize=0;
     state.thirdPrize=0;
 
-    const saved=await save();
+    const saved=await save("configure");
     if(!saved){
       showAppToast("Change not saved","Please try again.",4000);
       return;
@@ -7139,7 +7188,7 @@ async function changeCurrentPrizePayout(){
   state.secondPrize=secondPrize;
   state.thirdPrize=thirdPrize;
 
-  const saved=await save();
+  const saved=await save("configure");
   if(!saved){
     showAppToast("Change not saved","Please try again.",4000);
     return;
@@ -8248,7 +8297,7 @@ async function changePaymentLink(){
   const previousProvider=state.paymentProvider;
   if(result.remove){state.paymentLink="";state.paymentProvider="";}
   else{state.paymentLink=result.link;state.paymentProvider=result.provider;}
-  const saved=await save();
+  const saved=await save("settings");
   if(!saved){state.paymentLink=previousLink;state.paymentProvider=previousProvider;alert("The payment method could not be saved. Please try again.");return;}
   render();
   alert(result.remove ? "Payment method removed." : `✅ ${paymentProviderLabel(result.provider)} payment link saved.`);
@@ -8624,7 +8673,7 @@ function tripSetupScreen(){
         <div style="margin-bottom:8px;font-weight:800;">Trip players</div>
         <div class="muted" style="margin-bottom:10px;">Choose everyone going on the trip. You can mark anyone Not Playing Today before each round.</div>
         <div class="notice" id="tripPlayerChoices" style="margin-bottom:18px;max-height:230px;overflow:auto;">
-          ${[...state.players].sort((a,b)=>a.name.localeCompare(b.name)).map(p=>`<label style="display:flex;align-items:center;gap:10px;padding:8px 2px;"><input type="checkbox" data-trip-player="${escAttr(p.id)}" checked style="width:22px;height:22px;margin:0;"><span><b>${esc(p.name)}</b> <span class="muted">HCP ${p.handicap}</span></span></label>`).join("")}
+          ${[...state.players].sort((a,b)=>a.name.localeCompare(b.name)).map(p=>`<label style="display:flex;align-items:center;gap:10px;padding:8px 2px;"><input type="checkbox" data-trip-player="${escAttr(p.id)}" checked style="width:22px;height:22px;margin:0;"><span><b>${esc(p.name)}</b> <span class="muted">HCP ${esc(String(p.handicap??"—"))}</span></span></label>`).join("")}
         </div>
 
         <div style="margin-bottom:8px;font-weight:800;">Main Trip scoring</div>
@@ -9143,6 +9192,7 @@ if(tripDate===null)return;
   state.thirdPrize=0;
 
   state.trip.competition=selectedCompetition;
+  state.pointsCompetition=selectedCompetition;
   state.trip.tripPointsValue=tripPointsValue;
 
   if(selectedType==="points"){
@@ -9198,6 +9248,10 @@ async function deletePastTrip(){
     "Normal leagues, players and current round will not be changed."
   ))return;
 
+  if(iigEntryBridge){
+    if(await applyGuardedOperation("deletepasttrip",index)){render();alert("Change saved.");}
+    return;
+  }
   pastTrips.splice(index,1);
 
   state.trip.pastTrips=pastTrips;
@@ -9222,6 +9276,10 @@ async function finishTrip(){
     "Your normal round will then be restored."
   ))return;
 
+  if(iigEntryBridge){
+    if(await applyGuardedOperation("tripreturn")){show("round");alert("Trip saved. Your normal golf group is ready.");}
+    return;
+  }
   // Find the normal round backup
   const backup=
     state.trip?.normalRoundBackup ||
@@ -9336,6 +9394,10 @@ async function cancelTrip(){
     "This will remove the current Trip setup and Trip standings.\n\n" +
     "Your normal Points League, Money League and previous rounds will not be changed."
   ))return;
+  if(iigEntryBridge){
+    if(await applyGuardedOperation("tripcancel")){show("round");alert("Trip saved. Your normal golf group is ready.");}
+    return;
+  }
 const backup=state.trip?.normalRoundBackup;
 const pastTrips=state.trip?.pastTrips || [];
 
@@ -9381,14 +9443,22 @@ show("round");
 
 alert("Trip cancelled. Your normal round has been restored.");
 }
-  async function resetPayments(){
+async function resetPayments(){
  if(!confirm("Mark everyone unpaid?"))return;
+  if(iigEntryBridge){
+    if(await applyGuardedOperation("resetpayments")){render();alert("Change saved.");}
+    return;
+  }
  state.players.forEach(p=>p.paid=false);
  render();
  await save();
 }
 async function resetScores(){
  if(!confirm("Clear all scores?"))return;
+  if(iigEntryBridge){
+    if(await applyGuardedOperation("resetscores")){render();alert("Change saved.");}
+    return;
+  }
  state.players.forEach(p=>{
    p.stableford=null;
    p.netScore=null;
@@ -9428,6 +9498,10 @@ async function deleteLastRound(){
 
   if(!confirm(deleteMessage))return;
 
+  if(iigEntryBridge){
+    if(await applyGuardedOperation("deletelast")){render();alert("Change saved.");}
+    return;
+  }
   // Undo winner win
   (lastRound.winners||[]).forEach(name=>{
     const p=state.players.find(x=>x.name===name);
@@ -9475,6 +9549,10 @@ if(!confirm(
   "Press OK again to PERMANENTLY DELETE the Points League and Money & Points round history."
 ))return;
 
+  if(iigEntryBridge){
+    if(await applyGuardedOperation("clearleague")){render();alert("Change saved.");}
+    return;
+  }
  state.players.forEach(p=>{
    p.wins=0;
    p.leaguePoints=0;

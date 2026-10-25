@@ -235,7 +235,7 @@ def canonical_candidate_races():
     cap='a'*64
     def seed_candidate(g,state):
         sql("INSERT INTO public.tens_in_groups(id,fixture_pin,state) VALUES('"+g+"','"+g+"',"+quote_state(state)+");"
-            "SELECT iig_closed_entry.provision('"+g+"','"+cap+"',clock_timestamp()+interval '30 days',ARRAY['finish','start','correct','cancel','members','settle']);")
+            "SELECT iig_closed_entry.provision('"+g+"','"+cap+"',clock_timestamp()+interval '30 days',ARRAY['finish','start','correct','cancel','members','settle','settings','tripreturn','tripcancel','resetscores','resetpayments','deletelast','clearleague','deletepasttrip','configure']);")
         return json.loads(sql("SELECT public.iig_entry_read('"+g+"')->'context';").stdout.strip())
     def write_candidate(g,c,op,state,nonce=None):
         nonce=nonce or str(uuid.uuid4())
@@ -325,6 +325,57 @@ def canonical_candidate_races():
                 if kind=='member-remove-profile':contend(removal,profile,'MEMBER_CREDENTIAL_REQUIRED')
                 else:contend(profile,removal)
         print('PASS — canonical member/payout race:',kind)
+
+    for kind in ['tripcancel-entry','double-tripcancel','resetscores-entry','historydelete-finish','score-configure','configure-score']:
+        g='candidate-'+kind
+        if kind in ['score-configure','configure-score']:
+            base=fixture();c=seed_candidate(g,base)
+            scored=copy.deepcopy(base);scored['players'][0].update(stableford=31,scoreSubmitted=True)
+            config=copy.deepcopy(base);config['stake']=20
+            score=write_candidate(g,c,'save',scored);configuration=write_candidate(g,c,'configure',config)
+            if kind=='score-configure':contend(score,configuration)
+            else:contend(configuration,score)
+        else:
+            base=copy.deepcopy(source['before'])
+            if kind in ['tripcancel-entry','double-tripcancel']:
+                backup=copy.deepcopy(base)
+                base['trip']=dict(active=True,completed=False,normalRoundBackup=backup,rounds=[{'id':'fictional-trip-day'}],pastTrips=[])
+                op='tripcancel'
+            else:op='resetscores' if kind=='resetscores-entry' else 'deletelast'
+            c=seed_candidate(g,base)
+            proposal=json.loads(sql("SELECT iig_closed_entry.derive_operation("+quote_state(base)+",'"+op+"');").stdout.strip())
+            request=write_candidate(g,c,op,proposal)
+            if kind=='double-tripcancel':
+                contend(request,request,None)
+                n=sql("SELECT count(*) FROM iig_closed_entry.operation_audit WHERE group_id='"+g+"';").stdout.strip()
+                if n!='1':raise RuntimeError('Trip cancellation duplicated audit')
+            elif kind=='historydelete-finish':contend(request,write_candidate(g,c,'finish',source['after']))
+            else:
+                late=copy.deepcopy(base);late['players'][-1]['paid']=True
+                contend(request,write_candidate(g,c,'save',late))
+            old=json.loads(sql("SELECT state FROM iig_closed_entry.operation_audit WHERE group_id='"+g+"';").stdout.strip())
+            if old!=base:raise RuntimeError('Maintenance audit changed original state')
+            if not meta(g)['closed']:raise RuntimeError('Maintenance reopened competition entries')
+        print('PASS — canonical Trip/maintenance race:',kind)
+
+    for kind in ['free-score-join','free-join-score']:
+        g='candidate-'+kind;base=fixture();base['stake']=0
+        for person in base['players']:person.update(paid=False,playingThisRound=False)
+        c=seed_candidate(g,base)
+        scored=copy.deepcopy(base);scored['players'][0].update(stableford=31,scoreSubmitted=True)
+        joined=copy.deepcopy(base);joined['players'].append(dict(id='e',name='Fictional new member',handicap=12,paid=False,playingThisRound=False,stableford=None,netScore=None,noReturn=False,scoreSubmitted=False,wins=0,leaguePoints=0,netWinnings=0))
+        score=write_candidate(g,c,'save',scored);join=write_candidate(g,c,'join',joined)
+        if kind=='free-score-join':
+            contend(score,join)
+            c=meta(g);current=json.loads(sql("SELECT state FROM public.tens_in_groups WHERE id='"+g+"';").stdout.strip())
+            current['players'].append(joined['players'][-1]);sql(write_candidate(g,c,'join',current))
+            if meta(g)['entrantIds']!=['a','b','c','d']:raise RuntimeError('Post-closure free join changed frozen entrants')
+        else:
+            contend(join,score)
+            c=meta(g);current=json.loads(sql("SELECT state FROM public.tens_in_groups WHERE id='"+g+"';").stdout.strip());current['players'][0].update(stableford=31,scoreSubmitted=True)
+            sql(write_candidate(g,c,'save',current))
+            if meta(g)['entrantIds']!=['a','b','c','d','e']:raise RuntimeError('Pre-score free member missing from frozen entrants')
+        print('PASS — canonical free-format membership race:',kind)
 
 
 def main():
