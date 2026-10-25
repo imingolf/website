@@ -229,6 +229,84 @@ class SavedReview(unittest.TestCase):
         self.assertIn('TEST_PIN_BINDING_SEMANTICS_AND_DEPENDENCIES',safe['preinstallation_blockers'])
         self.assertNotIn('PRIVATE_RESOLVER_SECRET',json.dumps(baseline)+plan)
 
+    def test_original_generator_utf8_bytes_round_trip_without_normalisation(self):
+        # Only fictional definitions are derived here; use the actual generator
+        # and writer to verify the saved-manifest convention across line endings.
+        with patch.object(p.sys,'path',[str(p.ROOT/'tools/closed-entry-inspection'),*p.sys.path]):
+            import prepare_pin_binding as generator
+        for index,ending in enumerate(['\n','\r\n','\r','\r\n\n']):
+            with self.subTest(ending=repr(ending)):
+                function={**self.getter,'arguments':'p_pin text','return':'jsonb',
+                    'configuration':['search_path=public']}
+                function['definition']=('CREATE FUNCTION public.get_group_state(p_pin text) RETURNS jsonb '
+                    'LANGUAGE sql SECURITY DEFINER AS $$'+ending+
+                    'SELECT state FROM public.tens_in_groups'+ending+
+                    "WHERE pin=p_pin AND group_name<>'PRIVATE_£_café' LIMIT 1;"+ending+'$$;')
+                table={'schema':'public','name':'tens_in_groups',
+                    'columns':[{'name':'id','type':'uuid'},{'name':'state','type':'jsonb'}]}
+                sql,manifest=generator.build(function,table)
+                binding=self.review_root/('fictional-binding-'+str(index))
+                generator.prep.write_new(binding,{'resolver.PRIVATE.REVIEW.sql':sql,
+                    'manifest.SANITISED.json':json.dumps(manifest)})
+                self.getter['definition']=function['definition'];self.save_capture()
+                raw=(binding/'resolver.PRIVATE.REVIEW.sql').read_bytes()
+                self.assertEqual(raw,sql.encode('utf-8'))
+                self.assertEqual(manifest['resolver_sql_sha256'],r.sha(raw))
+                if ending!='\n':
+                    self.assertNotEqual(raw,(binding/'resolver.PRIVATE.REVIEW.sql').read_text().encode())
+                before=self.snapshots()
+                baseline,safe,plan=r.build_review(self.folder,pin_binding=binding)
+                self.assertEqual(safe['pin_binding'],'MATCHED_SAVED_TEST_GETTER_REVIEW_REQUIRED')
+                self.assertEqual(baseline['saved_pin_binding']['resolver_sql_sha256'],r.sha(raw))
+                self.assertEqual(before,self.snapshots())
+                self.assertEqual(safe['installation'],'NO-GO')
+                self.assertIn('TEST_PIN_BINDING_SEMANTICS_AND_DEPENDENCIES',safe['preinstallation_blockers'])
+                self.assertNotIn('PRIVATE_£_café',json.dumps(baseline)+json.dumps(safe)+plan)
+
+    def test_resolver_byte_changes_never_use_a_normalised_hash_fallback(self):
+        binding=self.bind();path=binding/'resolver.PRIVATE.REVIEW.sql';original=path.read_bytes()
+        for changed in [original.replace(b'\n',b'\r\n'),original.replace(b'\n',b'\r'),
+                        original.replace(b'PRIVATE_RESOLVER_SECRET',b'PRIVATE_CHANGED'),original+b'\n']:
+            with self.subTest(changed_sha=r.sha(changed)):
+                path.write_bytes(changed);before=self.snapshots()
+                status,pointers=r.binding_review(self.data,binding)
+                self.assertEqual(status,'SAVED_PIN_BINDING_INVALID');self.assertIsNone(pointers)
+                self.assertEqual(before,self.snapshots())
+
+    def test_matching_raw_hash_still_requires_utf8_header_and_signature(self):
+        binding=self.bind();path=binding/'resolver.PRIVATE.REVIEW.sql';original=path.read_bytes()
+        manifest_path=binding/'manifest.SANITISED.json';manifest=json.loads(manifest_path.read_text())
+        for raw in [original+b'\xff',b'\xef\xbb\xbf'+original,original.decode().encode('utf-16'),
+                    original.replace(b'-- PRIVATE REVIEW ONLY;',b'-- PRIVATE_OTHER_HEADER;'),
+                    original.replace(b'p_pin text',b'p_pin varchar')]:
+            with self.subTest(raw_sha=r.sha(raw)):
+                path.write_bytes(raw);manifest['resolver_sql_sha256']=r.sha(raw)
+                manifest_path.write_text(json.dumps(manifest));before=self.snapshots()
+                status,pointers=r.binding_review(self.data,binding)
+                self.assertEqual(status,'SAVED_PIN_BINDING_INVALID');self.assertIsNone(pointers)
+                self.assertEqual(before,self.snapshots())
+
+    def test_saved_test_getter_hash_is_not_normalised(self):
+        self.getter['definition']+='\r\n'
+        binding=self.bind(source_definition_sha256=r.sha(self.getter['definition'].replace('\r\n','\n').encode()))
+        status,_=r.binding_review(self.data,binding)
+        self.assertEqual(status,'SAVED_PIN_BINDING_TEST_PARITY_UNPROVEN')
+
+    def test_resolver_line_endings_changed_after_read_fail_integrity_recheck(self):
+        binding=self.bind();path=binding/'resolver.PRIVATE.REVIEW.sql'
+        original=path.read_bytes();raw=original.replace(b'\n',b'\r\n');path.write_bytes(raw)
+        manifest_path=binding/'manifest.SANITISED.json';manifest=json.loads(manifest_path.read_text())
+        manifest['resolver_sql_sha256']=r.sha(raw);manifest_path.write_text(json.dumps(manifest))
+        original_sha=r.sha;changed=[]
+        def change_after_read(value):
+            if value==raw and not changed:
+                changed.append(True);path.write_bytes(original)
+            return original_sha(value)
+        with patch.object(r,'sha',side_effect=change_after_read):
+            status,pointers=r.binding_review(self.data,binding)
+        self.assertEqual(changed,[True])
+        self.assertEqual(status,'SAVED_PIN_BINDING_INVALID');self.assertIsNone(pointers)
+
     def test_missing_or_mismatched_binding_remains_offline_blocker(self):
         _,safe,_=r.build_review(self.folder)
         self.assertEqual(safe['pin_binding'],'SAVED_PIN_BINDING_NOT_FOUND')

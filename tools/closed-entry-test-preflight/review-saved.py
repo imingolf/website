@@ -163,14 +163,18 @@ def binding_review(data, explicit=None):
         m = saved_json(folder, 'manifest.SANITISED.json')
         path = p.private_file(folder / 'resolver.PRIVATE.REVIEW.sql', 'saved binding')
         require(path.stat().st_size <= p.LIMIT)
-        text = path.read_text()
+        # The generator hashes the original UTF-8 text before writing it. Bind
+        # these exact saved bytes; read_text() would normalise CR/CRLF to LF.
+        raw = path.read_bytes()
+        resolver_hash = sha(raw)
         require(m.get('project') in (p.PROJECT, 'kzzzputsqxdntfqpprnz')
                 and m.get('source_predicate_and_path_preserved') is True and m.get('projection_only_change') is True
                 and type(m.get('database_connections')) is int and m['database_connections'] == 0
                 and m.get('sql_execution_authorised') is False)
         require(isinstance(m.get('source_definition_sha256'), str)
                 and re.fullmatch(r'[a-f0-9]{64}', m['source_definition_sha256']) is not None
-                and m.get('resolver_sql_sha256') == sha(text.encode()))
+                and m.get('resolver_sql_sha256') == resolver_hash)
+        text = raw.decode('utf-8')  # Strict decoding of the same verified bytes.
         require(text.startswith('-- PRIVATE REVIEW ONLY;')
                 and 'FUNCTION iig_closed_entry.resolve_pin(p_pin text) RETURNS text' in text)
         getters = [f for f in data['functions']['items']
@@ -178,9 +182,9 @@ def binding_review(data, explicit=None):
         matched = (len(getters) == 1 and getters[0].get('signature') == 'public.get_group_state(text)'
                    and isinstance(getters[0].get('definition'), str)
                    and sha(getters[0]['definition'].encode()) == m['source_definition_sha256'])
-        require(p.digest(folder / 'manifest.SANITISED.json') == manifest_hash and p.digest(path) == sha(text.encode()))
+        require(p.digest(folder / 'manifest.SANITISED.json') == manifest_hash and p.digest(path) == resolver_hash)
         pointers = {'folder': str(folder), 'manifest_sha256': manifest_hash,
-                    'resolver_sql_sha256': sha(text.encode()), 'source_definition_sha256': m['source_definition_sha256']}
+                    'resolver_sql_sha256': resolver_hash, 'source_definition_sha256': m['source_definition_sha256']}
         return ('MATCHED_SAVED_TEST_GETTER_REVIEW_REQUIRED' if matched else 'SAVED_PIN_BINDING_TEST_PARITY_UNPROVEN'), pointers
     except Exception:
         return 'SAVED_PIN_BINDING_INVALID', None

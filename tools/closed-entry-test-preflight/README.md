@@ -247,11 +247,19 @@ sanitised blocker summary. Original files and the consumed attempt marker stay i
 Only the printed sanitised summary is intended for sharing. No raw catalog, resolver,
 baseline or private plan should be uploaded.
 
+The PIN-binding generator records SHA-256 of the original resolver text encoded
+as UTF-8, before writing it. The saved file must match those exact bytes. The
+reviewer hashes raw bytes, then strictly decodes that same data as UTF-8 for the
+existing header/signature checks. It preserves original CR/LF line endings and
+rechecks the byte hash before recording the binding. It never accepts a normalised
+hash as a fallback or rewrites the resolver/manifest. The saved TEST getter's
+definition hash remains an exact UTF-8 comparison; its line endings are preserved.
+
 PASS means offline review preparation succeeded, not installation approval. Missing
 bindings, exact-hook/dependency review, faithful installer/rollback and recovery
 rehearsal, writer/client cutover and identity arrangements remain explicit gates.
 Saved outputs are hashed now, not retrospectively authenticated at collection time.
 See [the plan and evidence limits](../../docs/incident-closed-entry/SAVED-TEST-INSTALL-ROLLBACK-PLAN.md).
 
-Verified: 124 preflight/diagnostic/saved-review tests pass offline. Existing inspection
+Verified: 129 preflight/diagnostic/saved-review tests pass offline. Existing inspection
 tests remain separate; no new collection or SQL execution is authorised by review.
