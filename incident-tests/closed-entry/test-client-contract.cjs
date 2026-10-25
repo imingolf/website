@@ -1,0 +1,39 @@
+const assert=require('node:assert/strict');
+const {createTransitionClient}=require('./client-transition-contract.cjs');
+const initial={groupId:'fictional-a',roundId:'round-1',revision:0};
+const cap='a'.repeat(64);
+(async()=>{
+ let count=0,calls=[];
+ const reply=(op,p)=>({ok:true,...p.expected,revision:p.expected.revision+1,roundId:op==='start'?'round-2':p.expected.roundId});
+ const client=createTransitionClient(async(op,p)=>{calls.push({op,p});return reply(op,p);});
+ client.load(initial);
+ await assert.rejects(()=>client.request('finish',{}),/ORGANISER_CREDENTIAL_REQUIRED/);count++;
+ assert.throws(()=>client.authorise('fictional-b',cap),/ORGANISER_CREDENTIAL_REQUIRED/);count++;
+ client.authorise('fictional-a',cap);
+ await client.request('save',{players:[]});assert.equal('organiserCredential' in calls[0].p,false);count++;
+ await client.request('finish',{});assert.equal(calls[1].p.expected.revision,1);assert.equal(calls[1].p.organiserCredential,cap);count++;
+ await client.request('start',{});assert.equal(calls[2].p.expected.revision,2);count++;
+ assert.equal(new Set(calls.map(x=>x.p.requestId)).size,3);count++;
+ client.load({...initial,groupId:'fictional-b'});
+ await assert.rejects(()=>client.request('finish',{}),/ORGANISER_CREDENTIAL_REQUIRED/);count++;
+ for(const invalid of [null,{ok:false,error:'SECRET_ERROR'}, {...initial,ok:true,revision:0},
+  {...initial,ok:true,groupId:'fictional-other',revision:1}, {...initial,ok:true,roundId:'other-round',revision:1}]){
+  let attempts=0;const c=createTransitionClient(async()=>{attempts++;return invalid;});c.load(initial);
+  await assert.rejects(()=>c.request('save',{}),e=>e.message==='RELOAD_REQUIRED'&&!e.message.includes('SECRET'));
+  await assert.rejects(()=>c.request('save',{}),/RELOAD_REQUIRED/);assert.equal(attempts,1);count++;
+ }
+ let finish;const pending=createTransitionClient(()=>new Promise(resolve=>{finish=resolve;}));pending.load(initial);
+ const proposal={players:[]};const request=pending.request('save',proposal);
+ await assert.rejects(()=>pending.request('save',{}),/REQUEST_PENDING/);
+ assert.throws(()=>pending.load(initial),/REQUEST_PENDING/);count++;
+ pending.clear();finish({...initial,ok:true,revision:1});await assert.rejects(()=>request,/RELOAD_REQUIRED/);count++;
+ let transmitted;let release;
+ const clone=createTransitionClient((_,p)=>{transmitted=p;return new Promise(r=>{release=r;});});clone.load(initial);
+ const payload={players:[{paid:false}]};const inFlight=clone.request('save',payload);payload.players[0].paid=true;
+ assert.equal(transmitted.proposal.players[0].paid,false);release(reply('save',transmitted));await inFlight;count++;
+ const badLoad=createTransitionClient(async()=>{throw Error('must not send');});badLoad.load(initial);badLoad.authorise(initial.groupId,cap);
+ assert.throws(()=>badLoad.load({}),/RELOAD_REQUIRED/);await assert.rejects(()=>badLoad.request('save',{}),/RELOAD_REQUIRED/);count++;
+ const timeout=createTransitionClient(async()=>{throw Error('SECRET_PASSWORD');});timeout.load(initial);
+ await assert.rejects(()=>timeout.request('save',{}),e=>e.message==='RELOAD_REQUIRED');count++;
+ console.log(`PASS: ${count} offline client contract checks; group-scoped memory credential, explicit operation routing, version checks, stale/in-flight invalidation and no auto-retry. NOT production app integration.`);
+})().catch(e=>{console.error(e);process.exitCode=1;});

@@ -49,6 +49,16 @@ class Analysis(unittest.TestCase):
  def test_unqualified_write_not_marked_bound(self):
   source,rows,r,p=self.fixture();source[0]['items'][0]['definition']=source[0]['items'][0]['definition'].replace('private_schema.private_target','private_target')
   self.assertFalse(a.analyse(source,rows,r,p)['routines'][0]['writes_lexical_NOT_complete'][0]['qualified_target_matches_saved_relation'])
+ def test_trim_special_form_not_missing_routine(self):
+  source,rows,r,p=self.fixture()
+  source[0]['items'][0]['definition']="CREATE FUNCTION public.save_group_state() RETURNS void AS $$ BEGIN PERFORM trim('SECRET'); END $$ LANGUAGE plpgsql;"
+  entry=a.analyse(source,rows,r,p)['routines'][0]['calls'][0]
+  self.assertEqual(entry['status'],'SQL_TRIM_SPECIAL_FORM_NOT_A_TRIM_CATALOG_LOOKUP')
+  self.assertEqual(entry['trim_parser_lowering_candidates'],['btrim'])
+ def test_trim_forms_and_qualified_call_remain_distinct(self):
+  self.assertEqual(a.trim_syntax("AS $$ SELECT trim(leading 'SECRET' from 'X'), trim(trailing from 'X'), trim(both from 'X') $$"),['btrim','ltrim','rtrim'])
+  self.assertEqual(a.trim_syntax('AS $$ SELECT public.trim(x), "trim"(x) $$'),[])
+  self.assertEqual(a.trim_syntax("AS $$ SELECT 'trim(leading from x)' $$"),[])
  def test_main_offline_error_redacted(self):
   with patch.object(a.driver,'load_package',side_effect=ValueError('SECRET')),patch.object(a.driver.subprocess,'run',side_effect=AssertionError('No process')),contextlib.redirect_stderr(io.StringIO()) as out:
    self.assertEqual(a.main(['--saved-folder','s','--package','p','--folder','f']),1)

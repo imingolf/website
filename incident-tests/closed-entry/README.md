@@ -204,3 +204,17 @@ races, for twelve total real lock-contention scenarios. No SQL file here is a LI
 or online TEST migration. Old statements above about unsupported active Trip starts
 refer to the original basic start fixture; the new source-setup fixture handles the
 tested planned Trip advancement, not unplanned legacy Trips or new Trip creation.
+
+## Additional offline integration contracts
+
+`test-sql-syntax.cjs` uses only local synthetic PostgreSQL objects to distinguish
+SQL TRIM special-form lowering from an ordinary qualified custom routine. It checks
+the local parsed view's function OIDs; deparsed SQL may print TRIM syntax again.
+This is not a binding probe against either Supabase project.
+
+`client-transition-contract.cjs` and its tests are not shipped app code. They specify
+in-memory group credentials, explicit operation routing and fail-closed revision/
+identity/conflict handling with no automatic retries. Actual UI routing, installed
+RPC names, verified transport, trusted credential issuance/recovery and server
+idempotency are unfinished. See
+[TRIM-AND-CLIENT-CONTRACT.md](../../docs/incident-closed-entry/TRIM-AND-CLIENT-CONTRACT.md).

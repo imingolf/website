@@ -13,6 +13,16 @@ import review_followup as reviewer
 import summarise
 
 
+def trim_syntax(definition):
+    # PostgreSQL's unqualified TRIM special form lowers to btrim/ltrim/rtrim.
+    # A schema-qualified or quoted identifier remains an ordinary routine call.
+    masked,_=calls.mask_values(definition)
+    forms=[]
+    for m in re.finditer(r'(?<![A-Za-z_0-9$.\"])\btrim\s*\(\s*(?:(leading|trailing|both)\b)?',masked,re.I):
+        forms.append({'leading':'ltrim','trailing':'rtrim'}.get((m[1] or '').lower(),'btrim'))
+    return sorted(set(forms))
+
+
 def analyse(source, rows, report, parameters):
     reviewer.review(rows,report,parameters)
     parts={x['section']:x for x in rows}
@@ -34,6 +44,7 @@ def analyse(source, rows, report, parameters):
         for call in extracted:
             if call in prep.SQL_SYNTAX:continue
             pieces=call.split('.')
+            trim_form=call=='trim' and bool(trim_syntax(definition)) and not re.search(r'"trim"\s*\(',calls.mask_values(definition)[0],re.I)
             pool=[f for f in candidates if f['name']==pieces[-1] and
                   (f['schema']==pieces[0] if len(pieces)==2 else not fixed or f['schema'] in schemas)]
             bindings.append({'call_number':len(bindings)+1,
@@ -42,7 +53,8 @@ def analyse(source, rows, report, parameters):
               'candidate_schemas_in_fixed_path':fixed,
               'extension_candidate_count':sum(f.get('extension') is not None for f in pool),
               'all_candidate_bodies_available':bool(pool) and all(f.get('definition') is not None or f.get('definition_already_saved') is True or f['schema']=='pg_catalog' for f in pool),
-              'status':'MISSING_CANDIDATE' if not pool else 'TYPES_AND_CALL_EXPRESSION_REVIEW_REQUIRED'})
+              'trim_parser_lowering_candidates':trim_syntax(definition) if trim_form else [],
+              'status':'SQL_TRIM_SPECIAL_FORM_NOT_A_TRIM_CATALOG_LOOKUP' if trim_form else 'MISSING_CANDIDATE' if not pool else 'TYPES_AND_CALL_EXPRESSION_REVIEW_REQUIRED'})
         writes=[]
         for operation,target in effects:
             possible=[t for key,t in names.items() if key==target] if '.' in target else [t for t in tables if t['name']==target]
