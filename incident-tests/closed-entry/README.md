@@ -229,3 +229,15 @@ PATTERN, not the private LIVE definitions. Actual-source finish results and lost
 client reconciliation are exercised. No production credential issuance or app/RPC
 installation is provided. See
 [remaining semantic, recovery and migration gates](../../docs/incident-closed-entry/RESULT-RECEIPTS-AND-PRIVATE-GATES.md).
+
+## Two handlers and five conditional effect paths
+
+five-path-contract.sql/test-five-path-contract.cjs model the reported RETURN NEW
+inner handler and fall-through outer handler with five hypothetical domain paths.
+Applicability is conditional, not a requirement that all five real paths execute.
+Faults and different-vs-identical existing payloads exercise an outer consistency
+boundary, rollback of receipts/awards/history and client failure handling. Each new
+fictional organiser credential uses independent CSPRNG bytes, stored hashed only;
+the shared fixture role cannot change credentials or bypass the outer RPC. This is
+NOT production credential issuance or a faithful copy of the private LIVE trigger.
+See [the exact evidence and integration gate](../../docs/incident-closed-entry/TWO-HANDLER-FIVE-PATH-GATE.md).
