@@ -76,3 +76,9 @@ For the remaining UPDATE-trigger blocker, run the semantic reviewer with
 statement CASE arms are now distinct in the redacted output. This does not assert
 runtime effects are verified. See the bounded private checklist in
 [UPDATE-EXCEPTION-CASE-REVIEW.md](../../../docs/incident-closed-entry/UPDATE-EXCEPTION-CASE-REVIEW.md).
+
+`--remaining-checks-only` is the focused local pass after structural UPDATE analysis
+has passed. It reports handler return/rethrow/message references and write/conflict
+checks, omitting completed source/index/declaration sketches. It does not verify
+runtime reachability. See
+[receipt contracts and four remaining private facts](../../../docs/incident-closed-entry/RESULT-RECEIPTS-AND-PRIVATE-GATES.md).

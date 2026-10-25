@@ -89,8 +89,8 @@ class Semantic(unittest.TestCase):
  def test_main_offline_no_process_or_prompt(self):
   original,rows,report,params=self.fixture()
   with patch.object(s.driver,'load_package',return_value=('',params)),patch.object(s.prep,'private_directory'),patch.object(s.summarise,'read_private',side_effect=[original,rows,report]),patch.object(s.driver.subprocess,'run',side_effect=AssertionError('No process')),patch('socket.socket',side_effect=AssertionError('No network')),patch('builtins.input',side_effect=AssertionError('No prompt')),contextlib.redirect_stdout(io.StringIO()) as out:
-   self.assertEqual(s.main(['--folder','f','--saved-folder','s','--package','p']),0)
-  self.assertNotIn('SECRET',out.getvalue());self.assertIn('NO-GO',out.getvalue())
+   self.assertEqual(s.main(['--folder','f','--saved-folder','s','--package','p','--remaining-checks-only']),0)
+  self.assertNotIn('SECRET',out.getvalue());self.assertIn('NO-GO',out.getvalue());self.assertIn('REMAINING_AFTER_UPDATE_HANDLER_AND_WRITE_CHECKS',out.getvalue())
  def test_cli_errors_and_exceptions_redacted(self):
   with patch.object(s.driver,'load_package',side_effect=ValueError('SECRET')),contextlib.redirect_stderr(io.StringIO()) as out:
    self.assertEqual(s.main(['--folder','f','--saved-folder','s','--package','p']),1)
@@ -154,6 +154,24 @@ class Semantic(unittest.TestCase):
   original,rows,report,params=self.fixture();rows[2]['items'].append({**rows[2]['items'][0],'type_bits':5})
   result=s.analyse(original,rows,report,params,after_update_only=True)
   self.assertEqual(result['scope'],'AFTER_UPDATE_ONLY');self.assertEqual(len(result['triggers']),1)
+ def test_handler_outcomes_are_references_not_proof(self):
+  result=s.analyse(*self.fixture("BEGIN RETURN NEW; EXCEPTION WHEN OTHERS THEN IF true THEN RAISE NOTICE 'SECRET'; RETURN NEW; ELSE RAISE; END IF; END;"))['triggers'][0]
+  handler=result['exception_blocks'][0]['handlers'][0]
+  refs=handler['outcome_references_NOT_reachability_proof']
+  self.assertTrue(refs['return_new']);self.assertTrue(refs['message_only_raise']);self.assertTrue(refs['bare_reraise'])
+  self.assertFalse(refs['new_exception']);self.assertFalse(handler['swallowing_or_error_preservation_verified'])
+  self.assertNotIn('SECRET',json.dumps(handler))
+ def test_inner_handler_outcome_not_misattributed_to_outer(self):
+  body="BEGIN RETURN NEW; EXCEPTION WHEN OTHERS THEN BEGIN RETURN NEW; EXCEPTION WHEN OTHERS THEN RAISE; END; RETURN OLD; END;"
+  result=s.analyse(*self.fixture(body))['triggers'][0]
+  outer=result['exception_blocks'][0]['handlers'][0]['outcome_references_NOT_reachability_proof']
+  inner=result['exception_blocks'][1]['handlers'][0]['outcome_references_NOT_reachability_proof']
+  self.assertTrue(outer['return_old']);self.assertFalse(outer['bare_reraise']);self.assertTrue(inner['bare_reraise'])
+ def test_remaining_checks_omit_completed_source_and_indexes(self):
+  result=s.remaining_checks(s.analyse(*self.fixture()))
+  raw=json.dumps(result)
+  self.assertNotIn('symbolic_statement',raw);self.assertNotIn('target_constraints',raw)
+  self.assertIn('write_checks',raw);self.assertIn('NO-GO',raw);self.assertNotIn('SECRET',raw)
  def test_missing_body_explicit(self):
   original,rows,report,params=self.fixture();original=[]
   result=s.analyse(original,rows,report,params)

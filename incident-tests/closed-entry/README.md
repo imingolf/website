@@ -218,3 +218,14 @@ identity/conflict handling with no automatic retries. Actual UI routing, install
 RPC names, verified transport, trusted credential issuance/recovery and server
 idempotency are unfinished. See
 [TRIM-AND-CLIENT-CONTRACT.md](../../docs/incident-closed-entry/TRIM-AND-CLIENT-CONTRACT.md).
+
+## Atomic Finish Round receipts (fictional contract)
+
+finish-receipts.sql and test-finish-receipts.cjs extend the private fixture with
+payload-bound finish acknowledgements, current capability checks on replay/lookup
+and outer postconditions that reject a missing/conflicting fictional result effect.
+Two swallowing exception scopes and conflict handling reproduce only the reported
+PATTERN, not the private LIVE definitions. Actual-source finish results and lost-ACK
+client reconciliation are exercised. No production credential issuance or app/RPC
+installation is provided. See
+[remaining semantic, recovery and migration gates](../../docs/incident-closed-entry/RESULT-RECEIPTS-AND-PRIVATE-GATES.md).

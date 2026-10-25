@@ -13,7 +13,7 @@ import prepare_followup as prep
 import review_followup as reviewer
 import summarise
 
-SAFE_WORDS=set('return raise sqlstate and or not is distinct from null true false exists new old tg_op coalesce nullif greatest least select where in as into values set excluded on conflict do nothing update insert delete returning join left right inner outer full lateral case when then else end any all array begin count sum filter over partition by order group having limit offset asc desc found'.split())|classifier.BUILTINS
+SAFE_WORDS=set('return raise exception warning notice info log debug sqlstate and or not is distinct from null true false exists new old tg_op coalesce nullif greatest least select where in as into values set excluded on conflict do nothing update insert delete returning join left right inner outer full lateral case when then else end any all array begin count sum filter over partition by order group having limit offset asc desc found'.split())|classifier.BUILTINS
 TOPICS={
  'history':{'history','rounds','roundhistory','round_history'},
  'payment_snapshot':{'paid','payment','payments','paymentmarkedat','payment_status','stake','pot','payouts','payout','payment_snapshot','payment_snapshots'},
@@ -114,6 +114,16 @@ class Review:
             if depth<0:raise Unsupported('unbalanced_expression')
             self.i+=1
         raise Unsupported('missing_terminator')
+    def control_outcome(self,statement):
+        if word(statement[0],'return'):
+            tail=statement[1:]
+            return {'return_expression':tail[0][1] if len(tail)==1 and tail[0] in [('word','new'),('word','old'),('word','null')] else 'other'}
+        if word(statement[0],'raise'):
+            if len(statement)==1:return {'raise_kind':'bare_reraise'}
+            if statement[1][0]=='word' and statement[1][1] in ('debug','log','info','notice','warning'):
+                return {'raise_kind':'message_level_not_exception'}
+            return {'raise_kind':'new_exception'}
+        return {}
     def emit(self,event):
         if len(self.events)>=160:raise Unsupported('event_limit')
         event['block_scope_path']=list(self.active_blocks)
@@ -166,6 +176,18 @@ class Review:
         self.active_blocks.pop()
         block['database_changes_in_protected_block_rolled_back_before_matching_handler']=bool(block['handlers'])
         block['plpgsql_local_variables_not_rewound']=bool(block['handlers'])
+        for handler in block['handlers']:
+            relevant=[self.events[i-1] for i in handler['event_numbers'] if self.events[i-1].get('exception_handler_path',[]) and self.events[i-1]['exception_handler_path'][-1]=={'block_number':ident,'handler_number':handler['handler_number']}]
+            outcomes=[e.get('control_outcome_reference',{}) for e in relevant]
+            handler['outcome_references_NOT_reachability_proof']={
+                'return_new':any(x.get('return_expression')=='new' for x in outcomes),
+                'return_old':any(x.get('return_expression')=='old' for x in outcomes),
+                'return_null':any(x.get('return_expression')=='null' for x in outcomes),
+                'other_return':any(x.get('return_expression')=='other' for x in outcomes),
+                'bare_reraise':any(x.get('raise_kind')=='bare_reraise' for x in outcomes),
+                'new_exception':any(x.get('raise_kind')=='new_exception' for x in outcomes),
+                'message_only_raise':any(x.get('raise_kind')=='message_level_not_exception' for x in outcomes)}
+            handler['swallowing_or_error_preservation_verified']=False
         block['handler_effects_and_error_propagation_verified']=False
     def statement_case(self,guards,loops):
         if len(self.cases)>=64:raise Unsupported('case_count_limit')
@@ -233,6 +255,7 @@ class Review:
                 self.emit(self.write(statement,guards,loops))
             elif ('operator',':=') in statement or word(first,'select') or word(first,'perform') or word(first,'return') or word(first,'raise'):
                 self.emit({'kind':'control_transfer' if first[1] in ('return','raise') else 'dataflow_or_control','topics_NOT_effect_proof':topics(statement),
+                  'control_outcome_reference':self.control_outcome(statement),
                   'symbolic_expression':self.symbols.render(statement),'branch_path':guards,'iteration_context':loops})
             else:raise Unsupported('unrecognised_statement')
             if len(self.events)>160:raise Unsupported('event_limit')
@@ -361,10 +384,30 @@ def analyse(original,rows,report,params,after_update_only=False):
       'release_decision':'NO-GO pending private semantic review and faithful integration'}
 
 
+def remaining_checks(result):
+    triggers=[]
+    for trigger in result['triggers']:
+        item={'trigger_number':trigger['trigger_number'],'status':trigger['status']}
+        if 'reason' in trigger:item['reason']=trigger['reason']
+        if 'exception_blocks' in trigger:
+            item['exception_scopes']=trigger['exception_blocks']
+            item['write_checks']=[{'event_number':i,'operation':e['operation'],
+                'target_candidates':e['target_candidates'],'branch_path':e['branch_path'],
+                'exception_handler_path':e['exception_handler_path'],'block_scope_path':e['block_scope_path'],
+                'conflict':e['conflict'],'reachability_verified':False}
+                for i,e in enumerate(trigger['events'],1) if e['kind']=='write']
+        triggers.append(item)
+    return {'project':result['project'],'database_connections':0,'group_records_read':0,
+        'scope':'REMAINING_AFTER_UPDATE_HANDLER_AND_WRITE_CHECKS','triggers':triggers,
+        'limitations':result['limitations'],'private_review_checklist':result['private_review_checklist'],
+        'release_decision':result['release_decision']}
+
+
 def main(argv=None):
     p=prep.QuietParser(description=__doc__)
     for arg in ('folder','saved-folder','package'):p.add_argument('--'+arg,type=Path)
     p.add_argument('--after-update-only',action='store_true')
+    p.add_argument('--remaining-checks-only',action='store_true')
     args=p.parse_args(argv)
     try:
         base=Path.home()/'Documents/ImInGolf-LIVE-Inspection'
@@ -374,7 +417,8 @@ def main(argv=None):
         _,params=driver.load_package(source,package);prep.private_directory(folder)
         result=analyse(summarise.read_private(source/'catalog-private.json'),
           summarise.read_private(folder/'catalog-followup.PRIVATE.json'),
-          summarise.read_private(folder/'report.SANITISED.json'),params,after_update_only=args.after_update_only)
+          summarise.read_private(folder/'report.SANITISED.json'),params,after_update_only=args.after_update_only or args.remaining_checks_only)
+        if args.remaining_checks_only:result=remaining_checks(result)
         print(json.dumps(result,indent=2,sort_keys=True));return 0
     except Exception:
         print('STOP — saved semantic review incompatible or non-private; no raw contents displayed. Database connections: 0',file=sys.stderr);return 1
