@@ -4,8 +4,8 @@ Status: OFFLINE REVIEW ONLY. Installation and activation remain NO-GO.
 Target: `nyavvwrsrxqfyhiygkgw` only. No LIVE connection or change is in scope.
 
 The owner reported a successful single read-only TEST capture using collector
-8eda5d8. The actual private catalog remains on the Mac; it has not been inspected
-in the development workspace. The next step uses that capture, not another query.
+8eda5d8. The private catalog remains on the Mac. The authorised PIN compatibility
+review used saved evidence without another database query.
 
 ## Run the saved-evidence review
 
@@ -53,9 +53,15 @@ The old backup's historical checksum and full recovery proof remain unavailable.
 
 ## Pre-installation evidence and blockers
 
-1. Review the saved TEST getter/save predicates, all overloads, column types, PIN
-   binding, original search paths and called helpers using existing private evidence.
-   A mismatch must be resolved offline, not replaced with a fictional PIN resolver.
+1. **PIN compatibility: COMPATIBLE — supported by evidence.** The saved TEST getter
+   and existing resolver use the same PIN comparison, canonical table and first-match
+   ordering; the resolver returns the selected row's canonical ID. TEST ownership
+   checks restrict access without selecting another group. Search-path differences
+   do not alter relevant bindings; group selection calls no custom helper.
+   Evidence: saved TEST getter, manifest-bound original LIVE getter, existing private
+   resolver and relevant saved dependency metadata. Originals remain unchanged and
+   private. Do not repeat this investigation. Separate save-path/security review
+   remains required. Installation and guarded activation remain NO-GO.
 2. Review actual BEFORE/AFTER trigger definitions, enabled state and ordering,
    exception scopes, conflict handling, recursive/indirect calls and external effects.
    Include constraints, defaults, indexes, policies, event triggers and extensions.

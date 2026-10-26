@@ -50,8 +50,15 @@ trust model; this work does not claim authenticated per-player score identity.
 
 ## Essential gates before controlled TEST installation
 
+The completed saved-evidence PIN review is **COMPATIBLE — supported by evidence**:
+the resolver identifies the same intended canonical group as TEST. See the
+[recorded finding](SAVED-TEST-INSTALL-ROLLBACK-PLAN.md#pre-installation-evidence-and-blockers).
+Do not repeat PIN investigation. Separate save-path/security, hook/dependency,
+installer/retaining-rollback rehearsal and recovery gates remain unresolved.
+Installation and guarded activation remain NO-GO.
+
 1. **Approved TEST-only read-only preflight.** Verify exact current TEST identity,
-   source definitions/PIN predicate, column types, grants/ownership, trigger dependencies,
+   remaining source definitions, column types, grants/ownership, trigger dependencies,
    data fingerprints and backup/recovery evidence. The user's private resolver stays on
    the Mac. Its completed derivation is not repeated. No further LIVE inspection is
    presently identified as necessary; saved evidence cannot prove current TEST parity.
