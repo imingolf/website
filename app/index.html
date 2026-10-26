@@ -144,6 +144,42 @@ body:not(.admin-mode) nav button.active:not(.hidden) {
 body:not(.admin-mode) nav button:not(.hidden):active {
   background: #91c7a0; border-color: #579568;
 }
+/* First-visit welcome and guided group entry */
+#setupOverlay{background:radial-gradient(ellipse at 80% 0%,#e1efdd 0,transparent 50%),#f7f9f4;padding:calc(30px + env(safe-area-inset-top)) 22px calc(28px + env(safe-area-inset-bottom))}
+.welcome-shell{width:min(540px,100%);margin:auto 0}
+.welcome-brand{display:flex;align-items:center;gap:13px;font-size:23px;font-weight:850;margin-bottom:38px}
+.welcome-brand img{border-radius:17px;box-shadow:0 5px 18px #173b1b18}
+.welcome-eyebrow{font-size:11px;font-weight:800;letter-spacing:1.7px;color:#356246}
+.welcome-shell h1{font-size:clamp(36px,7vw,52px);line-height:1.06;letter-spacing:-1.8px;margin:15px 0 18px}
+.welcome-shell h1 span{color:#176b3a}
+.welcome-intro,.welcome-panel>p{font-size:18px;line-height:1.55;color:#526157;margin:0 0 22px}
+.welcome-benefits{display:flex;flex-wrap:wrap;gap:8px 16px;font-size:13px;color:#285b38;margin-bottom:29px}
+.welcome-choices{display:grid;gap:12px}
+.welcome-choice{width:100%;text-align:left;padding:20px 22px;border-radius:18px;cursor:pointer;min-height:91px}
+.welcome-choice>span{display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:19px;font-weight:800}
+.welcome-choice small{display:block;font-size:14px;font-weight:400;margin-top:7px;line-height:1.4}
+.welcome-start{background:#176b3a;color:#fff;box-shadow:0 8px 20px #176b3a1a}
+.welcome-join{background:white;color:#193b27;border:1px solid #cad9cc}
+.welcome-link{display:block;background:transparent;color:#176b3a;padding:14px 0;min-height:48px;text-align:left;font-size:14px;text-decoration:underline;text-underline-offset:4px;cursor:pointer}
+.welcome-footnote{font-size:13px!important;line-height:1.65!important;color:#667268!important;margin:16px 0 0!important}
+.welcome-footnote a{color:#176b3a}
+.welcome-panel{background:#fff;padding:26px;border:1px solid #dae4d8;border-radius:24px;box-shadow:0 10px 40px #183b2010}
+.welcome-panel h1{font-size:34px;letter-spacing:-1px}
+.welcome-back{padding:0;background:transparent;color:#526157;cursor:pointer;min-height:44px}
+.welcome-panel input{margin-top:10px;padding:16px;font-size:20px}
+.welcome-panel .primary{padding:17px;font-size:16px;cursor:pointer}
+.welcome-help{border-top:1px solid #e1e7df;margin-top:24px;padding-top:18px;font-size:14px;line-height:1.6}
+.welcome-help summary{cursor:pointer;font-weight:750;color:#176b3a;min-height:32px}
+.welcome-steps{padding-left:22px;margin:24px 0}
+.welcome-steps li{padding-left:6px;margin-bottom:21px;color:#176b3a}
+.welcome-steps b{display:block;color:#203a29;font-size:16px}
+.welcome-steps span{display:block;color:#58665c;font-size:14px;line-height:1.6;margin-top:5px}
+.welcome-email{display:block;background:#176b3a;color:white;text-align:center;text-decoration:none;padding:17px;border-radius:13px;font-weight:750}
+.welcome-note{background:#f0f6ec;padding:14px;border-radius:12px;font-size:14px!important}
+.welcome-shell :focus-visible{outline:3px solid #8a6500;outline-offset:4px}
+@media(max-width:380px){.welcome-brand{margin-bottom:25px}.welcome-choice{padding:17px}.welcome-choice>span{font-size:17px}.welcome-panel{padding:20px}}
+@media(min-width:760px){.welcome-shell{padding:35px 0}.welcome-brand{margin-bottom:42px}}
+
 </style>
 <script>
 if(/iPhone|iPod/.test(navigator.userAgent) &&
@@ -151,7 +187,7 @@ if(/iPhone|iPod/.test(navigator.userAgent) &&
   document.documentElement.classList.add("iig-ios-fullscreen");
 }
 </script>
-</head>
+<script src="handicap-input.js"></script></head>
 <body>
 
 <div id="openingSplash" aria-hidden="true">
@@ -255,18 +291,60 @@ if(/iPhone|iPod/.test(navigator.userAgent) &&
 
 
 <div id="setupOverlay">
- <div class="setup">
-  <div class="card">
-   <h1 style="margin-top:0">⛳ I'm In Golf</h1>
-   <p>Golf. Mates. You're In.</p>
-   <div id="configMissing" class="notice warning hidden"><b>One-time setup needed.</b><br>This shared version needs your Supabase project details added to <code>config.js</code>.</div>
-   <label><b>Group PIN</b></label>
-<input id="pinInput" inputmode="numeric" autocomplete="off" placeholder="Enter your shared PIN">
-<button class="primary full" onclick="connect()">Open I'm In Golf</button>
-<div id="connectMsg" class="muted" style="margin-top:10px"></div>
-     </div>
+ <div class="setup welcome-shell">
+  <div class="welcome-brand"><img src="icon-192.png" alt="I'm In Golf" width="64" height="64"><span>I’m In Golf</span></div>
+  <div id="welcomeHome">
+   <span class="welcome-eyebrow">GOOD GOLF. GREAT COMPANY.</span>
+   <h1>Your golf group.<br><span>All organised.</span></h1>
+   <p class="welcome-intro">Competitions, scores, leagues and golf trips — in one simple place.</p>
+   <div class="welcome-benefits"><span>✓ See who’s playing</span><span>✓ Enter one final score</span><span>✓ Follow the results</span></div>
+   <div class="welcome-choices">
+    <button type="button" class="welcome-choice welcome-start" onclick="showWelcomePanel('start')"><span>Start a golf group <b aria-hidden="true">→</b></span><small>Bring your friends or society together</small></button>
+    <button type="button" class="welcome-choice welcome-join" onclick="showWelcomePanel('join')"><span>Join my golf group <b aria-hidden="true">→</b></span><small>I have a PIN from my organiser</small></button>
+   </div>
+   <button type="button" class="welcome-link" onclick="showWelcomePanel('how')">New here? See how it works →</button>
+   <p class="welcome-footnote">For friends, societies and golf trips.<br>No hole-by-hole scoring. Just enjoy your round.</p>
+  </div>
+  <section id="welcomeJoin" class="welcome-panel hidden" aria-labelledby="welcomeJoinTitle">
+   <button type="button" class="welcome-back" onclick="showWelcomePanel('home')">← Back</button>
+   <h1 id="welcomeJoinTitle" tabindex="-1">Join your group.</h1>
+   <p>Your organiser will give you a group PIN. Enter it below to open your private golf group.</p>
+   <form onsubmit="event.preventDefault();connect()">
+    <label for="pinInput"><b>Group PIN</b></label>
+    <input id="pinInput" inputmode="numeric" autocomplete="off" placeholder="Enter your group PIN" aria-describedby="connectMsg">
+    <button class="primary full" type="submit">Open my group →</button>
+   </form>
+   <div id="connectMsg" class="muted" role="status" aria-live="polite" style="margin-top:10px"></div>
+   <details class="welcome-help"><summary>I don’t have a PIN</summary><p>Ask the person organising your golf for the group PIN. If you want to organise your own group, we can help you get started.</p><button class="welcome-link" type="button" onclick="showWelcomePanel('start')">Start a golf group →</button></details>
+  </section>
+  <section id="welcomeStart" class="welcome-panel hidden" aria-labelledby="welcomeStartTitle">
+   <button type="button" class="welcome-back" onclick="showWelcomePanel('home')">← Back</button>
+   <h1 id="welcomeStartTitle" tabindex="-1">Get your mates in.</h1>
+   <p>Name your group and enter your details. We’ll verify your email before creating it.</p>
+   <div id="registrationAuth"><p>Loading group setup…</p></div>
+  </section>
+  <section id="welcomeHow" class="welcome-panel hidden" aria-labelledby="welcomeHowTitle">
+   <button type="button" class="welcome-back" onclick="showWelcomePanel('home')">← Back</button>
+   <h1 id="welcomeHowTitle" tabindex="-1">Less organising.<br>More golf.</h1>
+   <ol class="welcome-steps"><li><b>Get your group together</b><span>Join with your organiser’s PIN, or create your own group in the app.</span></li><li><b>See what’s coming up</b><span>Check the competition, course and date, then join the round.</span></li><li><b>Play. Score. Enjoy the results.</b><span>Enter your final Stableford or Net score. Follow the leaderboard, leagues and golf trips.</span></li></ol>
+   <p class="welcome-note">You keep your usual scorecard. I’m In Golf only needs your final total.</p>
+   <button type="button" class="primary full" onclick="showWelcomePanel('join')">Join my golf group →</button>
+   <button type="button" class="welcome-link" onclick="showWelcomePanel('start')">Start a golf group →</button>
+  </section>
+  <div id="configMissing" class="notice warning hidden">We’re having trouble getting things ready. Please try again shortly or contact hello@imingolf.co.uk.</div>
  </div>
 </div>
+<script>
+function showWelcomePanel(panel, moveFocus=true){
+ const names={home:'welcomeHome',join:'welcomeJoin',start:'welcomeStart',how:'welcomeHow'};
+ Object.entries(names).forEach(([key,id])=>document.getElementById(id).classList.toggle('hidden',key!==panel));
+ document.getElementById('setupOverlay').scrollTop=0;
+ if(moveFocus){
+  const target=panel==='join'?document.getElementById('pinInput'):document.querySelector('#'+names[panel]+' h1');
+  if(target){if(target.tagName!=='INPUT')target.setAttribute('tabindex','-1');target.focus({preventScroll:true});}
+ }
+}
+</script>
 
 <div class="app">
 <header class="app-header">
@@ -292,6 +370,16 @@ if(/iPhone|iPod/.test(navigator.userAgent) &&
 <script src="./config.js"></script>
 <script src="./entry-guard-client.js"></script>
 <script>
+// Account registration is inert until a separately approved, exact TEST build.
+window.IIG_ACCOUNT_ACCESS=null;
+if(window.IIG_ACCOUNT_BUILD!==undefined){
+ try{
+  if(window.IIG_CLOSED_ENTRY_BUILD!==undefined)throw Error('Choose one TEST adapter');
+  IIGEntryGuard.validateBuild(window.IIG_ACCOUNT_BUILD,TENS_IN_CONFIG,location.origin);
+  if(typeof TENS_IN_CONFIG.supabaseKey!=='string'||!TENS_IN_CONFIG.supabaseKey)throw Error('Missing key');
+  window.IIG_ACCOUNT_ACCESS=Object.freeze({url:TENS_IN_CONFIG.supabaseUrl,key:TENS_IN_CONFIG.supabaseKey});
+ }catch(_){document.getElementById('configMissing').classList.remove('hidden');}
+}
 let db=null, pin="", page="round", poller=null, groupPlanType="";
 let iigEntryBridge=null;
 let leagueView="points";
@@ -583,6 +671,7 @@ window.addEventListener("load",()=>{
   const saved=localStorage.getItem("tensInPin");
 
   if(urlPin){
+    showWelcomePanel("join",false);
     $("pinInput").value=urlPin;
     connect();
   }else if(saved){
@@ -591,6 +680,13 @@ window.addEventListener("load",()=>{
 });
 
 async function connect(){
+ if(window.IIG_ACCOUNT_BUILD!==undefined){
+  const value=$("pinInput").value.trim();
+  if(!window.IIG_ACCOUNT_ACCESS){$("connectMsg").textContent="This TEST build is not configured. Group access is unavailable.";return;}
+  if(!/^\d{4}$/.test(value)){$("connectMsg").textContent="Enter your four-digit group PIN.";return;}
+  // Account-bound membership is checked after sign-in. A PIN grants no authority.
+  location.assign(location.pathname+'#pin='+encodeURIComponent(value));location.reload();return;
+ }
  if(!configured()){ $("connectMsg").textContent="Please complete the one-time database setup first."; return; }
  pin=$("pinInput").value.trim(); if(!pin){$("connectMsg").textContent="Enter your group PIN.";return}
  $("connectMsg").textContent="Opening shared group…";
@@ -758,6 +854,12 @@ startPolling();
 // focus/pageshow handlers are useful. Re-check once group + player state are loaded.
 setTimeout(recognisePaymentReturn,500);
  }
+function cancelProtectedDialogs(){
+ for(const id of ['appConfirmNo','appPromptCancel','cancelWinnerPayout','newRoundCancel','roundCompCancel','normalSetupCancel','tripSetupCancel','cancelTripDay'])document.getElementById(id)?.click();
+ document.querySelectorAll('.player-big-message,.app-toast').forEach(el=>el.remove());
+}
+function sideGameToday(){return typeof window!=="undefined" && window.iigSecurePlayer?.active && state.sideGameDate ? state.sideGameDate : new Date().toLocaleDateString("en-CA");}
+function sideGameBackToGolf(){sideGameOpen=false;sideGameHomeOpen=false;show("round");}
 function ensureSideGameState(){
   if(!state.sideGame || typeof state.sideGame!=="object"){
     state.sideGame={};
@@ -826,6 +928,7 @@ async function save(operation="save"){
 }
 
 async function applyGuardedOperation(operation,selection=null){
+ if(typeof window!=="undefined" && window.iigSecureOrganiser?.active)return window.iigSecureOrganiser.maintain(operation,selection);
   if(!isAdmin || !iigEntryBridge || saveActive || scoreDraftActive){
     alert("Finish saving or submitting your current changes first.");return false;
   }
@@ -879,7 +982,7 @@ async function refresh(){
 let finishRoundActive=false;
 let normalFinishInProgress=false;
 let scoreDraftActive=false;
-let sideGameOpen=false;
+let sideGameOpen=false,sideGameHomeOpen=false;
 
 async function refreshSideGameLive(){
   if(!db || !sideGameOpen || !sideGameHomeOpen || refreshBlocked())return;
@@ -962,7 +1065,12 @@ function render(){
   if(page==="tripsummary")showTripSummary();
   if(page==="adminhelp")adminHelpPage();
 }
+function accountEntryStatus(){
+ if(typeof window==='undefined')return null;
+ return window.iigSecureOrganiser?.entryStatus || window.iigSecurePlayer?.entryStatus || null;
+}
 function roundLocked(){
+ if(typeof accountEntryStatus==='function' && accountEntryStatus()?.closed)return true;
   if(typeof iigEntryBridge!=="undefined" && iigEntryBridge && iigEntryBridge.entryStatus(state,pin).closed)return true;
   return Object.values(state.trip?.currentTeamScores||{}).some(v=>v!=null && v!=="") || state.players.some(p=>
     p.stableford!=null ||
@@ -998,6 +1106,7 @@ async function refreshEntryState(){
 }
 
 function roundOpenNow(){
+ if(typeof accountEntryStatus==='function' && accountEntryStatus())return accountEntryStatus().open;
   if(typeof iigEntryBridge!=="undefined" && iigEntryBridge)return iigEntryBridge.entryStatus(state,pin).open;
   if(state.roundOpen===false)return false;
   if(state.roundOpen===true)return true;
@@ -1243,6 +1352,8 @@ function tripFormatLabel(format=tripRoundFormat()){
 }
 function currentRoundPlayers(){
   const players=state.players.filter(p=>tripPlayerIsPlaying(p));
+  const account=typeof accountEntryStatus==='function'?accountEntryStatus():null;
+  if(account?.closed && Array.isArray(account.entrantIds))return players.filter(p=>account.entrantIds.includes(p.id));
   if(typeof iigEntryBridge!=="undefined" && iigEntryBridge){
     const status=iigEntryBridge.entryStatus(state,pin);
     if(status.closed && Array.isArray(status.entrantIds))return players.filter(p=>status.entrantIds.includes(p.id));
@@ -1647,8 +1758,8 @@ function playerNextActionHtml(){
   if(state.trip?.active && !tripPlayerIsPlaying(me)){
     return `<div class="card" style="text-align:center;"><div class="muted">TODAY'S ROUND</div><div style="font-size:30px;margin:8px;">☕</div><b>Not playing today</b><div class="muted" style="margin-top:5px;">You are still part of the Trip and can follow today's result.</div></div>`;
   }
-  if(iigEntryBridge){
-    const entry=iigEntryBridge.entryStatus(state,pin);
+  if(iigEntryBridge || accountEntryStatus()){
+    const entry=accountEntryStatus() || iigEntryBridge.entryStatus(state,pin);
     if(entry.closed && Array.isArray(entry.entrantIds)){
       const ids=entry.entrantIds;
       const team=tripTeamRoundActive() && (state.trip.currentTeams||[]).find(t=>(t.playerIds||[]).includes(me.id));
@@ -1742,7 +1853,7 @@ function sideGamePickPlayer(playerId){
   if(!me || !player)return;
 
   ensureSideGameState();
-  const today=new Date().toLocaleDateString("en-CA");
+  const today=sideGameToday();
   const existingBet=state.sideGame.bets.find(b=>
     b.date===today &&
     (b.status==="pending" || b.status==="active") &&
@@ -1813,7 +1924,7 @@ function sideGameAgreedInPerson(playerId,mode="in_person"){
     existingBets=[];
   }
 
-  const today=new Date().toLocaleDateString("en-CA");
+  const today=sideGameToday();
   ensureSideGameState();
 
   const todaysExistingBet=state.sideGame.bets.find(b=>
@@ -1955,7 +2066,7 @@ async function sideGameConfirmBet(playerId){
     bets=[];
   }
 
-  const today=new Date().toLocaleDateString("en-CA");
+  const today=sideGameToday();
 
   const duplicate=bets.some(b=>
     b.playerId===playerId &&
@@ -2043,7 +2154,7 @@ async function sideGameSendChallenge(playerId){
     return;
   }
 
-  const today=new Date().toLocaleDateString("en-CA");
+  const today=sideGameToday();
 
   const duplicate=state.sideGame.bets.some(b=>
     b.date===today &&
@@ -2098,7 +2209,7 @@ async function sideGameAcceptChallenge(betId){
     return;
   }
 
-  const today=new Date().toLocaleDateString("en-CA");
+  const today=sideGameToday();
 
   const todaysExistingBet=state.sideGame.bets.find(b=>
     b.id!==bet.id &&
@@ -2154,7 +2265,7 @@ async function sideGameDeclineChallenge(betId){
 function sideGameResolveBetsForToday(){
   ensureSideGameState();
 
-  const today=new Date().toLocaleDateString("en-CA");
+  const today=sideGameToday();
 
   state.sideGame.bets.forEach(b=>{
     if(b.date!==today || b.status!=="active")return;
@@ -2207,7 +2318,7 @@ async function sideGameSaveScore(format){
   }
   const score=Number(raw);
 
-  const today=new Date().toLocaleDateString("en-CA");
+  const today=sideGameToday();
 
   ensureSideGameState();
 
@@ -2251,7 +2362,7 @@ function sideGameScoreEntry(){
 
   ensureSideGameState();
 
-  const today=new Date().toLocaleDateString("en-CA");
+  const today=sideGameToday();
 
   const todaysBets=state.sideGame.bets.filter(b=>
     b.date===today &&
@@ -2439,7 +2550,7 @@ async function sideGameHome(){
       ${(()=>{
         ensureSideGameState();
 
-        const today=new Date().toLocaleDateString("en-CA");
+        const today=sideGameToday();
 
         const todaysBets=state.sideGame.bets
           .filter(b=>
@@ -2633,7 +2744,7 @@ async function sideGameHome(){
       ${(()=>{
         ensureSideGameState();
 
-        const today=new Date().toLocaleDateString("en-CA");
+        const today=sideGameToday();
 
         const hasBet=state.sideGame.bets.some(b=>
           b.date===today &&
@@ -2662,7 +2773,7 @@ async function sideGameHome(){
       </button>
     </div>
 
-    <button class="secondary full" onclick="sideGameOpen=false;round()">← Back to Golf</button>
+    <button class="secondary full" onclick="sideGameBackToGolf()">← Back to Golf</button>
   `;
 
   window.scrollTo(0,0);
@@ -3156,7 +3267,7 @@ function pay(){
            ${isAdmin
              ? (Number(state.stake||0)<=0
                 ? `<span class="pill paid">No payment required</span>`
-                : `<button class="${p.paid?'secondary':'primary'} small" onclick="togglePaid(${i})" ${entryClosed()?"disabled":""}>${p.paid?'✓ Paid':'Mark paid'}</button>`)
+                : `<button class="${p.paid?'secondary':'primary'} small" onclick="togglePaid(${i})" ${entryClosed()&&!window.iigSecureOrganiser?.active?"disabled":""}>${p.paid?'✓ Paid':'Mark paid'}</button>`)
              : (Number(state.stake||0)<=0
                 ? `<span class="pill paid">No payment required</span>`
                 : `<span class="pill ${p.paid?'paid':'pending'}">${p.paid?'✓ Paid':'Not paid'}</span>`)
@@ -4209,6 +4320,10 @@ async function finishRound(){
 }
 
 async function finishRoundImpl(){
+ if(typeof window!=="undefined" && window.iigSecureOrganiser?.active){
+  try{await window.iigSecureOrganiser.prepareFinish();}catch(error){alert(error.message);return;}
+ }
+
 
 
   const isPointsGame=state.gameType==="points";
@@ -4222,7 +4337,7 @@ async function finishRoundImpl(){
 
   // Normal rounds: refresh from Supabase before finalising so the
   // Admin cannot finish using a stale copy while a player is submitting.
-  if(!isTrip && db){
+  if(!isTrip && db && !(typeof window!=="undefined" && window.iigSecureOrganiser?.active)){
     const {data:latestState,error:latestError}=await db.rpc(
       "get_group_state",
       {p_pin:pin}
@@ -9248,7 +9363,7 @@ async function deletePastTrip(){
     "Normal leagues, players and current round will not be changed."
   ))return;
 
-  if(iigEntryBridge){
+  if(iigEntryBridge || (typeof window!=="undefined" && window.iigSecureOrganiser?.active)){
     if(await applyGuardedOperation("deletepasttrip",index)){render();alert("Change saved.");}
     return;
   }
@@ -9276,7 +9391,7 @@ async function finishTrip(){
     "Your normal round will then be restored."
   ))return;
 
-  if(iigEntryBridge){
+  if(iigEntryBridge || (typeof window!=="undefined" && window.iigSecureOrganiser?.active)){
     if(await applyGuardedOperation("tripreturn")){show("round");alert("Trip saved. Your normal golf group is ready.");}
     return;
   }
@@ -9394,7 +9509,7 @@ async function cancelTrip(){
     "This will remove the current Trip setup and Trip standings.\n\n" +
     "Your normal Points League, Money League and previous rounds will not be changed."
   ))return;
-  if(iigEntryBridge){
+  if(iigEntryBridge || (typeof window!=="undefined" && window.iigSecureOrganiser?.active)){
     if(await applyGuardedOperation("tripcancel")){show("round");alert("Trip saved. Your normal golf group is ready.");}
     return;
   }
@@ -9445,7 +9560,7 @@ alert("Trip cancelled. Your normal round has been restored.");
 }
 async function resetPayments(){
  if(!confirm("Mark everyone unpaid?"))return;
-  if(iigEntryBridge){
+  if(iigEntryBridge || (typeof window!=="undefined" && window.iigSecureOrganiser?.active)){
     if(await applyGuardedOperation("resetpayments")){render();alert("Change saved.");}
     return;
   }
@@ -9455,7 +9570,7 @@ async function resetPayments(){
 }
 async function resetScores(){
  if(!confirm("Clear all scores?"))return;
-  if(iigEntryBridge){
+  if(iigEntryBridge || (typeof window!=="undefined" && window.iigSecureOrganiser?.active)){
     if(await applyGuardedOperation("resetscores")){render();alert("Change saved.");}
     return;
   }
@@ -9498,7 +9613,7 @@ async function deleteLastRound(){
 
   if(!confirm(deleteMessage))return;
 
-  if(iigEntryBridge){
+  if(iigEntryBridge || (typeof window!=="undefined" && window.iigSecureOrganiser?.active)){
     if(await applyGuardedOperation("deletelast")){render();alert("Change saved.");}
     return;
   }
@@ -9549,7 +9664,7 @@ if(!confirm(
   "Press OK again to PERMANENTLY DELETE the Points League and Money & Points round history."
 ))return;
 
-  if(iigEntryBridge){
+  if(iigEntryBridge || (typeof window!=="undefined" && window.iigSecureOrganiser?.active)){
     if(await applyGuardedOperation("clearleague")){render();alert("Change saved.");}
     return;
   }
@@ -9589,4 +9704,8 @@ function formatDate(d){
 function esc(s){return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
 function escAttr(s){return esc(s)}
 </script>
+<script src="secure-organiser.js"></script>
+<script src="secure-player.js"></script>
+<script src="account-controls.js"></script>
+<script src="self-service.js"></script>
 </body></html>

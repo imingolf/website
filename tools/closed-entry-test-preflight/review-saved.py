@@ -22,11 +22,13 @@ CANDIDATE_FILES = ('supabase/closed-entry-candidate/core.sql',
                    'supabase/closed-entry-candidate/validators.sql',
                    'supabase/closed-entry-candidate/boundary.sql',
                    'supabase/closed-entry-candidate/authenticated-writers.sql',
-                   'app/entry-guard-client.js', 'app/index.html')
+                   'app/entry-guard-client.js', 'app/index.html', 'app/config.js',
+                   'app/secure-organiser.js', 'app/secure-player.js',
+                   'app/self-service.js', 'app/account-controls.js', 'app/handicap-input.js')
 PLAN_FILE = 'docs/incident-closed-entry/SAVED-TEST-INSTALL-ROLLBACK-PLAN.md'
 PUBLIC_RPCS = {'iig_entry_prepare', 'iig_entry_read', 'iig_entry_check_credential',
                'iig_entry_check_member', 'iig_entry_write', 'iig_entry_receipt',
-               'iig_operate_owned_group'}
+               'iig_operate_owned_group', 'iig_read_entry_group', 'iig_prepare_owned_entry'}
 PRIVATE_TABLES = ('rounds', 'credentials', 'permits', 'receipts', 'archives',
                   'member_credentials', 'operation_audit', 'identity_ids')
 PREINSTALL_GATES = (

@@ -3,63 +3,108 @@
 **Offline candidate only. NOT installable; guarded mode remains disabled.**
 No online database, existing group, hosted application or demonstration changed.
 
-## Authenticated writer integration — 26 October 2026
+## Two-priority release integration — 26 October 2026
 
-The offline candidate now includes `authenticated-writers.sql`, loaded after the
-existing three candidate files **only in fictional tests**. It reuses the narrow
-TEST writers from registration commit `38f81215331224079aa7c19ba6e5de0dbc4bcb2e`,
-without merging that branch or copying its UI. It retains the existing
-`verified_organiser()` and `check_group_access()` helpers, membership/ownership
-tables, getters and projections, RLS and notification hooks. This is repository
-source integration, not proof those definitions match the saved TEST baseline.
+**Repository candidate only; installation/cutover remains NO-GO.** No flag,
+registration setting, hosted function, notification hook, RLS policy or deployment
+was activated. Work continues from pushed `ed50c35`, a descendant of `72adf30`.
+The completed PIN compatibility review is not reopened.
 
-- Joining still binds the verified account to its own generated player ID and
-  requires the current invite. Attendance/scoring remain member-only. Group access,
-  ban/deletion checks and owner revision conflicts remain enforced.
-- Payment is the player's self-declaration. Unpaid Money players cannot score;
-  zero-stake competitions need no payment. First score/NR/pair score freezes
-  entrants atomically. New members can join the group without entering that round.
-- An explicit `payment` organiser operation can correct a frozen entrant's status,
-  but cannot admit a new entrant after closure. Score resets cannot reopen entries.
-- Each writer supplies an exact transaction/revision/state-bound permit to the
-  existing central guard. Canonical state, account revision, guard revision,
-  membership, closure/audit and existing hook effects commit or fail together.
-- `iig_save_owned_group` permits only ordinary validated saves.
-  `iig_operate_owned_group` requires an explicit validated organiser operation;
-  it never guesses lifecycle intent from a whole-state diff. The compatible
-  authenticated TEST client's organiser controls still need this explicit routing
-  before cutover. No client fallback or guarded activation was added.
-- Shared-PIN candidate endpoints reject account-owned groups, including reads;
-  golfers continue to use the existing private member projections. Without the
-  authenticated adapter, the presence of the ownership schema fails closed.
+The existing central row guard and authenticated writers are reused. Ordinary
+whole-state saves cannot infer lifecycle intent. The organiser adapter now calls
+`iig_operate_owned_group` with the explicit action, captures the observed revision,
+rejects overlapping submissions, and reads back the committed state. Failed or
+ambiguous responses require an explicit reload; no write is automatically retried.
+A new round's server-generated ID is never guessed from the submitted snapshot.
+Late declarations and Admin corrections cannot add a frozen entrant. Unpaid
+players cannot score; free competitions require no payment. Score reset retains
+the closure latch. Existing account/membership/access checks and canonical update
+hooks remain in place, including rollback of revisions and notifications on error.
 
-This adds **one public RPC** and replaces **five existing authenticated writer
-signatures**, with no new tables. The six legacy candidate RPCs and eight private
-RLS tables remain. Saved-review plans now hash the adapter too. Replacement owners,
-ACLs, default grants and dependencies must still match the private baseline; no
-blanket Auth/schema/security changes are authorised.
+Two small read RPCs complete the adapter: `iig_read_entry_group(text default null)`
+retains the installed owner/member projections, verifies the same account revision
+under lock, and adds only closure/entrant metadata. It performs no initialization
+or data writes. `iig_prepare_owned_entry(text,text,bigint,integer default null)`
+reuses the existing server-derived maintenance proposals; the following write must
+still match the observed revision. Both require authenticated authority and deny
+PUBLIC/anon/service_role. The candidate adds three public RPCs in total, including
+`iig_operate_owned_group`, replaces the same five existing writers, and adds no
+further tables. All three names must be checked for baseline collisions.
 
-Next task: on the Mac, bind these writer replacements and the explicit organiser
-call sites to the existing saved TEST catalog, then incorporate them into the
-already planned isolated installer/retaining-rollback rehearsal. Do not collect
-PIN evidence again. Remaining essential gates are exact hooks/dependencies and
-writer/client cutover, baseline-bound installer/rollback with independent-session
-races, and proven backup/security recovery. Installation remains **NO-GO**.
+The welcome screen, email-code registration, first-competition form, account
+controls and protected player/organiser adapters are reused selectively from
+`38f81215331224079aa7c19ba6e5de0dbc4bcb2e`. No branch merge or gameplay redesign.
+Start a golf group is first and green; Join my golf group is white. Guided first
+setup resets only competition fields, including for players who joined before
+setup; identity and historical totals remain. Existing gameplay calculation,
+League, Trip and result code is retained. Late config.js overrides now preserve
+explicit operation names too.
 
-Verification for this increment: 101 authenticated-writer checks PASS; full
-17-script incident suite PASS; 15 closed-entry and 10 sync scenarios PASS;
-130 preflight and 153 inspection Python tests PASS. Checks include unchanged
-pre-existing rows/security helpers, identity denial, trust-based Money entry,
-free rounds, Points/NR/pairs, explicit lifecycle/corrections, Side Game/payout
-dispatch and rollback after failing or suppressed hooks. Existing supported-link
-validation remains strict; the adapter converts valid links to the guard's provider
-labels without broadening its allowlist.
+Account modules are inert unless a separately prepared build provides
+`IIG_ACCOUNT_BUILD`, validated against the exact TEST project, configured URL and
+HTTPS origin. It cannot be combined with the legacy capability build. Missing or
+invalid account configuration blocks connection rather than using LIVE/legacy
+fallback. No such build configuration is committed. Original legacy deployment
+configuration remains unchanged. Auth tokens stay in memory. Registration uses
+verified account identity and the existing idempotent creation endpoint; neither
+an email address nor a shared PIN claims an existing group.
 
-Docker is unavailable in this environment, so the independent-session race/actual
-login-role suite was not run for this increment. The saved private TEST baseline
-and actual hooks are on the Mac; target-specific installation/rollback, real
-PostgREST/JWT and physical-device validation were not performed. Earlier recorded
-concurrency results below are historical, not a rerun of this adapter.
+### Essential remaining gates
+
+1. **Saved TEST baseline and notification/access compatibility.** On the Mac,
+   bind the existing registration/getter/access/deletion definitions, writer
+   replacements, exact hooks/dependencies, owners, grants and RLS to the saved
+   catalog. Preserve all canonical rows and security metadata. The reused TEST
+   player adapter does not enable unverified legacy push-registration RPCs;
+   account-bound notification setup/native delivery remains a specific cutover
+   gate, not a reason to change hooks or silently claim notification parity.
+2. **Trusted ownership and writer cutover.** Existing verified TEST mappings and
+   new-group creation can be reused. No trusted mechanism for linking existing
+   unowned LIVE groups was supplied here. That remains a blocker. Installing the
+   row boundary rejects unversioned legacy writes, including older clients; a
+   compatible-client/update plan is essential. No bypass fallback is acceptable.
+3. **Baseline-bound installer and retaining rollback.** Rehearse installation,
+   drift refusal, backup restoration/security recovery and rollback against the
+   saved private TEST baseline. Preserve closure/entrant metadata, existing groups,
+   results, payments, League/Trip history, policies, grants and notification state.
+   Prove real independent-session score/payment/finish/start races before cutover.
+4. **Release journey checks.** The reused account-deletion handler and SQL tests
+   verify authenticated deletion of a non-owner and preservation of golf history.
+   SQL explicitly refuses deletion while an account owns a group. A sole/new
+   organiser with nobody to transfer to has no complete deletion route: a genuine
+   release blocker, not fixed by deleting a group or weakening ownership checks.
+   Actual OTP delivery, mobile rendering, native-wrapper/App Store packaging,
+   notifications and end-to-end deletion still require controlled validation.
+   Native-wrapper source is not in this repository.
+
+### Offline evidence and limits
+
+- Full 17-script incident suite PASS, including 125 authenticated-writer
+  checks and modelled race orderings (not independent sessions).
+- `node tests/authenticated-release.cjs`: 80 checks PASS; actual reused client code with mocked
+  DOM/HTTP, explicit actions, conflict/ambiguous ACK handling, session invalidation,
+  closure readback, guided setup and email-code/idempotent creation.
+- Existing 15 closed-entry and 10 sync regression scenarios.
+- 130 preflight and 153 inspection Python tests. The existing saved reviewer now
+  hashes the reused client files/config and checks all new RPC name collisions.
+  Collector/hash-bound connection runner files and private evidence are untouched.
+- Existing registration source `38f8121`: 51 protected gameplay/account-lifecycle
+  assertions, 79 access assertions, creation/hardening/setup-bundle suites and
+  the deletion-handler suite passed in fictional local databases with mocked
+  Auth. The reference access/setup fixtures required adding the standard
+  `service_role` to their scratch role setup; their assertions were unchanged. These establish reused-source behavior, not hosted parity.
+
+No Docker/PostgreSQL server is installed for the independent-session runner.
+No browser executable or linkedom is installed for the existing rendered/DOM
+suites. Automatic approval review rejected downloading linkedom under the
+offline-only restriction; no substitute network download was attempted. The VM
+client checks are not rendered-browser tests. No private Mac baseline, real JWT,
+email, APNs/Web Push, hosted hooks or online SQL was accessed or tested.
+
+**Next task:** use the existing saved Mac evidence to finish the baseline-bound
+installation/rollback and compatible-client cutover review. Do not recollect PIN
+or database evidence just to repeat completed checks. Do not install or activate
+until the listed gates and separate controlled TEST approval are complete.
 
 ## Completed in this follow-up
 

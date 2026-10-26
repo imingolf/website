@@ -11,7 +11,11 @@ The 26 October authenticated-writer candidate is included in the saved review's
 source hashes. It must be bound to the saved TEST `iig_private` account/membership
 schema and the five existing writer signatures before installation. Its source
 checks are documented in [controlled readiness](CONTROLLED-TEST-READINESS.md).
-The new explicit `iig_operate_owned_group` signature is a name-collision gate.
+The new `iig_operate_owned_group`, `iig_read_entry_group` and
+`iig_prepare_owned_entry` signatures are name-collision gates. The reused account
+clients and config are included in the source hash set. No account-to-group
+ownership linking is inferred from email or shared PIN. See the controlled
+readiness document for the sole-organiser deletion and notification cutover gaps.
 Do not infer approval, current baseline parity or client compatibility from the
 offline tests. The original package, resolver, evidence and the unrelated PR6
 rollback-preparation directory stay untouched.

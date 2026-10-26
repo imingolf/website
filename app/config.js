@@ -318,7 +318,7 @@ setTimeout(function(){
         if(!clean){showAppToast('Group name needed','Please enter a group name.',3000);return;}
         var previous=state.groupName;
         state.groupName=clean;
-        var ok=await save();
+        var ok=await save("settings");
         if(!ok){state.groupName=previous;showAppToast('Not saved','The group name could not be saved. Please try again.',3200);return;}
         render();
         showAppToast('✅ Group name changed',clean,3000);
@@ -337,7 +337,7 @@ setTimeout(function(){
         p.name=name;
         p.handicap=handicap;
         render();
-        await save();
+        await save("members");
         showAppToast('✅ Player updated',name,2600);
       };
       adminAddPlayer=async function(){
@@ -355,7 +355,7 @@ setTimeout(function(){
         var handicap=Number(h);
         if(!Number.isFinite(handicap)||handicap < -10||handicap > 60){showAppToast('Invalid handicap','Please enter a handicap between -10 and 60.',3200);return;}
         state.players.push({id:Date.now().toString(36),name:cleanName,handicap:handicap,competition:null,paid:false,stableford:null,netScore:null,noReturn:false,scoreSubmitted:false,wins:0,leaguePoints:0,netWinnings:0});
-        await save();
+        await save("members");
         render();
         showAppToast('✅ Player added',cleanName+' is now in the group.',3000);
       };
@@ -371,7 +371,7 @@ setTimeout(function(){
         if(!ok)return;
         state.pointsCompetition=next;
         state.players.forEach(function(p){if(p.stableford==null&&p.netScore==null&&p.noReturn!==true)p.competition=next;});
-        await save();
+        await save("configure");
         showAppToast('✅ Competition changed',nextLabel+' is now selected.',3000);
         settingsPage();
       };
@@ -445,7 +445,7 @@ setTimeout(function(){
         state.course='';state.date='';state.gameType='money';state.pointsCompetition='stableford';state.pointsValue=10;state.roundOpen=false;
         state.players.forEach(function(p){p.paid=false;p.competition=null;p.stableford=null;p.netScore=null;p.noReturn=false;p.scoreSubmitted=false;});
         scoreDraftActive=false;
-        if(!await save()){showAppToast('Not cancelled','The current round could not be cancelled. Please try again.',3400);return;}
+        if(!await save("cancel")){showAppToast('Not cancelled','The current round could not be cancelled. Please try again.',3400);return;}
         showAppToast('✅ Round cancelled','League and previous-round history were kept.',3200);show('round');
       };
       if(typeof changePaymentLink==='function'){
@@ -465,7 +465,7 @@ setTimeout(function(){
         var ok=await appConfirm('Confirm Prize Payment','Confirm that £'+moneyText(payout.amount)+' has been sent to '+payout.winnerName+'?','Mark as Paid');
         if(!ok)return;
         payout.status='paid';payout.paidAt=new Date().toISOString();
-        if(await save()){showRoundHistory(historyIndex);showAppToast('✅ Prize marked paid','£'+moneyText(payout.amount)+' sent to '+payout.winnerName+'.',3000);}
+        if(await save("settle")){showRoundHistory(historyIndex);showAppToast('✅ Prize marked paid','£'+moneyText(payout.amount)+' sent to '+payout.winnerName+'.',3000);}
       };
       if(typeof deletePastTrip==='function')deletePastTrip=async function(){
         var pastTrips=state.trip&&state.trip.pastTrips?state.trip.pastTrips:[];
@@ -478,6 +478,9 @@ setTimeout(function(){
         var tripName=pastTrips[index].name||'Trip';
         var ok=await appConfirm('Delete '+tripName,'This removes only this past Trip.\n\nNormal leagues, players and the current round will not be changed.','Delete Trip',true);
         if(!ok)return;
+        if(iigEntryBridge || window.iigSecureOrganiser?.active){
+          if(await applyGuardedOperation("deletepasttrip",index)){render();showAppToast('Trip deleted',tripName+' was removed.',3000);}return;
+        }
         pastTrips.splice(index,1);state.trip.pastTrips=pastTrips;await save();render();showAppToast('Trip deleted',tripName+' was removed.',3000);
       };
     }catch(e){}

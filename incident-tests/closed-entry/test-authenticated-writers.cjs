@@ -42,6 +42,21 @@ const {fixture,originalFinish,originalSetup}=require('./test-source-finish.cjs')
    CREATE FUNCTION public.save_group_state(p_pin text,p_state jsonb) RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
    BEGIN UPDATE public.tens_in_groups SET state=p_state WHERE group_pin=p_pin;END $$;
    GRANT EXECUTE ON FUNCTION public.save_group_state(text,jsonb) TO anon,authenticated;`);
+  // Fictional installed getters: the adapter must retain the member projection.
+  await db.exec(`CREATE FUNCTION public.iig_get_owned_group() RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
+   DECLARE u uuid=iig_private.verified_organiser();r jsonb;BEGIN
+   SELECT jsonb_build_object('group_pin',g.group_pin,'state',g.state,'revision',o.revision,'invite_token',o.invite_token) INTO r
+   FROM public.tens_in_groups g JOIN iig_private.group_owners o ON o.group_id=g.id WHERE o.owner_id=u;
+   IF r IS NOT NULL THEN PERFORM iig_private.check_group_access(r->>'group_pin');END IF;RETURN r;END $$;
+   CREATE FUNCTION public.iig_get_player_group(p_pin text) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
+   DECLARE u uuid=iig_private.verified_organiser();r jsonb;BEGIN
+   SELECT jsonb_build_object('player_id',m.player_id,'revision',o.revision,'state',jsonb_build_object('players',g.state->'players')) INTO r
+   FROM public.tens_in_groups g JOIN iig_private.group_owners o ON o.group_id=g.id JOIN iig_private.group_members m ON m.group_id=g.id
+   WHERE g.group_pin=p_pin AND m.user_id=u AND EXISTS(SELECT 1 FROM jsonb_array_elements(g.state->'players') p WHERE p->>'id'=m.player_id::text);
+   IF r IS NULL THEN RAISE EXCEPTION 'Group membership required' USING ERRCODE='42501';END IF;
+   PERFORM iig_private.check_group_access(p_pin);RETURN r;END $$;
+   REVOKE ALL ON FUNCTION public.iig_get_owned_group(),public.iig_get_player_group(text) FROM PUBLIC,anon;
+   GRANT EXECUTE ON FUNCTION public.iig_get_owned_group(),public.iig_get_player_group(text) TO authenticated;`);
   const security=async()=> (await db.query(`SELECT oid::regprocedure::text AS f,pg_get_functiondef(oid) AS def,proacl::text AS acl FROM pg_proc
    WHERE pronamespace IN ('iig_private'::regnamespace,'fixture_hooks'::regnamespace) ORDER BY 1`)).rows;
   const originalSecurity=await security(),untouched=await seed();
@@ -77,6 +92,18 @@ const {fixture,originalFinish,originalSetup}=require('./test-source-finish.cjs')
   async function action(x,i,name,payload={},rev){return rpc(x.users[i],'iig_player_action',[x.pin,name,{round_id:(await state(x)).roundId,format:x.s.pointsCompetition,...payload},rev??await revision(x)]);}
   async function operate(x,op,s,uid=x.owner,rev){return rpc(uid,'iig_operate_owned_group',[x.pin,op,s,rev??await revision(x)]);}
   async function adminPayment(x,i,paid){const s=await state(x);Object.assign(s.players[i],{paid,paymentMarkedAt:'fictional',paymentMarkMethod:'admin-confirmed'});return operate(x,'payment',s);}
+  const beforeRead=await inventory();
+  const ownerRead=await rpc(untouched.owner,'iig_read_entry_group',[null]);
+  ok(ownerRead.state,untouched.s);ok(ownerRead.entry,{open:true,closed:false,entrantIds:null});
+  const memberRead=await rpc(untouched.users[0],'iig_read_entry_group',[untouched.pin]);
+  ok(memberRead.state,{players:untouched.s.players});ok(memberRead.entry,ownerRead.entry);
+  ok(await inventory(),beforeRead); // metadata read must not initialise the guard
+  const noOwner=await user();ok(await rpc(noOwner,'iig_read_entry_group',[null]),null);
+  await reject(()=>rpc(noOwner,'iig_read_entry_group',[untouched.pin]),/membership required/);
+  await reject(()=>rpc(untouched.owner,'iig_read_entry_group',[null],'anon'),/permission denied/);
+  await reject(()=>rpc(untouched.users[0],'iig_prepare_owned_entry',[untouched.pin,'resetscores',41,null]),/Organiser access required/);
+  await reject(()=>rpc(untouched.owner,'iig_prepare_owned_entry',[untouched.pin,'start',41,null]),/UNSUPPORTED_DERIVED_OPERATION/);
+  await reject(()=>rpc(untouched.owner,'iig_prepare_owned_entry',[untouched.pin,'resetscores',40,null]),/reload before saving/);
   const activity=await state(untouched);activity.lastActivityAt='fictional';
   // Owning the group does not require retaining a player slot in its roster.
   await db.query('INSERT INTO iig_private.group_members VALUES($1,$2,$3)',[untouched.id,untouched.owner,randomUUID()]);
@@ -120,6 +147,24 @@ const {fixture,originalFinish,originalSetup}=require('./test-source-finish.cjs')
    await reject(async()=>rpc(money.users[0],'save_group_state',[money.pin,money.s],role),/VERSIONED_WRITE_REQUIRED/);
   }
   await reject(async()=>rpc(money.users[0],'iig_player_action',[money.pin,'payment',{},await revision(money)],'anon'),/permission denied/);
+  // Both serial orders of the payment/first-score race; this models ordering,
+  // not independent-session locking (which still needs local PostgreSQL/Docker).
+  for(const scoreFirst of [true,false]){
+   const x=await seed();await action(x,0,'payment',{confirmed:true});const observed=await revision(x);
+   if(scoreFirst){
+    await action(x,0,'score',{score:1},observed);
+    await reject(()=>action(x,1,'payment',{confirmed:true},observed),/Group changed/);
+    await reject(()=>action(x,1,'payment',{confirmed:true}),/Payment entry is closed/);
+    ok((await round(x)).entrant_ids,[x.ids[0]]);
+   }else{
+    await action(x,1,'payment',{confirmed:true},observed);
+    await reject(()=>action(x,0,'score',{score:1},observed),/Group changed/);
+    await action(x,0,'score',{score:1});ok((await round(x)).entrant_ids,x.ids.slice(0,2));
+   }
+  }
+  const cancelled=await seed(),cancelState=await state(cancelled);
+  Object.assign(cancelState,{course:'',date:'',roundOpen:false});await operate(cancelled,'cancel',cancelState);
+  ok((await rpc(cancelled.owner,'iig_read_entry_group',[null])).entry,{open:false,closed:true,entrantIds:null});
   const points=await seed({game:'points',format:'net'});
   await reject(async()=>rpc(points.users[0],'iig_submit_my_score',[points.pin,70,'net',await revision(points)]),/marked as playing/);
   for(let i=0;i<2;i++)await rpc(points.users[i],'iig_set_my_attendance',[points.pin,true,await revision(points)]);
@@ -150,6 +195,12 @@ const {fixture,originalFinish,originalSetup}=require('./test-source-finish.cjs')
   await reject(()=>operate(money,'correct',wrongCorrection),/CORRECTION_/);
   const reset=(await db.query("SELECT iig_closed_entry.derive_operation($1,'resetscores') s",[await state(money)])).rows[0].s;
   await operate(money,'resetscores',reset);ok((await round(money)).closed,true);
+  const resetRead=await rpc(money.users[0],'iig_read_entry_group',[money.pin]);
+  ok(resetRead.entry.closed,true);ok(resetRead.entry.entrantIds,(await round(money)).entrant_ids);
+  await reject(async()=>rpc(money.owner,'iig_prepare_owned_entry',[money.pin,'resetpayments',await revision(money),null]),/ENTRIES_CLOSED/);
+  const preparationInventory=await inventory();
+  ok(await rpc(money.owner,'iig_prepare_owned_entry',[money.pin,'resetscores',await revision(money),null]),await state(money));
+  ok(await inventory(),preparationInventory);
   await reject(()=>action(money,2,'payment',{confirmed:true}),/Payment entry is closed/);
   await reject(()=>adminPayment(money,2,true),/ENTRIES_CLOSED/);
   await action(money,0,'score',{score:35});
@@ -213,6 +264,8 @@ const {fixture,originalFinish,originalSetup}=require('./test-source-finish.cjs')
   const blocked=await seed();await db.query('INSERT INTO fixture_hooks.access_denied VALUES($1)',[blocked.id]);
   await reject(()=>action(blocked,0,'payment',{confirmed:true}),/Group access unavailable/);
   await reject(()=>operate(blocked,'settings',blocked.s),/Group access unavailable/);
+  await reject(()=>rpc(blocked.owner,'iig_read_entry_group',[null]),/Group access unavailable/);
+  await reject(()=>rpc(blocked.users[0],'iig_read_entry_group',[blocked.pin]),/Group access unavailable/);
   await reject(async()=>rpc(outsider,'iig_join_owned_group',[blocked.pin,blocked.invite,'Blocked',12]),/Group access unavailable/);
   const invalid=await seed();
   for(const change of ["banned_until=now()+interval '1 day'","is_anonymous=true","email_confirmed_at=NULL"]){

@@ -39,7 +39,7 @@ const {fixture,extract,originalFinish}=require('./test-source-finish.cjs'),guard
    const c={state:loaded,pin:x.pin,db:bridge.db,iigEntryBridge:bridge,isAdmin:true,myPlayerId:'a',saveActive:false,savePending:0,saveQueue:Promise.resolve(),stateSaveVersion:0,scoreDraftActive:false,
     Date,JSON,Object,Array,String,Number,Boolean,Math,Promise,URL,demoCanEdit:()=>true,demoReadOnly:()=>false,$:()=>({value:'37',textContent:''}),render(){},show(){},showRoundHistory(){},sideGameHome(){},alert(){},confirm:()=>true,
     localStorage:{getItem:k=>memory.get(k)||null,setItem:(k,v)=>memory.set(k,v)},window:{scrollTo(){}},moneyText:String,appPrompt:async()=> '12.3',...extras};
-   vm.createContext(c);for(const f of ['save','applyGuardedOperation','createWinnerPayouts','currentPlayerMatchesPayout','ensureSideGameState','validGolfHandicap','validIndividualScore','sideGameResolveBetsForToday'])vm.runInContext(extract(f),c);
+   vm.createContext(c);for(const f of ['sideGameToday','save','applyGuardedOperation','createWinnerPayouts','currentPlayerMatchesPayout','ensureSideGameState','validGolfHandicap','validIndividualScore','sideGameResolveBetsForToday'])vm.runInContext(extract(f),c);
    vm.runInContext(extract(name),c);await c[name](...args);assert.deepEqual(failures,[],name);return {state:await read(x),ctx:c,bridge};
   }
   const x=await seed('canonical-a','0007'),y=await seed('canonical-b','0099');
@@ -312,7 +312,7 @@ const {fixture,extract,originalFinish}=require('./test-source-finish.cjs'),guard
   assert.equal((await write(free,freeRead,'save',existingFree,null)).error,null);checks++;
   const freeBridge=app(free,free.admin),freeLoaded=(await freeBridge.db.rpc('get_group_state',{p_pin:free.pin})).data;
   const nextCtx={state:freeLoaded,pin:free.pin,iigEntryBridge:freeBridge,isAdmin:false,demoReadOnly:()=>false,myPlayerId:'late-free',tripPlayerIsPlaying:()=>true,tripTeamRoundActive:()=>false,roundLocked:()=>true,esc:String};
-  vm.createContext(nextCtx);vm.runInContext(extract('playerNextActionHtml'),nextCtx);
+  vm.createContext(nextCtx);vm.runInContext(extract('accountEntryStatus')+'\n'+extract('playerNextActionHtml'),nextCtx);
   assert.match(nextCtx.playerNextActionHtml(),/Entries Closed/);assert.doesNotMatch(nextCtx.playerNextActionHtml(),/Enter My Score|Pay .*Join/);checks++;
   nextCtx.myPlayerId='a';assert.match(nextCtx.playerNextActionHtml(),/View Leaderboard/);checks++;
   const freeFinished=await originalFinish(freeLoaded,{bridge:freeBridge,pin:free.pin});assert.equal((await read(free)).state.history.length,freeBase.history.length+1);assert.deepEqual(freeFinished.history[0].winners,['Fictional B']);assert.equal(freeFinished.history[0].stablefordPot,0);checks++;

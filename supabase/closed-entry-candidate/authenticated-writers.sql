@@ -78,6 +78,45 @@ BEGIN
  RETURN iig_closed_entry.write_authenticated(g.group_id,g.revision,'save',p_state);
 END $$;
 
+-- Preserve the installed owner/member projections and their access checks. Read
+-- closure metadata at the same locked account revision, including after score
+-- resets. NULL pin means the caller's existing owned group, never a PIN claim.
+-- This read does not initialise or modify private guard records.
+CREATE FUNCTION public.iig_read_entry_group(p_pin text DEFAULT NULL) RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
+DECLARE result jsonb;g record;r iig_closed_entry.rounds;entry jsonb;closed boolean;
+BEGIN
+ IF p_pin IS NULL THEN result:=public.iig_get_owned_group();
+ ELSE result:=public.iig_get_player_group(p_pin);END IF;
+ IF result IS NULL THEN RETURN NULL;END IF;
+ SELECT * INTO g FROM iig_closed_entry.lock_authenticated(coalesce(p_pin,result->>'group_pin'),
+  (result->>'revision')::bigint,CASE WHEN p_pin IS NULL THEN 'owner' ELSE 'member' END);
+ IF p_pin IS NULL THEN result:=public.iig_get_owned_group();
+ ELSE result:=public.iig_get_player_group(p_pin);END IF;
+ IF (result->>'revision')::bigint IS DISTINCT FROM g.revision THEN RAISE EXCEPTION 'READ_REVISION_CHANGED';END IF;
+ SELECT * INTO r FROM iig_closed_entry.rounds WHERE group_id=g.group_id::text;
+ IF FOUND THEN
+  entry:=jsonb_build_object('open',r.phase='open','closed',r.closed,'entrantIds',r.entrant_ids);
+ ELSE
+  closed:=iig_closed_entry.has_score(g.state);
+  entry:=jsonb_build_object('open',iig_closed_entry.round_is_open(g.state),'closed',closed,
+   'entrantIds',CASE WHEN closed THEN (SELECT coalesce(jsonb_agg(p->'id'),'[]') FROM jsonb_array_elements(g.state->'players') p WHERE iig_closed_entry.eligible(g.state,p)) ELSE NULL END);
+ END IF;
+ RETURN result||jsonb_build_object('entry',entry);
+END $$;
+
+-- Reuse the existing server-derived maintenance proposals. A proposal does not
+-- write; the subsequent explicit operation must still match this exact revision.
+CREATE FUNCTION public.iig_prepare_owned_entry(p_pin text,p_operation text,p_revision bigint,p_selection integer DEFAULT NULL)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
+DECLARE g record;
+BEGIN
+ SELECT * INTO g FROM iig_closed_entry.lock_authenticated(p_pin,p_revision,'owner');
+ IF p_operation='resetpayments' AND (iig_closed_entry.has_score(g.state) OR EXISTS(
+  SELECT 1 FROM iig_closed_entry.rounds WHERE group_id=g.group_id::text AND closed)) THEN RAISE EXCEPTION 'ENTRIES_CLOSED';END IF;
+ RETURN iig_closed_entry.derive_operation(g.state,p_operation,p_selection);
+END $$;
+
 -- The existing organiser controls must explicitly name their validated action
 -- when the compatible TEST client is separately prepared. No UI changes here.
 CREATE FUNCTION public.iig_operate_owned_group(p_pin text,p_operation text,p_state jsonb,p_revision bigint)
@@ -322,3 +361,7 @@ REVOKE ALL ON FUNCTION public.iig_save_owned_group(text,jsonb,bigint) FROM PUBLI
 GRANT EXECUTE ON FUNCTION public.iig_save_owned_group(text,jsonb,bigint) TO authenticated;
 REVOKE ALL ON FUNCTION public.iig_operate_owned_group(text,text,jsonb,bigint) FROM PUBLIC,anon;
 GRANT EXECUTE ON FUNCTION public.iig_operate_owned_group(text,text,jsonb,bigint) TO authenticated;
+REVOKE ALL ON FUNCTION public.iig_read_entry_group(text) FROM PUBLIC,anon,service_role;
+GRANT EXECUTE ON FUNCTION public.iig_read_entry_group(text) TO authenticated;
+REVOKE ALL ON FUNCTION public.iig_prepare_owned_entry(text,text,bigint,integer) FROM PUBLIC,anon,service_role;
+GRANT EXECUTE ON FUNCTION public.iig_prepare_owned_entry(text,text,bigint,integer) TO authenticated;

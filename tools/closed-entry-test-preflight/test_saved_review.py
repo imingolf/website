@@ -357,12 +357,15 @@ class SavedReview(unittest.TestCase):
         self.assertIn('SAVED_CATALOG_SECURITY_METADATA_INCOMPLETE',safe['preinstallation_blockers'])
 
     def test_authenticated_organiser_rpc_collision_is_a_blocker(self):
-        collision=copy.deepcopy(self.getter)
-        collision.update(name='iig_operate_owned_group',signature='public.iig_operate_owned_group(text,text,jsonb,bigint)')
-        self.data['functions']['items'].append(collision);self.save_capture()
-        _,safe,_=r.build_review(self.folder)
-        self.assertIn('CANDIDATE_OBJECT_NAME_COLLISION',safe['preinstallation_blockers'])
-        self.assertEqual(safe['installation'],'NO-GO')
+        for name in ('iig_operate_owned_group','iig_read_entry_group','iig_prepare_owned_entry'):
+            with self.subTest(name=name):
+                collision=copy.deepcopy(self.getter)
+                collision.update(name=name,signature='public.'+name+'(text)')
+                self.data['functions']['items'].append(collision);self.save_capture()
+                _,safe,_=r.build_review(self.folder)
+                self.assertIn('CANDIDATE_OBJECT_NAME_COLLISION',safe['preinstallation_blockers'])
+                self.assertEqual(safe['installation'],'NO-GO')
+                self.data['functions']['items'].remove(collision)
 
     def test_existing_or_source_package_output_never_written(self):
         for out in [self.folder,self.folder/'new-review',self.root]:
