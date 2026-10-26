@@ -117,6 +117,33 @@ BEGIN
  THEN RAISE EXCEPTION 'PAIR_SCORE_REMOVAL'; END IF;
 END $$;
 
+-- Payment is an honest declaration/correction, not organiser approval. It cannot
+-- grant entry after closure; the frozen entrant IDs never change here.
+CREATE FUNCTION iig_closed_entry.validate_payment(old_s jsonb,new_s jsonb,locked boolean,frozen jsonb,actor text)
+RETURNS void LANGUAGE plpgsql SET search_path=pg_catalog AS $$
+DECLARE p jsonb;n jsonb; fields text[]:=ARRAY['paid','paymentMarkedAt','paymentMarkMethod'];
+BEGIN
+ IF old_s->>'gameType' IS DISTINCT FROM 'money'
+ OR (old_s-'players'-'lastActivityAt') IS DISTINCT FROM (new_s-'players'-'lastActivityAt')
+ OR jsonb_typeof(new_s->'players') IS DISTINCT FROM 'array'
+ OR jsonb_array_length(old_s->'players')<>jsonb_array_length(new_s->'players')
+ THEN RAISE EXCEPTION 'INVALID_PAYMENT_CHANGE';END IF;
+ FOR p,n IN SELECT a.value,b.value FROM jsonb_array_elements(old_s->'players') WITH ORDINALITY a
+  JOIN jsonb_array_elements(new_s->'players') WITH ORDINALITY b USING(ordinality) LOOP
+  IF (p-fields) IS DISTINCT FROM (n-fields) THEN RAISE EXCEPTION 'PAYMENT_CHANGED_PROTECTED_FIELDS';END IF;
+  IF p IS DISTINCT FROM n THEN
+   IF actor IS NOT NULL AND p->>'id' IS DISTINCT FROM actor THEN RAISE EXCEPTION 'WRONG_PLAYER';END IF;
+   IF jsonb_typeof(n->'paid') IS DISTINCT FROM 'boolean'
+    OR jsonb_typeof(n->'paymentMarkedAt') IS DISTINCT FROM 'string'
+    OR n->>'paymentMarkMethod' IS DISTINCT FROM (CASE WHEN actor IS NULL THEN 'admin-confirmed' ELSE 'player-confirmed' END)
+   THEN RAISE EXCEPTION 'INVALID_PAYMENT_METADATA';END IF;
+   IF actor IS NOT NULL AND n->'paid' IS DISTINCT FROM 'true'::jsonb THEN RAISE EXCEPTION 'PAYMENT_DECLARATION_REQUIRED';END IF;
+   IF locked AND (actor IS NOT NULL OR (n->'paid'='true'::jsonb AND p->'paid' IS DISTINCT FROM 'true'::jsonb AND NOT coalesce(frozen,'[]') ? (p->>'id')))
+   THEN RAISE EXCEPTION 'ENTRIES_CLOSED';END IF;
+  END IF;
+ END LOOP;
+END $$;
+
 -- Narrow non-financial group settings; never score, entry or payout changes.
 CREATE FUNCTION iig_closed_entry.validate_settings(old_s jsonb,new_s jsonb)
 RETURNS void LANGUAGE plpgsql SET search_path=pg_catalog AS $$

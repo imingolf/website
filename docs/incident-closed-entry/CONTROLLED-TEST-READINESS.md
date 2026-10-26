@@ -3,6 +3,64 @@
 **Offline candidate only. NOT installable; guarded mode remains disabled.**
 No online database, existing group, hosted application or demonstration changed.
 
+## Authenticated writer integration — 26 October 2026
+
+The offline candidate now includes `authenticated-writers.sql`, loaded after the
+existing three candidate files **only in fictional tests**. It reuses the narrow
+TEST writers from registration commit `38f81215331224079aa7c19ba6e5de0dbc4bcb2e`,
+without merging that branch or copying its UI. It retains the existing
+`verified_organiser()` and `check_group_access()` helpers, membership/ownership
+tables, getters and projections, RLS and notification hooks. This is repository
+source integration, not proof those definitions match the saved TEST baseline.
+
+- Joining still binds the verified account to its own generated player ID and
+  requires the current invite. Attendance/scoring remain member-only. Group access,
+  ban/deletion checks and owner revision conflicts remain enforced.
+- Payment is the player's self-declaration. Unpaid Money players cannot score;
+  zero-stake competitions need no payment. First score/NR/pair score freezes
+  entrants atomically. New members can join the group without entering that round.
+- An explicit `payment` organiser operation can correct a frozen entrant's status,
+  but cannot admit a new entrant after closure. Score resets cannot reopen entries.
+- Each writer supplies an exact transaction/revision/state-bound permit to the
+  existing central guard. Canonical state, account revision, guard revision,
+  membership, closure/audit and existing hook effects commit or fail together.
+- `iig_save_owned_group` permits only ordinary validated saves.
+  `iig_operate_owned_group` requires an explicit validated organiser operation;
+  it never guesses lifecycle intent from a whole-state diff. The compatible
+  authenticated TEST client's organiser controls still need this explicit routing
+  before cutover. No client fallback or guarded activation was added.
+- Shared-PIN candidate endpoints reject account-owned groups, including reads;
+  golfers continue to use the existing private member projections. Without the
+  authenticated adapter, the presence of the ownership schema fails closed.
+
+This adds **one public RPC** and replaces **five existing authenticated writer
+signatures**, with no new tables. The six legacy candidate RPCs and eight private
+RLS tables remain. Saved-review plans now hash the adapter too. Replacement owners,
+ACLs, default grants and dependencies must still match the private baseline; no
+blanket Auth/schema/security changes are authorised.
+
+Next task: on the Mac, bind these writer replacements and the explicit organiser
+call sites to the existing saved TEST catalog, then incorporate them into the
+already planned isolated installer/retaining-rollback rehearsal. Do not collect
+PIN evidence again. Remaining essential gates are exact hooks/dependencies and
+writer/client cutover, baseline-bound installer/rollback with independent-session
+races, and proven backup/security recovery. Installation remains **NO-GO**.
+
+Verification for this increment: 101 authenticated-writer checks PASS; full
+17-script incident suite PASS; 15 closed-entry and 10 sync scenarios PASS;
+130 preflight and 153 inspection Python tests PASS. Checks include unchanged
+pre-existing rows/security helpers, identity denial, trust-based Money entry,
+free rounds, Points/NR/pairs, explicit lifecycle/corrections, Side Game/payout
+dispatch and rollback after failing or suppressed hooks. Existing supported-link
+validation remains strict; the adapter converts valid links to the guard's provider
+labels without broadening its allowlist.
+
+Docker is unavailable in this environment, so the independent-session race/actual
+login-role suite was not run for this increment. The saved private TEST baseline
+and actual hooks are on the Mac; target-specific installation/rollback, real
+PostgREST/JWT and physical-device validation were not performed. Earlier recorded
+concurrency results below are historical, not a rerun of this adapter.
+
 ## Completed in this follow-up
 
 - Trip return and cancellation are server-derived and version-bound. Current roster,
@@ -29,7 +87,7 @@ No online database, existing group, hosted application or demonstration changed.
   in memory per group and clear on identity/logout/group changes. Payment-return retries
   acknowledge an already-confirmed payment without writing it again after closure.
 
-Candidate inventory is now **eight private RLS tables and six public RPCs**. No new
+Legacy candidate inventory is **eight private RLS tables and six public RPCs**. No new
 public application tables, Auth-managed objects, extensions or broad Data API grants
 are required. These files remain outside automatic migrations.
 
@@ -41,12 +99,13 @@ independent identity verification, secure issuance/delivery and ordinary-user re
 are not implemented. A group PIN, selected player name, client Admin flag or platform
 creation code cannot issue organiser/member authority.
 
-Production should reuse a verified account/session and bind its authority once to the
+For legacy groups, production should reuse a verified account/session and bind its authority once to the
 specific group/player through a trusted issuer; subsequent scoped capability access
 should be automatic. Do not ask golfers to copy tokens or sign up before every score.
 The actual issuer/account-to-group proof and recovery process need approval and TEST
 verification. Existing simple group joining/scoring retains its legacy group-PIN/name
-trust model; this work does not claim authenticated per-player score identity.
+trust model. The new TEST adapter above uses existing account-bound player identity;
+it does not migrate legacy groups or invent ownership from a PIN/name.
 
 ## Essential gates before controlled TEST installation
 

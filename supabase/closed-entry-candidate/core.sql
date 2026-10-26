@@ -15,7 +15,7 @@ CREATE TABLE iig_closed_entry.credentials(
 );
 CREATE TABLE iig_closed_entry.permits(
  backend integer NOT NULL,group_id text NOT NULL,transaction_id text NOT NULL,
- operation text NOT NULL CHECK(operation IN ('save','join','finish','start','correct','cancel','settings','members','settle','tripreturn','tripcancel','resetscores','resetpayments','deletelast','clearleague','deletepasttrip','configure','profile','sidegame','claim')),expected_revision bigint NOT NULL,
+ operation text NOT NULL CHECK(operation IN ('save','join','finish','start','correct','cancel','settings','members','settle','tripreturn','tripcancel','resetscores','resetpayments','deletelast','clearleague','deletepasttrip','configure','profile','sidegame','claim','payment')),expected_revision bigint NOT NULL,
  state_digest text NOT NULL,available boolean NOT NULL,actor_id text,PRIMARY KEY(backend,group_id)
 );
 CREATE TABLE iig_closed_entry.receipts(
@@ -64,13 +64,23 @@ CREATE FUNCTION iig_closed_entry.resolve_pin(p_pin text) RETURNS text
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
 BEGIN RAISE EXCEPTION 'PIN_RESOLVER_NOT_BOUND'; END $$;
 -- No guess at LIVE PIN hashing/search_path/filters. Fixture supplies its OWN resolver.
+-- The authenticated TEST adapter replaces this hook. Its owned groups must never
+-- be readable/writable through the shared-PIN/capability API.
+CREATE FUNCTION iig_closed_entry.require_legacy_group(g text) RETURNS void
+LANGUAGE plpgsql SET search_path=pg_catalog AS $$
+BEGIN
+ IF to_regclass('iig_private.group_owners') IS NOT NULL THEN
+  RAISE EXCEPTION 'AUTHENTICATED_ADAPTER_REQUIRED';
+ END IF;
+END $$;
 CREATE FUNCTION iig_closed_entry.lock_group(p_pin text) RETURNS public.tens_in_groups
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE g text; row public.tens_in_groups;
 BEGIN
  g:=iig_closed_entry.resolve_pin(p_pin);
  SELECT * INTO row FROM public.tens_in_groups WHERE id::text=g FOR UPDATE;
- IF NOT FOUND OR iig_closed_entry.resolve_pin(p_pin) IS DISTINCT FROM g THEN RAISE EXCEPTION 'GROUP_NOT_FOUND'; END IF; RETURN row;
+ IF NOT FOUND OR iig_closed_entry.resolve_pin(p_pin) IS DISTINCT FROM g THEN RAISE EXCEPTION 'GROUP_NOT_FOUND'; END IF;
+ PERFORM iig_closed_entry.require_legacy_group(g); RETURN row;
 END $$;
 CREATE FUNCTION iig_closed_entry.authorise(g text,token text,scope text) RETURNS void
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$

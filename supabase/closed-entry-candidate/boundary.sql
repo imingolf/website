@@ -29,7 +29,7 @@ LANGUAGE sql SET search_path=pg_catalog AS $$
  FROM iig_closed_entry.rounds r WHERE group_id=g $$;
 CREATE FUNCTION iig_closed_entry.guard_row() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
-DECLARE m iig_closed_entry.rounds; p iig_closed_entry.permits; g text;expected jsonb;selection integer;matched boolean:=false;person jsonb;prior_person jsonb;backup jsonb;
+DECLARE m iig_closed_entry.rounds; p iig_closed_entry.permits; g text;expected jsonb;selection integer;matched boolean:=false;person jsonb;prior_person jsonb;backup jsonb;submitted_team jsonb;
 BEGIN
  IF TG_OP='DELETE' THEN RAISE EXCEPTION 'PROTECTED_GROUP_DELETE_NOT_IMPLEMENTED'; END IF;
  IF NEW.id IS DISTINCT FROM OLD.id THEN RAISE EXCEPTION 'PROTECTED_GROUP_IDENTITY'; END IF;
@@ -58,6 +58,11 @@ BEGIN
      iig_closed_entry.score_signature(person) IS DISTINCT FROM iig_closed_entry.score_signature(prior_person)
     THEN RAISE EXCEPTION 'INELIGIBLE_SCORER';END IF;
    END LOOP;
+   FOR submitted_team IN SELECT value FROM jsonb_array_elements(coalesce(OLD.state#>'{trip,currentTeams}','[]')) LOOP
+    IF NEW.state#>ARRAY['trip','currentTeamScores',submitted_team->>'id'] IS DISTINCT FROM OLD.state#>ARRAY['trip','currentTeamScores',submitted_team->>'id']
+     AND EXISTS(SELECT 1 FROM jsonb_array_elements_text(submitted_team->'playerIds') member WHERE NOT m.entrant_ids ? member)
+    THEN RAISE EXCEPTION 'INELIGIBLE_PAIR';END IF;
+   END LOOP;
   END IF;
   IF m.phase<>'open' THEN
    -- Harmless activity/side-data still needs a separately reviewed validator.
@@ -67,6 +72,11 @@ BEGIN
    closed=closed OR iig_closed_entry.has_score(OLD.state) OR iig_closed_entry.has_score(NEW.state),
    entrant_ids=CASE WHEN entrant_ids IS NULL AND (iig_closed_entry.has_score(OLD.state) OR iig_closed_entry.has_score(NEW.state))
     THEN (SELECT coalesce(jsonb_agg(entry.value->'id'),'[]') FROM jsonb_array_elements(OLD.state->'players') entry(value) WHERE iig_closed_entry.eligible(OLD.state,entry.value)) ELSE entrant_ids END WHERE group_id=g;
+ ELSIF p.operation='payment' THEN
+  IF m.phase<>'open' THEN RAISE EXCEPTION 'ROUND_NOT_OPEN';END IF;
+  PERFORM iig_closed_entry.validate_payment(OLD.state,NEW.state,m.closed OR iig_closed_entry.has_score(OLD.state),m.entrant_ids,p.actor_id);
+  INSERT INTO iig_closed_entry.operation_audit VALUES(g,m.revision,p.operation,OLD.state);
+  UPDATE iig_closed_entry.rounds SET revision=revision+1 WHERE group_id=g;
  ELSIF p.operation IN ('tripreturn','tripcancel','resetscores','resetpayments','deletelast','clearleague','deletepasttrip') THEN
   IF p.operation='resetpayments' AND (m.closed OR iig_closed_entry.has_score(OLD.state)) THEN RAISE EXCEPTION 'ENTRIES_CLOSED';END IF;
   IF p.operation='deletepasttrip' THEN

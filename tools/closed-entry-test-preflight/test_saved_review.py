@@ -90,6 +90,8 @@ class SavedReview(unittest.TestCase):
         self.assertFalse(safe['executable_install_or_rollback_generated'])
         self.assertEqual(set(baseline['saved_catalog_section_sha256']),p.SECTIONS)
         self.assertEqual(baseline['application_fingerprints'],self.data['fingerprints']['items'])
+        adapter='supabase/closed-entry-candidate/authenticated-writers.sql'
+        self.assertEqual(baseline['candidate_file_sha256'][adapter],p.digest(p.ROOT/adapter))
         self.assertIn(r.json_sha(baseline),plan)
         self.assertTrue(safe['saved_security_metadata_fields_present'])
         self.assertTrue(safe['canonical_table_shape_supported'])
@@ -353,6 +355,14 @@ class SavedReview(unittest.TestCase):
         _,safe,_=r.build_review(self.folder)
         self.assertFalse(safe['saved_security_metadata_fields_present'])
         self.assertIn('SAVED_CATALOG_SECURITY_METADATA_INCOMPLETE',safe['preinstallation_blockers'])
+
+    def test_authenticated_organiser_rpc_collision_is_a_blocker(self):
+        collision=copy.deepcopy(self.getter)
+        collision.update(name='iig_operate_owned_group',signature='public.iig_operate_owned_group(text,text,jsonb,bigint)')
+        self.data['functions']['items'].append(collision);self.save_capture()
+        _,safe,_=r.build_review(self.folder)
+        self.assertIn('CANDIDATE_OBJECT_NAME_COLLISION',safe['preinstallation_blockers'])
+        self.assertEqual(safe['installation'],'NO-GO')
 
     def test_existing_or_source_package_output_never_written(self):
         for out in [self.folder,self.folder/'new-review',self.root]:

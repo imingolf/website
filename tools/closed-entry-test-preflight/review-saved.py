@@ -21,10 +21,12 @@ SAVED_FILES = ('manifest.PRIVATE.json', 'inspection.READONLY.sql',
 CANDIDATE_FILES = ('supabase/closed-entry-candidate/core.sql',
                    'supabase/closed-entry-candidate/validators.sql',
                    'supabase/closed-entry-candidate/boundary.sql',
+                   'supabase/closed-entry-candidate/authenticated-writers.sql',
                    'app/entry-guard-client.js', 'app/index.html')
 PLAN_FILE = 'docs/incident-closed-entry/SAVED-TEST-INSTALL-ROLLBACK-PLAN.md'
 PUBLIC_RPCS = {'iig_entry_prepare', 'iig_entry_read', 'iig_entry_check_credential',
-               'iig_entry_check_member', 'iig_entry_write', 'iig_entry_receipt'}
+               'iig_entry_check_member', 'iig_entry_write', 'iig_entry_receipt',
+               'iig_operate_owned_group'}
 PRIVATE_TABLES = ('rounds', 'credentials', 'permits', 'receipts', 'archives',
                   'member_credentials', 'operation_audit', 'identity_ids')
 PREINSTALL_GATES = (

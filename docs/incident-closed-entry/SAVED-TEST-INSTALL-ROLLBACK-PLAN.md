@@ -7,6 +7,15 @@ The owner reported a successful single read-only TEST capture using collector
 8eda5d8. The private catalog remains on the Mac. The authorised PIN compatibility
 review used saved evidence without another database query.
 
+The 26 October authenticated-writer candidate is included in the saved review's
+source hashes. It must be bound to the saved TEST `iig_private` account/membership
+schema and the five existing writer signatures before installation. Its source
+checks are documented in [controlled readiness](CONTROLLED-TEST-READINESS.md).
+The new explicit `iig_operate_owned_group` signature is a name-collision gate.
+Do not infer approval, current baseline parity or client compatibility from the
+offline tests. The original package, resolver, evidence and the unrelated PR6
+rollback-preparation directory stay untouched.
+
 ## Run the saved-evidence review
 
 `tools/closed-entry-test-preflight/review-saved.py --package <existing-package>`
