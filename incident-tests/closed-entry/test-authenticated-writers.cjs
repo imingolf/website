@@ -93,7 +93,7 @@ const {fixture,originalFinish,originalSetup}=require('./test-source-finish.cjs')
   const installed=(await db.query(`SELECT 'public.'||proname||'('||replace(oidvectortypes(proargtypes),', ', ',')||')' AS signature
    FROM pg_proc WHERE pronamespace='public'::regnamespace AND proname LIKE 'iig_%' AND proname NOT IN('iig_get_owned_group','iig_get_player_group') ORDER BY 1`)).rows.map(r=>r.signature);
   ok(installed,signatures);ok(installed.length,14);
-  ok(Number((await db.query("SELECT count(*) n FROM pg_proc WHERE pronamespace='iig_closed_entry'::regnamespace")).rows[0].n),41);
+  ok(Number((await db.query("SELECT count(*) n FROM pg_proc WHERE pronamespace='iig_closed_entry'::regnamespace")).rows[0].n),42);
   ok(await security(),originalSecurity);
   ok(await state(untouched),untouched.s);ok(await revision(untouched),41);
   await db.exec(`CREATE OR REPLACE FUNCTION iig_closed_entry.resolve_pin(p_pin text) RETURNS text LANGUAGE sql SET search_path=pg_catalog AS $$ SELECT id::text FROM public.tens_in_groups WHERE group_pin=p_pin $$;`);
@@ -123,9 +123,25 @@ const {fixture,originalFinish,originalSetup}=require('./test-source-finish.cjs')
   }
   async function inventory(){const out={};for(const t of ['public.tens_in_groups','iig_private.group_owners','iig_private.group_members','iig_closed_entry.rounds','iig_closed_entry.permits','iig_closed_entry.archives','iig_closed_entry.operation_audit','iig_closed_entry.identity_ids','fixture_hooks.events'])out[t]=(await db.query(`SELECT to_jsonb(t) r FROM ${t} t ORDER BY to_jsonb(t)::text`)).rows;return out;}
   async function reject(fn,re){const before=await inventory();await assert.rejects(fn,re);ok(await inventory(),before);}
+  // Fixture superuser supplies a permit directly to exercise the trigger without
+  // the RPC's earlier validator. Never a public/client path; always rolled back.
+  async function guardProbe(x,proposed,actor){
+   await db.exec('BEGIN');
+   try{
+    await db.query('SELECT iig_closed_entry.initialise($1,$2)',[String(x.id),await state(x)]);
+    await db.query(`INSERT INTO iig_closed_entry.permits
+     SELECT pg_backend_pid(),group_id,pg_current_xact_id()::text,'member_score',revision,iig_closed_entry.digest($2),true,$3
+     FROM iig_closed_entry.rounds WHERE group_id=$1
+     ON CONFLICT(backend,group_id) DO UPDATE SET transaction_id=excluded.transaction_id,operation=excluded.operation,
+      expected_revision=excluded.expected_revision,state_digest=excluded.state_digest,available=true,actor_id=excluded.actor_id`,[String(x.id),proposed,actor]);
+    await db.query('UPDATE public.tens_in_groups SET state=$1 WHERE id=$2',[proposed,x.id]);
+   }finally{await db.exec('ROLLBACK');}
+  }
   async function action(x,i,name,payload={},rev){return rpc(x.users[i],'iig_player_action',[x.pin,name,{round_id:(await state(x)).roundId,format:x.s.pointsCompetition,...payload},rev??await revision(x)]);}
   async function operate(x,op,s,uid=x.owner,rev){return rpc(uid,'iig_operate_owned_group',[x.pin,op,s,rev??await revision(x)]);}
   async function adminPayment(x,i,paid){const s=await state(x);Object.assign(s.players[i],{paid,paymentMarkedAt:'fictional',paymentMarkMethod:'admin-confirmed'});return operate(x,'payment',s);}
+  const attend=async(x,i,value=true,rev)=>rpc(x.users[i],'iig_set_my_attendance',[x.pin,value,rev??await revision(x)]);
+  const score=async(x,i,value=31,format=x.s.pointsCompetition,rev)=>rpc(x.users[i],'iig_submit_my_score',[x.pin,value,format,rev??await revision(x)]);
   const beforeRead=await inventory();
   const ownerRead=await rpc(untouched.owner,'iig_read_entry_group',[null]);
   ok(ownerRead.state,untouched.s);ok(ownerRead.entry,{open:true,closed:false,entrantIds:null});
@@ -266,6 +282,94 @@ const {fixture,originalFinish,originalSetup}=require('./test-source-finish.cjs')
   ok((await state(free)).players.every(p=>!p.paid),true);
   const newcomer=await user();await rpc(newcomer,'iig_join_owned_group',[free.pin,free.invite,'Fictional Late',10]);
   await reject(async()=>rpc(newcomer,'iig_player_action',[free.pin,'score',{round_id:free.s.roundId,format:'stableford',score:33},await revision(free)]),/INELIGIBLE_SCORER/);
+  // The installed narrow endpoints accept Money and individual Trip rounds too.
+  // Attendance changes only the member's flag, never payment or the Trip roster.
+  for(const game of ['money','points'])for(const trip of [false,true])for(const stake of game==='money'?[0,10]:[0]){
+   const format=trip?'net':'stableford',x=await seed({game,trip,format,enrich(s){s.stake=stake;}});
+   const initialTrip=structuredClone(x.s.trip),initialHistory=structuredClone(x.s.history);
+   await attend(x,0);await attend(x,0,false);await action(x,0,'attendance',{attending:true});await attend(x,1);
+   if(stake>0){
+    await reject(()=>score(x,0,70,format),/Pay before/);
+    await action(x,0,'payment',{confirmed:true});await action(x,1,'payment',{confirmed:true});
+   }
+   if(trip&&stake===0){
+    await attend(x,3); // This does not place the member in the organiser's Trip selection.
+    await reject(()=>score(x,3,70,format),/INELIGIBLE_SCORER/);
+   }
+   await reject(()=>score(x,0,-1,format),/Invalid final score/);
+   await reject(()=>score(x,0,format==='net'?1000:100,format),/Invalid final score/);
+   await reject(()=>score(x,0,1,format==='net'?'stableford':'net'),/format changed/);
+   await reject(()=>score(x,0,null,format),/Invalid final score/);
+   await reject(()=>attend(x,0,null),/Group changed/);
+   const observed=await revision(x),beforeGuard=(await round(x)).revision;
+   await score(x,0,format==='net'?999:0,format,observed);
+   ok(await revision(x),observed+1);ok((await round(x)).revision,beforeGuard+1);
+   const frozen=stake>0?x.ids.slice(0,2):game==='points'&&!trip?x.ids.slice(0,2):trip?x.ids.slice(0,3):x.ids;
+   ok((await round(x)).entrant_ids,frozen);
+   await reject(()=>score(x,1,30,format,observed),/Group changed/);
+   await reject(()=>attend(x,0,true),/Entries are closed|ENTRIES_CLOSED/);
+   await reject(()=>attend(x,1,false),/Entries are closed|ENTRIES_CLOSED/);
+   await action(x,1,'score',{score:30,format});
+   await reject(()=>score(x,1,31,format),/already recorded/);
+   ok((await state(x)).trip,initialTrip);ok((await state(x)).history,initialHistory);
+   ok((await state(x)).players.map(p=>p.paid),stake>0?[true,true,false,false]:[false,false,false,false]);
+  }
+  // Both attendance/first-score serial orders, including fresh late retries.
+  for(const scoreFirst of [true,false]){
+   const x=await seed({game:'points'});await attend(x,0);const observed=await revision(x);
+   if(scoreFirst){
+    await score(x,0,1,'stableford',observed);
+    await reject(()=>attend(x,1,true,observed),/Group changed/);
+    await reject(()=>attend(x,1,true),/Entries are closed|ENTRIES_CLOSED/);
+    ok((await round(x)).entrant_ids,[x.ids[0]]);
+   }else{
+    await attend(x,1,true,observed);
+    await reject(()=>score(x,0,1,'stableford',observed),/Group changed/);
+    await score(x,0,1);ok((await round(x)).entrant_ids,x.ids.slice(0,2));
+   }
+  }
+  // Legacy unrelated data is retained exactly, not subjected to owner-save rules.
+  const legacy=await seed({game:'points',enrich(s){delete s.history;s.adminPin='FICTIONAL';s.adminSetupToken='FICTIONAL';
+   s.retainedMetadata={unknown:['keep',1]};s.players[2].paid='legacy-flag';s.players[2].scoreSubmitted=true;
+   s.players[3].playingThisRound='legacy-flag';}});
+  const beforeLegacy=await state(legacy);await attend(legacy,0);await score(legacy,0,31);
+  const expectedLegacy=structuredClone(beforeLegacy);Object.assign(expectedLegacy.players[0],{playingThisRound:true,stableford:31,scoreSubmitted:true});
+  ok(await state(legacy),expectedLegacy);ok((await round(legacy)).entrant_ids,[legacy.ids[0]]);
+  await reject(async()=>rpc(legacy.owner,'iig_save_owned_group',[legacy.pin,{...await state(legacy),lastActivityAt:'fixture'},await revision(legacy)]),/Invalid group state/);
+  // Exercise the latch with a normal supported owner reset on a separate round.
+  const latch=await seed({game:'points'});await attend(latch,0);await score(latch,0,31);
+  const resetLatch=await rpc(latch.owner,'iig_prepare_owned_entry',[latch.pin,'resetscores',await revision(latch),null]);
+  await operate(latch,'resetscores',resetLatch);ok((await round(latch)).closed,true);
+  await reject(()=>attend(latch,0,true),/ENTRIES_CLOSED/);await reject(()=>attend(latch,1,true),/ENTRIES_CLOSED/);
+  await score(latch,0,32);ok((await round(latch)).entrant_ids,[latch.ids[0]]);
+  // Member operations cannot smuggle arbitrary whole-state or other-player changes.
+  const scoped=await seed({game:'points'});await attend(scoped,0);
+  for(const tamper of [s=>s.players[1].paid=true,s=>s.players[0].paid=true,s=>s.players[0].handicap=1,
+   s=>s.history=[],s=>s.course='Forged course',s=>s.trip={active:true},s=>s.players.reverse()]){
+   const bad=await state(scoped);bad.players[0].stableford=31;bad.players[0].scoreSubmitted=true;tamper(bad);
+   await reject(async()=>db.query("SELECT iig_closed_entry.write_authenticated($1,$2,'member_score',$3,$4)",
+    [scoped.id,await revision(scoped),bad,scoped.ids[0]]),/WRONG_PLAYER|PROTECTED_FIELDS|INVALID_MEMBER_CHANGE/);
+   await reject(()=>guardProbe(scoped,bad,scoped.ids[0]),/WRONG_PLAYER|PROTECTED_FIELDS|INVALID_MEMBER_CHANGE/);
+  }
+  const invalidScore=await state(scoped);Object.assign(invalidScore.players[0],{stableford:100,scoreSubmitted:true});
+  await reject(()=>guardProbe(scoped,invalidScore,scoped.ids[0]),/INVALID_SCORE/);
+  const forgedLate=await state(free);Object.assign(forgedLate.players.at(-1),{stableford:31,scoreSubmitted:true});
+  await reject(()=>guardProbe(free,forgedLate,forgedLate.players.at(-1).id),/INELIGIBLE_SCORER/);
+  await reject(async()=>rpc(scoped.owner,'iig_operate_owned_group',[scoped.pin,'member_score',await state(scoped),await revision(scoped)]),/EXPLICIT_ORGANISER_OPERATION_REQUIRED/);
+  await reject(()=>score(scoped,0,31,'stableford',40),/Group changed/);
+  await reject(()=>rpc(scoped.users[0],'iig_submit_my_score',[scoped.pin,31,'stableford',null]),/Group changed/);
+  await reject(()=>score(scoped,0,31,null),/format changed/);
+  await reject(()=>rpc(null,'iig_set_my_attendance',[scoped.pin,true,42]),/sign-in required/);
+  await reject(()=>rpc(null,'iig_submit_my_score',[scoped.pin,31,'stableford',42]),/sign-in required/);
+  await reject(()=>rpc(scoped.users[0],'iig_set_my_attendance',[scoped.pin,true,42],'anon'),/permission denied/);
+  await reject(()=>rpc(scoped.users[0],'iig_submit_my_score',[scoped.pin,31,'stableford',42],'anon'),/permission denied/);
+  await db.query('DELETE FROM iig_private.group_members WHERE group_id=$1 AND user_id=$2',[scoped.id,scoped.users[0]]);
+  await reject(()=>attend(scoped,0),/membership required/);await reject(()=>score(scoped,0),/membership required/);
+  const missingPlayer=await seed({game:'points'});
+  await db.query('UPDATE iig_private.group_members SET player_id=$1 WHERE group_id=$2 AND user_id=$3',[randomUUID(),missingPlayer.id,missingPlayer.users[0]]);
+  await reject(()=>attend(missingPlayer,0),/Player no longer/);await reject(()=>score(missingPlayer,0),/Player no longer/);
+  const duplicate=await seed({game:'money',enrich(s,ids){s.stake=0;s.players[1].id=ids[0];}});
+  await reject(()=>attend(duplicate,0),/MEMBER_IDENTITY_AMBIGUOUS/);await reject(()=>score(duplicate,0),/MEMBER_IDENTITY_AMBIGUOUS/);
   // Explicit lifecycle intent is required; changing round/history in whole-state
   // save cannot silently finish/start/reset or discard the closure latch.
   const finished=await originalFinish(await state(points));
@@ -296,6 +400,7 @@ const {fixture,originalFinish,originalSetup}=require('./test-source-finish.cjs')
    await action(x,0,'payment',{confirmed:true});
    await reject(()=>action(x,0,'team_score',{team_id:'ab',score:38}),/Both partners must be paid/);
    for(const i of [1,2,3])await action(x,i,'payment',{confirmed:true});
+   await reject(()=>score(x,0,38),/Use the pair score/);
    await reject(()=>action(x,2,'team_score',{team_id:'ab',score:38}),/Only a team member/);
    await action(x,0,'team_score',{team_id:'ab',score:38});ok((await round(x)).closed,true);
    ok((await round(x)).entrant_ids,x.ids.slice(0,4));
@@ -338,28 +443,52 @@ const {fixture,originalFinish,originalSetup}=require('./test-source-finish.cjs')
    await db.query('INSERT INTO fixture_hooks.failures VALUES($1)',[x.id]);
    await reject(()=>operation==='join'?rpc(outsider,'iig_join_owned_group',[x.pin,x.invite,'Failure Join',12]):operation==='finish'?operate(x,'finish',fin):action(x,0,operation,operation==='payment'?{confirmed:true}:{score:31}),/FICTIONAL_NOTIFICATION_FAILURE/);
   }
+  for(const operation of ['attendance','score']){
+   const x=await seed({game:'points'});if(operation==='score')await attend(x,0);
+   await db.query('INSERT INTO fixture_hooks.failures VALUES($1)',[x.id]);
+   await reject(()=>operation==='attendance'?attend(x,0):score(x,0),/FICTIONAL_NOTIFICATION_FAILURE/);
+  }
   // A later BEFORE hook may suppress a row after the guard ran. No false success,
   // consumed permit, advanced revision, frozen entrants or joined identity survives.
   const suppressed=await seed();
   await db.exec(`CREATE FUNCTION fixture_hooks.suppress() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.id=${suppressed.id} THEN RETURN NULL;END IF;RETURN NEW;END $$;
    CREATE TRIGGER z_suppress BEFORE UPDATE ON public.tens_in_groups FOR EACH ROW EXECUTE FUNCTION fixture_hooks.suppress();`);
   await reject(()=>action(suppressed,0,'payment',{confirmed:true}),/AUTHENTICATED_WRITE_NOT_APPLIED/);
+  await reject(()=>attend(suppressed,0),/AUTHENTICATED_WRITE_NOT_APPLIED/);
   await reject(()=>rpc(outsider,'iig_join_owned_group',[suppressed.pin,suppressed.invite,'Suppressed Join',12]),/AUTHENTICATED_WRITE_NOT_APPLIED/);
   await db.exec('DROP TRIGGER z_suppress ON public.tens_in_groups;DROP FUNCTION fixture_hooks.suppress()');
   const blocked=await seed();await db.query('INSERT INTO fixture_hooks.access_denied VALUES($1)',[blocked.id]);
+  await reject(()=>attend(blocked,0),/Group access unavailable/);await reject(()=>score(blocked,0),/Group access unavailable/);
   await reject(()=>action(blocked,0,'payment',{confirmed:true}),/Group access unavailable/);
   await reject(()=>operate(blocked,'settings',blocked.s),/Group access unavailable/);
   await reject(()=>rpc(blocked.owner,'iig_read_entry_group',[null]),/Group access unavailable/);
   await reject(()=>rpc(blocked.users[0],'iig_read_entry_group',[blocked.pin]),/Group access unavailable/);
   await reject(async()=>rpc(outsider,'iig_join_owned_group',[blocked.pin,blocked.invite,'Blocked',12]),/Group access unavailable/);
-  const invalid=await seed();
-  for(const change of ["banned_until=now()+interval '1 day'","is_anonymous=true","email_confirmed_at=NULL"]){
-   await db.query('UPDATE auth.users SET '+change+' WHERE id=$1',[invalid.users[0]]);
-   await reject(()=>action(invalid,0,'payment',{confirmed:true}),/sign-in required/);
-   await db.query('UPDATE auth.users SET banned_until=NULL,is_anonymous=false,email_confirmed_at=now() WHERE id=$1',[invalid.users[0]]);
+  // Membership is account-bound, not organiser-registration-bound. These flags
+  // are fictional Auth rows; this does not test real session issuance/revocation.
+  for(const change of ["banned_until=now()+interval '1 day'","is_anonymous=true","email_confirmed_at=NULL","email=NULL",
+   "email=NULL,email_confirmed_at=NULL,is_anonymous=true,banned_until=now()+interval '1 day'"]){
+   for(const trip of [false,true]){
+    const x=await seed({game:trip?'money':'points',trip,format:'net'});
+    await db.query('UPDATE auth.users SET '+change+' WHERE id IN($1,$2)',[x.users[0],x.owner]);
+    await attend(x,0);
+    if(trip)await action(x,0,'payment',{confirmed:true});
+    await score(x,0,70,'net');ok((await state(x)).players[0].netScore,70);ok((await round(x)).closed,true);
+    await reject(async()=>operate(x,'settings',await state(x)),/sign-in required/);
+    await reject(()=>rpc(x.users[0],'iig_join_owned_group',[x.pin,x.invite,'Existing member',12]),/sign-in required/);
+    await reject(()=>attend(x,1),/Entries are closed|ENTRIES_CLOSED/);
+   }
   }
+  const invalid=await seed();
   await db.query('INSERT INTO iig_private.account_deletions VALUES($1)',[invalid.users[0]]);
   await reject(()=>action(invalid,0,'payment',{confirmed:true}),/sign-in required/);
+  await reject(()=>attend(invalid,0),/sign-in required/);await reject(()=>score(invalid,0),/sign-in required/);
+  // Size and history restrictions for submitted owner snapshots cannot reject
+  // a bounded server-built score/attendance update to an already large row.
+  const large=await seed({game:'points',enrich(s){s.history={retained:'legacy-history-shape'};s.retained='x'.repeat(1048577);}});
+  await attend(large,0);await score(large,0,31);
+  const savedLarge=await state(large);ok(savedLarge.history,large.s.history);ok(savedLarge.retained.length,1048577);
+  ok((await round(large)).closed,true);ok(await revision(large),43);
   for(const role of ['anon','authenticated','service_role']){
    await db.exec('SET SESSION AUTHORIZATION '+role);
    try{

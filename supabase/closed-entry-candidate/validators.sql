@@ -117,6 +117,72 @@ BEGIN
  THEN RAISE EXCEPTION 'PAIR_SCORE_REMOVAL'; END IF;
 END $$;
 
+-- Server-built member changes preserve every unrelated field exactly. Do not
+-- revalidate old owner/history/profile metadata as if the member supplied it.
+-- The private permit fixes the actor and operation; public APIs cannot select
+-- these operations or provide a replacement state.
+CREATE FUNCTION iig_closed_entry.validate_member_update(old_s jsonb,new_s jsonb,operation text,actor text,latched boolean,frozen jsonb)
+RETURNS void LANGUAGE plpgsql SET search_path=pg_catalog AS $$
+DECLARE p jsonb;n jsonb;fields text[];matched integer:=0;fmt text;field text;value jsonb;locked boolean;
+BEGIN
+ IF actor IS NULL OR actor='' OR operation IS NULL OR operation NOT IN ('member_attendance','member_score')
+ THEN RAISE EXCEPTION 'INVALID_MEMBER_OPERATION';END IF;
+ IF jsonb_typeof(old_s) IS DISTINCT FROM 'object' OR jsonb_typeof(new_s) IS DISTINCT FROM 'object'
+  OR jsonb_typeof(old_s->'players') IS DISTINCT FROM 'array' OR jsonb_typeof(new_s->'players') IS DISTINCT FROM 'array'
+  OR (old_s-'players') IS DISTINCT FROM (new_s-'players')
+  OR jsonb_array_length(old_s->'players')<>jsonb_array_length(new_s->'players')
+ THEN RAISE EXCEPTION 'INVALID_MEMBER_CHANGE';END IF;
+ IF old_s->'roundOpen' IS DISTINCT FROM 'true'::jsonb THEN RAISE EXCEPTION 'ROUND_NOT_OPEN';END IF;
+ IF old_s->>'gameType' IS NULL OR old_s->>'gameType' NOT IN ('points','money') THEN RAISE EXCEPTION 'Unknown competition type';END IF;
+ locked:=coalesce(latched,false) OR iig_closed_entry.has_score(old_s);
+ IF operation='member_attendance' THEN
+  IF locked THEN RAISE EXCEPTION 'ENTRIES_CLOSED';END IF;
+  fields:=ARRAY['playingThisRound'];
+ ELSE
+  fields:=ARRAY['stableford','netScore','noReturn','scoreSubmitted'];
+  fmt:=old_s->>'pointsCompetition';
+  IF fmt IS NULL OR fmt NOT IN ('stableford','net') THEN RAISE EXCEPTION 'Competition format changed';END IF;
+  IF nullif(btrim(old_s->>'course'),'') IS NULL OR nullif(old_s->>'date','') IS NULL THEN RAISE EXCEPTION 'Scoring is closed';END IF;
+  IF old_s#>'{trip,active}'='true'::jsonb AND coalesce(old_s#>>'{trip,currentFormat}','individual')<>'individual'
+  THEN RAISE EXCEPTION 'Use the pair score';END IF;
+ END IF;
+ FOR p,n IN SELECT a.value,b.value FROM jsonb_array_elements(old_s->'players') WITH ORDINALITY a
+  JOIN jsonb_array_elements(new_s->'players') WITH ORDINALITY b USING(ordinality) LOOP
+  IF p->>'id' IS DISTINCT FROM actor THEN
+   IF p IS DISTINCT FROM n THEN RAISE EXCEPTION 'WRONG_PLAYER';END IF;
+   CONTINUE;
+  END IF;
+  matched:=matched+1;
+  IF (p-fields) IS DISTINCT FROM (n-fields) THEN RAISE EXCEPTION 'MEMBER_CHANGED_PROTECTED_FIELDS';END IF;
+  IF operation='member_attendance' THEN
+   IF jsonb_typeof(n->'playingThisRound') IS DISTINCT FROM 'boolean' THEN RAISE EXCEPTION 'Invalid attendance';END IF;
+  ELSE
+   IF p->'scoreSubmitted'='true'::jsonb OR p->'noReturn'='true'::jsonb OR p->>'stableford' IS NOT NULL OR p->>'netScore' IS NOT NULL
+   THEN RAISE EXCEPTION 'A result is already recorded. Ask your organiser about corrections.';END IF;
+   IF old_s->>'gameType'='money' AND (old_s->>'stake')::numeric>0 AND p->'paid' IS DISTINCT FROM 'true'::jsonb
+   THEN RAISE EXCEPTION 'Pay before submitting a score';END IF;
+   IF NOT coalesce(iig_closed_entry.eligible(old_s,p),false)
+   THEN RAISE EXCEPTION 'INELIGIBLE_SCORER: You must be marked as playing in this competition';END IF;
+   IF locked AND (jsonb_typeof(frozen) IS DISTINCT FROM 'array' OR NOT frozen ? actor)
+   THEN RAISE EXCEPTION 'INELIGIBLE_SCORER';END IF;
+   IF n->'scoreSubmitted' IS DISTINCT FROM 'true'::jsonb THEN RAISE EXCEPTION 'INVALID_SUBMISSION_FLAG';END IF;
+   IF n->'noReturn' IS DISTINCT FROM p->'noReturn' AND jsonb_typeof(n->'noReturn') IS DISTINCT FROM 'boolean'
+   THEN RAISE EXCEPTION 'INVALID_NR';END IF;
+   IF n->'noReturn'='true'::jsonb THEN
+    IF fmt<>'net' OR n->>'stableford' IS NOT NULL OR n->>'netScore' IS NOT NULL THEN RAISE EXCEPTION 'INVALID_NR';END IF;
+   ELSE
+    field:=CASE WHEN fmt='net' THEN 'netScore' ELSE 'stableford' END;
+    value:=n->field;
+    IF jsonb_typeof(value) IS DISTINCT FROM 'number' OR value::text !~ '^[0-9]+$'
+     OR value::text::numeric>(CASE WHEN fmt='net' THEN 999 ELSE 99 END)
+     OR n->>(CASE WHEN fmt='net' THEN 'stableford' ELSE 'netScore' END) IS NOT NULL
+    THEN RAISE EXCEPTION 'INVALID_SCORE';END IF;
+   END IF;
+  END IF;
+ END LOOP;
+ IF matched<>1 THEN RAISE EXCEPTION 'MEMBER_IDENTITY_AMBIGUOUS_OR_MISSING';END IF;
+END $$;
+
 -- Payment is an honest declaration/correction, not organiser approval. It cannot
 -- grant entry after closure; the frozen entrant IDs never change here.
 CREATE FUNCTION iig_closed_entry.validate_payment(old_s jsonb,new_s jsonb,locked boolean,frozen jsonb,actor text)

@@ -15,7 +15,7 @@ CREATE TABLE iig_closed_entry.credentials(
 );
 CREATE TABLE iig_closed_entry.permits(
  backend integer NOT NULL,group_id text NOT NULL,transaction_id text NOT NULL,
- operation text NOT NULL CHECK(operation IN ('save','join','finish','start','correct','cancel','settings','members','settle','tripreturn','tripcancel','resetscores','resetpayments','deletelast','clearleague','deletepasttrip','configure','profile','sidegame','claim','payment')),expected_revision bigint NOT NULL,
+ operation text NOT NULL CHECK(operation IN ('save','join','finish','start','correct','cancel','settings','members','settle','tripreturn','tripcancel','resetscores','resetpayments','deletelast','clearleague','deletepasttrip','configure','profile','sidegame','claim','payment','member_attendance','member_score')),expected_revision bigint NOT NULL,
  state_digest text NOT NULL,available boolean NOT NULL,actor_id text,PRIMARY KEY(backend,group_id)
 );
 CREATE TABLE iig_closed_entry.receipts(

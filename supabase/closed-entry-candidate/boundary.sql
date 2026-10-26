@@ -50,7 +50,11 @@ BEGIN
    THEN RAISE EXCEPTION 'MEMBER_ID_ALREADY_USED';END IF;
   END LOOP;
  END IF;
- IF p.operation='save' THEN
+ IF p.operation IN ('save','member_attendance','member_score') THEN
+  IF p.operation IN ('member_attendance','member_score') THEN
+   IF m.phase<>'open' THEN RAISE EXCEPTION 'ROUND_NOT_OPEN';END IF;
+   PERFORM iig_closed_entry.validate_member_update(OLD.state,NEW.state,p.operation,p.actor_id,m.closed,m.entrant_ids);
+  ELSE
   IF m.closed AND m.entrant_ids IS NOT NULL THEN
    FOR person IN SELECT value FROM jsonb_array_elements(NEW.state->'players') LOOP
     SELECT value INTO prior_person FROM jsonb_array_elements(OLD.state->'players') x WHERE x->>'id'=person->>'id';
@@ -68,6 +72,7 @@ BEGIN
    -- Harmless activity/side-data still needs a separately reviewed validator.
    IF (OLD.state-'lastActivityAt') IS DISTINCT FROM (NEW.state-'lastActivityAt') THEN RAISE EXCEPTION 'ROUND_NOT_OPEN';END IF;
   ELSE PERFORM iig_closed_entry.validate_snapshot(OLD.state,NEW.state,m.closed);END IF;
+  END IF;
   UPDATE iig_closed_entry.rounds SET revision=revision+1,
    closed=closed OR iig_closed_entry.has_score(OLD.state) OR iig_closed_entry.has_score(NEW.state),
    entrant_ids=CASE WHEN entrant_ids IS NULL AND (iig_closed_entry.has_score(OLD.state) OR iig_closed_entry.has_score(NEW.state))

@@ -20,23 +20,48 @@ form remains valid. Member declarations still require true and player metadata;
 paid=true still requires its proper metadata. Frozen entrant IDs, unpaid scoring
 refusal, stale revisions, atomic hooks and the closure latch are unchanged.
 
-**Unresolved: saved member-writer parity.** The identified verified-account and
-Points-only/non-Trip restrictions remain in the candidate until the exact saved
-TEST attendance/scoring contracts are reviewed locally. Removing a shared check
-without those definitions could grant unintended authority. No compatibility PASS
-is claimed. Use the existing private Mac review once to produce the endpoint-specific
-identity/access/eligibility/revision/helper contract and fictional differential cases.
-Keep SQL and raw evidence on the Mac; no new inspection or PIN review is needed.
+**Member correction from edeaca74, based on the completed private Mac review.**
+The owner reported SPECIFIC CORRECTION REQUIRED: organiser-registration restrictions
+had been applied to member authority, Money/Trip rounds were excluded, and owner
+whole-state validation rejected server-built field updates because of unrelated
+saved data. These findings are now addressed in the offline candidate. Do not
+repeat the completed diagnosis or PIN work; the private definitions remain on the Mac.
+
+Member locks require an authenticated account, its current player mapping/roster,
+group-access permission and the expected owner revision. They no longer add email
+verification, non-anonymous or non-banned registration requirements to that mapping.
+Actual Auth session validation is still required; fictional tests do not prove real
+JWT issuance/revocation. Pending account deletion remains revoked, and the existing
+verified organiser/join helper, ownership checks, getters and grants are unchanged.
+
+Attendance and individual score RPCs now support Money and individual Trip rounds.
+The current dispatcher reuses these RPCs rather than a conflicting field contract.
+Paid Money scoring requires a declaration; free Money scoring does not. Points
+attendance and organiser-selected Trip eligibility still govern entry. A member's
+attendance flag cannot change payment, the Trip roster or a frozen entrant set.
+Pair rounds continue through the existing team score action, not individual scores.
+
+Private `member_attendance`/`member_score` permits validate only the exact member
+field changes, retaining every unrelated state/player field. The same check runs
+at the central row boundary; no client can request these operations or supply a
+state replacement. Existing malformed unrelated flags, absent/non-array history,
+owner metadata or an already oversized row do not block a bounded field update.
+Owner whole-state restrictions are unchanged. Individual Net No Return uses the
+same score boundary. First score freezes eligibility atomically, including free
+rounds; attendance remains closed after score resets. Both revisions, canonical
+notification hooks, stale-write rejection and rollback postconditions are retained.
 
 The saved reviewer now records all 14 public identity signatures, actual additions/
 replacements against the saved catalog, and hashes of replacement metadata. It
-requires explicit all-group ownership/writer-hold coverage and member-writer parity.
+requires explicit all-group ownership/writer-hold coverage and a baseline-bound
+rehearsal of the corrected member writers.
 Both remain hard NO-GO gates; an empty session list or claimed approval cannot clear
 them. The corrected installation/retaining rollback sequence includes all four
 SQL files and exact allowed replacement metadata. No installer or linking bypass
 has been invented. See [the existing plan](SAVED-TEST-INSTALL-ROLLBACK-PLAN.md).
 
-Before installation: finish that local adapter contract review, approved coverage
+Before installation: apply the completed local contract review to the target-bound
+offline rehearsal, approved coverage
 for every affected unlinked group, exact hooks/access/notification binding, and the
 baseline-bound installation/retaining rollback and recovery rehearsal. The sole-
 organiser account-deletion gap remains a LIVE release gate; it does not justify
@@ -120,11 +145,16 @@ an email address nor a shared PIN claims an existing group.
 
 ### Offline evidence and limits
 
-- Full 17-script incident suite PASS, including 198 authenticated-writer
+- Full 17-script incident suite PASS, including 394 authenticated-writer
   checks and modelled race orderings (not independent sessions). The bounded
   follow-up covers private projection filtering, exact unpaid metadata and rollback
   after every candidate file/private-binding stage, including all five fictional
-  writer replacements and their original definitions/ACLs/settings.
+  writer replacements and their original definitions/ACLs/settings. Member tests
+  include account variants, paid/free Money and Trip rounds, attendance/score race
+  orderings, score boundaries, denied/revoked membership, private field tampering,
+  unchanged legacy metadata, duplicate identities, stale requests and hook failures.
+  Direct fictional permit probes also verify the row trigger independently rejects
+  protected-field changes, invalid scores and non-frozen late scorers.
 - `node tests/authenticated-release.cjs`: 91 checks PASS; actual reused client code with mocked
   DOM/HTTP, explicit actions, conflict/ambiguous ACK handling, session invalidation,
   closure readback, guided setup and email-code/idempotent creation.
@@ -179,7 +209,7 @@ until the listed gates and separate controlled TEST approval are complete.
 
 The legacy files alone contain eight private RLS tables and six public RPCs. The
 full candidate, including authenticated-writers, has **eight private RLS tables,
-41 private helper signatures and 14 public signatures** (nine declared new, five
+42 private helper signatures and 14 public signatures** (nine declared new, five
 classified against the saved catalog), one private schema and one canonical trigger. No new
 public application tables, Auth-managed objects, extensions or broad Data API grants
 are required. These files remain outside automatic migrations.

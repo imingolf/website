@@ -222,7 +222,7 @@ class SavedReview(unittest.TestCase):
         self.assertEqual(safe['writer_control'],'UNVERIFIED');self.assertFalse(safe['full_restore_proven'])
         self.assertIn('ALL_GROUP_WRITERS_AND_COMPATIBLE_CLIENT_CUTOVER',safe['preinstallation_blockers'])
         self.assertIn('AFFECTED_GROUP_OWNERSHIP_OR_WRITER_HOLD_PLAN_UNPROVEN',safe['preinstallation_blockers'])
-        self.assertIn('SAVED_MEMBER_WRITER_AUTHORITY_AND_ELIGIBILITY_PARITY',safe['preinstallation_blockers'])
+        self.assertIn('SAVED_MEMBER_WRITER_CORRECTIONS_BASELINE_REHEARSAL',safe['preinstallation_blockers'])
         self.assertEqual(safe['affected_group_cutover'],'UNPROVEN')
         self.assertEqual(safe['installation'],'NO-GO')
 

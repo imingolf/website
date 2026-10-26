@@ -12,14 +12,24 @@ BEGIN
  THEN RAISE EXCEPTION 'USE_AUTHENTICATED_GROUP_API' USING ERRCODE='42501';END IF;
 END $$;
 
--- Keep the account writer lock order: verified account, owner revision, canonical
+-- Keep the account writer lock order: account, owner revision, canonical
 -- group, private round. Transfer/join and member writes serialise on the same owner.
 CREATE FUNCTION iig_closed_entry.lock_authenticated(p_pin text,p_revision bigint,p_authority text,p_invite uuid DEFAULT NULL)
 RETURNS TABLE(group_id bigint,revision bigint,player_id uuid,state jsonb)
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
-DECLARE uid uuid:=iig_private.verified_organiser();o iig_private.group_owners;g public.tens_in_groups;pid uuid;
+DECLARE uid uuid;o iig_private.group_owners;g public.tens_in_groups;pid uuid;
 BEGIN
  IF p_authority IS NULL OR p_authority NOT IN ('owner','member','join') THEN RAISE EXCEPTION 'INVALID_AUTHORITY';END IF;
+ IF p_authority='member' THEN
+  -- Saved TEST member authority is the authenticated account-to-player mapping,
+  -- not the organiser registration policy. Auth still validates the session;
+  -- this RPC adds no email/anonymous/ban-status requirement to membership.
+  uid:=auth.uid();
+  IF uid IS NULL THEN RAISE EXCEPTION 'Member sign-in required' USING ERRCODE='42501';END IF;
+  PERFORM 1 FROM auth.users WHERE id=uid FOR UPDATE;
+  IF NOT FOUND OR EXISTS(SELECT 1 FROM iig_private.account_deletions WHERE user_id=uid)
+  THEN RAISE EXCEPTION 'Member sign-in required' USING ERRCODE='42501';END IF;
+ ELSE uid:=iig_private.verified_organiser();END IF;
  SELECT owners.* INTO o FROM iig_private.group_owners owners JOIN public.tens_in_groups groups ON groups.id=owners.group_id
  WHERE groups.group_pin=p_pin FOR UPDATE OF owners;
  IF NOT FOUND THEN RAISE EXCEPTION 'Group membership required' USING ERRCODE='42501';END IF;
@@ -45,11 +55,18 @@ BEGIN
  PERFORM 1 FROM iig_private.group_owners WHERE group_id=gid AND revision=rev FOR UPDATE;
  IF NOT FOUND THEN RAISE EXCEPTION 'Group changed; reload before saving' USING ERRCODE='40001';END IF;
  SELECT state INTO old_s FROM public.tens_in_groups WHERE id=gid FOR UPDATE;
- IF s IS NULL OR jsonb_typeof(s)<>'object' OR jsonb_typeof(s->'players') IS DISTINCT FROM 'array'
-  OR jsonb_typeof(s->'history') IS DISTINCT FROM 'array' OR s ?| ARRAY['adminPin','adminSetupToken'] OR octet_length(s::text)>1048576
+ IF op NOT IN ('member_attendance','member_score') AND
+  (s IS NULL OR jsonb_typeof(s)<>'object' OR jsonb_typeof(s->'players') IS DISTINCT FROM 'array'
+  OR jsonb_typeof(s->'history') IS DISTINCT FROM 'array' OR s ?| ARRAY['adminPin','adminSetupToken'] OR octet_length(s::text)>1048576)
  THEN RAISE EXCEPTION 'Invalid group state';END IF;
  PERFORM iig_closed_entry.initialise(gid::text,old_s);
  SELECT * INTO r FROM iig_closed_entry.rounds WHERE group_id=gid::text FOR UPDATE;
+ IF op IN ('member_attendance','member_score') THEN
+  IF r.phase<>'open' THEN RAISE EXCEPTION 'ROUND_NOT_OPEN';END IF;
+  -- Validate even identical attendance requests, which do not run the row guard.
+  -- The row guard repeats this exact field check before any changed state persists.
+  PERFORM iig_closed_entry.validate_member_update(old_s,s,op,actor,r.closed,r.entrant_ids);
+ END IF;
  INSERT INTO iig_closed_entry.permits VALUES(pg_backend_pid(),gid::text,pg_current_xact_id()::text,op,r.revision,iig_closed_entry.digest(s),true,actor)
  ON CONFLICT(backend,group_id) DO UPDATE SET transaction_id=excluded.transaction_id,operation=excluded.operation,
  expected_revision=excluded.expected_revision,state_digest=excluded.state_digest,available=true,actor_id=excluded.actor_id;
@@ -213,7 +230,7 @@ BEGIN
  RETURN pid;
 END $$;
 
--- Narrow member action validation retained from the pinned registration source.
+-- Saved TEST member field contract, with the central closure/payment protection.
 create or replace function public.iig_set_my_attendance(p_pin text,p_attending boolean,p_revision bigint)
 returns bigint language plpgsql security definer set search_path = '' as $$
 declare v_id bigint; v_player uuid; v_state jsonb; v_revision bigint; v_players jsonb;
@@ -222,19 +239,14 @@ begin
     from iig_closed_entry.lock_authenticated(p_pin,p_revision,'member');
   if p_attending is null or p_revision is null or p_revision<>v_revision
   then raise exception 'Group changed; reload before saving' using errcode='40001'; end if;
-  if v_state->>'gameType' is distinct from 'points' or v_state->'trip'->'active'='true'::jsonb
-  then raise exception 'This action requires an individual Points Game outside Trip Mode'; end if;
-  if v_state->'roundOpen' is distinct from 'true'::jsonb or exists(
-    select 1 from jsonb_array_elements(v_state->'players') p
-    where p->'scoreSubmitted'='true'::jsonb or p->'noReturn'='true'::jsonb
-      or (p->>'stableford') is not null or (p->>'netScore') is not null)
+  if v_state->'roundOpen' is distinct from 'true'::jsonb or iig_closed_entry.has_score(v_state)
   then raise exception 'Entries are closed'; end if;
   if not exists(select 1 from jsonb_array_elements(v_state->'players') p where p->>'id'=v_player::text)
   then raise exception 'Player no longer in group' using errcode='42501'; end if;
   select jsonb_agg(case when p->>'id'=v_player::text
     then p || jsonb_build_object('playingThisRound',p_attending) else p end order by pos)
     into v_players from jsonb_array_elements(v_state->'players') with ordinality as entries(p,pos);
-  v_revision:=iig_closed_entry.write_authenticated(v_id,v_revision,'save',jsonb_set(v_state,'{players}',v_players),v_player::text);
+  v_revision:=iig_closed_entry.write_authenticated(v_id,v_revision,'member_attendance',jsonb_set(v_state,'{players}',v_players),v_player::text);
   return v_revision;
 end $$;
 
@@ -250,8 +262,6 @@ begin
   if p_revision is null or p_revision<>v_revision then
     raise exception 'Group changed; reload before submitting' using errcode='40001';
   end if;
-  if v_state->>'gameType' is distinct from 'points' or v_state->'trip'->'active'='true'::jsonb
-  then raise exception 'This action requires an individual Points Game outside Trip Mode'; end if;
   if v_state->'roundOpen' is distinct from 'true'::jsonb
     or nullif(btrim(v_state->>'course'),'') is null
     or nullif(v_state->>'date','') is null then raise exception 'Scoring is closed'; end if;
@@ -263,9 +273,7 @@ begin
     raise exception 'Invalid final score';
   end if;
   select p into v_me from jsonb_array_elements(v_state->'players') p where p->>'id'=v_player::text;
-  if v_me is null or v_me->'playingThisRound' is distinct from 'true'::jsonb then
-    raise exception 'You must be marked as playing';
-  end if;
+  if v_me is null then raise exception 'Player no longer in group' using errcode='42501';end if;
   if v_me->'scoreSubmitted'='true'::jsonb or v_me->'noReturn'='true'::jsonb
     or v_me->>'stableford' is not null or v_me->>'netScore' is not null then
     raise exception 'A result is already recorded. Ask your organiser about corrections.';
@@ -275,7 +283,7 @@ begin
     p || jsonb_build_object(v_field,p_score,'scoreSubmitted',true)
     else p end order by pos) into v_players
   from jsonb_array_elements(v_state->'players') with ordinality as entries(p,pos);
-  v_revision:=iig_closed_entry.write_authenticated(v_id,v_revision,'save',jsonb_set(v_state,'{players}',v_players),v_player::text);
+  v_revision:=iig_closed_entry.write_authenticated(v_id,v_revision,'member_score',jsonb_set(v_state,'{players}',v_players),v_player::text);
   return v_revision;
 end $$;
 
@@ -288,6 +296,18 @@ begin
  select group_id,revision,player_id,state into gid,rev,pid,s from iig_closed_entry.lock_authenticated(p_pin,p_revision,'member');
  if p_revision is null or p_revision<>rev then raise exception 'Group changed; reload before saving' using errcode='40001'; end if;
  if p_payload is null or jsonb_typeof(p_payload)<>'object' or octet_length(p_payload::text)>4096 then raise exception 'Invalid action'; end if;
+ -- Reuse the same field contract for current clients and older narrow RPC calls.
+ -- No whole-state/client player ID is accepted by either endpoint.
+ if p_action in ('attendance','score') then
+  if coalesce(p_payload->>'round_id','')<>coalesce(s->>'roundId','') then raise exception 'Competition changed; reload before saving' using errcode='40001';end if;
+  if p_action='attendance' then
+   if jsonb_typeof(p_payload->'attending') is distinct from 'boolean' then raise exception 'Invalid attendance';end if;
+   return public.iig_set_my_attendance(p_pin,(p_payload->>'attending')::boolean,p_revision);
+  end if;
+  val=(p_payload->>'score')::numeric;
+  if val is null or val<>trunc(val) or val<0 or val>999 then raise exception 'Invalid final score';end if;
+  return public.iig_submit_my_score(p_pin,val::integer,p_payload->>'format',p_revision);
+ end if;
  select p into me from jsonb_array_elements(s->'players') p where p->>'id'=pid::text;
  if me is null then raise exception 'Player no longer in group' using errcode='42501'; end if;
  fmt=coalesce(s->>'pointsCompetition','stableford');
@@ -296,7 +316,7 @@ begin
  before_score=not exists(select 1 from jsonb_array_elements(s->'players') p where p->>'stableford' is not null or p->>'netScore' is not null or p->'scoreSubmitted'='true' or p->'noReturn'='true')
  and not exists(select 1 from jsonb_each(coalesce(s->'trip'->'currentTeamScores','{}')) where value<>'null')
  and not coalesce((select closed from iig_closed_entry.rounds where group_id=gid::text),false);
- if p_action in ('payment','attendance','score','no_return','team_score') then
+ if p_action in ('payment','no_return','team_score') then
   if s->>'gameType' not in ('points','money') or s->>'gameType' is null then raise exception 'Unknown competition type'; end if;
   if s->'roundOpen' is distinct from 'true'::jsonb or not eligible or nullif(btrim(s->>'course'),'') is null or nullif(s->>'date','') is null
   then raise exception 'This competition is closed or you are not playing today'; end if;
@@ -307,11 +327,7 @@ begin
   if s->>'gameType' is distinct from 'money' or not before_score then raise exception 'Payment entry is closed'; end if;
   if p_payload->'confirmed' is distinct from 'true'::jsonb then raise exception 'Confirm your own payment first'; end if;
   me=me||jsonb_build_object('paid',true,'paymentMarkedAt',now(),'paymentMarkMethod','player-confirmed');
- elsif p_action='attendance' then
-  if s->>'gameType' is distinct from 'points' or s->'trip'->'active'='true' or not before_score or jsonb_typeof(p_payload->'attending') is distinct from 'boolean'
-  then raise exception 'Entries are closed or controlled by your Trip organiser'; end if;
-  me=me||jsonb_build_object('playingThisRound',p_payload->'attending');
- elsif p_action in ('score','no_return','team_score') then
+ elsif p_action in ('no_return','team_score') then
   if s->>'gameType'='money' and coalesce((s->>'stake')::numeric,0)>0 and me->'paid' is distinct from 'true'::jsonb then raise exception 'Pay before submitting a score'; end if;
   if s->>'gameType'='points' and s->'trip'->'active' is distinct from 'true'::jsonb and me->'playingThisRound' is distinct from 'true'::jsonb then raise exception 'You must be marked as playing'; end if;
   if p_payload->>'format' is distinct from fmt or fmt not in ('stableford','net') then raise exception 'Competition format changed'; end if;
@@ -327,14 +343,8 @@ begin
   else
    if s->'trip'->'active'='true' and coalesce(s->'trip'->>'currentFormat','individual')<>'individual' then raise exception 'Use the pair score'; end if;
    if me->'scoreSubmitted'='true' or me->'noReturn'='true' or me->>'stableford' is not null or me->>'netScore' is not null then raise exception 'A result is already recorded; ask your organiser for corrections'; end if;
-   if p_action='no_return' then
-    if fmt<>'net' then raise exception 'No Return is only available for Net'; end if;
-    me=me||jsonb_build_object('noReturn',true,'scoreSubmitted',true,'stableford',null,'netScore',null);
-   else
-    val=(p_payload->>'score')::numeric;
-    if val is null or val<>trunc(val) or val<0 or val>(case when fmt='net' then 999 else 99 end) then raise exception 'Invalid final score'; end if;
-    me=me||jsonb_build_object('stableford',case when fmt='stableford' then val end,'netScore',case when fmt='net' then val end,'noReturn',false,'scoreSubmitted',true);
-   end if;
+   if fmt<>'net' then raise exception 'No Return is only available for Net'; end if;
+   me=me||jsonb_build_object('noReturn',true,'scoreSubmitted',true,'stableford',null,'netScore',null);
   end if;
  elsif p_action like 'side_%' then
   sg=coalesce(s->'sideGame','{}');
@@ -409,8 +419,8 @@ begin
  else raise exception 'Unknown player action'; end if;
  select jsonb_agg(case when p->>'id'=pid::text then me else p end order by n) into arr from jsonb_array_elements(s->'players') with ordinality x(p,n);
  s=jsonb_set(s,'{players}',arr);
- if octet_length(s::text)>1048576 then raise exception 'Group capacity reached; ask your organiser'; end if;
- rev:=iig_closed_entry.write_authenticated(gid,rev,case when p_action='payment' then 'payment' when p_action like 'side_%' then 'sidegame' when p_action='claim_prize' then 'claim' else 'save' end,s,pid::text);
+ if p_action<>'no_return' and octet_length(s::text)>1048576 then raise exception 'Group capacity reached; ask your organiser'; end if;
+ rev:=iig_closed_entry.write_authenticated(gid,rev,case when p_action='payment' then 'payment' when p_action like 'side_%' then 'sidegame' when p_action='claim_prize' then 'claim' when p_action='no_return' then 'member_score' else 'save' end,s,pid::text);
  return rev;
 end $$;
 

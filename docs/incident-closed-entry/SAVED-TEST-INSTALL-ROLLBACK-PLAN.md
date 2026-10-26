@@ -114,18 +114,21 @@ The old backup's historical checksum and full recovery proof remain unavailable.
    verification, private credential delivery, expiry, rotation/revocation and recovery
    plan. Never derive authority from a shared group PIN, selected name or client flag.
    Do not issue tokens during offline review or put secrets in SQL/logs/group JSON.
-7. Complete the saved member-writer contract comparison locally. The exact
+7. Reuse the completed private member-writer review in the baseline-bound offline
+   rehearsal. The user-confirmed findings for
    `iig_set_my_attendance(text,boolean,bigint)` and
-   `iig_submit_my_score(text,integer,text,bigint)` bodies/helpers/ACLs are not
-   available here. The candidate still contains the identified verified-account
-   and Points-only/non-Trip restrictions. Do not install these replacements yet.
-   Using the existing private catalog, record their actual identity/member/access,
-   eligibility, payment, Trip/format, existing-score and revision rules, including
-   indirect helpers and hooks. Translate only those rules into fictional differential
-   cases locally; then remove only demonstrated extra restrictions at those endpoints.
-   Do not relax the shared organiser/join authority helper or infer new authority.
-   Include member projection privacy and notification compatibility in this same
-   local adapter review. Share only sanitised findings/tests, never private definitions.
+   `iig_submit_my_score(text,integer,text,bigint)` are corrected in the candidate:
+   member mapping/access instead of organiser registration policy, Money/individual
+   Trip support, and field-scoped validation instead of owner whole-state checks.
+   The dispatcher uses the same endpoints for attendance/individual scores.
+   Existing organiser/join authority and account-deletion revocation remain intact.
+   The central guard still enforces payment eligibility, frozen entrants, duplicates,
+   format/ranges, closure and both revisions. The private permit's two new operation
+   values have no public operation selector or private EXECUTE grants.
+   Bind the corrected code to the existing saved definitions/helpers/ACLs and
+   notification dependencies in the local rehearsal; no new inspection or repeated
+   diagnosis is requested. Fictional tests here are not a faithful private-baseline
+   rehearsal. Keep private definitions local and report only sanitised results.
 
 No new database connection is requested for this review. A saved snapshot cannot
 guarantee that TEST will remain unchanged. A separately approved installation must
@@ -152,10 +155,14 @@ this is a future installation requirement, not authority to reconnect now.
    existing matched private PIN binding, `boundary.sql`, then
    **`authenticated-writers.sql`**. All four candidate files are in
    `supabase/closed-entry-candidate/`. Inventory: one private schema, eight private
-   RLS tables, 41 distinct private helper signatures, 14 public signatures and one
+   RLS tables, 42 distinct private helper signatures, 14 public signatures and one
    canonical BEFORE UPDATE/DELETE trigger. The private resolver binding replaces
    the candidate resolver stub; authenticated-writers replaces the candidate-local
    `require_legacy_group` stub. These are not replacements of installed TEST writers.
+   The member correction adds the private validator
+   `validate_member_update(jsonb,jsonb,text,text,boolean,jsonb)` and extends only the
+   private permit CHECK with `member_attendance`/`member_score`; public RPC identity
+   signatures, grants and the eight-table inventory are unchanged.
    The 14 exact public signatures and saved function metadata hashes are recorded
    in `baseline.PRIVATE.json`. Nine use CREATE (six entry RPCs plus operate/read/
    prepare owned entry); five use CREATE OR REPLACE (save, join, attendance, score,
