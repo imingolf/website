@@ -3,6 +3,45 @@
 **Offline candidate only. NOT installable; guarded mode remains disabled.**
 No online database, existing group, hosted application or demonstration changed.
 
+## Bounded compatibility corrections from 05018589
+
+The member read now reconstructs gameplay fields from the locked canonical state
+using explicit recursive allowlists, after both existing getter/access checks.
+The owner getter is unchanged. Member output includes payment status/link, League,
+Trip/team scores and history; unknown security/profile fields and normal-round
+backups are omitted. Winner payout links are visible only to their named winner;
+Side Game bets/settlements and opponent scores are participant/date filtered.
+The player client refuses incomplete stake/open/history data rather than treating
+a missing stake as free. No existing getter, authority helper, RLS or grant is widened.
+
+Organiser unpaid corrections accept exactly `paid=false`, `paymentMarkedAt=null`,
+`paymentMarkMethod=null`, matching the existing client. The prior audited correction
+form remains valid. Member declarations still require true and player metadata;
+paid=true still requires its proper metadata. Frozen entrant IDs, unpaid scoring
+refusal, stale revisions, atomic hooks and the closure latch are unchanged.
+
+**Unresolved: saved member-writer parity.** The identified verified-account and
+Points-only/non-Trip restrictions remain in the candidate until the exact saved
+TEST attendance/scoring contracts are reviewed locally. Removing a shared check
+without those definitions could grant unintended authority. No compatibility PASS
+is claimed. Use the existing private Mac review once to produce the endpoint-specific
+identity/access/eligibility/revision/helper contract and fictional differential cases.
+Keep SQL and raw evidence on the Mac; no new inspection or PIN review is needed.
+
+The saved reviewer now records all 14 public identity signatures, actual additions/
+replacements against the saved catalog, and hashes of replacement metadata. It
+requires explicit all-group ownership/writer-hold coverage and member-writer parity.
+Both remain hard NO-GO gates; an empty session list or claimed approval cannot clear
+them. The corrected installation/retaining rollback sequence includes all four
+SQL files and exact allowed replacement metadata. No installer or linking bypass
+has been invented. See [the existing plan](SAVED-TEST-INSTALL-ROLLBACK-PLAN.md).
+
+Before installation: finish that local adapter contract review, approved coverage
+for every affected unlinked group, exact hooks/access/notification binding, and the
+baseline-bound installation/retaining rollback and recovery rehearsal. The sole-
+organiser account-deletion gap remains a LIVE release gate; it does not justify
+changing these compatibility corrections or existing gameplay screens.
+
 ## Two-priority release integration — 26 October 2026
 
 **Repository candidate only; installation/cutover remains NO-GO.** No flag,
@@ -22,14 +61,16 @@ the closure latch. Existing account/membership/access checks and canonical updat
 hooks remain in place, including rollback of revisions and notifications on error.
 
 Two small read RPCs complete the adapter: `iig_read_entry_group(text default null)`
-retains the installed owner/member projections, verifies the same account revision
-under lock, and adds only closure/entrant metadata. It performs no initialization
+retains the installed owner projection and both getters' access checks, verifies
+the same account revision under lock, and adds closure/entrant metadata. Member
+gameplay projection is restored by the bounded allowlist described above. It performs no initialization
 or data writes. `iig_prepare_owned_entry(text,text,bigint,integer default null)`
 reuses the existing server-derived maintenance proposals; the following write must
 still match the observed revision. Both require authenticated authority and deny
 PUBLIC/anon/service_role. The candidate adds three public RPCs in total, including
-`iig_operate_owned_group`, replaces the same five existing writers, and adds no
-further tables. All three names must be checked for baseline collisions.
+`iig_operate_owned_group`, declares five CREATE OR REPLACE writers, and adds no
+further tables. Actual additions/replacements must match the saved exact-signature
+inventory. All three new names must be checked for baseline collisions.
 
 The welcome screen, email-code registration, first-competition form, account
 controls and protected player/organiser adapters are reused selectively from
@@ -79,14 +120,18 @@ an email address nor a shared PIN claims an existing group.
 
 ### Offline evidence and limits
 
-- Full 17-script incident suite PASS, including 125 authenticated-writer
-  checks and modelled race orderings (not independent sessions).
-- `node tests/authenticated-release.cjs`: 80 checks PASS; actual reused client code with mocked
+- Full 17-script incident suite PASS, including 198 authenticated-writer
+  checks and modelled race orderings (not independent sessions). The bounded
+  follow-up covers private projection filtering, exact unpaid metadata and rollback
+  after every candidate file/private-binding stage, including all five fictional
+  writer replacements and their original definitions/ACLs/settings.
+- `node tests/authenticated-release.cjs`: 91 checks PASS; actual reused client code with mocked
   DOM/HTTP, explicit actions, conflict/ambiguous ACK handling, session invalidation,
   closure readback, guided setup and email-code/idempotent creation.
 - Existing 15 closed-entry and 10 sync regression scenarios.
-- 130 preflight and 153 inspection Python tests. The existing saved reviewer now
-  hashes the reused client files/config and checks all new RPC name collisions.
+- 132 preflight and 153 inspection Python tests. The existing saved reviewer now
+  hashes the reused client files/config, checks all new RPC name collisions and
+  distinguishes exact baseline additions/replacements from overloads/unknown signatures.
   Collector/hash-bound connection runner files and private evidence are untouched.
 - Existing registration source `38f8121`: 51 protected gameplay/account-lifecycle
   assertions, 79 access assertions, creation/hardening/setup-bundle suites and
@@ -132,7 +177,10 @@ until the listed gates and separate controlled TEST approval are complete.
   in memory per group and clear on identity/logout/group changes. Payment-return retries
   acknowledge an already-confirmed payment without writing it again after closure.
 
-Legacy candidate inventory is **eight private RLS tables and six public RPCs**. No new
+The legacy files alone contain eight private RLS tables and six public RPCs. The
+full candidate, including authenticated-writers, has **eight private RLS tables,
+41 private helper signatures and 14 public signatures** (nine declared new, five
+classified against the saved catalog), one private schema and one canonical trigger. No new
 public application tables, Auth-managed objects, extensions or broad Data API grants
 are required. These files remain outside automatic migrations.
 

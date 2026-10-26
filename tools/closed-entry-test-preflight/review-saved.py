@@ -29,6 +29,23 @@ PLAN_FILE = 'docs/incident-closed-entry/SAVED-TEST-INSTALL-ROLLBACK-PLAN.md'
 PUBLIC_RPCS = {'iig_entry_prepare', 'iig_entry_read', 'iig_entry_check_credential',
                'iig_entry_check_member', 'iig_entry_write', 'iig_entry_receipt',
                'iig_operate_owned_group', 'iig_read_entry_group', 'iig_prepare_owned_entry'}
+# Identity signatures, not CREATE/CREATE OR REPLACE keyword counts. The saved
+# collector inventories all public functions. Missing expected writers remain a
+# compatibility blocker, even though CREATE OR REPLACE would silently add them.
+PUBLIC_SIGNATURES = (
+    'iig_entry_prepare(text,text,uuid,bigint,text,text,integer)',
+    'iig_entry_read(text)', 'iig_entry_check_credential(text,text,text)',
+    'iig_entry_check_member(text,text,text,text)',
+    'iig_entry_write(text,text,uuid,bigint,text,jsonb,text,uuid)',
+    'iig_entry_receipt(text,text,uuid,text)',
+    'iig_operate_owned_group(text,text,jsonb,bigint)', 'iig_read_entry_group(text)',
+    'iig_prepare_owned_entry(text,text,bigint,integer)',
+    'iig_save_owned_group(text,jsonb,bigint)',
+    'iig_join_owned_group(text,uuid,text,numeric)',
+    'iig_set_my_attendance(text,boolean,bigint)',
+    'iig_submit_my_score(text,integer,text,bigint)',
+    'iig_player_action(text,text,jsonb,bigint)',
+)
 PRIVATE_TABLES = ('rounds', 'credentials', 'permits', 'receipts', 'archives',
                   'member_credentials', 'operation_audit', 'identity_ids')
 PREINSTALL_GATES = (
@@ -38,6 +55,8 @@ PREINSTALL_GATES = (
     'BASELINE_BOUND_INSTALLER_AND_RETAINING_ROLLBACK_REHEARSAL',
     'BACKUP_RESTORE_AND_SECURITY_RECOVERY',
     'ALL_GROUP_WRITERS_AND_COMPATIBLE_CLIENT_CUTOVER',
+    'AFFECTED_GROUP_OWNERSHIP_OR_WRITER_HOLD_PLAN_UNPROVEN',
+    'SAVED_MEMBER_WRITER_AUTHORITY_AND_ELIGIBILITY_PARITY',
     'TRUSTED_TEST_IDENTITY_ISSUANCE_AND_RECOVERY_PLAN',
     'SEPARATE_INSTALL_APPROVAL_AND_TRANSACTIONAL_DRIFT_RECHECK',
 )
@@ -57,6 +76,27 @@ def sha(value):
 def json_sha(value):
     return sha(json.dumps(value, sort_keys=True, separators=(',', ':'),
                           ensure_ascii=True, allow_nan=False).encode())
+
+
+def candidate_inventory(functions):
+    """Fixed candidate labels only; never reflect raw catalog text into summaries."""
+    entries = []
+    for signature in PUBLIC_SIGNATURES:
+        name = signature.split('(')[0]
+        same_name = [f for f in functions if f.get('schema') == 'public' and f.get('name') == name]
+        matches = [f for f in same_name if f.get('signature') in (signature, 'public.' + signature)]
+        pattern = r'(?:public\.)?' + re.escape(name) + r'\([^()]*\)'
+        ambiguous = len(matches) > 1 or any(not isinstance(f.get('signature'), str)
+            or re.fullmatch(pattern, f['signature']) is None for f in same_name)
+        disposition = 'UNRESOLVED' if ambiguous else 'REPLACE' if matches else 'ADD'
+        expected = 'ADD' if name in PUBLIC_RPCS else 'REPLACE'
+        entries.append({'signature': 'public.' + signature, 'expected': expected,
+                        'saved_disposition': disposition,
+                        'baseline_function_sha256': json_sha(matches[0]) if len(matches) == 1 else None,
+                        'approved': False})
+    counts = {key: sum(e['saved_disposition'] == key for e in entries)
+              for key in ('ADD', 'REPLACE', 'UNRESOLVED')}
+    return entries, counts
 
 
 def private_directory(folder):
@@ -208,6 +248,9 @@ def build_review(folder, pin_binding=None):
     collisions = collisions or any(t.get('table') == 'public.tens_in_groups' and t.get('name') == 'iig_entry_before_write'
                                    for t in data['triggers']['items'])
     gates = list(PREINSTALL_GATES)
+    inventory, counts = candidate_inventory(data['functions']['items'])
+    if any(e['saved_disposition'] != e['expected'] for e in inventory):
+        gates.insert(0, 'CANDIDATE_FUNCTION_DISPOSITION_REQUIRES_LOCAL_REVIEW')
     if binding_status != 'MATCHED_SAVED_TEST_GETTER_REVIEW_REQUIRED':
         gates.insert(0, binding_status)
     if not supported:
@@ -239,6 +282,12 @@ def build_review(folder, pin_binding=None):
         'current_online_state_verified': False, 'database_connections_this_review': 0,
         'installation': 'NO-GO', 'sql_execution_authorised': False, 'rollback_executable': False,
         'preserve_existing_security_metadata': True, 'retain_private_runtime_tables': list(PRIVATE_TABLES),
+        'candidate_public_function_inventory': inventory,
+        'candidate_public_function_counts': counts,
+        # Saved table fingerprints prove neither each group's ownership nor an
+        # approved writer hold. No free-form writer note can satisfy this gate.
+        'affected_group_cutover': {'coverage': 'UNPROVEN', 'approved': False,
+                                  'scope': 'ALL_CANONICAL_GROUP_ROWS'},
         'preinstallation_blockers': gates, 'activation_blockers': list(ACTIVATION_GATES),
     }
     baseline_id = json_sha(baseline)
@@ -257,6 +306,8 @@ def build_review(folder, pin_binding=None):
             'pin_binding': binding_status, 'canonical_table_shape_supported': supported,
             'saved_security_metadata_fields_present': complete,
             'candidate_object_collision': collisions, 'preinstallation_blockers': gates,
+            'candidate_public_function_counts': counts,
+            'affected_group_cutover': 'UNPROVEN',
             'activation_blockers': list(ACTIVATION_GATES), 'executable_install_or_rollback_generated': False}
     plan = ('# Private saved TEST baseline review\n\n'
             'Installation NO-GO. This document is not SQL and is not executable.\n\n'

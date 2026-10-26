@@ -134,8 +134,11 @@ BEGIN
   IF p IS DISTINCT FROM n THEN
    IF actor IS NOT NULL AND p->>'id' IS DISTINCT FROM actor THEN RAISE EXCEPTION 'WRONG_PLAYER';END IF;
    IF jsonb_typeof(n->'paid') IS DISTINCT FROM 'boolean'
-    OR jsonb_typeof(n->'paymentMarkedAt') IS DISTINCT FROM 'string'
-    OR n->>'paymentMarkMethod' IS DISTINCT FROM (CASE WHEN actor IS NULL THEN 'admin-confirmed' ELSE 'player-confirmed' END)
+    OR NOT ((jsonb_typeof(n->'paymentMarkedAt') IS NOT DISTINCT FROM 'string'
+      AND n->>'paymentMarkMethod' IS NOT DISTINCT FROM (CASE WHEN actor IS NULL THEN 'admin-confirmed' ELSE 'player-confirmed' END))
+     OR (actor IS NULL AND n->'paid' IS NOT DISTINCT FROM 'false'::jsonb
+      AND n->'paymentMarkedAt' IS NOT DISTINCT FROM 'null'::jsonb
+      AND n->'paymentMarkMethod' IS NOT DISTINCT FROM 'null'::jsonb))
    THEN RAISE EXCEPTION 'INVALID_PAYMENT_METADATA';END IF;
    IF actor IS NOT NULL AND n->'paid' IS DISTINCT FROM 'true'::jsonb THEN RAISE EXCEPTION 'PAYMENT_DECLARATION_REQUIRED';END IF;
    IF locked AND (actor IS NOT NULL OR (n->'paid'='true'::jsonb AND p->'paid' IS DISTINCT FROM 'true'::jsonb AND NOT coalesce(frozen,'[]') ? (p->>'id')))

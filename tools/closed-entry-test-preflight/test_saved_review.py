@@ -221,6 +221,47 @@ class SavedReview(unittest.TestCase):
         _,safe,_=r.build_review(self.folder)
         self.assertEqual(safe['writer_control'],'UNVERIFIED');self.assertFalse(safe['full_restore_proven'])
         self.assertIn('ALL_GROUP_WRITERS_AND_COMPATIBLE_CLIENT_CUTOVER',safe['preinstallation_blockers'])
+        self.assertIn('AFFECTED_GROUP_OWNERSHIP_OR_WRITER_HOLD_PLAN_UNPROVEN',safe['preinstallation_blockers'])
+        self.assertIn('SAVED_MEMBER_WRITER_AUTHORITY_AND_ELIGIBILITY_PARITY',safe['preinstallation_blockers'])
+        self.assertEqual(safe['affected_group_cutover'],'UNPROVEN')
+        self.assertEqual(safe['installation'],'NO-GO')
+
+    def test_exact_public_inventory_classifies_baseline_not_create_keyword(self):
+        signatures = r.PUBLIC_SIGNATURES[9:]
+        for signature in signatures:
+            item = copy.deepcopy(self.getter)
+            item.update(name=signature.split('(')[0],signature='public.'+signature)
+            self.data['functions']['items'].append(item)
+        self.save_capture()
+        baseline,safe,_=r.build_review(self.folder)
+        self.assertEqual(safe['candidate_public_function_counts'],{'ADD':9,'REPLACE':5,'UNRESOLVED':0})
+        self.assertEqual(len(baseline['candidate_public_function_inventory']),14)
+        replaced=baseline['candidate_public_function_inventory'][9:]
+        self.assertTrue(all(e['baseline_function_sha256'] and not e['approved'] for e in replaced))
+        self.assertEqual(baseline['affected_group_cutover'],
+            {'scope':'ALL_CANONICAL_GROUP_ROWS','coverage':'UNPROVEN','approved':False})
+        # Missing CREATE OR REPLACE target is an addition, not a replacement.
+        self.data['functions']['items'].pop();self.save_capture()
+        _,safe,_=r.build_review(self.folder)
+        self.assertEqual(safe['candidate_public_function_counts'],{'ADD':10,'REPLACE':4,'UNRESOLVED':0})
+        self.assertIn('CANDIDATE_FUNCTION_DISPOSITION_REQUIRES_LOCAL_REVIEW',safe['preinstallation_blockers'])
+        self.assertEqual(safe['installation'],'NO-GO')
+
+    def test_inventory_does_not_treat_an_overload_or_other_schema_as_replacement(self):
+        signature=r.PUBLIC_SIGNATURES[-1]
+        for schema,sig in [('public','public.iig_player_action(text)'),('iig_private','iig_private.'+signature)]:
+            entries,counts=r.candidate_inventory([{'schema':schema,'name':'iig_player_action','signature':sig}])
+            self.assertEqual(entries[-1]['saved_disposition'],'ADD')
+            self.assertEqual(counts,{'ADD':14,'REPLACE':0,'UNRESOLVED':0})
+        entries,_=r.candidate_inventory([{'schema':'public','name':'iig_player_action','signature':signature}])
+        self.assertEqual(entries[-1]['saved_disposition'],'REPLACE')
+        # Unsupported or duplicate exact signatures must never claim a replacement.
+        item={'schema':'public','name':'iig_player_action','signature':signature}
+        entries,_=r.candidate_inventory([item,item])
+        self.assertEqual(entries[-1]['saved_disposition'],'UNRESOLVED')
+        item['signature']=None
+        entries,_=r.candidate_inventory([item])
+        self.assertEqual(entries[-1]['saved_disposition'],'UNRESOLVED')
 
     def test_pin_binding_reused_and_not_copied_or_regenerated(self):
         binding=self.bind();before=self.snapshots()

@@ -78,7 +78,67 @@ BEGIN
  RETURN iig_closed_entry.write_authenticated(g.group_id,g.revision,'save',p_state);
 END $$;
 
--- Preserve the installed owner/member projections and their access checks. Read
+-- Candidate-local projection, adapted from the existing protected gameplay
+-- allowlist. Never replace the installed getters or their access checks. Unknown
+-- fields (including future profile/security fields) are omitted at every depth.
+-- Private payout links belong only to the named winner; Side Game records belong
+-- only to their participants. No arbitrary nested JSON is returned unchanged.
+CREATE FUNCTION iig_closed_entry.member_view(v jsonb,pid text,context text DEFAULT 'state',depth integer DEFAULT 0)
+RETURNS jsonb LANGUAGE plpgsql IMMUTABLE SET search_path=pg_catalog AS $$
+DECLARE k text;x jsonb;out jsonb='{}';
+BEGIN
+ IF depth>24 THEN RAISE EXCEPTION 'MEMBER_PROJECTION_TOO_DEEP';END IF;
+ IF jsonb_typeof(v)='array' THEN
+  RETURN coalesce((SELECT jsonb_agg(iig_closed_entry.member_view(value,pid,context,depth+1) ORDER BY ordinality)
+   FROM jsonb_array_elements(v) WITH ORDINALITY),'[]');
+ END IF;
+ IF jsonb_typeof(v) IS DISTINCT FROM 'object' THEN RETURN v;END IF;
+ FOR k,x IN SELECT * FROM jsonb_each(v) LOOP
+  IF context='state' AND NOT k=ANY(ARRAY['groupName','roundId','course','date','stake','gameType','pointsCompetition',
+   'pointsValue','roundOpen','players','history','splitPrizes','firstPrize','secondPrize','thirdPrize','paymentLink',
+   'paymentProvider','trip','sideGame']) THEN CONTINUE;END IF;
+  IF context='players' AND NOT k=ANY(ARRAY['id','name','handicap','paid','playingThisRound','stableford','netScore',
+   'noReturn','scoreSubmitted','competition','leaguePoints','wins','netWinnings','tripPointsExcluded']) THEN CONTINUE;END IF;
+  IF k='paymentLink' OR (context='payouts' AND k='paymentProvider') THEN
+   IF (context='state' OR (context='payouts' AND v->>'winnerPlayerId'=pid)) AND jsonb_typeof(x)='string'
+   THEN out=out||jsonb_build_object(k,x);END IF;
+  ELSIF context='sideGame' THEN
+   IF k='bets' AND jsonb_typeof(x)='array' THEN
+    SELECT coalesce(jsonb_agg(iig_closed_entry.member_view(b,pid,'bets',depth+1) ORDER BY n),'[]') INTO x
+    FROM jsonb_array_elements(x) WITH ORDINALITY a(b,n) WHERE pid IN(b->>'player1Id',b->>'player2Id');
+   ELSIF k='scores' AND jsonb_typeof(x)='array' THEN
+    SELECT coalesce(jsonb_agg(iig_closed_entry.member_view(b,pid,'scores',depth+1) ORDER BY n),'[]') INTO x
+    FROM jsonb_array_elements(x) WITH ORDINALITY a(b,n) WHERE b->>'playerId'=pid OR EXISTS(
+     SELECT 1 FROM jsonb_array_elements(CASE WHEN jsonb_typeof(v->'bets')='array' THEN v->'bets' ELSE '[]' END) bet
+     WHERE pid IN(bet->>'player1Id',bet->>'player2Id') AND b->>'playerId' IN(bet->>'player1Id',bet->>'player2Id') AND b->>'date'=bet->>'date');
+   ELSIF k='settlements' AND jsonb_typeof(x)='array' THEN
+    SELECT coalesce(jsonb_agg(iig_closed_entry.member_view(b,pid,'settlements',depth+1) ORDER BY n),'[]') INTO x
+    FROM jsonb_array_elements(x) WITH ORDINALITY a(b,n) WHERE pid IN(b->>'debtorId',b->>'creditorId');
+   ELSE CONTINUE;END IF;
+   out=out||jsonb_build_object(k,x);
+  ELSIF k=ANY(ARRAY['standings','teamStandings','currentTeamScores']) AND jsonb_typeof(x)='object' THEN
+   out=out||jsonb_build_object(k,(SELECT coalesce(jsonb_object_agg(key,value),'{}') FROM jsonb_each(x) WHERE jsonb_typeof(value)='number'));
+  ELSIF k=ANY(ARRAY['players','history','payouts','prizePlaces','winners','stablefordWinnerNames','netWinnerNames','stablefordCountback',
+   'netCountback','pointsResults','trip','plan','rounds','playerIds','currentPlayingIds','currentGroups','currentTeams',
+   'teams','groups','playingIds','teamResults','winnerTeamIds','winnerNames','winnerPlayerNames','notPlayingNames',
+   'champion','pointsChampion','teamChampion','tripTieNames','pastTrips','countback']) OR (context='state' AND k='sideGame') THEN
+   out=out||jsonb_build_object(k,iig_closed_entry.member_view(x,pid,k,depth+1));
+  ELSIF k=ANY(ARRAY['id','name','groupName','roundId','course','date','stake','gameType','pointsCompetition','pointsValue',
+   'roundOpen','paid','playingThisRound','competition','handicap','stableford','netScore','noReturn','scoreSubmitted',
+   'leaguePoints','wins','netWinnings','splitPrizes','firstPrize','secondPrize','thirdPrize','prizePlaces',
+   'winnerPlayerId','winnerName','amount','status','paymentProvider','claimedAt','paidAt','position','score','points',
+   'stablefordPot','netPot','stablefordSplit','netSplit','active','completed','totalRounds','currentRound','currentFormat','format','teamPot',
+   'sharedWin','tripPointsValue','tripPointsEnabled','tripPointsExcluded','teamEventPointsAwarded','tripFormat',
+   'player1Id','player2Id','player1Name','player2Name','playerId','playerName','setup','createdAt','acceptedAt','declinedAt',
+   'resolvedAt','updatedAt','result','winnerId','loserId','debtorId','creditorId','debtorName','creditorName','requestedAt','confirmedAt'])
+   AND jsonb_typeof(x) IN('string','number','boolean','null') THEN out=out||jsonb_build_object(k,x);
+  END IF;
+ END LOOP;
+ RETURN out;
+END $$;
+REVOKE ALL ON FUNCTION iig_closed_entry.member_view(jsonb,text,text,integer) FROM PUBLIC,anon,authenticated,service_role;
+
+-- Preserve the installed owner projection and both getters' access checks. Read
 -- closure metadata at the same locked account revision, including after score
 -- resets. NULL pin means the caller's existing owned group, never a PIN claim.
 -- This read does not initialise or modify private guard records.
@@ -94,6 +154,13 @@ BEGIN
  IF p_pin IS NULL THEN result:=public.iig_get_owned_group();
  ELSE result:=public.iig_get_player_group(p_pin);END IF;
  IF (result->>'revision')::bigint IS DISTINCT FROM g.revision THEN RAISE EXCEPTION 'READ_REVISION_CHANGED';END IF;
+ IF p_pin IS NOT NULL THEN
+  IF result->>'player_id' IS DISTINCT FROM g.player_id::text THEN RAISE EXCEPTION 'READ_MEMBER_CHANGED';END IF;
+  result:=jsonb_build_object('player_id',g.player_id,'revision',g.revision,
+   'plan_type',(SELECT plan_type FROM public.tens_in_groups WHERE id=g.group_id),
+   'state',iig_closed_entry.member_view(g.state,g.player_id::text)||jsonb_build_object(
+    'sideGameDate',to_char(now() AT TIME ZONE 'Europe/London','YYYY-MM-DD')));
+ END IF;
  SELECT * INTO r FROM iig_closed_entry.rounds WHERE group_id=g.group_id::text;
  IF FOUND THEN
   entry:=jsonb_build_object('open',r.phase='open','closed',r.closed,'entrantIds',r.entrant_ids);

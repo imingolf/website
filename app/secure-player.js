@@ -12,7 +12,9 @@
   if(!e||typeof e.open!=='boolean'||typeof e.closed!=='boolean'||!(e.entrantIds===null&&(!e.closed||!e.open)||Array.isArray(e.entrantIds)&&e.entrantIds.every(id=>typeof id==='string')))throw Error('Reload to confirm competition entry status.');
   if(!data || !Number.isSafeInteger(data.revision) || !Array.isArray(data.state?.players) || !data.state.players.some(p=>p.id===data.player_id))throw Error('Your player record could not be loaded.');
   if(!['points','money'].includes(data.state.gameType))throw Error('Unknown competition type. Ask your organiser to reload the group.');
-  state={history:[],pointsValue:10,stake:0,...JSON.parse(JSON.stringify(data.state))};
+  const stake=data.state.stake;
+  if(typeof data.state.roundOpen!=='boolean'||!['number','string'].includes(typeof stake)||String(stake).trim()===''||!Number.isFinite(Number(stake))||Number(stake)<0||!Array.isArray(data.state.history))throw Error('Competition details are incomplete. Reload your saved group.');
+  state={pointsValue:10,...JSON.parse(JSON.stringify(data.state))};
   entry=JSON.parse(JSON.stringify(e));myPlayerId=data.player_id;revision=data.revision;groupPlanType=String(data.plan_type||'trial');isAdmin=false;isOwner=false;
  }
  function banner(){

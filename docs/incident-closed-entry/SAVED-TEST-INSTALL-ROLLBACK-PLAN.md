@@ -9,7 +9,8 @@ review used saved evidence without another database query.
 
 The 26 October authenticated-writer candidate is included in the saved review's
 source hashes. It must be bound to the saved TEST `iig_private` account/membership
-schema and the five existing writer signatures before installation. Its source
+schema and the five CREATE OR REPLACE writer signatures before installation. Their
+actual additions/replacements are determined by exact saved signatures, not SQL keywords. Its source
 checks are documented in [controlled readiness](CONTROLLED-TEST-READINESS.md).
 The new `iig_operate_owned_group`, `iig_read_entry_group` and
 `iig_prepare_owned_entry` signatures are name-collision gates. The reused account
@@ -97,10 +98,34 @@ The old backup's historical checksum and full recovery proof remain unavailable.
    guard affects all canonical group rows, not just a fictional pilot group; it blocks
    old unversioned state writes even while the browser flag is off. Resolve or hold
    unsupported owner whole-state/delete workflows without adding a guard bypass.
+   **Hard NO-GO until every canonical group is covered:** a private, baseline-bound
+   row inventory must identify each already-linked group and each unlinked group.
+   For each unlinked group, record either an independently approved trusted
+   account-to-group link (proof, exact account/group IDs and approving authority),
+   or an explicitly approved writer hold (affected clients/jobs, responsible person,
+   acknowledgement of unavailable writes, recovery action and review point).
+   Email, shared PIN, an empty session list or a blanket "approved" note is not
+   ownership or hold evidence. No owner/service/direct-write exemption is allowed.
+   Missing rows, unsupported writers, unapproved holds or stale evidence abort the
+   whole installation; do not install first and silently strand existing groups.
+   The existing reviewer deliberately leaves this gate UNPROVEN: aggregate saved
+   fingerprints cannot prove per-group coverage, and it is not an installer.
 6. Prepare compatible TEST client cutover and a trusted fictional organiser/member
    verification, private credential delivery, expiry, rotation/revocation and recovery
    plan. Never derive authority from a shared group PIN, selected name or client flag.
    Do not issue tokens during offline review or put secrets in SQL/logs/group JSON.
+7. Complete the saved member-writer contract comparison locally. The exact
+   `iig_set_my_attendance(text,boolean,bigint)` and
+   `iig_submit_my_score(text,integer,text,bigint)` bodies/helpers/ACLs are not
+   available here. The candidate still contains the identified verified-account
+   and Points-only/non-Trip restrictions. Do not install these replacements yet.
+   Using the existing private catalog, record their actual identity/member/access,
+   eligibility, payment, Trip/format, existing-score and revision rules, including
+   indirect helpers and hooks. Translate only those rules into fictional differential
+   cases locally; then remove only demonstrated extra restrictions at those endpoints.
+   Do not relax the shared organiser/join authority helper or infer new authority.
+   Include member projection privacy and notification compatibility in this same
+   local adapter review. Share only sanitised findings/tests, never private definitions.
 
 No new database connection is requested for this review. A saved snapshot cannot
 guarantee that TEST will remain unchanged. A separately approved installation must
@@ -123,19 +148,35 @@ this is a future installation requirement, not authority to reconnect now.
    indexes, constraints, triggers/order/enabled state and dependencies. Assert exact
    whole-row counts/fingerprints for every captured application table. This preserves
    existing groups, scores/results/history, payments/payouts and other JSON fields.
-4. Apply reviewed additive candidate objects in order: core, validators, the matched
-   private PIN binding, then boundary. Inventory: one private schema, eight private
-   RLS tables, six public RPCs and one canonical BEFORE UPDATE/DELETE trigger. Verify
-   the exact function inventory from the bound SQL rather than assuming a count.
+4. Apply the bound candidate files in order: `core.sql`, `validators.sql`, the
+   existing matched private PIN binding, `boundary.sql`, then
+   **`authenticated-writers.sql`**. All four candidate files are in
+   `supabase/closed-entry-candidate/`. Inventory: one private schema, eight private
+   RLS tables, 41 distinct private helper signatures, 14 public signatures and one
+   canonical BEFORE UPDATE/DELETE trigger. The private resolver binding replaces
+   the candidate resolver stub; authenticated-writers replaces the candidate-local
+   `require_legacy_group` stub. These are not replacements of installed TEST writers.
+   The 14 exact public signatures and saved function metadata hashes are recorded
+   in `baseline.PRIVATE.json`. Nine use CREATE (six entry RPCs plus operate/read/
+   prepare owned entry); five use CREATE OR REPLACE (save, join, attendance, score,
+   player action). If all five exact signatures exist, this is nine additions and
+   five replacements; if one is absent it is ten additions and four replacements,
+   requiring explicit local review. Same-name overloads are not matching signatures.
+   Do not approve an unexpected addition or collision automatically.
    Leave existing AFTER hooks and their ownership/settings unchanged. No Auth trigger,
    extension, new public table, broad grant or default-privilege change is included.
 5. Apply and verify explicit reviewed ownership and least-privilege ACLs, including
    effective inherited/default access. API roles must not access private metadata or
    provisioning helpers; new public RPC access must be exactly the reviewed allowlist.
-   Preserve existing object ACLs/RLS/policies and metadata-only owner behaviour.
+   Bind each replaced function's definition, return/argument contract, owner, raw
+   ACL/grantors, effective permissions and settings to the approved before/after
+   inventory. CREATE OR REPLACE is not proof that grants or search paths are safe.
+   Preserve existing access restrictions, RLS/policies and metadata-only owner behaviour.
 6. Before commit, compare all original data fingerprints and original security
-   metadata with the bound baseline, allowing only the explicitly inventoried new
-   objects. No existing group data is rewritten/backfilled or restored from an old
+   metadata with the bound baseline, allowing only explicitly inventoried additions
+   and the exact approved replacement definitions/security metadata. All unrelated
+   functions, hooks, owners, grants and policies must remain byte-for-byte equivalent
+   under the catalog comparison. No existing group data is rewritten/backfilled or restored from an old
    snapshot. Any failure rolls back this complete transaction; do not retry blindly.
 7. Record the exact committed object/security inventory and baseline-bound receipt.
    A missing commit acknowledgement is an ambiguous outcome: retain writer holds and
@@ -149,6 +190,9 @@ this is a future installation requirement, not authority to reconnect now.
 candidate objects survive and the original rows, results, payments, owners, grants,
 RLS/policies, triggers and definitions match the original baseline exactly. Do not
 run a data-restoring backup as a substitute for transactional DDL rollback.
+Inject failure after each of the four SQL files and private binding, including
+after writer replacements/ACL statements. Verify all replaced definitions and
+their exact security metadata restore as well as the new objects disappearing.
 
 **After commit, or after any runtime activity:** hold writers and use the reviewed
 fail-closed write-suspension/forward-repair path. Retain the canonical current rows
@@ -161,6 +205,10 @@ Restrict/retire only the explicitly inventoried new write surface as reviewed;
 preserve its exact pre-suspension security metadata for subsequent repair. Existing
 owner/service/direct writers must remain controlled. Keep the central guard blocking
 unsafe old writes. Rolling back the website alone does not make old writes safe.
+Restoring an old authenticated writer is not a safe runtime rollback unless it
+has separately passed the same boundary, authority, revision and hook checks;
+otherwise retain the writer hold. Keep both owner and guard revisions and each
+frozen entrant set, including unpaid corrections and post-install scores.
 Do not replay obsolete group JSON, reset payment flags, rewrite historical results,
 drop populated private tables, use CASCADE or remove the guard to restore service.
 

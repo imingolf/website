@@ -42,7 +42,8 @@ const {fixture,originalFinish,originalSetup}=require('./test-source-finish.cjs')
    CREATE FUNCTION public.save_group_state(p_pin text,p_state jsonb) RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
    BEGIN UPDATE public.tens_in_groups SET state=p_state WHERE group_pin=p_pin;END $$;
    GRANT EXECUTE ON FUNCTION public.save_group_state(text,jsonb) TO anon,authenticated;`);
-  // Fictional installed getters: the adapter must retain the member projection.
+  // Fictional installed getters: access checks stay intact; the deliberately
+  // narrow member projection must be enriched without exposing raw group JSON.
   await db.exec(`CREATE FUNCTION public.iig_get_owned_group() RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
    DECLARE u uuid=iig_private.verified_organiser();r jsonb;BEGIN
    SELECT jsonb_build_object('group_pin',g.group_pin,'state',g.state,'revision',o.revision,'invite_token',o.invite_token) INTO r
@@ -59,8 +60,40 @@ const {fixture,originalFinish,originalSetup}=require('./test-source-finish.cjs')
    GRANT EXECUTE ON FUNCTION public.iig_get_owned_group(),public.iig_get_player_group(text) TO authenticated;`);
   const security=async()=> (await db.query(`SELECT oid::regprocedure::text AS f,pg_get_functiondef(oid) AS def,proacl::text AS acl FROM pg_proc
    WHERE pronamespace IN ('iig_private'::regnamespace,'fixture_hooks'::regnamespace) ORDER BY 1`)).rows;
+  // Fictional installed signatures, not guessed TEST bodies. Exercise actual
+  // replacement and restoration of definitions/ACLs/settings in one transaction.
+  for(const [declaration,result] of [
+   ['iig_save_owned_group(p_pin text,p_state jsonb,p_revision bigint)','bigint'],
+   ['iig_join_owned_group(p_pin text,p_invite uuid,p_name text,p_handicap numeric)','uuid'],
+   ['iig_set_my_attendance(p_pin text,p_attending boolean,p_revision bigint)','bigint'],
+   ['iig_submit_my_score(p_pin text,p_score integer,p_format text,p_revision bigint)','bigint'],
+   ['iig_player_action(p_pin text,p_action text,p_payload jsonb,p_revision bigint)','bigint']]){
+   await db.exec(`CREATE FUNCTION public.${declaration} RETURNS ${result} LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$ BEGIN RAISE EXCEPTION 'FICTIONAL_BASELINE_WRITER'; END $$;`);
+  }
+  const publicMetadata=async()=>(await db.query(`SELECT oid::regprocedure::text signature,pg_get_functiondef(oid) definition,proowner,proacl::text,proconfig
+   FROM pg_proc WHERE pronamespace='public'::regnamespace ORDER BY 1`)).rows;
+  const tableMetadata=async()=>(await db.query(`SELECT n.nspname,c.relname,c.relowner,c.relacl::text,c.relrowsecurity,c.relforcerowsecurity
+   FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname IN('public','iig_private','fixture_hooks') AND c.relkind='r' ORDER BY 1,2`)).rows;
   const originalSecurity=await security(),untouched=await seed();
+  const originalPublic=await publicMetadata(),originalTables=await tableMetadata();
+  const stages=['core','validators','binding','boundary','authenticated-writers'].map(name=>name==='binding'
+   ? `CREATE OR REPLACE FUNCTION iig_closed_entry.resolve_pin(p_pin text) RETURNS text LANGUAGE sql SET search_path=pg_catalog AS $$ SELECT id::text FROM public.tens_in_groups WHERE group_pin=p_pin $$;`
+   : fs.readFileSync(__dirname+'/../../supabase/closed-entry-candidate/'+name+'.sql','utf8'));
+  for(let stage=1;stage<=stages.length;stage++){
+   await db.exec('BEGIN');for(const sql of stages.slice(0,stage))await db.exec(sql);
+   await assert.rejects(()=>db.exec('SELECT 1/0'),/division by zero/);checks++;
+   await db.exec('ROLLBACK');
+   ok(await publicMetadata(),originalPublic);ok(await tableMetadata(),originalTables);ok(await security(),originalSecurity);
+   ok(await state(untouched),untouched.s);ok(await revision(untouched),41);
+   ok(Number((await db.query("SELECT count(*) n FROM pg_namespace WHERE nspname='iig_closed_entry'")).rows[0].n),0);
+  }
   for(const name of ['core','validators','boundary','authenticated-writers'])await db.exec(fs.readFileSync(__dirname+'/../../supabase/closed-entry-candidate/'+name+'.sql','utf8'));
+  const inventorySource=fs.readFileSync(__dirname+'/../../tools/closed-entry-test-preflight/review-saved.py','utf8').split('PUBLIC_SIGNATURES = (')[1].split('\n)')[0];
+  const signatures=[...inventorySource.matchAll(/'(iig_[^']+)'/g)].map(m=>'public.'+m[1]).sort();
+  const installed=(await db.query(`SELECT 'public.'||proname||'('||replace(oidvectortypes(proargtypes),', ', ',')||')' AS signature
+   FROM pg_proc WHERE pronamespace='public'::regnamespace AND proname LIKE 'iig_%' AND proname NOT IN('iig_get_owned_group','iig_get_player_group') ORDER BY 1`)).rows.map(r=>r.signature);
+  ok(installed,signatures);ok(installed.length,14);
+  ok(Number((await db.query("SELECT count(*) n FROM pg_proc WHERE pronamespace='iig_closed_entry'::regnamespace")).rows[0].n),41);
   ok(await security(),originalSecurity);
   ok(await state(untouched),untouched.s);ok(await revision(untouched),41);
   await db.exec(`CREATE OR REPLACE FUNCTION iig_closed_entry.resolve_pin(p_pin text) RETURNS text LANGUAGE sql SET search_path=pg_catalog AS $$ SELECT id::text FROM public.tens_in_groups WHERE group_pin=p_pin $$;`);
@@ -73,6 +106,7 @@ const {fixture,originalFinish,originalSetup}=require('./test-source-finish.cjs')
    if(options.claim)s.history=[{id:'claim-round',course:'Fictional previous course',payouts:[{id:'claim-payout',winnerPlayerId:ids[0],winnerName:s.players[0].name,amount:30,status:'awaiting_details',paymentLink:'',paymentProvider:''}]}];
    if(options.trip){for(const k of ['playerIds','currentPlayingIds'])s.trip[k]=s.trip[k].map(x=>mapping[x]);
     if(options.pair){s.trip.currentTeams.forEach(t=>t.playerIds=t.playerIds.map(x=>mapping[x]));s.trip.currentTeamScores={};s.trip.currentGroups=s.trip.currentGroups.map(g=>g.map(x=>mapping[x]));}}
+   if(options.enrich)options.enrich(s,ids);
    const id=++serial,pin='fixture-'+id,invite=randomUUID();
    await db.query('INSERT INTO public.tens_in_groups(id,group_pin,state) VALUES($1,$2,$3)',[id,pin,s]);
    await db.query('INSERT INTO iig_private.group_owners VALUES($1,$2,41,$3)',[id,owner,invite]);
@@ -96,8 +130,39 @@ const {fixture,originalFinish,originalSetup}=require('./test-source-finish.cjs')
   const ownerRead=await rpc(untouched.owner,'iig_read_entry_group',[null]);
   ok(ownerRead.state,untouched.s);ok(ownerRead.entry,{open:true,closed:false,entrantIds:null});
   const memberRead=await rpc(untouched.users[0],'iig_read_entry_group',[untouched.pin]);
-  ok(memberRead.state,{players:untouched.s.players});ok(memberRead.entry,ownerRead.entry);
+  const expected=structuredClone(untouched.s);
+  for(const p of [...expected.players,...expected.history[0].players])delete p.paymentMarkedAt;
+  delete memberRead.state.sideGameDate;
+  ok(memberRead.state,expected);ok(memberRead.entry,ownerRead.entry);ok(memberRead.plan_type,'plus');
   ok(await inventory(),beforeRead); // metadata read must not initialise the guard
+  const privateView=await seed({trip:true,pair:'betterball',enrich(s,ids){
+   Object.assign(s,{groupName:'Fictional group',paymentLink:'https://monzo.me/fictional',paymentProvider:'Monzo',adminPin:'PRIVATE_PIN',invite_token:'PRIVATE_INVITE',futurePrivate:{name:'PRIVATE_NESTED'}});
+   Object.assign(s.players[0],{email:'PRIVATE_EMAIL',bankDetails:'PRIVATE_BANK',futurePrivate:{name:'PRIVATE_PROFILE'}});
+   s.players[1].name={name:'PRIVATE_MALFORMED_SCALAR'};
+   s.history[0].payouts=[{id:'mine',winnerPlayerId:ids[0],amount:20,status:'ready',paymentLink:'https://monzo.me/fictional-winner',paymentProvider:'Monzo',bankDetails:'PRIVATE_BANK'},
+    {id:'other',winnerPlayerId:ids[2],amount:10,status:'ready',paymentLink:'PRIVATE_OTHER_LINK',paymentProvider:'PRIVATE_OTHER_PROVIDER'}];
+   s.history[0].prizePlaces=[{position:1,name:'Fictional winner',playerId:ids[0],score:38,secret:'PRIVATE_RESULT'}];
+   s.trip.normalRoundBackup={players:[{name:'PRIVATE_BACKUP'}]};s.trip.currentTeamScores={ab:38,cd:35,hidden:{name:'PRIVATE_MAP'}};
+   s.trip.pastTrips=[{name:'Fictional past Trip',rounds:[{payouts:s.history[0].payouts}],secret:'PRIVATE_TRIP'}];
+   s.sideGame={bets:[{id:'mine',player1Id:ids[0],player2Id:ids[1],date:'2099-01-01',stake:5,secret:'PRIVATE_BET'},
+     {id:'other',player1Id:ids[2],player2Id:ids[3],date:'2099-01-01',stake:7}],
+    scores:[{playerId:ids[0],date:'2099-01-02',score:30},{playerId:ids[1],date:'2099-01-01',score:31},
+     {playerId:ids[1],date:'2099-01-02',score:32},{playerId:ids[2],date:'2099-01-01',score:33}],
+    settlements:[{id:'mine',debtorId:ids[0],creditorId:ids[1],amount:5},{id:'other',debtorId:ids[2],creditorId:ids[3],amount:7}]};
+  }});
+  const beforePrivateRead=await inventory(),view=(await rpc(privateView.users[0],'iig_read_entry_group',[privateView.pin])).state;
+  ok(await inventory(),beforePrivateRead);
+  ok(JSON.stringify(view).includes('PRIVATE_'),false);
+  ok(view.paymentLink,privateView.s.paymentLink);ok(view.players[0].paid,false);ok(view.players[0].leaguePoints,4);
+  ok(view.trip.playerIds,privateView.s.trip.playerIds);ok(view.trip.currentGroups,privateView.s.trip.currentGroups);
+  ok(view.trip.currentTeamScores,{ab:38,cd:35});ok(view.trip.plan,privateView.s.trip.plan);
+  ok(view.history[0].prizePlaces,[{position:1,name:'Fictional winner',playerId:privateView.ids[0],score:38}]);
+  ok(view.history[0].payouts[0].paymentLink,'https://monzo.me/fictional-winner');ok(view.history[0].payouts[1].paymentLink,undefined);
+  ok(view.trip.pastTrips[0].rounds[0].payouts[1].paymentLink,undefined);
+  ok(view.sideGame.bets.map(b=>b.id),['mine']);ok(view.sideGame.scores.map(b=>b.score),[30,31]);ok(view.sideGame.settlements.map(b=>b.id),['mine']);
+  const otherView=(await rpc(privateView.users[2],'iig_read_entry_group',[privateView.pin])).state;
+  ok(otherView.history[0].payouts[0].paymentLink,undefined);ok(otherView.sideGame.bets.map(b=>b.id),['other']);
+  ok(typeof view.sideGameDate,'string');
   const noOwner=await user();ok(await rpc(noOwner,'iig_read_entry_group',[null]),null);
   await reject(()=>rpc(noOwner,'iig_read_entry_group',[untouched.pin]),/membership required/);
   await reject(()=>rpc(untouched.owner,'iig_read_entry_group',[null],'anon'),/permission denied/);
@@ -126,9 +191,29 @@ const {fixture,originalFinish,originalSetup}=require('./test-source-finish.cjs')
   await reject(()=>action(money,1,'score',{score:29},beforeScore),/Group changed/);
   // Admin corrections do not require approving everyone, alter eligibility IDs,
   // rewrite results or allow an unpaid player to submit a score.
-  await adminPayment(money,1,false);
+  const unpaid=await state(money);Object.assign(unpaid.players[1],{paid:false,paymentMarkedAt:null,paymentMarkMethod:null});
+  const beforeUnpaidRev=await revision(money),beforeUnpaidGuard=(await round(money)).revision;
+  await reject(()=>operate(money,'payment',unpaid,money.users[1]),/Organiser access required/);
+  await operate(money,'payment',unpaid);
+  ok(await revision(money),beforeUnpaidRev+1);ok((await round(money)).revision,beforeUnpaidGuard+1);
+  ok((await state(money)).players[1].paymentMarkedAt,null);ok((await round(money)).closed,true);
+  ok((await round(money)).entrant_ids,[money.ids[0],money.ids[1]]);
   await reject(()=>action(money,1,'score',{score:29}),/Pay before/);
+  for(const metadata of [{paid:true,paymentMarkedAt:null,paymentMarkMethod:null},
+   {paid:false,paymentMarkedAt:null,paymentMarkMethod:'admin-confirmed'},
+   {paid:false,paymentMarkedAt:undefined,paymentMarkMethod:null},
+   {paid:false,paymentMarkedAt:'fictional',paymentMarkMethod:null}]){
+   const bad=await state(money);Object.assign(bad.players[1],metadata);
+   await reject(()=>operate(money,'payment',bad),/INVALID_PAYMENT_METADATA/);
+  }
+  // A member cannot use the organiser's cleared-metadata form, even before closure.
+  const beforeMemberUnpaid=structuredClone(unpaid);
+  Object.assign(beforeMemberUnpaid.players[1],{paid:true,paymentMarkedAt:'fictional',paymentMarkMethod:'player-confirmed'});
+  await assert.rejects(()=>db.query('SELECT iig_closed_entry.validate_payment($1,$2,false,NULL,$3)',[beforeMemberUnpaid,unpaid,money.ids[1]]),/INVALID_PAYMENT_METADATA/);checks++;
   await adminPayment(money,1,true);await action(money,1,'score',{score:29});
+  await adminPayment(money,0,false); // retain the previous audited unpaid form too
+  ok((await state(money)).players[0].stableford,0);
+  await adminPayment(money,0,true);
   ok((await round(money)).entrant_ids,[money.ids[0],money.ids[1]]);
   ok((await state(money)).history,money.s.history);
   await reject(()=>action(money,1,'score',{score:30}),/already recorded/);
@@ -279,6 +364,7 @@ const {fixture,originalFinish,originalSetup}=require('./test-source-finish.cjs')
    await db.exec('SET SESSION AUTHORIZATION '+role);
    try{
     await assert.rejects(()=>db.query('SELECT iig_closed_entry.write_authenticated($1,41,$2,$3)',[money.id,'save',money.s]),/permission denied/);checks++;
+    await assert.rejects(()=>db.query('SELECT iig_closed_entry.member_view($1,$2)',[privateView.s,privateView.ids[0]]),/permission denied/);checks++;
     await assert.rejects(()=>db.query('SELECT * FROM iig_private.group_members'),/permission denied/);checks++;
     await assert.rejects(()=>db.query('UPDATE public.tens_in_groups SET state=$1 WHERE id=$2',[money.s,money.id]),/permission denied/);checks++;
    }finally{await db.exec('SET SESSION AUTHORIZATION postgres');}

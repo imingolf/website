@@ -82,6 +82,15 @@ function setup(enabled=true){
  const playerCalls=[];
  async function playerRequest(url,body){playerCalls.push({url,body:clone(body)});if(url.endsWith('iig_read_entry_group'))return clone(player);
   eq(body.p_revision,player.revision);eq(body.p_state,undefined);eq(body.p_player_id,undefined);player.revision++;player.state.players[0].paid=true;return player.revision;}
+ for(const key of ['stake','roundOpen','history']){
+  const incomplete=clone(player);delete incomplete.state[key];
+  assert.throws(()=>ctx.iigSecurePlayer.open(incomplete,'3520',playerRequest,()=>{}),/details are incomplete/);checks++;
+  eq(ctx.iigSecurePlayer.active,false);eq(playerCalls.length,0);
+ }
+ // Preserve stored numeric-string stakes; missing data must not manufacture a free round.
+ const numericStake=clone(player);numericStake.state.stake='10';
+ ctx.iigSecurePlayer.open(numericStake,'3520',playerRequest,()=>{});eq(ctx.iigSecurePlayer.active,true);
+ ctx.iigSecurePlayer.close();eq(playerCalls.length,0);
  ctx.iigSecurePlayer.open(player,'3520',playerRequest,()=>ctx.iigSecurePlayer.close());
  ctx.appConfirm=async()=>true;await nodes.get('securePlayerConfirmPayment').onclick();
  eq(playerCalls[0].body.p_action,'payment');eq(playerCalls[0].body.p_payload.confirmed,true);eq(playerCalls[0].body.p_payload.round_id,'round-a');
