@@ -1,10 +1,131 @@
 // Fictional embedded PostgreSQL only. No credentials, URLs, network or hosted SQL.
 // Auth/session stubs exercise DB authority, not Supabase JWT issuance/verification.
 const fs=require('node:fs'),assert=require('node:assert/strict'),{randomUUID}=require('node:crypto');
-const {PGlite}=require('@electric-sql/pglite');
 const {fixture,originalFinish,originalSetup}=require('./test-source-finish.cjs');
+// Opt-in transport for ONE fresh cached-image container. No DB URL/container
+// argument, host mounts, packages, private evidence or existing Docker resources.
+const dockerMode=process.argv.includes('--docker-postgres');
+class DockerPostgres {
+ static image='public.ecr.aws/supabase/postgres@sha256:6942962433a569e87f228b4d4ab7e11db5deca64e43babb3a038443ad6c4f1bb';
+ constructor(){
+  this.name='iig-auth-rehearsal-'+randomUUID();this.id=null;this.sessions=[];
+  this.env={PATH:process.env.PATH,HOME:require('node:os').homedir()};
+  this.host='unix://'+this.env.HOME+'/.docker/run/docker.sock';
+ }
+ command(args){
+  const r=require('node:child_process').spawnSync('docker',['--host='+this.host,...args],{env:this.env,encoding:'utf8',timeout:30000,maxBuffer:8*1024*1024});
+  if(r.error||r.status!==0)throw Error('Isolated Docker command failed: '+(r.error?.message||r.stderr||r.stdout));
+  return r.stdout.trim();
+ }
+ inspect(){
+  const [c]=JSON.parse(this.command(['inspect',this.id]));
+  assert.equal(c.Id,this.id);assert.equal(c.Name,'/'+this.name);
+  assert.equal(c.Config.Labels['iig.incident.fixture'],this.name);
+  assert.equal(c.Config.Image,DockerPostgres.image);assert.equal(c.Image,this.imageId);
+  return c;
+ }
+ isolated(){
+  const c=this.inspect();assert.equal(c.HostConfig.NetworkMode,'none');
+  assert.equal(c.HostConfig.Privileged,false);assert.equal(c.HostConfig.ReadonlyRootfs,true);
+  assert.equal(Object.keys(c.HostConfig.PortBindings||{}).length,0);
+  assert.equal(Object.keys(c.NetworkSettings.Ports||{}).length,0);
+  assert.equal((c.HostConfig.Binds||[]).length,0);assert.equal((c.HostConfig.VolumesFrom||[]).length,0);
+  assert.equal(c.Config.User,'postgres');assert.equal(c.HostConfig.PidMode,'');assert.equal(c.HostConfig.IpcMode,'private');
+  assert.deepEqual(Object.keys(c.HostConfig.Tmpfs||{}).sort(),['/rehearsal','/tmp']);
+  for(const m of c.Mounts){assert.equal(m.Type,'tmpfs');assert(['/tmp','/rehearsal'].includes(m.Destination));}
+  return c;
+ }
+ static async start(){
+  const d=new DockerPostgres();
+  try{
+   const [image]=JSON.parse(d.command(['image','inspect',DockerPostgres.image]));
+   assert.equal(image.Os,'linux');assert.equal(image.Architecture,'arm64');
+   assert.equal(Object.keys(image.Config.Volumes||{}).length,0);d.imageId=image.Id;
+   const boot='set -eu; umask 077; initdb -D /rehearsal/data --auth-local=trust --auth-host=reject --no-locale --encoding=UTF8 >/rehearsal/init.log 2>&1; exec postgres -D /rehearsal/data -k /rehearsal -c listen_addresses= -c unix_socket_permissions=0700 -c max_connections=20';
+   d.id=d.command(['run','--pull=never','--name',d.name,'--label','iig.incident.fixture='+d.name,
+    '--network=none','--ipc=private','--read-only','--user=postgres','--cap-drop=ALL','--security-opt=no-new-privileges',
+    '--tmpfs','/rehearsal:rw,noexec,nosuid,size=512m,mode=1777','--tmpfs','/tmp:rw,noexec,nosuid,size=64m,mode=1777',
+    '-e','LC_ALL=C','--entrypoint=/bin/sh','-d',DockerPostgres.image,'-c',boot]);
+   d.isolated();
+   const deadline=Date.now()+30000;
+   for(;;){
+    if(!d.inspect().State.Running)throw Error('Fresh PostgreSQL startup failed; '+d.command(['logs',d.id]));
+    try{d.command(['exec','--user=postgres',d.id,'pg_isready','-h','/rehearsal','-U','postgres']);break;}
+    catch(e){if(Date.now()>deadline)throw e;await new Promise(r=>setTimeout(r,100));}
+   }
+   d.isolated();d.primary=d.session();
+   await d.primary.exec("SET standard_conforming_strings=on; SET statement_timeout='15s'; SET lock_timeout='10s';");
+   const settings=(await d.query("SELECT current_setting('listen_addresses') listen,inet_server_addr() addr,current_setting('server_version_num')::int version")).rows[0];
+   assert.equal(settings.listen,'');assert.equal(settings.addr,null);assert.equal(Math.floor(settings.version/10000),17);
+   assert.deepEqual((await d.query('SELECT $1::text value,$2::jsonb document,$3::boolean flag,$4::text absent',
+    ["fictional 'quote' \\ slash $2",{text:"fictional 'quote' \\ slash $1"},false,null])).rows,
+    [{value:"fictional 'quote' \\ slash $2",document:{text:"fictional 'quote' \\ slash $1"},flag:false,absent:null}]);
+   console.log('PASS isolation: digest-pinned fresh PostgreSQL '+settings.version+'; network none, no ports/volumes/host mounts; tmpfs and Unix socket only.');
+   return d;
+  }catch(e){await d.close();throw e;}
+ }
+ session(){
+  this.isolated();
+  const p=require('node:child_process').spawn('docker',['--host='+this.host,'exec','-i','--user=postgres',this.id,
+   '/bin/sh','-c','exec psql -X -w -qAt -P pager=off -h /rehearsal -U postgres -d postgres 2>&1'],{env:this.env,stdio:['pipe','pipe','pipe']});
+  let pending=null,buffer='',tail='',queue=Promise.resolve(),closed=false;
+  p.stdout.setEncoding('utf8');p.stderr.setEncoding('utf8');
+  const fail=e=>{if(pending){clearTimeout(pending.timer);pending.reject(e);pending=null;}};
+  p.stderr.on('data',x=>{tail=(tail+x).slice(-2000);});
+  p.on('error',fail);p.on('exit',()=>{closed=true;fail(Error('Fixture psql exited: '+tail));});
+  p.stdout.on('data',data=>{
+   buffer+=data;let end;
+   while((end=buffer.indexOf('\n'))>=0){
+    const line=buffer.slice(0,end).replace(/\r$/,'');buffer=buffer.slice(end+1);
+    if(!pending)continue;
+    if(line.startsWith(pending.marker+' ')){
+     const item=pending;pending=null;clearTimeout(item.timer);
+     const code=line.slice(item.marker.length+1).trim();
+     if(code!=='00000'||item.lines.some(x=>x.startsWith('ERROR:')||x.startsWith('FATAL:')))item.reject(Error(item.lines.join('\n')||'Fixture SQLSTATE '+code));
+     else item.resolve(item.lines);
+    }else pending.lines.push(line);
+   }
+  });
+  function send(sql){
+   const task=queue.then(()=>new Promise((resolve,reject)=>{
+    if(closed)return reject(Error('Fixture session closed'));
+    const marker='IIG_END_'+randomUUID().replaceAll('-','');
+    pending={marker,lines:[],resolve,reject,timer:setTimeout(()=>{fail(Error('Fixture SQL timed out'));p.kill();},20000)};
+    p.stdin.write(sql.trim()+'\n;\n\\echo '+marker+' :SQLSTATE\n');
+   }));queue=task.catch(()=>{});return task;
+  }
+  function literal(x){
+   if(x===null||x===undefined)return 'NULL';
+   if(typeof x==='number'){assert(Number.isFinite(x));return String(x);}
+   if(typeof x==='boolean')return x?'true':'false';
+   return "'"+(typeof x==='object'?JSON.stringify(x):String(x)).replaceAll("'","''")+"'";
+  }
+  const s={exec:async sql=>{await send(sql);},query:async(sql,args=[])=>{
+   // Only the existing fixed fixture query templates contain placeholders;
+   // substitution happens once, before any value is inserted. No caller SQL API.
+   const bound=sql.trim().replace(/;\s*$/,'').replace(/\$(\d+)\b/g,(_,n)=>{assert(Number(n)<=args.length);return literal(args[Number(n)-1]);});
+   if(/^\s*(insert|update|delete)\b/i.test(bound)&&!/(?:\s|^)returning\s/i.test(sql)){await send(bound);return {rows:[]};}
+   const wrapped=/^\s*select\b/i.test(bound)?'SELECT coalesce(json_agg(row_to_json(q)),\'[]\'::json)::text FROM ('+bound+') q'
+    :'WITH q AS ('+bound+') SELECT coalesce(json_agg(row_to_json(q)),\'[]\'::json)::text FROM q';
+   const lines=await send(wrapped),row=lines.find(x=>x.startsWith('['));
+   if(row===undefined)throw Error('Fixture query returned no JSON rows');return {rows:JSON.parse(row)};
+  },close:async()=>{
+   await queue;if(!closed){p.stdin.end('\\quit\n');await new Promise((resolve,reject)=>{const timer=setTimeout(()=>{p.kill();reject(Error('Fixture session cleanup timed out'));},5000);p.once('exit',()=>{clearTimeout(timer);resolve();});});}
+  }};
+  this.sessions.push(s);return s;
+ }
+ exec(sql){return this.primary.exec(sql);}
+ query(sql,args){return this.primary.query(sql,args);}
+ async close(){
+  let error;
+  for(const s of this.sessions)try{await s.close();}catch(e){error=e;}
+  if(this.id){this.inspect();this.command(['stop','--time','3',this.id]);this.inspect();this.command(['rm',this.id]);this.id=null;
+   console.log('PASS cleanup: only the identity-checked rehearsal container removed.');}
+  if(error)throw error;
+ }
+}
 (async()=>{
- const db=new PGlite();let checks=0,serial=1000;
+ const db=dockerMode?await DockerPostgres.start():new (require('@electric-sql/pglite').PGlite)();let checks=0,serial=1000;
  const ok=(a,b)=>{assert.deepEqual(a,b);checks++;};
  try{
   await db.exec(`CREATE ROLE anon;CREATE ROLE authenticated;CREATE ROLE service_role BYPASSRLS;
@@ -14,7 +135,9 @@ const {fixture,originalFinish,originalSetup}=require('./test-source-finish.cjs')
    CREATE TABLE public.tens_in_groups(id bigint PRIMARY KEY,group_pin text UNIQUE,state jsonb NOT NULL,updated_at timestamptz,plan_type text DEFAULT 'plus',group_name text);
    CREATE TABLE iig_private.group_owners(group_id bigint PRIMARY KEY REFERENCES public.tens_in_groups(id),owner_id uuid NOT NULL UNIQUE REFERENCES auth.users(id),revision bigint NOT NULL,invite_token uuid NOT NULL DEFAULT gen_random_uuid());
    CREATE TABLE iig_private.group_members(group_id bigint REFERENCES iig_private.group_owners(group_id),user_id uuid REFERENCES auth.users(id),player_id uuid NOT NULL DEFAULT gen_random_uuid(),PRIMARY KEY(group_id,user_id),UNIQUE(group_id,player_id));
-   CREATE TABLE iig_private.account_deletions(user_id uuid PRIMARY KEY);
+   -- Relevant shape from the saved local account-lifecycle deployment source;
+   -- fictional markers only. This is NOT evidence of TEST installation.
+   CREATE TABLE iig_private.account_deletions(user_id uuid PRIMARY KEY,requested_at timestamptz NOT NULL DEFAULT now());
    CREATE TABLE fixture_hooks.access_denied(group_id bigint PRIMARY KEY);
    CREATE TABLE fixture_hooks.failures(group_id bigint PRIMARY KEY);
    CREATE TABLE fixture_hooks.events(group_id bigint,old_state jsonb,new_state jsonb);
@@ -94,6 +217,70 @@ const {fixture,originalFinish,originalSetup}=require('./test-source-finish.cjs')
    FROM pg_proc WHERE pronamespace='public'::regnamespace AND proname LIKE 'iig_%' AND proname NOT IN('iig_get_owned_group','iig_get_player_group') ORDER BY 1`)).rows.map(r=>r.signature);
   ok(installed,signatures);ok(installed.length,14);
   ok(Number((await db.query("SELECT count(*) n FROM pg_proc WHERE pronamespace='iig_closed_entry'::regnamespace")).rows[0].n),42);
+  async function realSessionRaces(){
+   if(!dockerMode)return;
+   // Reuse the existing race harness's real wait-observation pattern, but run
+   // these cases through the actual authenticated adapter in this SAME container.
+   async function contender(uid,label){
+    const s=db.session();
+    await s.exec("SET statement_timeout='15s'; SET lock_timeout='10s';");
+    await s.query("SELECT set_config('fixture.user_id',$1,false),set_config('application_name',$2,false)",[uid,label]);
+    await s.exec('SET SESSION AUTHORIZATION authenticated');return s;
+   }
+   function call(s,name,args){return s.query('SELECT public.'+name+'('+args.map((_,i)=>'$'+(i+1)).join(',')+') result',args);}
+   async function contend(winnerUid,loserUid,winnerCall,loserCall){
+    const label='iig-wait-'+randomUUID(),a=await contender(winnerUid,'iig-winner-'+randomUUID()),b=await contender(loserUid,label);
+    let waiting;
+    try{
+     await a.exec('BEGIN');await winnerCall(a);
+     waiting=loserCall(b).then(()=>({error:null}),error=>({error}));
+     const deadline=Date.now()+5000;
+     for(;;){
+      const seen=(await db.query("SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE application_name=$1 AND wait_event_type='Lock') blocked",[label])).rows[0].blocked;
+      if(seen){checks++;break;}
+      if(Date.now()>deadline)throw Error('Independent authenticated writer did not reach a real lock wait');
+      await new Promise(r=>setTimeout(r,25));
+     }
+     await a.exec('COMMIT');
+     const outcome=await waiting;assert.match(outcome.error?.message||'',/Group changed/);checks++;
+    }finally{
+     await a.exec('ROLLBACK');if(waiting)await waiting;
+     await a.close();await b.close();
+    }
+   }
+   for(const game of ['money','points'])for(const entryFirst of [false,true]){
+    const x=await seed({game});
+    if(game==='money')await action(x,0,'payment',{confirmed:true});else await attend(x,0);
+    const rev=await revision(x),guardRev=(await round(x)).revision;
+    const scoreCall=s=>call(s,'iig_submit_my_score',[x.pin,0,'stableford',rev]);
+    const entryCall=game==='money'
+     ? s=>call(s,'iig_player_action',[x.pin,'payment',{round_id:x.s.roundId,confirmed:true},rev])
+     : s=>call(s,'iig_set_my_attendance',[x.pin,true,rev]);
+    await contend(x.users[entryFirst?1:0],x.users[entryFirst?0:1],entryFirst?entryCall:scoreCall,entryFirst?scoreCall:entryCall);
+    ok(await revision(x),rev+1);ok((await round(x)).revision,guardRev+1);
+    if(entryFirst){await score(x,0,0);ok((await round(x)).entrant_ids,x.ids.slice(0,2));}
+    else{
+     await reject(()=>game==='money'?action(x,1,'payment',{confirmed:true}):attend(x,1),/closed|CLOSED/);
+     ok((await round(x)).entrant_ids,[x.ids[0]]);
+    }
+    ok((await round(x)).closed,true);ok((await state(x)).history,x.s.history);
+    console.log('PASS real authenticated lock race: '+game+' '+(entryFirst?'entry before score':'score before entry'));
+   }
+   for(const transition of ['finish','start']){
+    const x=await seed();await action(x,0,'payment',{confirmed:true});await score(x,0,31);
+    const finished=await originalFinish(await state(x));
+    if(transition==='start')await operate(x,'finish',finished);
+    const rev=await revision(x),oldRound=await round(x),oldState=await state(x);
+    const proposal=transition==='finish'?finished:await originalSetup(oldState,'stableford');
+    await contend(x.owner,x.users[1],s=>call(s,'iig_operate_owned_group',[x.pin,transition,proposal,rev]),
+     s=>call(s,'iig_player_action',[x.pin,'payment',{round_id:oldState.roundId,confirmed:true},rev]));
+    ok(await revision(x),rev+1);ok((await round(x)).revision,oldRound.revision+1);
+    if(transition==='finish'){ok((await round(x)).phase,'finished');ok((await state(x)).history[0],finished.history[0]);}
+    else{ok((await round(x)).phase,'open');ok((await round(x)).closed,false);ok((await state(x)).history,oldState.history);}
+    console.log('PASS real authenticated lock race: '+transition+' versus stale entry');
+   }
+   db.isolated();
+  }
   ok(await security(),originalSecurity);
   ok(await state(untouched),untouched.s);ok(await revision(untouched),41);
   await db.exec(`CREATE OR REPLACE FUNCTION iig_closed_entry.resolve_pin(p_pin text) RETURNS text LANGUAGE sql SET search_path=pg_catalog AS $$ SELECT id::text FROM public.tens_in_groups WHERE group_pin=p_pin $$;`);
@@ -499,6 +686,7 @@ const {fixture,originalFinish,originalSetup}=require('./test-source-finish.cjs')
    }finally{await db.exec('SET SESSION AUTHORIZATION postgres');}
   }
   ok(await security(),originalSecurity);
+  await realSessionRaces();
   ok((await db.query('SELECT count(*) n FROM iig_closed_entry.permits WHERE available')).rows[0].n,0);
   console.log(`PASS authenticated writers: ${checks} checks; fictional DB only; no hosted connections`);
  }finally{await db.close();}

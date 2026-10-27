@@ -1,7 +1,6 @@
 // Execute ACTUAL repository Finish Round functions with fictional state and mocked
 // I/O, then persist the exact result through the isolated protected SQL boundary.
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
-const {PGlite}=require('@electric-sql/pglite');
 const source=fs.readFileSync(__dirname+'/../../app/index.html','utf8');
 const clone=x=>JSON.parse(JSON.stringify(x));
 function extract(name){
@@ -94,6 +93,7 @@ function leagueMoney(state){
 }
 
 async function run(){
+ const {PGlite}=require('@electric-sql/pglite');
  const db=new PGlite();let count=0;
  try{
   for(const file of ['prototype.sql','legacy-adapter.sql','legacy-finish-result.sql','legacy-start-result.sql'])await db.exec(fs.readFileSync(__dirname+'/'+file,'utf8'));
