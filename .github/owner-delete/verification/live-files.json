@@ -1,0 +1,58 @@
+{
+  "anonymous_review": {
+    "status": 401,
+    "code": "42501",
+    "message": "permission denied for function iig_owner_group_deletion_review"
+  },
+  "files": [
+    {
+      "path": "app/owner-delete.js",
+      "match": true,
+      "sha256": "c6c5c6f337c8db43e886e055f097285067a86ec74d4bec8b044541a7d1fd433c"
+    },
+    {
+      "path": "app/owner-control.js",
+      "match": true,
+      "sha256": "70b01e47b291bb4dcd9d286252d6404c2971a4c5c650226e1f628d238b99bf2b"
+    },
+    {
+      "path": "app/owner-control.css",
+      "match": true,
+      "sha256": "343dda8675525edb71db4751dadfc1dd6fff70367ebb9628b6e6b9ffe29ecd61"
+    },
+    {
+      "path": "app/owner-dashboard.html",
+      "match": true,
+      "sha256": "64cecffe17ee38eee10a6433bd6b6d87a0d5ac25d7a78540cc5cdf09a147eeb5"
+    },
+    {
+      "path": "app/self-service.js",
+      "match": true,
+      "sha256": "8fa98095beda84315774d06aaaed21c562ce917eda5289a11fe2d3245445b13b"
+    },
+    {
+      "path": "app/index.html",
+      "match": true,
+      "sha256": "8b0a29c7f00a4a5f44a11162066664f984cbc8f8d330fb166f5932fa46fc8383"
+    },
+    {
+      "path": "app/account-session.js",
+      "match": true,
+      "sha256": "59e56c5a92737ad484080e6e55627365f267cc50367865ac6d12d2ddde5a8b40"
+    },
+    {
+      "path": "app/account-controls.js",
+      "match": true,
+      "sha256": "2ebbbc98f04eee6307e6b25632c1dbc6f2c94758927098ecd9461b70b4ee0afc"
+    },
+    {
+      "path": "app/full-release.production.js",
+      "match": true,
+      "sha256": "17352e51e7667e4ecf0cd19b93c52effff26817b822500c1711143f556b7dce0"
+    }
+  ],
+  "private_source_status": {
+    ".github/owner-delete/tests/catalog.json": 404,
+    ".github/owner-delete/supabase/migrations/20261115111413_owner_permanent_group_delete.sql": 404
+  }
+}

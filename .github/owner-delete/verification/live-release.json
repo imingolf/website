@@ -1,0 +1,45 @@
+{
+  "date": "2026-11-15",
+  "status": "LIVE",
+  "url": "https://imingolf.co.uk/app/owner-dashboard.html",
+  "deploy_id": "6af998d8cc486fa438d67b7d",
+  "production_commit": "e210cb58aa68d34bc2174db470e20d1b1d1d97ce",
+  "published_at": "2026-11-15T11:34:56.069Z",
+  "rollback_deploy_id": "6af990ef47b1c3bcb7ba770b",
+  "pull_request": "https://github.com/imingolf/website/pull/9",
+  "migration": "owner_permanent_group_delete",
+  "before": {
+    "users": 22,
+    "groups": 14,
+    "group_hash": "1fa9a02c09293ddc284ffb4d56528914",
+    "guard_hashes": {
+      "iig_private.release_hold": "6122eef855e16af105ae4781ff7d2f6e",
+      "iig_closed_entry.guard_row": "be1b7dcd62c8880bd710d2f0271b61df"
+    }
+  },
+  "after": {
+    "users": 22,
+    "groups": 14,
+    "group_hash": "1fa9a02c09293ddc284ffb4d56528914",
+    "guard_hashes": {
+      "iig_private.release_hold": "99663a9b1cb8e8539124da3794f6ce12",
+      "iig_closed_entry.guard_row": "7618645e398ad7712a1ad70520c132c9"
+    }
+  },
+  "checks": {
+    "isolated_postgres": 21,
+    "isolated_browser": 10,
+    "existing_sync_payment": 10,
+    "live_assets": 9,
+    "anonymous_review": "401 / 42501 permission denied",
+    "live_owner_session": "Restored; 14-group register and new deletion button loaded",
+    "live_review": "Selected PIN 3219; returned correct group and fresh-code requirement; cancelled without requesting email or deleting",
+    "private_migration_and_fixture_http": "404",
+    "actual_production_deletions": 0
+  },
+  "advisors": {
+    "new_private_tables": "RLS enabled with no client policies intentionally; client privileges revoked",
+    "new_rpcs": "SECURITY DEFINER intentionally callable by authenticated; platform owner, verified account, current session and recent OTP checked on server",
+    "existing_warnings": "Existing anonymous legacy RPC and password settings unchanged"
+  }
+}
