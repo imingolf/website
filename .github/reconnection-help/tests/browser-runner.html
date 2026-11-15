@@ -1,0 +1,53 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Reconnection checks</title><style>body{font:15px system-ui;margin:24px;background:#f5f8f5}iframe{height:844px;border:1px solid #ccc}pre{white-space:pre-wrap}</style><h1>Reconnection checks</h1><p id="status">Running isolated checks…</p><pre id="results"></pre><iframe id="app" title="Actual app with isolated data" width="390"></iframe><script>
+const frame=document.querySelector('#app'),out=document.querySelector('#results'),results=[];
+const check=(name,ok)=>{if(!ok)throw Error(name);results.push(name);out.textContent=JSON.stringify({passed:results.length,results},null,2)};
+const wait=async test=>{const start=Date.now();while(!test()){if(Date.now()-start>8000)throw Error('Timeout: '+String(test));await new Promise(r=>setTimeout(r,20))}};
+const win=()=>frame.contentWindow,doc=()=>frame.contentDocument,get=id=>doc().getElementById(id),visible=id=>!!get(id)&&get(id).getClientRects().length>0;
+const pause=()=>new Promise(r=>setTimeout(r,50)),idle=()=>wait(()=>get('regCreate')&&!get('regCreate').disabled);
+const fill=(id,value)=>{get(id).value=value;get(id).dispatchEvent(new Event('input',{bubbles:true}))};
+async function click(id){get(id).click();await pause();await idle()}
+async function load(hash='#pin=1260',reset=false){if(reset){localStorage.clear();sessionStorage.clear()}frame.src='/app/?qa='+Date.now()+hash;await new Promise(r=>frame.onload=r);await idle()}
+async function login(email,code='123456'){fill('regEmail',email);get('regEmailForm').requestSubmit();await pause();await idle();fill('regCode',code);await click('regVerify')}
+const writes=()=>win().IIGPreview.calls.filter(c=>/\/iig_(join|claim|create|save|operate)/.test(c.path));
+(async()=>{
+ await load('#pin=1260',true);
+ check('Unlinked account receives clear email guidance',visible('regAccessHelp')&&get('welcomeStartTitle').textContent==='Check your sign-in email'&&get('regAccessHelpText').textContent.includes('isn’t linked'));
+ check('Current signed-in email is visible',visible('regAccount')&&get('regAccount').textContent.includes('gaspinall@kieurope.com'));
+ check('Different email is the primary action',visible('regAccessChangeEmail')&&get('regAccessChangeEmail').className==='primary full');
+ check('Protected group still requires a private reconnection link',get('regAccessHelpNext').textContent.includes('private reconnection link')&&!visible('regJoinForm')&&!visible('regReconnectOwned'));
+ check('Diagnostic panel and global hook are removed even for original target account',!get('iigReadOnlyAccessTrace')&&!win().iigReadOnlyAccessTrace);
+ for(const width of [320,390,768]){frame.width=width;await pause();check('Access help fits '+width+'px',doc().documentElement.scrollWidth<=width)}frame.width=390;
+ check('Displaying help performs no group or player writes',writes().length===0);
+ const hash=win().location.hash,links=JSON.stringify(win().IIGPreview.data.links);
+ win().IIGPreview.failSignout();await click('regAccessChangeEmail');
+ check('Failed sign-out stays on current account and shows retry error',visible('regAccessHelp')&&!visible('regEmailForm')&&!!win().IIGPreview.data.session&&get('regMessage').textContent.includes('Sign-out could not be confirmed'));
+ await click('regAccessChangeEmail');
+ check('Successful change signs out through existing local SDK operation',!win().IIGPreview.data.session&&win().IIGPreview.calls.filter(c=>c.path==='SDK.signOut').every(c=>c.body.scope==='local'));
+ check('Chosen PIN stays in the route',win().location.hash===hash&&get('regMessage').textContent.includes('1260'));
+ check('Fresh email form clears previous email and hides previous access',visible('regEmailForm')&&!get('regEmail').value&&!get('regPasswordEmail').value&&!visible('regSignedIn')&&!win().iigSecurePlayer.active&&!win().iigSecureOrganiser.active);
+ check('Email field receives focus after the sign-out action unlocks',doc().activeElement===get('regEmail'));
+ check('Account change does not alter memberships',links===JSON.stringify(win().IIGPreview.data.links)&&writes().length===0);
+ await load();check('Refreshing after sign-out retains PIN and requires sign-in',visible('regEmailForm')&&!win().IIGPreview.data.session&&win().location.hash==='#pin=1260');
+ await login('linked@example.com','000000');check('Incorrect email code still blocks access',visible('regCodeForm')&&!win().iigSecurePlayer.active&&get('regMessage').textContent.includes('incorrect or has expired'));
+ fill('regCode','123456');await click('regVerify');await wait(()=>win().iigSecurePlayer.active);
+ check('Correct verified email opens its existing player in the chosen group',win().IIGPreview.data.session.user.email==='linked@example.com'&&win().iigSecurePlayer.identity.groupPin==='1260'&&!visible('setupOverlay'));
+ check('Existing member opens without joining or relinking again',writes().length===0&&links===JSON.stringify(win().IIGPreview.data.links));
+ get('regSignout').click();await wait(()=>win().location.hash===''&&get('regCreate')&&!get('regCreate').disabled);
+ check('Ordinary sign-out still clears the group route',!win().IIGPreview.data.session&&!win().iigSecurePlayer.active&&!win().iigSecureOrganiser.active&&win().location.hash==='');
+ win().IIGPreview.signIn('owner');await load();
+ check('Retained organiser keeps the existing reconnection action',visible('regReconnectOwned')&&get('welcomeStartTitle').textContent==='Reconnect your player account'&&get('regAccessChangeEmail').className==='secondary full'&&!visible('regAccessHelpNext'));
+ await click('regAccessChangeEmail');await login('linked@example.com');check('Organiser can change to a separate linked player account',win().iigSecurePlayer.active&&!win().iigSecureOrganiser.active);
+ win().IIGPreview.signIn('wrong');await load('#pin=5828');
+ check('Invitation-only group explains how first-time players join',visible('regAccessHelpNext')&&get('regAccessHelpNext').textContent.includes('private invitation')&&!visible('regJoinForm'));
+ await click('regOtherPin');check('Enter another PIN remains available',visible('pinInput'));
+ await load('#pin=6830');check('Enabled PIN joining still opens the original player form',visible('regJoinForm')&&!visible('regAccessHelp'));
+ const invite='#pin=5828&invite=44444444-4444-4444-8444-444444444444';await load(invite);
+ check('Valid private invitation still opens the original player form',visible('regJoinForm')&&win().location.hash===invite&&!visible('regAccessHelp'));
+ const protectedInvite='#pin=1010&invite=44444444-4444-4444-8444-444444444444';await load(protectedInvite);await click('regAccessChangeEmail');
+ check('Changing email also retains the complete private invitation route',win().location.hash===protectedInvite&&visible('regEmailForm')&&!win().IIGPreview.data.session);
+ win().IIGPreview.signIn('owner');await load('#pin=1260&relink='+'a'.repeat(64));
+ check('Existing authorised reconnection route still claims its token once',win().iigSecurePlayer.active&&win().IIGPreview.calls.filter(c=>c.path.endsWith('/iig_claim_player_relink')).length===1&&win().location.hash==='#pin=1260');
+ win().IIGPreview.signIn('wrong');await load();
+ document.querySelector('#status').textContent='PASS — '+results.length+' isolated integration checks';out.textContent=JSON.stringify({passed:results.length,results,scope:'Actual app, synthetic transport only. No LIVE writes or emails.'},null,2);
+})().catch(e=>{document.querySelector('#status').textContent='FAIL — '+e.message;out.textContent+='\n'+e.stack});
+</script></html>

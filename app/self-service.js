@@ -38,35 +38,6 @@
   const ownedStorageKey=()=>session?.user?.id?'iig-last-owned-group-v1-'+session.user.id:null;
   const rememberedOwnedGroup=()=>{try{return localStorage.getItem(ownedStorageKey());}catch(_){return null;}};
   function rememberOwnedGroup(pin){selectedOwnedPin=pin;try{if(ownedStorageKey())localStorage.setItem(ownedStorageKey(),pin);}catch(_){}}
-  // Diagnostic only: local, target-session-gated and never uploaded by the app.
-  const accessTrace={build:'access-trace-20261107-01',events:[],fingerprints:{},enabled:false};
-  const traceOperation=path=>({'/rest/v1/rpc/iig_read_entry_group':'group.read','/rest/v1/rpc/get_group_access_status':'group.access','/rest/v1/rpc/iig_get_player_join_options':'join.options'}[path]||'other');
-  function traceSnapshot(){return {diagnosticBuild:accessTrace.build,utc:new Date().toISOString(),verifiedTarget:accessTrace.enabled,route:playerMode?'player':adminMode?'organiser':'home',busy,
-    sessionPresent:!!session,sessionNotExpired:!!session&&Date.now()<session.expires_at*1000,
-    fingerprints:{...accessTrace.fingerprints},scripts:[...document.scripts].filter(s=>s.src).map(s=>{const u=new URL(s.src,location.href);return u.origin+u.pathname;}),events:accessTrace.events.slice()};}
-  function traceRender(){const node=$('iigReadOnlyAccessTraceOutput');if(node){const text=JSON.stringify(traceSnapshot(),null,2);if(node.textContent!==text)node.textContent=text;}}
-  function traceStep(phase,operation,status){try{const event={ms:Math.round(performance.now()),phase};if(operation)event.operation=operation;if(Number.isInteger(status))event.httpStatus=status;accessTrace.events.push(event);if(accessTrace.events.length>60)accessTrace.events.shift();if(accessTrace.enabled)traceRender();}catch(_){}}
-  async function traceFingerprints(){
-    const functions={'index.round':window.round,'index.welcome':window.showWelcomePanel,'entry-guard.validateBuild':window.IIGEntryGuard?.validateBuild,'focused-release.entered':window.IIGRelease?.entered,'account-session.create':window.IIGAccountSession?.create,'secure-player.open':window.iigSecurePlayer?.open,'secure-organiser.open':window.iigSecureOrganiser?.open,'simple-clean.decorate':window.iigDecorateLive,'player-access.members':window.iigPlayerAccess?.openMembers,'self-service.request':request,'self-service.restore':restoreSession};
-    for(const [name,fn] of Object.entries(functions)){try{accessTrace.fingerprints[name]=typeof fn==='function'?[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(Function.prototype.toString.call(fn))))].map(b=>b.toString(16).padStart(2,'0')).join(''):'unavailable';}catch(_){accessTrace.fingerprints[name]='unavailable';}}
-    if(accessTrace.enabled)traceRender();
-  }
-  function traceEnable(data){
-    if(String(data?.user?.email||'').toLowerCase()!=='gaspinall@kieurope.com'||(invitePin!=='7196'&&rememberedGroup()!=='7196'))return;
-    accessTrace.enabled=true;
-    if(!$('iigReadOnlyAccessTrace')){
-      const details=document.createElement('details');details.id='iigReadOnlyAccessTrace';details.className='ui-options';
-      const summary=document.createElement('summary');summary.textContent='Access details (read-only)';details.append(summary);
-      const note=document.createElement('p');note.textContent='Local diagnostic only. No credentials, golfer details or payment data are included.';details.append(note);
-      const output=document.createElement('pre');output.id='iigReadOnlyAccessTraceOutput';output.style.cssText='white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px';details.append(output);
-      const copy=document.createElement('button');copy.type='button';copy.className='secondary full';copy.textContent='Copy access details';details.append(copy);
-      const fallback=document.createElement('textarea');fallback.readOnly=true;fallback.hidden=true;fallback.setAttribute('aria-label','Safe access details to copy');details.append(fallback);
-      copy.onclick=async()=>{const safe=JSON.stringify(traceSnapshot(),null,2);try{if(!navigator.clipboard?.writeText)throw Error();await navigator.clipboard.writeText(safe);copy.textContent='Access details copied';}catch(_){fallback.value=safe;fallback.hidden=false;fallback.focus();fallback.select();}};
-      root.after(details);
-    }
-    traceStep('target.enabled');setTimeout(traceFingerprints,0);
-  }
-  window.iigReadOnlyAccessTrace=()=>traceSnapshot();
   if (dashboard) {
     document.querySelector('#loginView .login-card').innerHTML = '<h1>I’m In Golf</h1><h2>Owner Dashboard</h2><p>Sign in to see groups created through the app.</p><div id="registrationAuth"></div>';
   }
@@ -80,7 +51,7 @@
     <form id="regCodeForm" hidden><label for="regCode">Code from your email</label><p id="regSentTo"></p><input id="regCode" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6,10}" minlength="6" maxlength="10" required><button class="primary full" id="regVerify">Verify email</button><button id="regResend" type="button" class="secondary full">Send another code</button><button id="regChangeEmail" type="button" class="ghost full">Use a different email</button></form>
     <section id="regSignedIn" hidden><p id="regAccount" class="muted"></p>
     <form id="regGroupForm" hidden><label for="regName">Your name</label><input id="regName" autocomplete="name" maxlength="80" required><label for="regSetupEmail" id="regSetupEmailLabel">Your email</label><input id="regSetupEmail" type="email" autocomplete="email" maxlength="254"><label for="regGroupName">Group name</label><input id="regGroupName" maxlength="80" required placeholder="e.g. Sunday Golfers"><label for="regSetupHandicap">Your handicap</label><input id="regSetupHandicap" type="text" inputmode="decimal" autocomplete="off" required aria-describedby="regSetupHandicapHelp"><small id="regSetupHandicapHelp">Example: 11.2. We’ll add you to the player list automatically using your name and handicap.</small><button id="regCreate" class="primary full">Create my group</button><p class="muted">I’m In Golf+ is included free for now. Your name and email are shared with I’m In Golf to manage your group.</p></form>
-    <section id="regAccessHelp" hidden><p id="regAccessHelpText"></p><button id="regReconnectOwned" class="primary full" type="button" hidden>Reconnect my existing player</button><button id="regOtherPin" class="secondary full" type="button">Enter group PIN</button></section><form id="regJoinForm" hidden><p id="regJoinGroupName" class="ui-invited-group"></p><label for="regPlayerName">Your name</label><input id="regPlayerName" autocomplete="name" maxlength="80" required><label for="regHandicap">Handicap</label><input id="regHandicap" type="text" inputmode="decimal" maxlength="5" pattern="-?[0-9]{1,2}([.][0-9])?" aria-describedby="regHandicapHelp" required><small id="regHandicapHelp">Example: 11.2.</small><p id="regAppJoinHelp" class="muted" hidden></p><p id="regJoinError" role="alert" tabindex="-1"></p><button class="primary full">Join my group</button></form>
+    <section id="regAccessHelp" hidden><p id="regAccessHelpText"></p><p id="regAccessHelpNext" hidden></p><button id="regReconnectOwned" class="primary full" type="button" hidden>Reconnect my existing player</button><button id="regAccessChangeEmail" class="primary full" type="button">Use a different email</button><button id="regOtherPin" class="secondary full" type="button">Enter group PIN</button></section><form id="regJoinForm" hidden><p id="regJoinGroupName" class="ui-invited-group"></p><label for="regPlayerName">Your name</label><input id="regPlayerName" autocomplete="name" maxlength="80" required><label for="regHandicap">Handicap</label><input id="regHandicap" type="text" inputmode="decimal" maxlength="5" pattern="-?[0-9]{1,2}([.][0-9])?" aria-describedby="regHandicapHelp" required><small id="regHandicapHelp">Example: 11.2.</small><p id="regAppJoinHelp" class="muted" hidden></p><p id="regJoinError" role="alert" tabindex="-1"></p><button class="primary full">Join my group</button></form>
     <section id="regCreated" hidden><h2>Your group is ready</h2><p id="regCreatedName"></p><p>Group PIN: <strong id="regPin"></strong></p><button id="regOpenGroup" type="button" class="primary full">Open my group</button><button id="regInvite" type="button" class="secondary full">Invite players</button><button id="regPlayerView" type="button" class="secondary full">Open my player account</button><details class="ui-options" hidden><summary>Competition options</summary><button id="regFirstCompetition" type="button" class="secondary full">Create first competition</button></details><details id="regOwnerPlayerSetup" class="ui-options" hidden><summary>I’m playing too</summary><form id="regOwnerPlayerForm"><label for="regOwnerPlayerName">Your player name</label><input id="regOwnerPlayerName" autocomplete="name" maxlength="80" required><label for="regOwnerHandicap">Your handicap</label><input id="regOwnerHandicap" inputmode="decimal" required><small>Up to two digits and one decimal place, e.g. 11.2.</small><button class="secondary full">Add me as a player</button></form><p id="regOwnerPlayerStatus" role="status"></p></details></section>
     <button id="regReload" type="button" class="secondary full">${dashboard ? 'Open dashboard' : 'Check my group'}</button><details id="regAccountOptions" class="ui-options"><summary>My account</summary><p id="regAccountReference" class="muted"></p><button id="regAccountControls" type="button" class="secondary full">Account settings</button><button id="regSignout" type="button" class="ghost full">Sign out</button></details></section>`;
   window.iigHandicap.bind($('regSetupHandicap'));
@@ -146,7 +117,6 @@
     dismissGroupPicker?.(null);additionalGroup=false;selectedOwnedPin=null;
     $('regCancelAdditional')?.remove();
     changingGroup=false;
-    traceStep('account.reset');accessTrace.enabled=false;$('iigReadOnlyAccessTrace')?.remove();
     accessReadSession=null;
     $('iigPlayerProfileDialog')?.remove();ownerReturnPin=null;ownerPlayerId=null;ownerPlayerGroupPin=null;viewOwnerCheckedPin=null;viewLookup++;
     $('iigAppHandover')?.remove();playerJoinOptions=null;
@@ -166,24 +136,21 @@
   }
   // A delayed Auth restore must not hold navigation and forms indefinitely.
   async function restoreSession() {
-    traceStep('restore.begin');
     let timer;
     try { const restored=await Promise.race([keeper.restore(), new Promise((_,reject)=>{
       timer=setTimeout(()=>reject(new Error('Your saved sign-in could not be checked. Please try again.')),15000);
     })]);
-      traceStep(restored?'restore.verified':'restore.empty');if(busy)accessReadSession=restored;
+      if(busy)accessReadSession=restored;
       return restored;
     }
-    finally { clearTimeout(timer);traceStep('restore.finished'); }
+    finally { clearTimeout(timer); }
   }
   async function request(path, body, auth = false) {
-    const traceOp=traceOperation(path);traceStep('request.begin',traceOp);
     if(auth && keeper){
      // Reuse the identity just verified for this one access-opening action.
      // Mutations and later actions still perform their own verified restore.
      const accessRead=['/rest/v1/rpc/iig_read_entry_group','/rest/v1/rpc/iig_read_owned_entry_group','/rest/v1/rpc/iig_list_owned_groups','/rest/v1/rpc/get_group_access_status','/rest/v1/rpc/iig_get_player_join_options'].includes(path);
      const checked=busy&&accessRead&&accessReadSession&&session&&accessReadSession.user.id===session.user.id&&accessReadSession.access_token===session.access_token&&Date.now()<accessReadSession.expires_at*1000;
-     traceStep(checked?'request.verified-read':'request.restore-wait',traceOp);
      const restored=checked?accessReadSession:await restoreSession();
      if(!restored || !session || restored.user.id!==session.user.id){reset();throw Error('Account changed. Sign in again.');}
      if(session.access_token!==restored.access_token)session={access_token:restored.access_token,user:restored.user,expires_at:restored.expires_at};
@@ -192,15 +159,12 @@
       reset(); throw new Error('Please sign in again to continue.');
     }
     const requestEpoch=sessionEpoch;
-    const controller = new AbortController(), timeout = setTimeout(() => {traceStep('request.timeout',traceOp);controller.abort();}, 20000);
+    const controller = new AbortController(), timeout = setTimeout(() => {controller.abort();}, 20000);
     try {
       const headers = { apikey: key, 'Content-Type': 'application/json' };
       if (auth) headers.Authorization = 'Bearer ' + session.access_token;
-      traceStep('request.fetch',traceOp);
       const response = await fetch(base + path, { method: path.startsWith('/auth/v1/user') ? 'PUT' : 'POST', headers, body: JSON.stringify(body), cache: 'no-store', signal: controller.signal });
-      traceStep('request.headers',traceOp,response.status);
       const data = response.status === 204 ? {} : await response.json();
-      traceStep('request.json',traceOp,response.status);
       if (!response.ok) {
         if (response.status === 401 && auth) reset();
         if (data.code === 'PGRST202') throw new Error('The test database update is needed before this step can run.');
@@ -216,9 +180,8 @@
       if (auth && (sessionEpoch !== requestEpoch || !session || Date.now() >= session.expires_at*1000)) {
         reset(); throw new Error('Your session expired. Sign in again to continue.');
       }
-      traceStep('request.return',traceOp,response.status);return data;
+      return data;
     } catch (error) {
-      traceStep(error.name==='AbortError'?'request.aborted':'request.failed',traceOp);
       if (error.name === 'AbortError') throw new Error(auth ? 'Connection timed out. Use Check my group before trying to create it again.' : 'Connection timed out. Check your connection and try again.');
       if(error instanceof TypeError)throw new Error('Unable to connect. Your details are kept on this page. Check your connection and try again.');
       throw error;
@@ -227,9 +190,9 @@
   async function action(fn) {
     if (busy) return;
     accessReadSession=null;
-    lock(true); message('Please wait…');traceStep('action.begin');
+    lock(true); message('Please wait…');
     try { await fn(); } catch (error) { const text=error.message || 'Please try again.';if(!$('regJoinForm').hidden){$('regJoinError').textContent=text;message('');$('regJoinError').focus();$('regJoinError').scrollIntoView?.({block:'nearest'});}else message(text); }
-    finally { accessReadSession=null;lock(false); if($('regMessage').textContent==='Please wait…')message('');traceStep('action.finished'); }
+    finally { accessReadSession=null;lock(false); if($('regMessage').textContent==='Please wait…')message(''); }
   }
   function showGroup(group) {
     const firstDisplay=$('regCreated').hidden;
@@ -367,7 +330,6 @@
       $('regEmailForm').hidden=true; $('regPasswordOption').hidden=true; $('regPassword').value='';
       $('regAccount').textContent = 'Signed in as ' + data.user.email;
       $('regAccountReference').textContent = '';
-      traceEnable(data);traceStep('signin.verified');
       message(playerMode?'Opening your player account…':'Opening your group…');
       if(playerMode)progress('Your player account');
       if (dashboard) { offset = 0; await loadDashboard(); }
@@ -445,10 +407,8 @@
     panel.querySelector('#iigAppHandoverPin').textContent=pin;panel.querySelector('button').onclick=()=>panel.remove();$('screen').before(panel);
   }
   function openPlayerData(data,pin){
-    traceStep('player.open.begin');
     if(!window.iigSecurePlayer)throw new Error('Reload the app to open your player account.');
     window.iigSecurePlayer.open(data,pin,request,()=>action(signout));
-    traceStep('player.open.return');
     homePin=pin;homeOwned=false;rememberGroup(pin);
     $('regJoinForm').hidden=true;$('regAccessHelp').hidden=true;showAppHandover(pin);
     if(ownerReturnPin!==pin&&viewOwnerCheckedPin!==pin){ownerReturnPin=null;confirmPlayerOwnership(pin);}
@@ -478,11 +438,27 @@
     const isOwnGroup=owned?.group_pin===invitePin;
     if(isOwnGroup&&!retainedGroup(invitePin)){showGroup(owned);rememberOwnedGroup(invitePin);ownerReturnPin=invitePin;message('You have organiser access. Open your group or your player account.');return;}
     $('regReconnectOwned').hidden=!isOwnGroup;
-    $('regAccessHelpText').textContent=isOwnGroup?'You have organiser access. Reconnect your existing player record to keep your scores and history.':retainedGroup(invitePin)?'Your existing player record and history are safe. Ask your organiser for your own private reconnection link, then open it using this verified email.':'To join for the first time, open your organiser’s private invitation. If you’ve played here before, use the same verified email or ask your organiser to help restore access. A PIN alone cannot add or recover a player.';
-    $('regOtherPin').className=isOwnGroup?'secondary full':'primary full';
+    $('regAccessHelpText').textContent=isOwnGroup
+      ? 'You have organiser access. Reconnect your existing player record to keep your scores and history.'
+      : 'This email isn’t linked to this group. If you used another email before, sign in with that email.';
+    $('regAccessHelpNext').hidden=isOwnGroup;
+    $('regAccessHelpNext').textContent=retainedGroup(invitePin)
+      ? 'To reconnect an existing player in this older group, ask your organiser for a private reconnection link.'
+      : 'Joining for the first time? Open the private invitation from your organiser.';
+    $('regAccessChangeEmail').className=isOwnGroup?'secondary full':'primary full';
+    $('regOtherPin').className='secondary full';
     $('regReconnectOwned').onclick=()=>action(async()=>{const group=await openOwnedGroup(invitePin);if(group)window.iigSecureOrganiser.reconnect();});
-    progress('');if($('welcomeStartTitle')){$('welcomeStartTitle').textContent=retainedGroup(invitePin)?'Reconnect your player account':'Join your group';$('welcomeStartTitle').nextElementSibling.textContent=retainedGroup(invitePin)?'Keep your scores and golf history.':'Use your private invitation to join.';}message('');
+    progress('');
+    if($('welcomeStartTitle')){
+      $('welcomeStartTitle').textContent=isOwnGroup?'Reconnect your player account':'Check your sign-in email';
+      $('welcomeStartTitle').nextElementSibling.textContent=isOwnGroup?'Keep your scores and golf history.':'Use the email linked to group '+invitePin+'.';
+    }
+    message('');
   }
+  $('regAccessChangeEmail').onclick=async()=>{
+    await action(()=>signout(true));
+    if(!session&&!$('regEmailForm').hidden)$('regEmail').focus();
+  };
   $('regOtherPin').onclick=()=>showWelcomePanel('join');
   function showGroupPin(){
     changingGroup=true;$('pinInput').value='';$('connectMsg').textContent='Enter the group PIN. Your sign-in stays the same.';
@@ -624,7 +600,6 @@
   };
   $('regPlayerView').onclick=()=>window.iigOpenOwnPlayer();
   async function loadPlayer(){
-    traceStep('player.load.begin');
     if(!validPlayerPin)throw new Error('Enter a valid group PIN.');
     if(focused&&relinkToken){
      if(!/^[a-f0-9]{64}$/.test(relinkToken))throw Error('Open the complete private reconnection link.');
@@ -660,10 +635,18 @@
     await loadPlayer();
   });};
   $('regReload').onclick = () => action(dashboard ? loadDashboard : ()=>onboarding?.pendingPin?loadGroup(onboarding.pendingPin):playerMode&&!additionalGroup?loadPlayer():loadGroup());
-  async function signout() {
+  async function signout(keepGroupRoute=false) {
     if(keeper)await keeper.signout();
     else if(session)await request('/auth/v1/logout', {}, true);
-    reset();message('Signed out.');
+    reset();
+    // Changing email uses confirmed SDK sign-out and keeps this invitation/PIN.
+    if(keepGroupRoute===true && playerMode && validPlayerPin){
+      email='';$('regEmail').value='';$('regPasswordEmail').value='';
+      showWelcomePanel('start',false);
+      message('Sign in with the email you used for this group. Group PIN '+invitePin+'.');
+      return;
+    }
+    message('Signed out.');
     if(!dashboard){
       showWelcomePanel('home',false);
       // Reinitialise captured Admin/player route intent after confirmed logout.
