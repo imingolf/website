@@ -1,8 +1,8 @@
-# Multiple groups for one organiser — private review candidate
+# Multiple groups for one organiser — approved release
 
 An organiser can currently own only one group. This candidate lets the same verified account create and manage several independent groups through **Group → Change group**. The picker shows group names and PINs, retains the existing PIN joining route, and offers **Create another group**. Additional groups reuse the four-step onboarding and automatically link the organiser as a player.
 
-**Status: private review only. No LIVE database migration, Netlify production deployment, Apple build or submission has been made.**
+**Status: LIVE release approved by Greg on 15 November 2026 ("just do it, no demo, if yu are happy its safe"). The database migration has been installed and verified; the three app scripts are ready for the single production publication tracked by this release PR. No Apple build or submission is part of this change.**
 
 Private preview: https://imingolf-multiple-groups-review-15nov.f7ndhjnfsj.chatgpt.site
 
@@ -49,10 +49,12 @@ npm test
 
 ## Release and rollback boundaries
 
-The reviewed migration is deliberately stored under `.github/multi-group/supabase/migrations/`, outside automatic production migrations. Supabase CLI 3.1.0 was used only to create the local migration file. No hosted branch or hosted database was altered.
+The reviewed migration is deliberately stored under `.github/multi-group/supabase/migrations/`, outside automatic production migrations. Supabase CLI 3.1.0 created the local migration file. After Greg’s explicit LIVE approval, the reviewed migration was applied through the Supabase migration API. Before/after digests of all 13 group rows, 7 ownership rows and 17 membership rows matched exactly. A rolled-back read-only policy check confirmed Greg’s owned-group list, explicit owner read, existing player link, other-owner denial and single-group compatibility. No customer group was created or modified for testing.
 
-After explicit LIVE approval, recheck the production source and catalog against the saved baseline. The migration itself aborts if any affected function definition changed. Install the migration before releasing the three app scripts together, then verify readback and the affected account/group paths. Existing single-group clients remain compatible during rollout. No automatic Netlify deployment or merge is authorized by this candidate.
+Production main and the published deployment were rechecked against the baseline immediately before the approved release. The migration aborts if any affected function definition changed; that guard passed. The database change was installed before the three app scripts are released together. Existing single-group clients remain compatible during rollout. The release PR records the resulting production deployment and verification.
 
 After additional groups exist, **do not restore the old unique-owner constraint or old implicit group readers**. Preserve the new ownership rows and explicit read API; disable additional creation in a forward fix if needed. Reverting blindly to the old app can block multi-group organisers. No rollback may delete groups or merge their players, payments or histories.
+
+Security advisors were compared before and after. The only additions were three expected authenticated SECURITY DEFINER RPC notices for the new explicitly granted, verified-owner endpoints. Anonymous and service-role EXECUTE grants are absent, and the private schema remains closed. Existing unrelated advisory findings were not changed.
 
 The permanent group deletion flow remains group-scoped. Existing account departure already loops over all owned groups; the new database check confirms it revokes access while keeping canonical golf state.
