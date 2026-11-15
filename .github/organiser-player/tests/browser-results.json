@@ -1,0 +1,8 @@
+{
+  "passed": 67,
+  "observed": "2026-11-15T12:38:00Z",
+  "browser": "Managed Chrome, actual app scripts with isolated simulated backend",
+  "coverage": ["Four-step layout at 320, 390, 768 and 1280px", "Required handicap and range validation before OTP", "OTP and wrong-code behavior", "Automatic account-bound player appears in Players", "Zero handicap survives draft reload", "Payment save and unrelated data preservation", "Optional invite and payment steps", "Returning users and existing-email handling", "Existing player join and PIN routes"],
+  "productionDataUsed": false,
+  "limitation": "Real email delivery, real payments and real LIVE group creation were not exercised. Database behavior was separately checked with audited server functions and synthetic records."
+}

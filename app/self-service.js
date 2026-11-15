@@ -75,10 +75,11 @@
     <details id="regPasswordOption"><summary>Sign in with an existing password</summary><form id="regPasswordForm"><label for="regPasswordEmail">Your email address</label><input id="regPasswordEmail" type="email" autocomplete="username" maxlength="254" required><label for="regPassword">Password</label><input id="regPassword" type="password" autocomplete="current-password" required><button class="primary full">Sign in</button><p class="muted">Sensitive changes still need a fresh email code.</p></form></details>
     <form id="regCodeForm" hidden><label for="regCode">Code from your email</label><p id="regSentTo"></p><input id="regCode" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6,10}" minlength="6" maxlength="10" required><button class="primary full" id="regVerify">Verify email</button><button id="regResend" type="button" class="secondary full">Send another code</button><button id="regChangeEmail" type="button" class="ghost full">Use a different email</button></form>
     <section id="regSignedIn" hidden><p id="regAccount" class="muted"></p>
-    <form id="regGroupForm" hidden><label for="regName">Your name</label><input id="regName" autocomplete="name" maxlength="80" required><label for="regSetupEmail" id="regSetupEmailLabel">Your email</label><input id="regSetupEmail" type="email" autocomplete="email" maxlength="254"><label for="regGroupName">Group name</label><input id="regGroupName" maxlength="80" required placeholder="e.g. Sunday Golfers"><button id="regCreate" class="primary full">Create my group</button><p class="muted">I’m In Golf+ is included free for now. Your name and email are shared with I’m In Golf to manage your group.</p></form>
+    <form id="regGroupForm" hidden><label for="regName">Your name</label><input id="regName" autocomplete="name" maxlength="80" required><label for="regSetupEmail" id="regSetupEmailLabel">Your email</label><input id="regSetupEmail" type="email" autocomplete="email" maxlength="254"><label for="regGroupName">Group name</label><input id="regGroupName" maxlength="80" required placeholder="e.g. Sunday Golfers"><label for="regSetupHandicap">Your handicap</label><input id="regSetupHandicap" type="text" inputmode="decimal" autocomplete="off" required aria-describedby="regSetupHandicapHelp"><small id="regSetupHandicapHelp">Example: 11.2. We’ll add you to the player list automatically using your name and handicap.</small><button id="regCreate" class="primary full">Create my group</button><p class="muted">I’m In Golf+ is included free for now. Your name and email are shared with I’m In Golf to manage your group.</p></form>
     <section id="regAccessHelp" hidden><p id="regAccessHelpText"></p><button id="regReconnectOwned" class="primary full" type="button" hidden>Reconnect my existing player</button><button id="regOtherPin" class="secondary full" type="button">Enter group PIN</button></section><form id="regJoinForm" hidden><p id="regJoinGroupName" class="ui-invited-group"></p><label for="regPlayerName">Your name</label><input id="regPlayerName" autocomplete="name" maxlength="80" required><label for="regHandicap">Handicap</label><input id="regHandicap" type="text" inputmode="decimal" maxlength="5" pattern="-?[0-9]{1,2}([.][0-9])?" aria-describedby="regHandicapHelp" required><small id="regHandicapHelp">Example: 11.2.</small><p id="regAppJoinHelp" class="muted" hidden></p><p id="regJoinError" role="alert" tabindex="-1"></p><button class="primary full">Join my group</button></form>
     <section id="regCreated" hidden><h2>Your group is ready</h2><p id="regCreatedName"></p><p>Group PIN: <strong id="regPin"></strong></p><button id="regOpenGroup" type="button" class="primary full">Open my group</button><button id="regInvite" type="button" class="secondary full">Invite players</button><button id="regPlayerView" type="button" class="secondary full">Open my player account</button><details class="ui-options" hidden><summary>Competition options</summary><button id="regFirstCompetition" type="button" class="secondary full">Create first competition</button></details><details id="regOwnerPlayerSetup" class="ui-options" hidden><summary>I’m playing too</summary><form id="regOwnerPlayerForm"><label for="regOwnerPlayerName">Your player name</label><input id="regOwnerPlayerName" autocomplete="name" maxlength="80" required><label for="regOwnerHandicap">Your handicap</label><input id="regOwnerHandicap" inputmode="decimal" required><small>Up to two digits and one decimal place, e.g. 11.2.</small><button class="secondary full">Add me as a player</button></form><p id="regOwnerPlayerStatus" role="status"></p></details></section>
     <button id="regReload" type="button" class="secondary full">${dashboard ? 'Open dashboard' : 'Check my group'}</button><details id="regAccountOptions" class="ui-options"><summary>My account</summary><p id="regAccountReference" class="muted"></p><button id="regAccountControls" type="button" class="secondary full">Account settings</button><button id="regSignout" type="button" class="ghost full">Sign out</button></details></section>`;
+  window.iigHandicap.bind($('regSetupHandicap'));
   // Onboarding is eligible only on the new-organiser route. All auth stays below.
   const onboarding = !dashboard && !playerMode && !adminMode && window.IIGOrganiserOnboarding
     ? window.IIGOrganiserOnboarding.create({root, account:()=>session, request, run:action, openGroup:openOwnedGroup}) : null;
@@ -108,7 +109,7 @@
     form.after(returning);
     returning.onclick=()=>{onboarding?.suspend();creating=false;form.hidden=true;$('regEmailForm').hidden=false;returning.hidden=true;progress('Sign in with your existing email');$('regEmail').focus();};
     progress('1 of 3 · Your group and details');onboarding?.details();
-    try{const draft=JSON.parse(sessionStorage.getItem('iig-group-draft')||'null');if(draft){$('regName').value=draft.organiser||'';$('regGroupName').value=draft.name||'';$('regSetupEmail').value=draft.email||'';}}catch(_){}
+    try{const draft=JSON.parse(sessionStorage.getItem('iig-group-draft')||'null');if(draft){$('regName').value=draft.organiser||'';$('regGroupName').value=draft.name||'';$('regSetupEmail').value=draft.email||'';$('regSetupHandicap').value=draft.handicap??'';}}catch(_){}
   }
   const nativeApp=()=>!!window.IigNativeApp||typeof window.IigPurchase?.postMessage==='function';
   if(validInvitation&&!nativeApp()){$('regAppJoinHelp').hidden=false;$('regAppJoinHelp').textContent='Join securely here first. Then open the iPhone app with group PIN '+invitePin+' and the same verified email.';}
@@ -255,7 +256,7 @@
       }
     }
     else if(adminMode){$('regCreated').hidden=true;$('regGroupForm').hidden=true;$('regReload').hidden=true;message('No group is owned by this account. Sign in with your organiser email, or use Start a golf group to create a new group.');}
-    else { $('regCreated').hidden = true; $('regGroupForm').hidden = false; $('regSetupEmail').hidden=true;$('regSetupEmailLabel').hidden=true;$('regSetupEmail').required=false;$('regCreate').textContent='Create my group'; message('Email verified. Check your name and group name, then create your group.'); }
+    else { $('regCreated').hidden = true; $('regGroupForm').hidden = false; $('regSetupEmail').hidden=true;$('regSetupEmailLabel').hidden=true;$('regSetupEmail').required=false;$('regCreate').textContent='Create my group'; message('Email verified. Check your name, group name and handicap, then create your group.'); }
     return group;
   }
   async function sendCode() {
@@ -323,16 +324,18 @@
   function groupDetails(){
     const name=$('regGroupName').value.trim(),organiser=$('regName').value.trim();
     if(!name||!organiser||name.length>80||organiser.length>80)throw new Error('Enter your name and a group name (up to 80 characters each).');
-    return {name,organiser};
+    const raw=$('regSetupHandicap').value.trim();
+    if(!window.iigHandicap.valid(raw))throw new Error('Enter your handicap from -10 to 60, with up to one decimal place.');
+    return {name,organiser,handicap:Number(raw)};
   }
   async function createGroup(){
-    const {name,organiser}=groupDetails();
+    const {name,organiser,handicap}=groupDetails();
     if(await loadGroup())return;
     const storageKey='iig-registration:'+session.user.id;
     if(!pending){try{pending=JSON.parse(sessionStorage.getItem(storageKey)||'null');}catch(_){}}
     if(!pending||pending.name!==name||!/^[0-9a-f-]{36}$/i.test(pending.id||''))pending={name,id:crypto.randomUUID()};
     try{sessionStorage.setItem(storageKey,JSON.stringify(pending));}catch(_){}
-    const result=await request('/rest/v1/rpc/iig_create_owned_group',{p_name:name,p_organiser_name:organiser,p_request_id:pending.id},true);
+    const result=await request('/rest/v1/rpc/iig_create_owned_playing_group',{p_name:name,p_organiser_name:organiser,p_handicap:handicap,p_request_id:pending.id},true);
     onboarding?.begin(result);
     // The RPC acknowledges creation; only readback supplies the name and full saved group.
     showGroup({...result,state:{groupName:name}});
