@@ -1,0 +1,3 @@
+node_modules/
+supabase/.temp/
+tests/fixture.sql

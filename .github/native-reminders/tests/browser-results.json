@@ -1,0 +1,22 @@
+{
+  "passed": 14,
+  "checks": [
+    "default on",
+    "ready after permission",
+    "all reminder times explained",
+    "setting lives inside My account",
+    "off saved",
+    "off after reopening",
+    "off after account restoration",
+    "on restored",
+    "OS denial explained",
+    "denied phone unregistered",
+    "permission recovery",
+    "failed off save does not lie",
+    "signed-out stale callback ignored",
+    "ordinary browser has no native setting"
+  ],
+  "syntheticOnly": true,
+  "productionWrites": false,
+  "iphoneDeliveryVerified": false
+}
