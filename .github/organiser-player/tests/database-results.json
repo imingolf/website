@@ -1,0 +1,19 @@
+{
+  "passed": 12,
+  "results": [
+    "verified organiser creates group and linked player atomically",
+    "player is not entered, paid or scored in a competition",
+    "same-request retry returns the same single player",
+    "existing organiser cannot create another group",
+    "zero and range-boundary handicaps are supported",
+    "missing, invalid range and excess precision create no records",
+    "unverified and anonymous accounts cannot create",
+    "anonymous database role cannot call the new RPC",
+    "failed membership write rolls back group and every related record",
+    "failed final confirmation rolls back successful creation and join",
+    "separate account gets its own player without changing the first group",
+    "new function retains caller privileges and fixed search path"
+  ],
+  "productionDataUsed": false,
+  "existingFunctions": "Actual audited LIVE definitions; synthetic local schema and accounts"
+}
