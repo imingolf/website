@@ -1,0 +1,24 @@
+{
+  "passed": 17,
+  "checks": [
+    "migration preserves existing groups, memberships and payment metadata",
+    "single-group legacy sign-in and original retry remain compatible",
+    "same organiser creates a second group with its own linked player",
+    "additional creation retries cannot create duplicate groups or players",
+    "group list contains only the signed-in organiser’s group summaries",
+    "explicit owner reads remain pinned to the requested group",
+    "legacy ambiguous reads fail instead of opening the wrong group",
+    "legacy creation remains protected while its original retry still works",
+    "player reads and membership cannot grant organiser access",
+    "settings save changes only the selected owned group",
+    "another organiser cannot write settings even when joined as a player",
+    "stale revision cannot overwrite either group",
+    "invalid handicap or failed membership rolls back additional creation",
+    "anonymous, unverified and anonymous-user accounts cannot use new RPCs",
+    "private schema stays closed and public RPC grants are restricted",
+    "additional creation requires an existing organiser group",
+    "account departure covers every owned group and preserves golf records"
+  ],
+  "productionChanged": false,
+  "syntheticDataOnly": true
+}

@@ -1,0 +1,62 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Multi-group organiser checks</title><style>body{font:15px system-ui;margin:24px;background:#f5f8f5}iframe{height:844px;border:1px solid #ccc}pre{white-space:pre-wrap}</style><h1>Multi-group organiser checks</h1><p id="status">Running isolated checks…</p><pre id="results"></pre><iframe id="app" title="Actual app with isolated data" width="390"></iframe><script>
+const frame=document.querySelector('#app'),out=document.querySelector('#results'),results=[];
+const check=(name,ok)=>{if(!ok)throw Error(name);results.push(name);out.textContent=JSON.stringify({passed:results.length,results},null,2)};
+const wait=async test=>{const start=Date.now();while(!test()){if(Date.now()-start>8000)throw Error('Timeout: '+String(test));await new Promise(r=>setTimeout(r,20))}};
+const win=()=>frame.contentWindow,doc=()=>frame.contentDocument,get=id=>doc().getElementById(id),visible=id=>!!get(id)&&get(id).getClientRects().length>0;
+const pause=()=>new Promise(r=>setTimeout(r,50)),idle=()=>wait(()=>!get('regCreate').disabled);
+const fill=(id,value)=>{get(id).value=value;get(id).dispatchEvent(new Event('input',{bubbles:true}));get(id).dispatchEvent(new Event('change',{bubbles:true}))};
+async function click(id){get(id).click();await pause();}
+async function load(hash='',reset=false){if(reset){localStorage.clear();sessionStorage.clear()}frame.src='/app/?qa='+Date.now()+hash;await new Promise(r=>frame.onload=r);await wait(()=>get('regCreate')&&(visible('iigGroupPicker')||!get('regCreate').disabled))}
+async function choose(pin){doc().querySelector('#iigGroupPicker [data-group-pin="'+pin+'"]').click();await idle()}
+async function picker(){await wait(()=>get('simplerOrganiserMenu')||get('uiPlayerOptions'));await click(win().iigSecureOrganiser.active?'simplerOrganiserMenu':'uiPlayerOptions');await click('simplerChangeGroup');await wait(()=>visible('iigGroupPicker'))}
+async function switchTo(pin){await picker();await choose(pin);await wait(()=>win().iigSecureOrganiser.groupPin===pin&&!visible('setupOverlay'))}
+const saved=pin=>win().IIGPreview.data.groups.find(g=>g.group_pin===pin);
+(async()=>{
+ await load('',true);
+ check('Returning account with multiple groups must choose explicitly',visible('iigGroupPicker'));
+ check('Only owned groups are listed',doc().querySelectorAll('#iigOwnedGroups button').length===2&&!get('iigOwnedGroups').textContent.includes('6830'));
+ check('PINs disambiguate groups',get('iigOwnedGroups').textContent.includes('4827')&&get('iigOwnedGroups').textContent.includes('5828'));
+ for(const width of [320,390,768,1280]){frame.width=width;await pause();check('Group chooser fits '+width+'px',doc().documentElement.scrollWidth<=width&&get('iigGroupPicker').scrollWidth<=get('iigGroupPicker').clientWidth)}frame.width=390;
+ await choose('4827');await click('regOpenGroup');await idle();
+ check('Chosen group opens in organiser view',win().iigSecureOrganiser.groupPin==='4827'&&!visible('setupOverlay'));
+ const first=JSON.stringify(saved('4827')),second=JSON.stringify(saved('5828'));
+ await switchTo('5828');check('Change group opens the second organiser group',win().iigSecureOrganiser.groupPin==='5828');
+ check('Switching does not modify either group',first===JSON.stringify(saved('4827'))&&second===JSON.stringify(saved('5828')));
+ check('Every organiser read carries the selected PIN',win().IIGPreview.calls.filter(c=>c.path.endsWith('iig_read_owned_entry_group')).every(c=>/^\d{4}$/.test(c.body.p_pin)));
+ check('No ambiguous legacy owner reads remain',!win().IIGPreview.calls.some(c=>c.path.endsWith('/iig_read_entry_group')&&!c.body.p_pin));
+ await picker();await click('iigGroupPickerCancel');await idle();check('Cancelling keeps the current organiser group',win().iigSecureOrganiser.groupPin==='5828');
+ await picker();win().IIGPreview.fail('/rest/v1/rpc/iig_read_owned_entry_group','Cannot load group');await choose('4827');check('Failed switch keeps the previous group open',win().iigSecureOrganiser.groupPin==='5828'&&!visible('setupOverlay'));
+ await picker();await click('iigCreateAnotherGroup');await idle();
+ check('Create another group uses step 1 of the same setup',visible('regGroupForm')&&get('regProgress').textContent==='Step 1 of 4');
+ check('Verified organiser does not repeat email verification',!visible('regSetupEmail')&&!visible('regEmailForm'));
+ await click('regCancelAdditional');await idle();check('Cancelling setup creates nothing',win().IIGPreview.data.groups.length===3&&win().iigSecureOrganiser.groupPin==='5828'&&!visible('setupOverlay'));
+ await picker();await click('iigCreateAnotherGroup');await idle();fill('regName','Alex Preview');fill('regSetupHandicap','11.2');fill('regGroupName','Trip Golfers');await click('regCreate');await idle();await wait(()=>visible('onboardingInvite'));
+ check('Additional creation uses an explicit additional-group request',win().IIGPreview.calls.filter(c=>c.path.endsWith('/iig_create_additional_playing_group')).length===1);
+ check('New group has the organiser’s linked player',saved('7829').state.players.length===1&&saved('7829').state.players[0].id===saved('7829').player_id);
+ check('Original players, payment settings and histories preserved',first===JSON.stringify(saved('4827'))&&second===JSON.stringify(saved('5828')));
+ await click('onboardingInviteLater');await idle();check('Invite step can be skipped',visible('onboardingPaymentForm'));
+ await load();await wait(()=>visible('onboardingPaymentForm'));check('Refresh resumes the new group’s setup',get('onboardingPin').textContent==='7829');
+ fill('onboardingPaymentLink','https://monzo.me/preview-trip');await click('onboardingPaymentForm');get('onboardingPaymentForm').requestSubmit();await idle();await wait(()=>visible('onboardingOpen'));
+ check('Payment setup saves to the new group only',saved('7829').state.paymentLink==='https://monzo.me/preview-trip'&&first===JSON.stringify(saved('4827'))&&second===JSON.stringify(saved('5828')));
+ const write=win().IIGPreview.calls.find(c=>c.path.endsWith('/iig_operate_owned_group'));check('Payment write explicitly identifies its group and revision',write.body.p_pin==='7829'&&Number.isSafeInteger(write.body.p_revision));
+ await click('onboardingOpen');await idle();check('Step 4 opens the newly created group',win().iigSecureOrganiser.groupPin==='7829'&&!visible('setupOverlay'));
+ await switchTo('4827');
+ const release=win().IIGPreview.delay('/rest/v1/rpc/iig_read_owned_entry_group');
+ const reloading=win().refresh();await pause();await switchTo('5828');release();await reloading;await pause();check('Late response from the previous group cannot replace the selected group',win().iigSecureOrganiser.groupPin==='5828'&&doc().body.textContent.includes('Wednesday Golf'));
+ const releaseManual=win().IIGPreview.delay('/rest/v1/rpc/iig_read_owned_entry_group');get('secureOrganiserReload').click();await pause();check('Group switching is blocked while the saved group reloads',win().iigChangeGroup()===false&&!visible('iigGroupPicker'));releaseManual();await wait(()=>win().iigSecureOrganiser.canSwitchView);
+ await switchTo('4827');await click('nplayers');check('Organiser still has their own player identity in original group',get('screen').textContent.includes('Alex Preview · You'));
+ await load('#pin=6830');await wait(()=>win().iigSecurePlayer.active);await pause();check('Member-only group remains player access',!win().iigSecureOrganiser.active&&!win().iigCanReturnToOrganiser('6830'));
+ await switchTo('5828');check('Organiser can return from a member-only group',win().iigSecureOrganiser.groupPin==='5828');
+ await picker();await click('iigCreateAnotherGroup');await idle();fill('regName','Alex Preview');fill('regSetupHandicap','0');fill('regGroupName','Extra Trip');await click('regCreate');await idle();await click('onboardingInviteLater');await idle();await click('onboardingPaymentLater');await idle();await click('onboardingOpen');await idle();check('Additional setup also works after a player invitation route',win().iigSecureOrganiser.groupPin==='7830');
+ await switchTo('4827');win().iigOpenOwnPlayer('4827');await wait(()=>win().iigSecurePlayer.active);check('Player view stays linked to selected group',win().iigSecurePlayer.identity.groupPin==='4827');await win().iigReturnToOrganiser();check('Return to organiser opens the same group',win().iigSecureOrganiser.groupPin==='4827');
+ await load('',false);await wait(()=>win().iigSecurePlayer.active||visible('regOpenGroup'));check('Returning session does not create more groups',win().IIGPreview.data.groups.length===5&&!visible('organiserOnboarding'));
+ await picker();await click('iigJoinAnotherGroup');await idle();check('Existing PIN join route is retained',visible('pinInput'));await win().iigCancelGroupChange();check('Back from PIN entry restores current view',!visible('setupOverlay'));
+ const seed=win().IIGPreview.data;seed.session=null;localStorage.setItem('iig-multi-group-preview-v1',JSON.stringify(seed));await load();check('Signed-out account cannot see the group list',!visible('iigGroupPicker')&&!win().iigSecureOrganiser.active&&!win().iigSecurePlayer.active);
+ // First-group and single-group compatibility use the same shipped files.
+ localStorage.clear();sessionStorage.clear();localStorage.setItem('iig-multi-group-preview-v1',JSON.stringify({session:null,groups:[],requests:{}}));await load();
+ doc().querySelector('.welcome-start').click();await pause();fill('regName','First Organiser');fill('regSetupEmail','preview@example.com');fill('regGroupName','First Golf');fill('regSetupHandicap','11.2');await click('regCreate');await idle();check('First-time setup still requests an email code',visible('regCode'));fill('regCode','123456');await click('regVerify');await idle();await wait(()=>visible('onboardingInvite'));check('First-time creation uses the original first-group RPC',win().IIGPreview.calls.some(c=>c.path.endsWith('/iig_create_owned_playing_group'))&&!win().IIGPreview.calls.some(c=>c.path.endsWith('/iig_create_additional_playing_group')));
+ await click('onboardingInviteLater');await idle();await click('onboardingPaymentLater');await idle();await click('onboardingOpen');await idle();check('First-time organiser still opens their linked group',win().iigSecureOrganiser.active&&win().IIGPreview.data.groups.length===1);
+ await load();await wait(()=>win().iigSecurePlayer.active||visible('regOpenGroup'));check('Single-group returning account needs no group picker',!visible('iigGroupPicker')&&!visible('organiserOnboarding'));
+ document.querySelector('#status').textContent='PASS — '+results.length+' isolated integration checks';out.textContent=JSON.stringify({passed:results.length,results,scope:'Actual app with synthetic transport; PostgreSQL access rules tested separately. No LIVE writes.'},null,2);
+})().catch(e=>{document.querySelector('#status').textContent='FAIL — '+e.message;out.textContent+='\n'+e.stack});
+</script></html>

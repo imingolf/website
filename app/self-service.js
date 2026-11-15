@@ -34,6 +34,10 @@
   const base=access.url,key=access.key;
   let creating = false, session = null, email = '', busy = false, resendAt = 0, pending = null, offset = 0, expiryTimer = null, sessionEpoch=0;
   let accessReadSession=null;
+  let additionalGroup=false, selectedOwnedPin=null, dismissGroupPicker=null;
+  const ownedStorageKey=()=>session?.user?.id?'iig-last-owned-group-v1-'+session.user.id:null;
+  const rememberedOwnedGroup=()=>{try{return localStorage.getItem(ownedStorageKey());}catch(_){return null;}};
+  function rememberOwnedGroup(pin){selectedOwnedPin=pin;try{if(ownedStorageKey())localStorage.setItem(ownedStorageKey(),pin);}catch(_){}}
   // Diagnostic only: local, target-session-gated and never uploaded by the app.
   const accessTrace={build:'access-trace-20261107-01',events:[],fingerprints:{},enabled:false};
   const traceOperation=path=>({'/rest/v1/rpc/iig_read_entry_group':'group.read','/rest/v1/rpc/get_group_access_status':'group.access','/rest/v1/rpc/iig_get_player_join_options':'join.options'}[path]||'other');
@@ -80,8 +84,8 @@
     <section id="regCreated" hidden><h2>Your group is ready</h2><p id="regCreatedName"></p><p>Group PIN: <strong id="regPin"></strong></p><button id="regOpenGroup" type="button" class="primary full">Open my group</button><button id="regInvite" type="button" class="secondary full">Invite players</button><button id="regPlayerView" type="button" class="secondary full">Open my player account</button><details class="ui-options" hidden><summary>Competition options</summary><button id="regFirstCompetition" type="button" class="secondary full">Create first competition</button></details><details id="regOwnerPlayerSetup" class="ui-options" hidden><summary>I’m playing too</summary><form id="regOwnerPlayerForm"><label for="regOwnerPlayerName">Your player name</label><input id="regOwnerPlayerName" autocomplete="name" maxlength="80" required><label for="regOwnerHandicap">Your handicap</label><input id="regOwnerHandicap" inputmode="decimal" required><small>Up to two digits and one decimal place, e.g. 11.2.</small><button class="secondary full">Add me as a player</button></form><p id="regOwnerPlayerStatus" role="status"></p></details></section>
     <button id="regReload" type="button" class="secondary full">${dashboard ? 'Open dashboard' : 'Check my group'}</button><details id="regAccountOptions" class="ui-options"><summary>My account</summary><p id="regAccountReference" class="muted"></p><button id="regAccountControls" type="button" class="secondary full">Account settings</button><button id="regSignout" type="button" class="ghost full">Sign out</button></details></section>`;
   window.iigHandicap.bind($('regSetupHandicap'));
-  // Onboarding is eligible only on the new-organiser route. All auth stays below.
-  const onboarding = !dashboard && !playerMode && !adminMode && window.IIGOrganiserOnboarding
+  // Additional groups use the same four steps after an explicit organiser choice.
+  const onboarding = !dashboard && window.IIGOrganiserOnboarding
     ? window.IIGOrganiserOnboarding.create({root, account:()=>session, request, run:action, openGroup:openOwnedGroup}) : null;
   // The same verified-email API serves both guided creation and returning users.
   if(playerMode)root.classList.add('iig-player-access');
@@ -89,12 +93,12 @@
   const progress = text => {
     const registering=creating || (!session && !$('regGroupForm').hidden);
     $('regProgress').textContent = !registering ? text.replace(/^[1-3] of 3 · /,'') : text;
-    if(playerMode){
+    if(playerMode&&!additionalGroup){
       const title=$('welcomeStartTitle');
       if(title){title.textContent='Join your group';if(title.nextElementSibling)title.nextElementSibling.textContent=session?'Add your name and handicap.':'We’ll email you a sign-in code.';}
       return;
     }
-    if(adminMode){const title=$('welcomeStartTitle');if(title){title.textContent='Admin sign in';if(title.nextElementSibling)title.nextElementSibling.textContent='';}return;}
+    if(adminMode&&!additionalGroup){const title=$('welcomeStartTitle');if(title){title.textContent='Admin sign in';if(title.nextElementSibling)title.nextElementSibling.textContent='';}return;}
     if(dashboard || !guided)return;
     const title=$('welcomeStartTitle');
     if(!title)return;
@@ -139,6 +143,8 @@
   function reset() {
     window.iigOwnerCentre?.closeActions();
     onboarding?.suspend();
+    dismissGroupPicker?.(null);additionalGroup=false;selectedOwnedPin=null;
+    $('regCancelAdditional')?.remove();
     changingGroup=false;
     traceStep('account.reset');accessTrace.enabled=false;$('iigReadOnlyAccessTrace')?.remove();
     accessReadSession=null;
@@ -175,7 +181,7 @@
     if(auth && keeper){
      // Reuse the identity just verified for this one access-opening action.
      // Mutations and later actions still perform their own verified restore.
-     const accessRead=['/rest/v1/rpc/iig_read_entry_group','/rest/v1/rpc/get_group_access_status','/rest/v1/rpc/iig_get_player_join_options'].includes(path);
+     const accessRead=['/rest/v1/rpc/iig_read_entry_group','/rest/v1/rpc/iig_read_owned_entry_group','/rest/v1/rpc/iig_list_owned_groups','/rest/v1/rpc/get_group_access_status','/rest/v1/rpc/iig_get_player_join_options'].includes(path);
      const checked=busy&&accessRead&&accessReadSession&&session&&accessReadSession.user.id===session.user.id&&accessReadSession.access_token===session.access_token&&Date.now()<accessReadSession.expires_at*1000;
      traceStep(checked?'request.verified-read':'request.restore-wait',traceOp);
      const restored=checked?accessReadSession:await restoreSession();
@@ -244,16 +250,61 @@
     if(firstDisplay)$('regCreated').scrollIntoView?.({block:'start'});
     if(onboarding && !onboarding.resume(group))onboarding.suspend();
   }
-  async function loadGroup() {
-    const group = await request('/rest/v1/rpc/iig_read_entry_group', {}, true);
-    if (group) {
-      showGroup(group);
-      ownerReturnPin=group.group_pin;viewOwnerCheckedPin=group.group_pin;
-      if(focused&&!dashboard){
-        try{const player=await request('/rest/v1/rpc/iig_read_entry_group',{p_pin:group.group_pin},true);ownerPlayerReady=!!player&&(player.group_pin===undefined||player.group_pin===group.group_pin)&&typeof player.player_id==='string'&&!!player.player_id&&player.state?.players?.filter(p=>p.id===player.player_id).length===1;ownerPlayerId=ownerPlayerReady?player.player_id:null;}
-        catch(error){if(error.code!=='42501'||error.message!=='Group membership required')throw error;}
-        $('regOwnerPlayerSetup').hidden=ownerPlayerReady||retainedGroup(group.group_pin);
+  async function listOwnedGroups(){
+    const groups=await request('/rest/v1/rpc/iig_list_owned_groups',{},true);
+    if(!Array.isArray(groups)||groups.some(g=>!/^\d{4}$/.test(g.group_pin||'')||typeof g.group_name!=='string'))throw Error('Your groups could not be loaded. Please try again.');
+    return groups;
+  }
+  function chooseOwnedGroup(groups,options=false){
+    dismissGroupPicker?.(null);
+    const epoch=sessionEpoch;
+    return new Promise(resolve=>{
+      const dialog=document.createElement('dialog');dialog.id='iigGroupPicker';dialog.className='iig-player-profile';
+      dialog.setAttribute('aria-labelledby','iigGroupPickerTitle');
+      dialog.innerHTML='<div class="card"><h2 id="iigGroupPickerTitle">Change group</h2><p>Choose a group you organise.</p><div id="iigOwnedGroups"></div><p id="iigGroupPickerMessage" role="status"></p></div>';
+      const card=dialog.firstElementChild;
+      const finish=value=>{if(dismissGroupPicker===finish)dismissGroupPicker=null;dialog.close();dialog.remove();resolve(epoch===sessionEpoch?value:null);};
+      dismissGroupPicker=finish;
+      const button=(text,value,parent=card)=>{const node=document.createElement('button');node.type='button';node.className='secondary full';node.textContent=text;node.onclick=()=>finish(value);parent.append(node);return node;};
+      for(const group of groups){
+        const unavailable=group.retired||group.status!=='active';
+        const node=button(group.group_name+' · PIN '+group.group_pin+(unavailable?' · Unavailable':''),group.group_pin,card.querySelector('#iigOwnedGroups'));
+        node.dataset.groupPin=group.group_pin;node.disabled=unavailable;
       }
+      if(options){button('Create another group','create').id='iigCreateAnotherGroup';button('Join another group','join').id='iigJoinAnotherGroup';}
+      button('Cancel',null).id='iigGroupPickerCancel';
+      dialog.addEventListener('cancel',event=>{event.preventDefault();finish(null);});
+      document.body.append(dialog);dialog.showModal();
+    });
+  }
+  async function readOwnedGroup(expectedPin=null){
+    let target=expectedPin;
+    if(!target){
+      const groups=await listOwnedGroups();if(!groups.length)return null;
+      const preferred=onboarding?.pendingPin||selectedOwnedPin||rememberedOwnedGroup();
+      target=groups.some(g=>g.group_pin===preferred)?preferred:groups.length===1?groups[0].group_pin:await chooseOwnedGroup(groups);
+      if(!target)throw Error('Choose a group when you’re ready.');
+    }
+    if(!/^\d{4}$/.test(target))throw Error('Choose a valid group.');
+    const group=await request('/rest/v1/rpc/iig_read_owned_entry_group',{p_pin:target},true);
+    if(!group||group.group_pin!==target)throw Error('Could not confirm organiser access to this group.');
+    return group;
+  }
+  async function ownsGroup(pin){
+    try{return await readOwnedGroup(pin);}catch(error){if(error.code==='42501')return null;throw error;}
+  }
+  async function loadGroup(expectedPin=null) {
+    const group = await readOwnedGroup(expectedPin);
+    if (group) {
+      let linkedPlayer=null;
+      if(focused&&!dashboard){
+        try{const player=await request('/rest/v1/rpc/iig_read_entry_group',{p_pin:group.group_pin},true);if(player&&(player.group_pin===undefined||player.group_pin===group.group_pin)&&typeof player.player_id==='string'&&!!player.player_id&&player.state?.players?.filter(p=>p.id===player.player_id).length===1)linkedPlayer=player.player_id;}
+        catch(error){if(error.code!=='42501'||error.message!=='Group membership required')throw error;}
+      }
+      showGroup(group);rememberOwnedGroup(group.group_pin);
+      ownerReturnPin=group.group_pin;viewOwnerCheckedPin=group.group_pin;
+      ownerPlayerReady=!!linkedPlayer;ownerPlayerId=linkedPlayer;
+      $('regOwnerPlayerSetup').hidden=ownerPlayerReady||retainedGroup(group.group_pin);
     }
     else if(adminMode){$('regCreated').hidden=true;$('regGroupForm').hidden=true;$('regReload').hidden=true;message('No group is owned by this account. Sign in with your organiser email, or use Start a golf group to create a new group.');}
     else { $('regCreated').hidden = true; $('regGroupForm').hidden = false; $('regSetupEmail').hidden=true;$('regSetupEmailLabel').hidden=true;$('regSetupEmail').required=false;$('regCreate').textContent='Create my group'; message('Email verified. Check your name, group name and handicap, then create your group.'); }
@@ -319,7 +370,11 @@
       traceEnable(data);traceStep('signin.verified');
       message(playerMode?'Opening your player account…':'Opening your group…');
       if(playerMode)progress('Your player account');
-      if (dashboard) { offset = 0; await loadDashboard(); } else if(adminMode){showWelcomePanel('start',false);await openOwnedGroup();} else if(playerMode) await loadPlayer(); else { if(!onboarding?.pending && await restorePlayerHome(true))return;const group=await loadGroup();if(group){if(!dashboard)showWelcomePanel('start',false);}else if(creating)await createGroup();else await restorePlayerHome(); }
+      if (dashboard) { offset = 0; await loadDashboard(); }
+      else if(onboarding?.pendingPin){showWelcomePanel('start',false);await loadGroup(onboarding.pendingPin);}
+      else if(adminMode){showWelcomePanel('start',false);await openOwnedGroup();}
+      else if(playerMode) await loadPlayer();
+      else { if(await restorePlayerHome(true))return;const group=await loadGroup();if(group){showWelcomePanel('start',false);}else if(creating)await createGroup();else await restorePlayerHome(); }
   }
   function groupDetails(){
     const name=$('regGroupName').value.trim(),organiser=$('regName').value.trim();
@@ -330,16 +385,19 @@
   }
   async function createGroup(){
     const {name,organiser,handicap}=groupDetails();
-    if(await loadGroup())return;
-    const storageKey='iig-registration:'+session.user.id;
+    if(!additionalGroup&&await loadGroup())return;
+    const storageKey='iig-registration:'+session.user.id+(additionalGroup?':additional':'');
     if(!pending){try{pending=JSON.parse(sessionStorage.getItem(storageKey)||'null');}catch(_){}}
     if(!pending||pending.name!==name||!/^[0-9a-f-]{36}$/i.test(pending.id||''))pending={name,id:crypto.randomUUID()};
     try{sessionStorage.setItem(storageKey,JSON.stringify(pending));}catch(_){}
-    const result=await request('/rest/v1/rpc/iig_create_owned_playing_group',{p_name:name,p_organiser_name:organiser,p_handicap:handicap,p_request_id:pending.id},true);
+    const rpc=additionalGroup?'iig_create_additional_playing_group':'iig_create_owned_playing_group';
+    const result=await request('/rest/v1/rpc/'+rpc,{p_name:name,p_organiser_name:organiser,p_handicap:handicap,p_request_id:pending.id},true);
     onboarding?.begin(result);
+    additionalGroup=false;pending=null;$('regCancelAdditional')?.remove();$('regReload').hidden=false;
+    try{sessionStorage.removeItem(storageKey);}catch(_){}
     // The RPC acknowledges creation; only readback supplies the name and full saved group.
     showGroup({...result,state:{groupName:name}});
-    try{await loadGroup();try{sessionStorage.removeItem('iig-group-draft');}catch(_){}}
+    try{await loadGroup(result.group_pin);try{sessionStorage.removeItem('iig-group-draft');}catch(_){}}
     catch(_){message('Your group was created. Tap Check my group to reload its details.');}
   }
   $('regGroupForm').onsubmit=event=>{event.preventDefault();action(async()=>{
@@ -353,12 +411,17 @@
   });};
   async function openOwnedGroup(expectedPin=null){
     if (!window.iigSecureOrganiser) throw new Error('Reload the app to open your group.');
-    const group = await loadGroup();
+    let group = await readOwnedGroup(expectedPin);
     if (!group) return;
     if(expectedPin&&group.group_pin!==expectedPin)throw Error('Your organiser group changed. Reopen your group before switching views.');
     const accessRows = await request('/rest/v1/rpc/get_group_access_status', {p_pin:group.group_pin}, true);
     const access = Array.isArray(accessRows) ? accessRows[0] : accessRows;
     if (!access || access.access_allowed !== true) throw new Error('Your group is not currently available.');
+    const adapter=window.iigSecureOrganiser?.active?window.iigSecureOrganiser:window.iigSecurePlayer;
+    if(adapter?.active&&!adapter.canSwitchView)throw Error('Finish saving or cancel your current entry before changing group.');
+    group=await loadGroup(group.group_pin);
+    if(adapter?.active&&!adapter.canSwitchView)throw Error('Finish saving or cancel your current entry before changing group.');
+    changingGroup=false;
     window.iigSecurePlayer?.close();
     window.iigSecureOrganiser.open(group, request, () => action(signout), access.plan_type);
     return group;
@@ -394,7 +457,7 @@
   async function confirmPlayerOwnership(pin){
     const lookup=++viewLookup,epoch=sessionEpoch;
     try{
-      const owned=await request('/rest/v1/rpc/iig_read_entry_group',{},true);
+      const owned=await ownsGroup(pin);
       if(lookup!==viewLookup||epoch!==sessionEpoch||!session||homePin!==pin||window.iigSecurePlayer?.identity?.groupPin!==pin)return;
       viewOwnerCheckedPin=pin;ownerReturnPin=owned?.group_pin===pin?pin:null;
       window.dispatchEvent?.(new Event('iig-view-authority'));
@@ -411,21 +474,54 @@
   }
   async function existingPlayerHelp(){
     $('regJoinForm').hidden=true;$('regAccessHelp').hidden=false;$('regReload').hidden=true;
-    const owned=await request('/rest/v1/rpc/iig_read_entry_group',{},true);
+    const owned=await ownsGroup(invitePin);
     const isOwnGroup=owned?.group_pin===invitePin;
-    if(isOwnGroup&&!retainedGroup(invitePin)){showGroup(owned);message('You have organiser access. Open your group or your player account.');return;}
+    if(isOwnGroup&&!retainedGroup(invitePin)){showGroup(owned);rememberOwnedGroup(invitePin);ownerReturnPin=invitePin;message('You have organiser access. Open your group or your player account.');return;}
     $('regReconnectOwned').hidden=!isOwnGroup;
     $('regAccessHelpText').textContent=isOwnGroup?'You have organiser access. Reconnect your existing player record to keep your scores and history.':retainedGroup(invitePin)?'Your existing player record and history are safe. Ask your organiser for your own private reconnection link, then open it using this verified email.':'To join for the first time, open your organiser’s private invitation. If you’ve played here before, use the same verified email or ask your organiser to help restore access. A PIN alone cannot add or recover a player.';
     $('regOtherPin').className=isOwnGroup?'secondary full':'primary full';
-    $('regReconnectOwned').onclick=()=>action(async()=>{const group=await openOwnedGroup();if(group)window.iigSecureOrganiser.reconnect();});
+    $('regReconnectOwned').onclick=()=>action(async()=>{const group=await openOwnedGroup(invitePin);if(group)window.iigSecureOrganiser.reconnect();});
     progress('');if($('welcomeStartTitle')){$('welcomeStartTitle').textContent=retainedGroup(invitePin)?'Reconnect your player account':'Join your group';$('welcomeStartTitle').nextElementSibling.textContent=retainedGroup(invitePin)?'Keep your scores and golf history.':'Use your private invitation to join.';}message('');
   }
   $('regOtherPin').onclick=()=>showWelcomePanel('join');
+  function showGroupPin(){
+    changingGroup=true;$('pinInput').value='';$('connectMsg').textContent='Enter the group PIN. Your sign-in stays the same.';
+    showWelcomePanel('join',false);$('setupOverlay').classList.remove('hidden');$('pinInput').focus();
+  }
+  function cancelAdditional(){
+    additionalGroup=false;pending=null;onboarding?.suspend();$('regGroupForm').hidden=true;$('regReload').hidden=false;$('regCancelAdditional')?.remove();
+    window.iigCancelGroupChange();
+  }
+  function beginAdditionalGroup(){
+    additionalGroup=true;pending=null;changingGroup=true;onboarding?.suspend();$('regReload').hidden=true;
+    root.classList.remove('iig-player-access');
+    $('regSignedIn').hidden=false;$('regGroupForm').hidden=false;$('regCreated').hidden=true;$('regJoinForm').hidden=true;$('regAccessHelp').hidden=true;
+    $('regEmailForm').hidden=true;$('regCodeForm').hidden=true;$('regPasswordOption').hidden=true;
+    $('regSetupEmail').hidden=true;$('regSetupEmailLabel').hidden=true;$('regSetupEmail').required=false;
+    $('regGroupName').value='';$('regCreate').textContent='Create my group';
+    if($('regReturning'))$('regReturning').hidden=true;
+    const me=typeof state==='object'?state.players?.find(p=>p.id===window.iigOwnPlayerId?.(homePin)):null;
+    if(me){$('regName').value=me.name||'';$('regSetupHandicap').value=me.handicap??'';}
+    const cancel=document.createElement('button');cancel.id='regCancelAdditional';cancel.type='button';cancel.className='ghost full';cancel.textContent='Cancel';cancel.onclick=cancelAdditional;$('regGroupForm').append(cancel);
+    showWelcomePanel('start',false);$('setupOverlay').classList.remove('hidden');onboarding?.details();
+    $('welcomeStartTitle').textContent='Start another golf group';$('welcomeStartTitle').nextElementSibling.textContent='Use your signed-in account. Each group has its own players, payments and results.';
+    message('');$('regGroupName').focus();
+  }
+  if(!dashboard)document.querySelector('#welcomeStart>.welcome-back').onclick=()=>{
+    if(busy)return;if(additionalGroup)cancelAdditional();else showWelcomePanel('home');
+  };
   window.iigChangeGroup=()=>{
     const adapter=window.iigSecureOrganiser?.active?window.iigSecureOrganiser:window.iigSecurePlayer;
     if(busy||!adapter?.canSwitchView){showAppToast('Finish your current action','Finish saving or cancel your current entry before changing group.');return false;}
-    changingGroup=true;$('pinInput').value='';$('connectMsg').textContent='Enter the group PIN. Your sign-in stays the same.';
-    showWelcomePanel('join',false);$('setupOverlay').classList.remove('hidden');$('pinInput').focus();return true;
+    action(async()=>{
+      try{
+        const groups=await listOwnedGroups();
+        if(!groups.length){showGroupPin();return;}
+        const choice=await chooseOwnedGroup(groups,true);if(!choice)return;
+        if(!adapter.canSwitchView)throw Error('Finish saving or cancel your current entry before changing group.');
+        if(choice==='create')beginAdditionalGroup();else if(choice==='join')showGroupPin();else await openOwnedGroup(choice);
+      }catch(error){showAppToast('Could not change group',error.message||'Please try again.');}
+    });return true;
   };
   window.iigCancelGroupChange=()=>{
     if(changingGroup){changingGroup=false;if(window.iigSecurePlayer?.active||window.iigSecureOrganiser?.active){$('setupOverlay').classList.add('hidden');return;}}
@@ -445,8 +541,8 @@
       const last=homePin||rememberedGroup();
       if(last){try{const data=await request('/rest/v1/rpc/iig_read_entry_group',{p_pin:last},true);openPlayerData(data,last);return;}
         catch(error){if(error.code!=='42501'||error.message!=='Group membership required')throw error;}}
-      const owned=await request('/rest/v1/rpc/iig_read_entry_group',{},true);
-      if(owned){await openOwnedGroup();return;}
+      const owned=await readOwnedGroup();
+      if(owned){await openOwnedGroup(owned.group_pin);return;}
       showWelcomePanel('join',false);if($('connectMsg'))$('connectMsg').textContent='Enter your group PIN to open your existing player account.';
     }catch(error){showWelcomePanel('join',false);if($('connectMsg'))$('connectMsg').textContent=error.message||'Sign in again to continue.';}
     });
@@ -478,7 +574,7 @@
     const note=text=>{if(current()){get('iigPlayerProfileMessage').textContent=text;get('iigPlayerProfileMessage').focus();}};
     const checkView=()=>{if(window.iigSecureOrganiser?.active&&!window.iigSecureOrganiser.canSwitchView)throw Error('Finish saving, or reload your saved group before switching views.');};
     const owned=async()=>{
-      checkView();const group=await request('/rest/v1/rpc/iig_read_entry_group',{},true);
+      checkView();const group=await readOwnedGroup(targetPin||window.iigSecureOrganiser?.groupPin||selectedOwnedPin);
       if(!group||!/^\d{4}$/.test(group.group_pin)||targetPin&&group.group_pin!==targetPin)throw Error('Could not confirm organiser access to this group. Reopen your group before switching views.');
       if(!current())return null;checkView();targetPin=group.group_pin;return group;
     };
@@ -546,7 +642,7 @@
         if(options?.group_pin!==invitePin||typeof options.group_name!=='string'||!options.group_name.trim()||typeof options.pin_join_enabled!=='boolean')throw Error('Could not confirm your group. Check the PIN and try again.');
         playerJoinOptions=options;
         if(invitePin==='1010'||(!validInvitation&&!options.pin_join_enabled)){await existingPlayerHelp();return;}
-        if(!validInvitation&&options.pin_join_enabled){const owned=await request('/rest/v1/rpc/iig_read_entry_group',{},true);if(owned?.group_pin===invitePin){showGroup(owned);message('You have organiser access. Open your group, or use I’m playing too to add your own player.');return;}}
+        if(!validInvitation&&options.pin_join_enabled){const owned=await ownsGroup(invitePin);if(owned){showGroup(owned);rememberOwnedGroup(invitePin);ownerReturnPin=invitePin;message('You have organiser access. Open your group, or use I’m playing too to add your own player.');return;}}
       }
       if(!validInvitation&&!playerJoinOptions?.pin_join_enabled)throw Error('Open the complete invitation link from your organiser.');
       $('regJoinGroupName').textContent=playerJoinOptions?.group_name||'Your golf group';$('regJoinError').textContent='';
@@ -563,7 +659,7 @@
     await request('/rest/v1/rpc/'+joinRpc,{p_pin:invitePin,p_invite:validInvitation?inviteToken:null,p_name:name,p_handicap:handicap},true);
     await loadPlayer();
   });};
-  $('regReload').onclick = () => action(dashboard ? loadDashboard : playerMode ? loadPlayer : loadGroup);
+  $('regReload').onclick = () => action(dashboard ? loadDashboard : ()=>onboarding?.pendingPin?loadGroup(onboarding.pendingPin):playerMode&&!additionalGroup?loadPlayer():loadGroup());
   async function signout() {
     if(keeper)await keeper.signout();
     else if(session)await request('/auth/v1/logout', {}, true);
@@ -580,12 +676,12 @@
   $('regAccountControls').onclick = () => window.iigAccount?.open();
   window.iigAccount?.configure({request,reset,signout,async afterDeletion(){try{if(keeper)await keeper.forgetDeleted();}finally{reset();}},focused,canSwitch:!dashboard,currentEmail:()=>session?.user?.email||'',
    async openOrganiser(){
-    const group=await request('/rest/v1/rpc/iig_read_entry_group',{},true);
+    const group=await readOwnedGroup(window.iigSecurePlayer?.identity?.groupPin||window.iigSecureOrganiser?.groupPin||selectedOwnedPin);
     if(!group)throw Error('Your account does not own a group.');
-    window.iigSecurePlayer?.close();window.iigSecureOrganiser.open(group,request,()=>action(signout));
+    await openOwnedGroup(group.group_pin);
    },
    async openPlayer(name,handicap){
-    const group=await request('/rest/v1/rpc/iig_read_entry_group',{},true);
+    const group=await readOwnedGroup(window.iigSecureOrganiser?.groupPin||selectedOwnedPin);
     if(!group)throw Error('Use your organiser’s invitation or the returning-player PIN login.');
     await request('/rest/v1/rpc/'+joinRpc,{p_pin:group.group_pin,p_invite:group.invite_token,p_name:name,p_handicap:handicap},true);
     const player=await request('/rest/v1/rpc/iig_read_entry_group',{p_pin:group.group_pin},true);
