@@ -1,0 +1,1349 @@
+{
+  "tables": [
+    {
+      "name": "help_knowledge",
+      "schema": "public",
+      "columns": [
+        {
+          "name": "id",
+          "type": "bigint",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "section",
+          "type": "text",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "title",
+          "type": "text",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "content",
+          "type": "jsonb",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "not_null": true
+        }
+      ]
+    },
+    {
+      "name": "group_creation_codes",
+      "schema": "public",
+      "columns": [
+        {
+          "name": "id",
+          "type": "bigint",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "code",
+          "type": "text",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "active",
+          "type": "boolean",
+          "default": "true",
+          "not_null": true
+        }
+      ]
+    },
+    {
+      "name": "tens_in_groups",
+      "schema": "public",
+      "columns": [
+        {
+          "name": "id",
+          "type": "bigint",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "group_name",
+          "type": "text",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "group_pin",
+          "type": "text",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "state",
+          "type": "jsonb",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "not_null": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "not_null": false
+        },
+        {
+          "name": "admin_name",
+          "type": "text",
+          "default": null,
+          "not_null": false
+        },
+        {
+          "name": "admin_contact",
+          "type": "text",
+          "default": null,
+          "not_null": false
+        },
+        {
+          "name": "plan_type",
+          "type": "text",
+          "default": "'complimentary'::text",
+          "not_null": false
+        },
+        {
+          "name": "trial_start_date",
+          "type": "date",
+          "default": "CURRENT_DATE",
+          "not_null": false
+        },
+        {
+          "name": "trial_expiry_date",
+          "type": "date",
+          "default": null,
+          "not_null": false
+        },
+        {
+          "name": "paid_status",
+          "type": "text",
+          "default": "'unpaid'::text",
+          "not_null": false
+        },
+        {
+          "name": "renewal_date",
+          "type": "date",
+          "default": null,
+          "not_null": false
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "default": "'active'::text",
+          "not_null": false
+        },
+        {
+          "name": "notes",
+          "type": "text",
+          "default": null,
+          "not_null": false
+        }
+      ]
+    },
+    {
+      "name": "iig_notification_settings",
+      "schema": "public",
+      "columns": [
+        {
+          "name": "group_pin",
+          "type": "text",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "enabled",
+          "type": "boolean",
+          "default": "false",
+          "not_null": true
+        },
+        {
+          "name": "timezone",
+          "type": "text",
+          "default": "'Europe/London'::text",
+          "not_null": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "not_null": true
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "not_null": true
+        }
+      ]
+    },
+    {
+      "name": "iig_push_subscriptions",
+      "schema": "public",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "default": "gen_random_uuid()",
+          "not_null": true
+        },
+        {
+          "name": "group_pin",
+          "type": "text",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "player_id",
+          "type": "text",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "endpoint",
+          "type": "text",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "p256dh",
+          "type": "text",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "auth",
+          "type": "text",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "enabled",
+          "type": "boolean",
+          "default": "true",
+          "not_null": true
+        },
+        {
+          "name": "user_agent",
+          "type": "text",
+          "default": null,
+          "not_null": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "not_null": true
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "not_null": true
+        }
+      ]
+    },
+    {
+      "name": "iig_notification_events",
+      "schema": "public",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "default": "gen_random_uuid()",
+          "not_null": true
+        },
+        {
+          "name": "group_pin",
+          "type": "text",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "round_key",
+          "type": "text",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "event_type",
+          "type": "text",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "title",
+          "type": "text",
+          "default": "'I''m In Golf'::text",
+          "not_null": true
+        },
+        {
+          "name": "message",
+          "type": "text",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "scheduled_for",
+          "type": "timestamp with time zone",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "default": "'pending'::text",
+          "not_null": true
+        },
+        {
+          "name": "attempts",
+          "type": "integer",
+          "default": "0",
+          "not_null": true
+        },
+        {
+          "name": "sent_at",
+          "type": "timestamp with time zone",
+          "default": null,
+          "not_null": false
+        },
+        {
+          "name": "last_error",
+          "type": "text",
+          "default": null,
+          "not_null": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "not_null": true
+        }
+      ]
+    },
+    {
+      "name": "group_owners",
+      "schema": "iig_private",
+      "columns": [
+        {
+          "name": "group_id",
+          "type": "bigint",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "owner_id",
+          "type": "uuid",
+          "default": null,
+          "not_null": false
+        },
+        {
+          "name": "request_id",
+          "type": "uuid",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "requested_name",
+          "type": "text",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "invite_token",
+          "type": "uuid",
+          "default": "gen_random_uuid()",
+          "not_null": true
+        },
+        {
+          "name": "revision",
+          "type": "bigint",
+          "default": "0",
+          "not_null": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "not_null": true
+        },
+        {
+          "name": "pin_join_enabled",
+          "type": "boolean",
+          "default": "false",
+          "not_null": true
+        }
+      ]
+    },
+    {
+      "name": "group_members",
+      "schema": "iig_private",
+      "columns": [
+        {
+          "name": "group_id",
+          "type": "bigint",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "player_id",
+          "type": "uuid",
+          "default": "gen_random_uuid()",
+          "not_null": true
+        }
+      ]
+    },
+    {
+      "name": "account_deletions",
+      "schema": "iig_private",
+      "columns": [
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "requested_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "not_null": true
+        }
+      ]
+    },
+    {
+      "name": "rounds",
+      "schema": "iig_closed_entry",
+      "columns": [
+        {
+          "name": "group_id",
+          "type": "text",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "round_id",
+          "type": "uuid",
+          "default": "gen_random_uuid()",
+          "not_null": true
+        },
+        {
+          "name": "revision",
+          "type": "bigint",
+          "default": "0",
+          "not_null": true
+        },
+        {
+          "name": "phase",
+          "type": "text",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "closed",
+          "type": "boolean",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "entrant_ids",
+          "type": "jsonb",
+          "default": null,
+          "not_null": false
+        }
+      ]
+    },
+    {
+      "name": "credentials",
+      "schema": "iig_closed_entry",
+      "columns": [
+        {
+          "name": "group_id",
+          "type": "text",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "token_hash",
+          "type": "text",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "revoked",
+          "type": "boolean",
+          "default": "false",
+          "not_null": true
+        },
+        {
+          "name": "scopes",
+          "type": "text[]",
+          "default": null,
+          "not_null": true
+        }
+      ]
+    },
+    {
+      "name": "permits",
+      "schema": "iig_closed_entry",
+      "columns": [
+        {
+          "name": "backend",
+          "type": "integer",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "group_id",
+          "type": "text",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "transaction_id",
+          "type": "text",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "operation",
+          "type": "text",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "expected_revision",
+          "type": "bigint",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "state_digest",
+          "type": "text",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "available",
+          "type": "boolean",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "actor_id",
+          "type": "text",
+          "default": null,
+          "not_null": false
+        }
+      ]
+    },
+    {
+      "name": "receipts",
+      "schema": "iig_closed_entry",
+      "columns": [
+        {
+          "name": "group_id",
+          "type": "text",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "request_id",
+          "type": "uuid",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "digest",
+          "type": "text",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "operation",
+          "type": "text",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "credential_hash",
+          "type": "text",
+          "default": null,
+          "not_null": false
+        },
+        {
+          "name": "outcome",
+          "type": "jsonb",
+          "default": null,
+          "not_null": true
+        }
+      ]
+    },
+    {
+      "name": "archives",
+      "schema": "iig_closed_entry",
+      "columns": [
+        {
+          "name": "group_id",
+          "type": "text",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "round_id",
+          "type": "uuid",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "state",
+          "type": "jsonb",
+          "default": null,
+          "not_null": true
+        }
+      ]
+    },
+    {
+      "name": "member_credentials",
+      "schema": "iig_closed_entry",
+      "columns": [
+        {
+          "name": "group_id",
+          "type": "text",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "player_id",
+          "type": "text",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "token_hash",
+          "type": "text",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "revoked",
+          "type": "boolean",
+          "default": "false",
+          "not_null": true
+        },
+        {
+          "name": "scopes",
+          "type": "text[]",
+          "default": null,
+          "not_null": true
+        }
+      ]
+    },
+    {
+      "name": "operation_audit",
+      "schema": "iig_closed_entry",
+      "columns": [
+        {
+          "name": "group_id",
+          "type": "text",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "revision",
+          "type": "bigint",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "operation",
+          "type": "text",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "state",
+          "type": "jsonb",
+          "default": null,
+          "not_null": true
+        }
+      ]
+    },
+    {
+      "name": "identity_ids",
+      "schema": "iig_closed_entry",
+      "columns": [
+        {
+          "name": "group_id",
+          "type": "text",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "identity_id",
+          "type": "text",
+          "default": null,
+          "not_null": true
+        }
+      ]
+    },
+    {
+      "name": "release_groups",
+      "schema": "iig_private",
+      "columns": [
+        {
+          "name": "group_id",
+          "type": "bigint",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "retired_at",
+          "type": "timestamp with time zone",
+          "default": null,
+          "not_null": false
+        },
+        {
+          "name": "owner_departed_at",
+          "type": "timestamp with time zone",
+          "default": null,
+          "not_null": false
+        },
+        {
+          "name": "reason",
+          "type": "text",
+          "default": null,
+          "not_null": false
+        },
+        {
+          "name": "changed_by",
+          "type": "uuid",
+          "default": null,
+          "not_null": false
+        },
+        {
+          "name": "changed_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "not_null": true
+        }
+      ]
+    },
+    {
+      "name": "player_links",
+      "schema": "iig_private",
+      "columns": [
+        {
+          "name": "group_id",
+          "type": "bigint",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "player_id",
+          "type": "text",
+          "default": null,
+          "not_null": true
+        }
+      ]
+    },
+    {
+      "name": "relink_grants",
+      "schema": "iig_private",
+      "columns": [
+        {
+          "name": "token_hash",
+          "type": "text",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "group_id",
+          "type": "bigint",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "player_id",
+          "type": "text",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "email_hash",
+          "type": "text",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "issued_by",
+          "type": "uuid",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "used_by",
+          "type": "uuid",
+          "default": null,
+          "not_null": false
+        },
+        {
+          "name": "revoked",
+          "type": "boolean",
+          "default": "false",
+          "not_null": true
+        }
+      ]
+    },
+    {
+      "name": "release_audit",
+      "schema": "iig_private",
+      "columns": [
+        {
+          "name": "id",
+          "type": "bigint",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "group_id",
+          "type": "bigint",
+          "default": null,
+          "not_null": false
+        },
+        {
+          "name": "actor_id",
+          "type": "uuid",
+          "default": null,
+          "not_null": false
+        },
+        {
+          "name": "action",
+          "type": "text",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "evidence",
+          "type": "text",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "recorded_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "not_null": true
+        }
+      ]
+    },
+    {
+      "name": "platform_owners",
+      "schema": "iig_private",
+      "columns": [
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "default": null,
+          "not_null": true
+        }
+      ]
+    },
+    {
+      "name": "registration_settings",
+      "schema": "iig_private",
+      "columns": [
+        {
+          "name": "singleton",
+          "type": "boolean",
+          "default": "true",
+          "not_null": true
+        },
+        {
+          "name": "enabled",
+          "type": "boolean",
+          "default": "false",
+          "not_null": true
+        }
+      ]
+    },
+    {
+      "name": "setup_testers",
+      "schema": "iig_private",
+      "columns": [
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "default": null,
+          "not_null": true
+        }
+      ]
+    },
+    {
+      "name": "subscription_bindings",
+      "schema": "iig_private",
+      "columns": [
+        {
+          "name": "original_transaction_id",
+          "type": "text",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "group_id",
+          "type": "bigint",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "not_null": true
+        }
+      ]
+    }
+  ],
+  "triggers": [
+    {
+      "table": "tens_in_groups",
+      "schema": "public",
+      "definition": "CREATE TRIGGER iig_create_notification_events_trigger AFTER UPDATE OF state ON public.tens_in_groups FOR EACH ROW EXECUTE FUNCTION iig_create_notification_events()"
+    },
+    {
+      "table": "tens_in_groups",
+      "schema": "public",
+      "definition": "CREATE TRIGGER iig_enable_notifications_for_new_group_trigger AFTER INSERT ON public.tens_in_groups FOR EACH ROW EXECUTE FUNCTION iig_enable_notifications_for_new_group()"
+    },
+    {
+      "table": "tens_in_groups",
+      "schema": "public",
+      "definition": "CREATE TRIGGER iig_entry_before_write BEFORE DELETE OR UPDATE ON public.tens_in_groups FOR EACH ROW EXECUTE FUNCTION iig_closed_entry.guard_row()"
+    },
+    {
+      "table": "tens_in_groups",
+      "schema": "public",
+      "definition": "CREATE TRIGGER a_iig_release_hold BEFORE DELETE OR UPDATE OF state ON public.tens_in_groups FOR EACH ROW EXECUTE FUNCTION iig_private.release_hold()"
+    }
+  ],
+  "functions": [
+    {
+      "acl": [
+        "postgres=X/postgres"
+      ],
+      "name": "recent_signin",
+      "schema": "iig_private",
+      "definition": "CREATE OR REPLACE FUNCTION iig_private.recent_signin()\n RETURNS void\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'pg_catalog'\nAS $function$\nDECLARE claims jsonb=coalesce(nullif(current_setting('request.jwt.claims',true),''),'{}')::jsonb;\nBEGIN\n IF NOT EXISTS(SELECT 1 FROM jsonb_array_elements(coalesce(claims->'amr','[]')) a WHERE a->>'method'='otp'\n AND (a->>'timestamp')::numeric BETWEEN extract(epoch FROM now())-600 AND extract(epoch FROM now())+30)\n THEN RAISE EXCEPTION 'Verify a fresh email code within ten minutes for this account change' USING ERRCODE='42501';END IF;\nEND $function$\n"
+    }
+  ],
+  "constraints": [
+    {
+      "name": "help_knowledge_pkey",
+      "type": "p",
+      "table": "help_knowledge",
+      "schema": "public",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "help_knowledge_section_key",
+      "type": "u",
+      "table": "help_knowledge",
+      "schema": "public",
+      "definition": "UNIQUE (section)"
+    },
+    {
+      "name": "group_creation_codes_code_key",
+      "type": "u",
+      "table": "group_creation_codes",
+      "schema": "public",
+      "definition": "UNIQUE (code)"
+    },
+    {
+      "name": "group_creation_codes_pkey",
+      "type": "p",
+      "table": "group_creation_codes",
+      "schema": "public",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "tens_in_groups_pkey",
+      "type": "p",
+      "table": "tens_in_groups",
+      "schema": "public",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "iig_notification_settings_pkey",
+      "type": "p",
+      "table": "iig_notification_settings",
+      "schema": "public",
+      "definition": "PRIMARY KEY (group_pin)"
+    },
+    {
+      "name": "iig_push_subscriptions_endpoint_key",
+      "type": "u",
+      "table": "iig_push_subscriptions",
+      "schema": "public",
+      "definition": "UNIQUE (endpoint)"
+    },
+    {
+      "name": "iig_push_subscriptions_pkey",
+      "type": "p",
+      "table": "iig_push_subscriptions",
+      "schema": "public",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "iig_notification_events_event_type_check",
+      "type": "c",
+      "table": "iig_notification_events",
+      "schema": "public",
+      "definition": "CHECK ((event_type = ANY (ARRAY['competition_created'::text, 'first_player_joined'::text, 'three_days_before'::text, 'night_before'::text])))"
+    },
+    {
+      "name": "iig_notification_events_group_pin_round_key_event_type_key",
+      "type": "u",
+      "table": "iig_notification_events",
+      "schema": "public",
+      "definition": "UNIQUE (group_pin, round_key, event_type)"
+    },
+    {
+      "name": "iig_notification_events_pkey",
+      "type": "p",
+      "table": "iig_notification_events",
+      "schema": "public",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "iig_notification_events_status_check",
+      "type": "c",
+      "table": "iig_notification_events",
+      "schema": "public",
+      "definition": "CHECK ((status = ANY (ARRAY['pending'::text, 'processing'::text, 'sent'::text, 'failed'::text, 'cancelled'::text])))"
+    },
+    {
+      "name": "group_owners_group_id_fkey",
+      "type": "f",
+      "table": "group_owners",
+      "schema": "iig_private",
+      "definition": "FOREIGN KEY (group_id) REFERENCES tens_in_groups(id) ON DELETE CASCADE"
+    },
+    {
+      "name": "group_owners_owner_id_fkey",
+      "type": "f",
+      "table": "group_owners",
+      "schema": "iig_private",
+      "definition": "FOREIGN KEY (owner_id) REFERENCES auth.users(id) ON DELETE RESTRICT"
+    },
+    {
+      "name": "group_owners_owner_id_key",
+      "type": "u",
+      "table": "group_owners",
+      "schema": "iig_private",
+      "definition": "UNIQUE (owner_id)"
+    },
+    {
+      "name": "group_owners_pkey",
+      "type": "p",
+      "table": "group_owners",
+      "schema": "iig_private",
+      "definition": "PRIMARY KEY (group_id)"
+    },
+    {
+      "name": "group_members_group_id_fkey",
+      "type": "f",
+      "table": "group_members",
+      "schema": "iig_private",
+      "definition": "FOREIGN KEY (group_id) REFERENCES iig_private.group_owners(group_id) ON DELETE CASCADE"
+    },
+    {
+      "name": "group_members_group_id_player_id_key",
+      "type": "u",
+      "table": "group_members",
+      "schema": "iig_private",
+      "definition": "UNIQUE (group_id, player_id)"
+    },
+    {
+      "name": "group_members_pkey",
+      "type": "p",
+      "table": "group_members",
+      "schema": "iig_private",
+      "definition": "PRIMARY KEY (group_id, user_id)"
+    },
+    {
+      "name": "group_members_user_id_fkey",
+      "type": "f",
+      "table": "group_members",
+      "schema": "iig_private",
+      "definition": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE"
+    },
+    {
+      "name": "account_deletions_pkey",
+      "type": "p",
+      "table": "account_deletions",
+      "schema": "iig_private",
+      "definition": "PRIMARY KEY (user_id)"
+    },
+    {
+      "name": "rounds_phase_check",
+      "type": "c",
+      "table": "rounds",
+      "schema": "iig_closed_entry",
+      "definition": "CHECK ((phase = ANY (ARRAY['open'::text, 'finished'::text])))"
+    },
+    {
+      "name": "rounds_pkey",
+      "type": "p",
+      "table": "rounds",
+      "schema": "iig_closed_entry",
+      "definition": "PRIMARY KEY (group_id)"
+    },
+    {
+      "name": "credentials_pkey",
+      "type": "p",
+      "table": "credentials",
+      "schema": "iig_closed_entry",
+      "definition": "PRIMARY KEY (group_id, token_hash)"
+    },
+    {
+      "name": "credentials_scopes_check",
+      "type": "c",
+      "table": "credentials",
+      "schema": "iig_closed_entry",
+      "definition": "CHECK (((scopes <@ ARRAY['finish'::text, 'start'::text, 'correct'::text, 'cancel'::text, 'settings'::text, 'members'::text, 'settle'::text, 'tripreturn'::text, 'tripcancel'::text, 'resetscores'::text, 'resetpayments'::text, 'deletelast'::text, 'clearleague'::text, 'deletepasttrip'::text, 'configure'::text]) AND (cardinality(scopes) > 0)))"
+    },
+    {
+      "name": "permits_operation_check",
+      "type": "c",
+      "table": "permits",
+      "schema": "iig_closed_entry",
+      "definition": "CHECK ((operation = ANY (ARRAY['save'::text, 'join'::text, 'finish'::text, 'start'::text, 'correct'::text, 'cancel'::text, 'settings'::text, 'members'::text, 'settle'::text, 'tripreturn'::text, 'tripcancel'::text, 'resetscores'::text, 'resetpayments'::text, 'deletelast'::text, 'clearleague'::text, 'deletepasttrip'::text, 'configure'::text, 'profile'::text, 'sidegame'::text, 'claim'::text, 'payment'::text, 'member_attendance'::text, 'member_score'::text])))"
+    },
+    {
+      "name": "permits_pkey",
+      "type": "p",
+      "table": "permits",
+      "schema": "iig_closed_entry",
+      "definition": "PRIMARY KEY (backend, group_id)"
+    },
+    {
+      "name": "receipts_pkey",
+      "type": "p",
+      "table": "receipts",
+      "schema": "iig_closed_entry",
+      "definition": "PRIMARY KEY (group_id, request_id)"
+    },
+    {
+      "name": "archives_pkey",
+      "type": "p",
+      "table": "archives",
+      "schema": "iig_closed_entry",
+      "definition": "PRIMARY KEY (group_id, round_id)"
+    },
+    {
+      "name": "member_credentials_pkey",
+      "type": "p",
+      "table": "member_credentials",
+      "schema": "iig_closed_entry",
+      "definition": "PRIMARY KEY (group_id, token_hash)"
+    },
+    {
+      "name": "member_credentials_scopes_check",
+      "type": "c",
+      "table": "member_credentials",
+      "schema": "iig_closed_entry",
+      "definition": "CHECK (((scopes <@ ARRAY['profile'::text, 'sidegame'::text, 'claim'::text]) AND (cardinality(scopes) > 0)))"
+    },
+    {
+      "name": "operation_audit_pkey",
+      "type": "p",
+      "table": "operation_audit",
+      "schema": "iig_closed_entry",
+      "definition": "PRIMARY KEY (group_id, revision)"
+    },
+    {
+      "name": "identity_ids_pkey",
+      "type": "p",
+      "table": "identity_ids",
+      "schema": "iig_closed_entry",
+      "definition": "PRIMARY KEY (group_id, identity_id)"
+    },
+    {
+      "name": "release_groups_group_id_fkey",
+      "type": "f",
+      "table": "release_groups",
+      "schema": "iig_private",
+      "definition": "FOREIGN KEY (group_id) REFERENCES tens_in_groups(id)"
+    },
+    {
+      "name": "release_groups_pkey",
+      "type": "p",
+      "table": "release_groups",
+      "schema": "iig_private",
+      "definition": "PRIMARY KEY (group_id)"
+    },
+    {
+      "name": "player_links_group_id_fkey",
+      "type": "f",
+      "table": "player_links",
+      "schema": "iig_private",
+      "definition": "FOREIGN KEY (group_id) REFERENCES tens_in_groups(id)"
+    },
+    {
+      "name": "player_links_group_id_player_id_key",
+      "type": "u",
+      "table": "player_links",
+      "schema": "iig_private",
+      "definition": "UNIQUE (group_id, player_id)"
+    },
+    {
+      "name": "player_links_pkey",
+      "type": "p",
+      "table": "player_links",
+      "schema": "iig_private",
+      "definition": "PRIMARY KEY (group_id, user_id)"
+    },
+    {
+      "name": "player_links_player_id_check",
+      "type": "c",
+      "table": "player_links",
+      "schema": "iig_private",
+      "definition": "CHECK (((length(player_id) >= 1) AND (length(player_id) <= 200)))"
+    },
+    {
+      "name": "player_links_user_id_fkey",
+      "type": "f",
+      "table": "player_links",
+      "schema": "iig_private",
+      "definition": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE"
+    },
+    {
+      "name": "relink_grants_group_id_fkey",
+      "type": "f",
+      "table": "relink_grants",
+      "schema": "iig_private",
+      "definition": "FOREIGN KEY (group_id) REFERENCES tens_in_groups(id)"
+    },
+    {
+      "name": "relink_grants_pkey",
+      "type": "p",
+      "table": "relink_grants",
+      "schema": "iig_private",
+      "definition": "PRIMARY KEY (token_hash)"
+    },
+    {
+      "name": "release_audit_pkey",
+      "type": "p",
+      "table": "release_audit",
+      "schema": "iig_private",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "platform_owners_pkey",
+      "type": "p",
+      "table": "platform_owners",
+      "schema": "iig_private",
+      "definition": "PRIMARY KEY (user_id)"
+    },
+    {
+      "name": "platform_owners_user_id_fkey",
+      "type": "f",
+      "table": "platform_owners",
+      "schema": "iig_private",
+      "definition": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE"
+    },
+    {
+      "name": "registration_settings_pkey",
+      "type": "p",
+      "table": "registration_settings",
+      "schema": "iig_private",
+      "definition": "PRIMARY KEY (singleton)"
+    },
+    {
+      "name": "registration_settings_singleton_check",
+      "type": "c",
+      "table": "registration_settings",
+      "schema": "iig_private",
+      "definition": "CHECK (singleton)"
+    },
+    {
+      "name": "setup_testers_pkey",
+      "type": "p",
+      "table": "setup_testers",
+      "schema": "iig_private",
+      "definition": "PRIMARY KEY (user_id)"
+    },
+    {
+      "name": "setup_testers_user_id_fkey",
+      "type": "f",
+      "table": "setup_testers",
+      "schema": "iig_private",
+      "definition": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE"
+    },
+    {
+      "name": "subscription_bindings_group_id_fkey",
+      "type": "f",
+      "table": "subscription_bindings",
+      "schema": "iig_private",
+      "definition": "FOREIGN KEY (group_id) REFERENCES tens_in_groups(id) ON DELETE RESTRICT"
+    },
+    {
+      "name": "subscription_bindings_pkey",
+      "type": "p",
+      "table": "subscription_bindings",
+      "schema": "iig_private",
+      "definition": "PRIMARY KEY (original_transaction_id)"
+    }
+  ]
+}

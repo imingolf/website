@@ -1,0 +1,8 @@
+{
+  "database_checks": 21,
+  "browser_checks": 10,
+  "browser": "Managed Chromium, synthetic adapters; desktop and 390px mobile layout",
+  "production_data_used_for_deletion_tests": false,
+  "update_guard_bodies_unchanged": true,
+  "authentication_joining_payments_implementation": "Preserved; dashboard adapter calls existing authenticated request and email-code flow."
+}

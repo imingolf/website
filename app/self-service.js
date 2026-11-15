@@ -136,6 +136,7 @@
     $('regResend').disabled = value || Date.now() < resendAt;
   };
   function reset() {
+    window.iigOwnerCentre?.closeActions();
     onboarding?.suspend();
     changingGroup=false;
     traceStep('account.reset');accessTrace.enabled=false;$('iigReadOnlyAccessTrace')?.remove();
@@ -652,6 +653,12 @@
       await request('/rest/v1/rpc/iig_adopt_retained_group',{p_pin:'1010',p_account:account,p_evidence:$('adoptEvidence').value.trim()},true);message('Organiser connected. Existing golf records were preserved.');
      });
     }
+    window.iigOwnerCentre?.configureActions({
+      request:(path,body)=>request(path,body,true),
+      userId:()=>session?.user?.id||null,
+      refresh:async()=>{offset=0;await loadDashboard();},
+      reauth:()=>action(async()=>{const address=session?.user?.email;if(!address)throw Error('Sign in again to continue.');await signout();email=address;$('regEmail').value=address;await sendCode();})
+    });
     $('liveText').textContent = 'Groups';
     document.querySelector('#dashView .side-foot').textContent = 'I’m In Golf • Active groups';
     $('loginView').classList.add('hidden'); $('dashView').classList.remove('hidden');

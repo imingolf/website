@@ -1,0 +1,1 @@
+{"private":true,"type":"module","scripts":{"test":"python tests/build-fixture.py && python tests/build-migration.py && node tests/database.mjs"},"devDependencies":{"@electric-sql/pglite":"0.5.16","playwright":"1.58.2"}}
