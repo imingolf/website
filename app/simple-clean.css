@@ -1,0 +1,362 @@
+/* Shared presentation only. No permissions, eligibility or write behaviour. */
+:root{--ui-deep:#10452e;--ui-green:#176b3a;--ui-player:#e4f2e8;--ui-bg:#f6f8f5;--ui-line:#dce5de;--ui-muted:#516259;--ui-radius:16px}
+html{scroll-padding-top:20px;-webkit-text-size-adjust:100%}
+body{background:var(--ui-bg);color:#172b20;line-height:1.5}
+button,input,select,textarea,summary{font:inherit}
+button,a,summary{touch-action:manipulation}
+button,input,select,summary{min-height:44px}
+button{font-size:15px;font-weight:700;line-height:1.3;cursor:pointer}
+.small,.small-btn{min-height:44px}
+button:disabled{cursor:default;opacity:.65}
+input,select,textarea{font-size:16px;max-width:100%;border-color:#aebfb2;border-radius:12px}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--ui-green);outline-offset:2px}
+:where(button,a,summary,[tabindex]):focus-visible{outline:3px solid #c2a123;outline-offset:3px}
+[hidden],.hidden{display:none!important}
+h1,h2,h3{color:inherit;line-height:1.2;letter-spacing:-.025em;text-wrap:balance}
+h2{font-size:21px;margin-bottom:12px}
+p{margin:8px 0 14px}
+.muted,.sub,.note{color:var(--ui-muted);font-size:14px;line-height:1.45}
+.card,.panel{border:1px solid var(--ui-line);border-radius:var(--ui-radius);box-shadow:none;padding:18px;margin-bottom:12px}
+.notice{border-radius:12px;font-size:14px;line-height:1.45}
+.primary{background:var(--ui-green);color:white;border:1px solid transparent}
+.secondary{background:#edf4ee;color:#174a2e;border:1px solid #d3e1d6}
+.ghost{background:transparent;color:#344f3d;border:1px solid var(--ui-line)}
+.full{margin-top:12px}
+.app{max-width:680px;margin:auto}
+.app-header{min-height:0;padding:calc(12px + env(safe-area-inset-top)) 20px 12px;border-radius:0 0 20px 20px;background:var(--ui-player);color:var(--ui-deep)}
+.app-header-brand{justify-content:space-between;gap:12px;min-height:44px;width:100%}
+.ui-app-name{font-size:18px;font-weight:750;margin-right:auto}
+.app-header-logo{height:44px;width:44px;border-radius:10px;box-shadow:none}
+.admin-mode .app-header{background:var(--ui-deep);color:white}
+.admin-mode-badge{width:auto;height:44px;min-width:92px;padding:10px 14px;border-radius:12px;background:#ffffff1f;color:white;border-color:#ffffff4d;font-size:14px;letter-spacing:0}
+.admin-mode-badge:hover{background:#ffffff30}
+main{padding:16px 14px}
+nav{width:min(680px,100%);gap:4px;padding:7px 8px calc(7px + env(safe-area-inset-bottom));box-shadow:0 -3px 15px #163c2410}
+nav button{font-size:12px;min-width:0;min-height:52px;border-radius:12px!important}
+body.admin-mode nav button:not(.hidden),body.admin-mode nav.iig-admin-nav-bar button:not(.hidden){background:transparent!important;color:var(--ui-deep)!important;border-color:transparent!important;font-weight:650!important}
+body.admin-mode nav button.active:not(.hidden),body.admin-mode nav.iig-admin-nav-bar button.active:not(.hidden){background:var(--ui-deep)!important;color:white!important;border-color:var(--ui-deep)!important}
+body:not(.admin-mode) nav button:not(.hidden){background:transparent!important;color:#385b43!important;border-color:transparent!important}
+body:not(.admin-mode) nav button.active:not(.hidden){background:#dcefe1!important;color:#16492d!important;border-color:#b9d7c2!important}
+#setupOverlay{background:var(--ui-bg);padding:calc(24px + env(safe-area-inset-top)) 20px 32px}
+.welcome-shell{width:min(460px,100%);margin:0}
+.welcome-brand{justify-content:flex-start;gap:12px;margin-bottom:28px}
+.welcome-brand img{height:48px;width:48px;border-radius:12px}
+.welcome-brand span{font-size:20px}
+.welcome-eyebrow{font-size:11px;letter-spacing:.12em;color:#55705d}
+#welcomeHome h1{font-size:clamp(32px,8vw,42px);line-height:1.12;margin:14px 0}
+.welcome-intro{font-size:16px;max-width:32ch;margin:0 0 24px}
+.welcome-benefits,.welcome-footnote{display:none} /* Duplicated in How it works. */
+.welcome-choices{gap:12px}
+.welcome-choice{border-radius:16px;padding:18px 16px;min-height:84px;text-align:left}
+.welcome-choice span{font-size:18px}
+.welcome-choice small{font-size:14px;margin-top:5px}
+.welcome-start{background:var(--ui-deep);color:white;border-color:var(--ui-deep)}
+.welcome-join{background:var(--ui-player);color:var(--ui-deep);border-color:#b9d7c2}
+.welcome-panel h1{font-size:30px;margin:18px 0 10px}
+.welcome-panel>p{font-size:15px;color:var(--ui-muted)}
+.welcome-back,.welcome-link{font-size:14px;min-height:44px}
+#registrationAuth>.notice{background:transparent;padding:0;color:var(--ui-muted);margin-bottom:16px}
+#registrationAuth form label{display:block;font-weight:650;font-size:14px}
+#regProgress{font-size:12px;font-weight:700;color:#42694d;margin:16px 0 8px}
+#regMessage:empty,#secureOrganiserStatus:empty,#securePlayerStatus:empty,#registerError:empty{display:none}
+#regMessage:not(:empty){padding:12px;border-left:3px solid #4a8257;background:#edf4ee;border-radius:8px}
+#regCreated{padding-top:8px}
+#regCreated h2{font-size:24px}
+#regCreatedName{font-weight:700;font-size:19px}
+#regPin{font-size:24px;font-variant-numeric:tabular-nums;letter-spacing:.05em}
+#regAccount{font-size:13px;overflow-wrap:anywhere}
+details.ui-options,details.ui-fold,#regPasswordOption,#registrationAuth>details,.welcome-help{border:1px solid var(--ui-line);border-radius:12px;margin:12px 0;background:white;padding:0 12px}
+details.ui-options>summary,details.ui-fold>summary,#regPasswordOption>summary,#registrationAuth>details>summary,.welcome-help>summary{padding:12px 0;cursor:pointer;font-size:14px;font-weight:700;color:var(--ui-deep)}
+details[open].ui-options,details[open].ui-fold{padding-bottom:12px}
+.ui-options button{margin:6px 0;min-height:44px}
+.ui-options>summary:focus-visible{border-radius:6px}
+#secureOrganiserBanner,#securePlayerBanner{padding:12px 14px;background:white;border:1px solid var(--ui-line);margin:0 0 16px;border-radius:14px}
+#secureOrganiserBanner>b,#securePlayerBanner>b{font-size:13px;display:block;letter-spacing:.01em}
+#secureOrganiserBanner{border-left:4px solid var(--ui-deep)}
+#securePlayerBanner{border-left:4px solid #67a477}
+#secureOrganiserBanner>.secondary,#securePlayerBanner>.secondary{font-size:13px;padding:8px 12px}
+#secureOrganiserStatus,#securePlayerStatus{font-size:14px;margin:8px 0;overflow-wrap:anywhere}
+#secureOrganiserBanner details,#securePlayerBanner details{margin-bottom:0}
+#secureInviteBox input{font-size:14px}
+.ui-fold{margin:0!important;border:0!important;padding:0!important;background:transparent!important}
+.ui-fold>summary{font-size:17px!important;min-height:48px}
+.ui-fold>summary::marker{color:var(--ui-green)}
+.ui-fold[open]>summary{margin-bottom:12px}
+#screen .card:has(>.ui-fold){padding-top:6px;padding-bottom:6px}
+.ui-secondary-action{background:#edf4ee!important;color:var(--ui-deep)!important;border:1px solid #d3e1d6!important}
+.pay-sticky,.finish-sticky{width:min(648px,calc(100% - 28px));border-radius:14px;box-shadow:0 4px 16px #143c231a}
+.player{padding:14px 0}
+.pill{font-size:12px;line-height:1.3}
+.score{min-width:82px;min-height:48px;font-size:20px}
+.app-toast{max-width:calc(100% - 28px);font-size:14px}
+/* The same readable hierarchy extends to Trip, team, score and history views. */
+#screen table{border-collapse:collapse;width:100%}
+#screen td,#screen th{padding:10px 8px;text-align:left}
+#screen .grid2{gap:12px}
+#screen>.card[style*="text-align:center"]{padding:20px 16px!important}
+#screen .trip-setup-card,#screen .trip-card{border-radius:var(--ui-radius)}
+/* Platform register: cards on phones, existing table on larger screens. */
+.login-card{box-shadow:none;border-radius:20px}
+.login-card h1{font-size:25px}
+.login-card h2{font-size:20px}
+.hero{min-height:0;background:#e5f1e7}
+.hero-inner{padding:24px}
+.hero h1{font-size:30px}
+.hero p{font-size:15px;font-style:normal}
+.content{padding:20px}
+.ui-register-table{min-width:0}
+.ui-register-table td{overflow-wrap:anywhere}
+.ui-register-table tbody tr{cursor:default}
+.ui-register-table caption{text-align:left;padding:0 0 12px;color:var(--ui-muted);font-size:14px;width:100%}
+.ui-dashboard-admin{margin-top:16px}
+@media(max-width:600px){
+ body{padding-bottom:calc(90px + env(safe-area-inset-bottom))}
+ .shell{display:block}.side{padding:10px 14px}.hero-inner{padding:20px 16px}.hero-art{opacity:.25}.hero h1{font-size:26px}.hero-actions{gap:6px}.live-pill,.owner-pill{padding:6px 10px;font-size:12px}
+ .shell .side .nav button{font-size:14px;min-height:44px;padding:8px 10px}
+ .content{padding:14px}.panel{padding:16px}.panel h2{font-size:21px}
+ .ui-register-wrap{overflow:visible;border:0;background:transparent}
+ .ui-register-table,.ui-register-table tbody{display:block;width:100%}
+ .ui-register-table caption{display:block}
+ .ui-register-table thead{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+ .ui-register-table tbody tr{display:grid;grid-template-columns:1fr 1fr;padding:14px;border:1px solid var(--ui-line);border-radius:12px;margin:0 0 12px;background:#fff;gap:8px 14px}
+ .ui-register-table td{display:block;border:0;padding:0;font-size:14px;min-width:0}
+ .ui-register-table td::before{content:attr(data-label);display:block;font-size:11px;font-weight:700;color:var(--ui-muted);margin-bottom:2px}
+ .ui-register-table td:first-child{grid-column:1/-1;font-size:18px;font-weight:750}
+ .ui-register-table td:nth-child(4){grid-column:1/-1}
+ .ui-register-table td:first-child::before{display:none}
+ .toolbar{display:flex;gap:8px;flex-wrap:wrap}.toolbar button{flex:1;min-width:90px}
+}
+@media(max-width:360px){main{padding:12px 10px}#setupOverlay{padding-left:16px;padding-right:16px}.grid2{grid-template-columns:1fr}.welcome-brand{margin-bottom:20px}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;transition-duration:.01ms!important}}
+/* Coordinated private review polish. Presentation only. */
+.welcome-join{background:#fff}.welcome-intro{display:none}.welcome-brand{margin-bottom:18px}
+#registrationAuth p{margin:7px 0 10px}#regProgress{margin:6px 0}#registrationAuth input{margin-bottom:10px}
+#regPasswordOption{border:0;background:transparent;padding:0}#regPasswordOption>summary{font-weight:500;font-size:14px}
+#registrationAuth:has(#regJoinForm:not([hidden]))>#regReload,#registrationAuth:has(#regJoinForm:not([hidden]))>details,#registrationAuth:has(#regCreated:not([hidden]))>#regReload{display:none}
+#regCreated>h2,#regCreated:not([hidden])~#regMessage{display:none}
+.ui-invited-group{font-size:22px;font-weight:750;color:var(--ui-deep)}
+.ui-app-name{overflow-wrap:anywhere;min-width:0;line-height:1.25}.app-header-brand{flex-wrap:wrap}.ui-close{float:right;margin:0 0 8px 12px;min-width:60px}
+.ui-submitted-total{display:block;font-size:28px;font-weight:800;margin:8px 0}
+.ui-quiet-banner>b,.ui-quiet-banner>p{display:none}
+#securePlayerBanner.ui-quiet-banner:not(.ui-show-options){display:none}
+.ui-group-admin{border:1px solid var(--ui-line);border-radius:10px;padding:0 10px;background:white;color:var(--green)}
+.ui-group-admin>summary{min-height:44px;display:flex;align-items:center;font-weight:700;cursor:pointer}
+.ui-group-admin[open]{display:flex;flex-direction:column;gap:8px;padding-bottom:10px}
+.ui-group-panel>b{display:none!important}
+.ui-group-panel h2{margin:0 0 8px;overflow-wrap:anywhere}
+.ui-group-panel button,.ui-group-admin button{min-height:44px}
+.ui-group-panel #securePlayerOrganiserReturn{display:none!important}
+#secureOrganiserBanner.ui-quiet-banner{padding:0;border:0;background:none;margin-bottom:10px}
+#secureOrganiserBanner.ui-quiet-banner details{margin:0}
+body[data-ui-page=league] #secureOrganiserBanner.ui-quiet-banner{display:none}
+.ui-trip-summary{font-weight:750;color:var(--ui-deep);margin-bottom:10px}
+[data-trip-round]>summary{font-weight:750;cursor:pointer;padding:6px 0 12px}
+#iigAccountDialog{padding:16px!important}#iigAccountDialog details{margin-top:12px}#iigAccountDialog .card{padding:16px}
+.iig-player-profile{width:min(100% - 24px,480px);max-height:calc(100dvh - 24px);padding:0;border:0;border-radius:18px;color:var(--ui-deep);overflow:auto;background:#fff;box-sizing:border-box}
+.iig-player-profile::backdrop{background:rgba(0,0,0,.5)}
+.iig-player-profile .card{margin:0;padding:20px}
+.iig-player-profile h2{font-size:24px;margin-top:0}
+.iig-player-profile label{display:block;font-weight:700;margin-top:14px}
+.iig-player-profile input{width:100%;box-sizing:border-box;font-size:18px}
+.iig-player-profile small{display:block;margin:8px 0 14px}
+.iig-player-profile button{min-height:44px;margin-top:12px}
+.iig-player-profile [hidden]{display:none!important}
+.shell{grid-template-columns:200px minmax(0,1fr)}.side .nav .txt{display:inline!important}.side .nav button{white-space:normal;overflow-wrap:anywhere;text-align:left!important;font-size:14px!important}.brand span{display:inline!important}
+.hero-inner{flex-wrap:wrap;gap:12px}.hero-actions{position:static!important}.hero h1{overflow-wrap:anywhere}
+@media(max-width:900px){.shell{display:block}.side{position:static!important;display:flex;flex-direction:row;flex-wrap:wrap;gap:10px;padding:12px 16px}.side .nav{display:flex;flex-wrap:wrap;margin:0;gap:8px}.side .nav button{width:auto}.hero-inner{padding:18px 16px}.ui-register-table,.ui-register-table tbody{display:block;width:100%}.ui-register-table caption{display:block}.ui-register-table thead{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}.ui-register-table tbody tr{display:grid;grid-template-columns:1fr 1fr;gap:8px 14px;background:white;border:1px solid var(--ui-line);border-radius:12px;padding:14px;margin-bottom:12px}.ui-register-table td{display:block;border:0;padding:0;min-width:0;overflow-wrap:anywhere}.ui-register-table td::before{content:attr(data-label);display:block;font-size:12px;color:var(--ui-muted)}.ui-register-table td:first-child{grid-column:1/-1;font-size:18px;font-weight:750}.ui-register-table td:first-child::before{display:none}.ui-register-table td.ui-group-details{grid-column:1/-1}.ui-register-wrap{overflow:visible;border:0}.content{padding:14px}}
+#registrationAuth:has(#regJoinForm:not([hidden])) #regSignedIn>#regReload,#registrationAuth:has(#regJoinForm:not([hidden])) #regSignedIn>details,#registrationAuth:has(#regCreated:not([hidden])) #regReload{display:none}
+#registrationAuth:has(#regCodeForm:not([hidden]))>details:not(#regPasswordOption){display:none}
+#regHandicapHelp{display:block;margin:0 0 10px}#regProgress:empty{display:none}
+.ui-quiet-banner>p[role=status],.ui-quiet-banner>b{display:none!important}
+.ui-course-summary .row{flex-wrap:wrap;gap:10px}
+.welcome-panel{padding:18px!important}.welcome-panel h1{margin:8px 0!important;font-size:28px}.welcome-panel>p{margin:6px 0 12px}
+#registrationAuth input{padding:11px 12px!important;margin:5px 0 10px!important;min-height:46px}
+#registrationAuth form label{margin:4px 0 0}#registrationAuth .full{margin-top:8px}
+#registrationAuth:has(#regCreated:not([hidden]))>details:has(#regReturnForm){display:none}
+#registrationAuth:has(#regGroupForm:not([hidden]))>details:has(#regReturnForm){display:none}
+/* Joining and returning: keep account administration outside access forms. */
+.iig-player-access #regSignedIn>details,.iig-player-access #regAccountReference{display:none}
+#regAccessHelp h2{margin-top:12px}#regAccessHelpText{line-height:1.5}
+
+/* Compact organiser home and visible, keyboard-accessible invitations. */
+#registrationAuth:has(#regCreated:not([hidden])) .ui-options{margin:8px 0;padding:10px 12px}
+#regCreatedName{font-size:22px;font-weight:750;line-height:1.25}
+#regCreated>p{margin:6px 0 10px}#regCreated>#regPlayerView{display:none}
+#regAccountOptions>summary{min-height:44px;display:flex;align-items:center;font-size:14px}
+#registrationAuth:has(#regCreated:not([hidden])) #regAccount{display:none}
+.welcome-panel:has(#regCreated:not([hidden]))>p{display:none}
+#secureInviteBox{scroll-margin-top:100px;margin-top:12px;padding:12px;border:1px solid var(--ui-line);border-radius:10px;overflow-wrap:anywhere}
+#secureInviteBox:focus{outline:3px solid #bd9a21;outline-offset:3px}
+#secureInviteControls[hidden],#regOwnerPlayerSetup[hidden]{display:none!important}
+#secureInviteLink{width:100%;min-width:0;box-sizing:border-box;min-height:44px}#secureInviteControls a,#secureInviteControls button{min-height:44px}
+#secureInviteControls button,#secureInviteOpen{display:block;width:100%;box-sizing:border-box;margin-top:8px;text-align:center}
+#secureInviteOpen{padding:12px 8px}
+#secureInviteControls [hidden]{display:none!important}#secureInviteMessage{width:100%;box-sizing:border-box;font:inherit;min-height:160px}
+
+/* Website invitation to existing iPhone app: explicit, member-bound guidance. */
+.ui-app-handover{border-color:var(--ui-green);overflow-wrap:anywhere}.ui-app-handover h2{font-size:20px;margin:0 0 8px}
+.ui-app-handover a{display:block;text-align:center;min-height:44px;padding:12px;box-sizing:border-box}.ui-app-handover p{line-height:1.5}
+body[data-ui-page]:not([data-ui-page=round]) .ui-app-handover{display:none}
+
+/* Consolidated player/group navigation; landing and gameplay layouts retained. */
+.simpler-player-identity{background:#edf5ed;border:1px solid #c8dbca;font-size:15px;padding:11px 14px}
+#securePlayerOrganiserReturn{margin:0}
+#securePlayerOrganiserReturn button{margin-top:0}
+#securePlayerOrganiserReturn p:empty{display:none}
+#securePlayerBanner details[open]>summary[hidden],#secureOrganiserBanner details>summary[hidden]{display:none!important}
+#simplerOrganiserMenu,#uiPlayerOptions{min-height:44px}
+.app-header-brand{display:grid;grid-template-columns:36px minmax(0,1fr) auto;align-items:center;gap:8px}
+.app-header-brand .app-header-logo{width:36px;height:36px;grid-column:1}
+.app-header-brand .ui-app-name{grid-column:2;min-width:0}
+#simplerOrganiserMenu,#uiPlayerOptions{grid-column:3;margin:0}
+#secureOrganiserBanner details[open]{padding:10px 12px}
+#simplerRoleSwitch{grid-column:1/-1;grid-row:2;min-height:44px;margin:0;font-size:14px}
+#simplerRoleSwitch[hidden]{display:none!important}
+#securePlayerOrganiserReturn{display:none!important}
+#securePlayerOrganiserStatus{grid-column:1/-1;margin:0;font-size:14px}
+#securePlayerOrganiserStatus:empty{display:none}
+.simpler-member-choice{text-align:left;min-height:64px}
+.simpler-member-choice strong,.simpler-member-choice small{display:block}
+.simpler-member-choice small{font-size:13px;margin-top:4px}
+.simpler-member-choice:disabled{opacity:1;background:#f3f6f2;color:#526255;border-color:#d8e1d7}
+#simplerMemberMessage:empty{display:none}
+#simplerAdminControls{grid-column:1/-1;grid-row:2;display:flex;flex-wrap:wrap;gap:8px;min-width:0}
+#simplerAdminControls[hidden]{display:none!important}
+#simplerAdminControls>button{flex:1 1 156px;min-width:0;min-height:44px;margin:0;padding:10px 12px;font-size:14px;line-height:1.3;border-radius:12px;white-space:normal}
+#simplerAdminControls{display:block}
+#simplerAdminControls>summary{min-height:44px;display:flex;align-items:center;font-weight:700;cursor:pointer}
+#simplerAdminControls>button{width:100%;margin-top:8px}
+#secureOrganiserBanner.ui-group-panel{display:block!important;padding:12px 14px;border:1px solid var(--ui-line);background:white}
+
+/* Second private review: presentation only; authorisation remains in existing handlers. */
+.ui-own-payment{border:2px solid var(--green)}
+.ui-own-payment h2{margin:0 0 8px}.ui-own-payment p{margin:8px 0}
+#uiRoundPayments .big{font-size:26px;margin:8px 0}
+.ui-previous-winnings .muted{line-height:1.4}
+.ui-result-payment{margin-top:16px}
+
+#uiScoredGroupPayments{margin-top:14px}#uiScoredGroupPayments .card{border:0;box-shadow:none;margin:8px 0;padding:8px 0}
+
+/* Result payment summary: one compact list, with an independent status per winner. */
+.ui-winner-summary .ui-winner-list{list-style:none;margin:0;padding:0}
+.ui-winner-summary .ui-winner-list>li{padding:12px 0;border-top:1px solid var(--ui-line)}
+.ui-winner-summary .ui-winner-list>li:first-child{border-top:0}
+.ui-winner-line{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.ui-winner-line>strong:first-child{min-width:0;overflow-wrap:anywhere}
+.ui-winner-line>strong:last-child{flex-shrink:0;white-space:nowrap}
+.ui-winner-status{display:block;margin-top:4px;font-size:14px;color:var(--ui-muted)}
+.ui-winner-paid{color:var(--ui-green)}
+#appPromptError{margin:8px 0 12px;padding:12px;border-radius:10px;background:#fff1c7;color:#704f00;font-size:15px;line-height:1.4}
+
+/* Group panel spacing only. Existing controls and handlers stay intact. */
+.ui-group-panel #simplerGroupInfo {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.ui-group-panel #simplerGroupInfo > h2,
+.ui-group-panel #simplerGroupInfo > p {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+.ui-group-panel #simplerGroupInfo > p {
+  color: var(--ui-muted);
+  margin-bottom: 4px;
+}
+.ui-group-panel #simplerGroupInfo > button {
+  width: 100%;
+  margin: 0;
+}
+.ui-group-panel > details.ui-options[open] {
+  display: block;
+  margin: 20px 0 0 !important;
+  padding: 8px 0 0 !important;
+  border: 0;
+  border-top: 1px solid var(--ui-line);
+  border-radius: 0;
+}
+.ui-group-panel > details.ui-options > p,
+.ui-group-panel > details.ui-options > div {
+  width: 100%;
+  min-width: 0;
+}
+.ui-group-panel > details.ui-options > button {
+  display: inline-block;
+  vertical-align: top;
+  min-width: 0;
+  max-width: 100%;
+  margin: 12px 12px 0 0;
+}
+.ui-group-panel > details.ui-options > button:last-child {
+  margin-right: 0;
+}
+.ui-group-panel #simplerGroupInfo > button,
+.ui-group-panel > details.ui-options > button {
+  min-height: 48px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.ui-group-panel > details.ui-options > :is(#securePlayerReload, #secureOrganiserReload) {
+  background: transparent;
+  color: var(--ui-muted);
+  border-color: var(--ui-line);
+  font-size: 14px;
+  font-weight: 600;
+}
+@media (max-width: 420px) {
+  .ui-group-panel > details.ui-options > button {
+    display: block;
+    width: 100%;
+    margin: 12px 0 0;
+  }
+}
+@media (max-width: 360px) {
+  .ui-group-panel #simplerGroupInfo {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+/* Matching invitation controls; each retains its separate sharing action. */
+#secureInviteControls .ui-invite-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  min-height: 48px;
+  margin: 12px 0 0;
+  padding: 12px 16px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: var(--ui-green);
+  color: #fff;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.3;
+  text-align: center;
+  text-decoration: none;
+  white-space: normal;
+}
+#secureInviteControls .ui-invite-action svg {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+}
+#secureInviteControls .ui-invite-action span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* Focused paid-competition entry. */
+.iig-paid-entry-next h2{margin:0 0 10px}.iig-paid-entry-next p{margin:0 0 16px}
+.iig-paid-entry h2{margin:0 0 18px}.iig-entry-details{border-top:1px solid #dbe5df;border-bottom:1px solid #dbe5df;padding:18px 0;margin:16px 0}
+.iig-entry-details h3{margin:0 0 6px;font-size:21px}.iig-entry-price{font-size:34px;font-weight:900;margin:15px 0 0}.iig-entry-price span{font-size:16px;font-weight:600;color:#4c6255}
+.iig-entry-dialog{box-sizing:border-box;width:calc(100% - 32px);max-width:470px;border:1px solid #d8e4db;border-radius:22px;padding:26px;background:#fff;color:#193125;font-family:inherit;box-shadow:0 18px 60px #0003}
+.iig-entry-dialog::backdrop{background:#10281ecc}.iig-entry-dialog h2{font-size:27px;line-height:1.2;margin:0 0 16px}.iig-entry-dialog p{font-size:17px;line-height:1.5}.iig-entry-dialog button{margin-top:12px;min-height:52px}.iig-entry-dialog [data-entry-status]:empty{display:none}
+.iig-entry-recovery{margin-top:22px;font-size:15px}.iig-entry-recovery summary{cursor:pointer}.iig-entry-recovery a{display:block;box-sizing:border-box;text-align:center;text-decoration:none;padding:14px;border-radius:12px}.iig-entry-dialog button:disabled{opacity:.6}
+@media(max-width:360px){.iig-entry-dialog{padding:20px}.iig-entry-dialog h2{font-size:24px}}
