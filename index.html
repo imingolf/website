@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>I'm In Golf</title>
-<meta name="description" content="I'm In Golf makes golf with your mates simple: join, pay, score and see who wins.">
+<meta name="description" content="I'm In Golf makes golf with your friends simple: join, pay, score and see who wins.">
 <style>
 :root{--green:#176b3a;--green2:#23864e;--dark:#102418;--cream:#f5f7f3;--card:#fff;--muted:#6d766f;--line:#dfe7e1}
 *{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;color:var(--dark);background:var(--cream)}
@@ -127,6 +127,13 @@ footer{padding:28px 0 42px;color:var(--muted);font-size:14px}.footer-row{display
   .help-panel{right:14px;bottom:72px;width:calc(100vw - 28px);max-height:calc(100vh - 94px)}
 }
 
+
+/* Website-only getting started and reviewed Help. */
+html{scroll-padding-top:90px}a,button{-webkit-tap-highlight-color:transparent}button{font:inherit;cursor:pointer}a:focus-visible,button:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid #b58012;outline-offset:4px}
+.navlinks{display:flex;align-items:center;gap:20px}.navlinks>a:first-child{color:var(--green);font-weight:800}.hero .route-note{font-size:14px;line-height:1.6;margin:16px 0 12px;max-width:510px}.textlink{color:var(--green);font-weight:800;text-decoration:underline;text-underline-offset:4px}
+.website-help{background:#edf4ee}.website-help .wrap{max-width:880px}.help-entry{display:grid;grid-template-columns:1fr 1fr;gap:14px}.help-entry>a{display:block;background:white;border:1px solid var(--line);padding:22px;border-radius:18px;color:var(--dark);font-size:19px;font-weight:800}.help-entry span{display:block;color:var(--green);font-size:14px;font-weight:500;margin-top:8px}.invite-prompt{text-align:center;line-height:1.6;margin:26px 0}.website-help a:not(.help-entry a){color:var(--green);text-decoration:underline;text-underline-offset:3px}.guide-list{background:white;border:1px solid var(--line);border-radius:18px;overflow:hidden}.guide-list details{border-bottom:1px solid var(--line);scroll-margin-top:90px}.guide-list details:last-child{border:0}.guide-list summary{padding:20px;cursor:pointer;font-weight:750;line-height:1.4}.guide-answer{padding:0 20px 16px;line-height:1.65;color:#405347}.guide-answer ol{padding-left:22px}.guide-answer li+li{margin-top:9px}.guide-answer p{margin:8px 0}.help-reopen{font-size:14px;color:var(--muted);line-height:1.6;text-align:center}.help-panel[hidden]{display:none}.help-panel{padding:0}.help-body .guide-answer{padding:0}.help-body h4{font-size:18px;margin:20px 0 12px}.help-matches{display:grid;gap:8px}.help-matches button{padding:12px;text-align:left;border:1px solid var(--line);border-radius:10px;background:#edf4ee;color:var(--green);font-weight:700}.help-input-wrap{min-width:0}.help-input{min-width:0;font-size:16px}.help-note{line-height:1.5}.help-head,.help-input-wrap,.help-note{flex-shrink:0}.help-body a{color:var(--green);text-decoration:underline}.help-body{overflow-wrap:anywhere}.visually-hidden{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}footer{padding-bottom:100px}
+@media(max-width:520px){.nav{gap:8px}.navlinks{gap:12px}.navlinks>a:first-child{font-size:13px}.brand{gap:7px;font-size:16px}.brand img{width:30px;height:30px}.navbtn{padding:10px}.hero .route-note{margin:16px auto 12px}.help-entry{grid-template-columns:1fr}.hero .actions a{flex:1 1 120px;padding:13px 10px;font-size:14px}.guide-list summary{padding:17px}.guide-answer{padding:0 17px 15px}.help-head{padding:16px}.help-panel{max-height:calc(100dvh - 94px)}.row{flex-wrap:wrap}.preview-row{min-width:0}}
+
 </style>
 </head>
 <body>
@@ -137,27 +144,26 @@ footer{padding:28px 0 42px;color:var(--muted);font-size:14px}.footer-row{display
       <img src="logo.png" alt="I'm In Golf logo">
       <span>I'm In Golf</span>
     </a>
-    <a class="navbtn" href="https://imingolf.co.uk/app/">Open App</a>
+    <nav class="navlinks" aria-label="Main navigation"><a href="#help">Help</a><a class="navbtn" href="https://imingolf.co.uk/app/">Open App</a></nav>
   </div>
 </header>
 
 <main>
 <section class="hero"><div class="wrap hero-grid">
-<div><span class="eyebrow">⛳ Golf with your mates, made simple</span><h1>Pay. Play.<br>Score. Brag.</h1><p>I'm In Golf keeps your golf group organised without the fuss. Group competitions, points competitions, golf trips and leaderboards — all in one simple app.</p><p class="problem-line">No more WhatsApp chasing who's in, who's paid or who won.</p><div class="actions">
-  <a class="primary" href="https://imingolf.co.uk/app/">Open My Group</a>
-  <a class="secondary" href="https://imingolf.co.uk/app/?pin=2026">Try the Demo</a>
-  <a class="secondary" href="mailto:hello@imingolf.co.uk?subject=Start%20My%20I'm%20In%20Golf%20Group">Start Your Group</a>
-</div>
+<div><span class="eyebrow">⛳ Golf with your friends, made simple</span><h1>Pay. Play.<br>Score. Brag.</h1><p>I'm In Golf keeps your golf group organised without the fuss. Group competitions, points competitions, golf trips and leaderboards — all in one simple app.</p><p class="problem-line">No more WhatsApp chasing who's in, who's paid or who won.</p><div class="actions">
+  <a class="primary" href="https://imingolf.co.uk/app/">Start Your Group</a>
+  <a class="secondary" href="https://imingolf.co.uk/app/">Join Your Group</a>
+</div><p class="route-note">In the app, choose <strong>Start a golf group</strong> or <strong>Join my golf group</strong>. Already an organiser? Choose <strong>Admin sign in</strong>.</p><a class="textlink" href="#help">New here? Get started with Help →</a>
 </div>
 
-<div class="phone"><div class="screen"><div class="apphead"><h3>I'm In Golf ⛳</h3><div style="opacity:.8;font-size:13px">Shared golf group</div></div><div class="mock">
-<div class="card"><div class="small">CURRENT ROUND</div><div class="row"><div><div style="font-weight:900;font-size:19px;margin-top:4px">Pinecrest Golf Club</div><div class="small">26.9.26 • 3 entered</div></div><span class="pill">OPEN</span></div><div style="margin-top:10px;font-weight:900">💷 GROUP GAME &nbsp; ⛳ NET</div><div class="small" style="margin-top:6px">£20 entry • 3/4 paid • £60 collected</div></div>
-<div class="card"><div style="font-weight:900;margin-bottom:10px">💷 Pay Before Play</div><div class="row"><div><div class="big">£60</div><div class="small">Paid so far</div></div><span class="pill">3/4 PAID</span></div><div class="small" style="margin-top:8px">Expected total £80 • £20 per player</div><div class="mockbtn">View payments</div></div>
+<div class="phone"><div class="screen"><div class="apphead"><h3>I'm In Golf ⛳</h3><div style="opacity:.8;font-size:13px">Fictional example · not a live group</div></div><div class="mock">
+<div class="card"><div class="small">CURRENT ROUND</div><div class="row"><div><div style="font-weight:900;font-size:19px;margin-top:4px">Pinecrest Golf Club</div><div class="small">4 players entered</div></div><span class="pill">SCORING</span></div><div style="margin-top:10px;font-weight:900">💷 MONEY GAME &nbsp; ⛳ NET</div><div class="small" style="margin-top:6px">£20 entry • 3/4 paid • £60 declared paid</div></div>
+<div class="card"><div style="font-weight:900;margin-bottom:10px">💷 Pay Before Play</div><div class="row"><div><div class="big">£60</div><div class="small">Declared paid</div></div><span class="pill">3/4 PAID</span></div><div class="small" style="margin-top:8px">Expected total £80 • £20 per player</div><div class="mockbtn">View payments</div></div>
 <div class="card"><div style="font-weight:900;margin-bottom:12px">⛳ Net Score Leaderboard</div><div class="row"><b>1. Alex</b><b>68</b></div><div class="row" style="margin-top:10px"><span>2. Sarah</span><span>70</span></div><div class="row" style="margin-top:10px"><span>3. Sam</span><span>72</span></div></div>
 </div></div></div>
 </div></section>
 
-<section><div class="wrap"><div class="section-title"><h2>Everything your golf group actually needs.</h2><p>No GPS. No clutter. No hole-by-hole scoring. Just the simple bits that make a mates' golf day run smoothly.</p></div>
+<section><div class="wrap"><div class="section-title"><h2>Everything your golf group actually needs.</h2><p>No GPS. No clutter. No hole-by-hole scoring. Just the simple bits that make a friends' golf day run smoothly.</p></div>
 <div class="features">
   <div class="feature">
     <div class="icon">💷</div>
@@ -188,7 +194,7 @@ footer{padding:28px 0 42px;color:var(--muted);font-size:14px}.footer-row{display
       <div class="audience-item"><span>🏌️</span>Regular golf groups</div>
       <div class="audience-item"><span>👥</span>Society days</div>
       <div class="audience-item"><span>✈️</span>Golf trips</div>
-      <div class="audience-item"><span>💷</span>Friendly games with your mates</div>
+      <div class="audience-item"><span>💷</span>Friendly games with your friends</div>
     </div>
   </div>
 </section>
@@ -210,7 +216,7 @@ footer{padding:28px 0 42px;color:var(--muted);font-size:14px}.footer-row{display
       <div class="feature">
         <div class="icon">💷</div>
         <h3>Who's paid?</h3>
-        <p>Keep track of entries and who's paid.</p>
+        <p>Keep track of entries and who has confirmed payment.</p>
       </div>
 
       <div class="feature">
@@ -224,22 +230,22 @@ footer{padding:28px 0 42px;color:var(--muted);font-size:14px}.footer-row{display
 <section>
   <div class="wrap">
     <div class="section-title">
-      <h2>See what your group sees.</h2>
-      <p>Simple screens for money games, season points and golf trips — without asking players to enter every hole.</p>
+      <h2>A feel for your group’s app.</h2>
+      <p>Illustrative screens with fictional players and amounts. Money Game, Points Game and Trip Mode — without hole-by-hole scoring.</p>
     </div>
 
     <div class="preview-grid">
       <div class="preview-card">
-        <div class="preview-label">GROUP GAME</div>
+        <div class="preview-label">MONEY GAME</div>
         <div class="preview-screen">
           <div class="preview-head"><b>💷 Pay Before Play</b><span>£20 each • 4 players</span></div>
           <div class="preview-body">
-            <div class="preview-row"><div><div class="preview-title">Payments received</div><div class="preview-sub">Everyone can see the status</div></div><div class="preview-money">£60</div></div>
+            <div class="preview-row"><div><div class="preview-title">Declared payments</div><div class="preview-sub">3 of 4 players marked paid</div></div><div class="preview-money">£60</div></div>
             <div class="preview-row"><div><div class="preview-title">Alex</div><div class="preview-sub">Money Game entrant</div></div><b>✓ Paid</b></div>
-            <div class="preview-row"><div><div class="preview-title">Sam</div><div class="preview-sub">Money Game entrant</div></div><b>Not paid</b></div>
+            <div class="preview-row"><div><div class="preview-title">Sam</div><div class="preview-sub">Entry fee due</div></div><b>Not paid</b></div>
           </div>
         </div>
-        <div class="preview-note">Track the entry fee, payments received and who's paid. The Admin sets the competition for everyone.</div>
+        <div class="preview-note">Track the entry fee, declared payments and who's paid. The Admin sets the competition for everyone.</div>
       </div>
 
       <div class="preview-card">
@@ -281,12 +287,12 @@ footer{padding:28px 0 42px;color:var(--muted);font-size:14px}.footer-row{display
       <div class="step">
         <b>STEP 1</b>
         <h3>Join</h3>
-        <p>Open the invite link and choose your player.</p>
+        <p>Open your organiser’s invitation. Verify your email, then add your name and handicap if asked.</p>
       </div>
 <div class="step">
   <b>STEP 2</b>
   <h3>Get ready</h3>
-  <p>See who's playing, who's paid and what's being played.</p>
+  <p>Check the round and join before scoring starts. If there’s a fee, pay externally and confirm in the app.</p>
 </div>
       
       <div class="step">
@@ -298,192 +304,88 @@ footer{padding:28px 0 42px;color:var(--muted);font-size:14px}.footer-row{display
       <div class="step">
         <b>STEP 4</b>
         <h3>Score</h3>
-        <p>Enter your final score and see who won.</p>
+        <p>Check and submit your final score. It then stays locked. See the results in your group.</p>
       </div>
     </div>
   </div>
 </section>
+<section id="help" class="website-help"><div class="wrap"><div class="section-title"><span class="eyebrow">A little help, whenever you need it</span><h2>Your first round starts here.</h2><p>Start with your role, or open a quick guide below.</p></div><div class="help-entry"><a href="#guide-start">I’m organising a group <span>Start, sign in and invite friends →</span></a><a href="#guide-join">I’m joining a group <span>Join, pay and submit a score →</span></a></div><p class="invite-prompt"><b>Ready to add your friends?</b> <a href="#guide-invite">How to invite players →</a></p><div class="guide-list"><details id="guide-start" data-topic="start" data-keywords="start create new organiser admin setup email code"><summary>Start a group</summary><div class="guide-answer"><ol><li>Open the app and choose <b>Start a golf group</b>.</li><li>Enter your name, group name and email address.</li><li>Request your sign-in code, check your email and enter the latest code to verify your email and create your group.</li><li>Choose <b>Open my group</b>, or <b>Invite players</b> to bring your friends in.</li></ol><p>Use the same email when you return. You don’t need to email the team to create a group.</p></div></details>
+<details id="guide-invite" data-topic="invite" data-keywords="invite invitation friends add players share whatsapp contacts send"><summary>Invite your friends</summary><div class="guide-answer"><ol><li>Open your group as the organiser.</li><li>Open <b>Group options → Invite players</b>. You can also choose <b>Invite players</b> on the “Your group is ready” screen.</li><li>Choose <b>Share on WhatsApp</b>, or <b>Copy invitation message</b> and paste it into your message to your friends.</li><li>Each friend opens the invitation and signs in with their own email. New players add their own name and handicap.</li></ol><p>Send the complete invitation privately. Joining the group and entering a particular round are separate steps.</p></div></details>
+<details id="guide-join" data-topic="join" data-keywords="join player invited invitation pin name handicap"><summary>Join as a player</summary><div class="guide-answer"><p>Open the invitation your organiser sent you. Sign in using your email and the code sent to it. If you are new to the group, follow the prompts to add your name and handicap.</p><p>If you have a group PIN, choose <b>Join my golf group</b> in the app and follow the prompts. If joining is not offered, ask your organiser for the complete invitation.</p><p>For an existing player account, use the same verified email. You don’t choose somebody else’s name from a list.</p></div></details>
+<details id="guide-return" data-topic="return" data-keywords="return returning reopen login signin sign signing in account email code iphone download app"><summary>Return to your group</summary><div class="guide-answer"><p>Reopen the app. If asked to sign in, use the same email you used before.</p><p><b>Organiser:</b> choose <b>Admin sign in</b>, verify your email if prompted, then open your group.</p><p><b>Player:</b> choose <b>Join my golf group</b>, use your group PIN if asked and sign in with your existing player email.</p><p>Joined in a browser and now using the iPhone app? Open the app from its icon and use the same PIN and verified email. Browser sign-in does not automatically transfer to the app.</p></div></details>
+<details id="guide-round" data-topic="round" data-keywords="round competition organise setup entered entries closed late first score"><summary>Set up and enter a round</summary><div class="guide-answer"><p>The organiser sets the course, date and competition in <b>Round</b>. Current game options include <b>Money Game</b>, <b>Points Game</b> and <b>Trip Mode</b>.</p><p>Players check the round details and follow the entry and payment prompts before scoring starts.</p><p><b>Once the first score is submitted, entries to that competition close.</b> A friend can still join the group, but cannot enter that closed round. “Awaiting scores” means an existing entrant has not submitted their score yet.</p></div></details>
+<details id="guide-pay" data-topic="pay" data-keywords="pay paid payment payments fee fees money bank automatic confirm confirmation unpaid"><summary>Pay and confirm your payment</summary><div class="guide-answer"><ol><li>Open <b>Pay</b> and use the organiser’s payment link.</li><li>Complete the payment in your banking or payment service.</li><li>Return to I’m In Golf and explicitly confirm that you have paid. Only confirm after actually paying.</li></ol><p>I’m In Golf records declared payment status. It does not receive, hold or automatically verify the money.</p><p>Already entered, with a submitted score? You can still confirm your entry fee in <b>Pay</b>; your submitted score stays locked. If you have not paid, keep your status as unpaid.</p></div></details>
+<details id="guide-score" data-topic="score" data-keywords="score scores submit final stableford net locked mistake correction"><summary>Submit your final score</summary><div class="guide-answer"><p>Open <b>Scores</b> after your round. Enter the final Stableford or Net total requested by the competition. Check it carefully and confirm submission.</p><p><b>Your submitted score is locked.</b> Payment confirmation does not unlock it. If you made a genuine mistake, contact your organiser rather than submitting again.</p><p>The app uses final totals, not hole-by-hole scoring.</p></div></details>
+<details id="guide-results" data-topic="results" data-keywords="result results winner league standings points history"><summary>Find results and league standings</summary><div class="guide-answer"><p>Use <b>Scores</b> for the current round’s scores. Once the organiser finishes the round, view the saved result and use <b>League</b> for standings.</p><p>Stableford points, Net totals and league points are different figures. Follow the label shown for your competition.</p></div></details>
+<details id="guide-trip" data-topic="trip" data-keywords="trip trips holiday rounds stableford net totals"><summary>Trip basics</summary><div class="guide-answer"><p>The organiser sets up the trip and its rounds in <b>Trip Mode</b>, including the competition format. Players follow each round’s entry, payment and score prompts.</p><p>View completed round results and the overall trip standings. Follow the selected format: Stableford uses points; Net uses net scores. The organiser starts each next round.</p></div></details>
+<details id="guide-stuck" data-topic="stuck" data-keywords="help stuck support problem wrong email code expired"><summary>Need a little more help?</summary><div class="guide-answer"><p>Check that you are using the same email as before and the latest sign-in code. Check your Inbox and Junk folder. If needed, use the app’s <b>Send another code</b> option when available.</p><p>For an invitation or group access issue, ask your organiser. For other help, email <a href="mailto:hello@imingolf.co.uk">hello@imingolf.co.uk</a>. Never send your sign-in code.</p></div></details>
+</div><p class="help-reopen">Come back to <b>Help</b> at the top of this website, or use <b>Need help?</b> on any part of this page.</p></div></section>
 <section class="cta">
   <div class="wrap">
     <div class="cta-box">
-      <h2>Golf. Mates. You're In.</h2>
-      <p>Try the demo. If you like it, start your own golf group.</p>
+      <h2>Golf. Friends. You're In.</h2>
+      <p>Create your group in the app, then invite your friends.</p>
 
       <div class="actions" style="justify-content:center;">
-        <a class="primary" href="https://imingolf.co.uk/app/?pin=2026">Try the Demo</a>
-        <a class="secondary" href="mailto:hello@imingolf.co.uk?subject=Start%20My%20I'm%20In%20Golf%20Group">Start Your Group</a>
+        <a class="primary" href="https://imingolf.co.uk/app/">Start Your Group</a>
+        <a class="secondary" href="https://imingolf.co.uk/app/?pin=2026">Try the Demo</a>
       </div>
     </div>
   </div>
 </section>
 </main>
-<footer><div class="wrap footer-row"><div>© 2026 I'm In Golf &nbsp; • &nbsp; <a href="mailto:hello@imingolf.co.uk">Contact</a> &nbsp; • &nbsp; <a href="privacy.html">Privacy</a> &nbsp; • &nbsp; <a href="terms.html">Terms</a></div></div></footer>
+<footer><div class="wrap footer-row"><div>© 2026 I'm In Golf &nbsp; • &nbsp; <a href="mailto:hello@imingolf.co.uk">Contact</a> &nbsp; • &nbsp; <a href='/privacy'>Privacy</a> &nbsp; • &nbsp; <a href='/terms'>Terms</a></div></div></footer>
 
-<button class="help-launcher" id="helpLauncher" type="button" aria-controls="helpPanel" aria-expanded="false">
-  💬 Need help?
-</button>
-
-<section class="help-panel" id="helpPanel" aria-label="I'm In Golf help" role="dialog" aria-modal="false">
-  <div class="help-head">
-    <div>
-      <h3>I'm In Golf Help ⛳</h3>
-      <p>Quick answers. Keep it simple.</p>
-    </div>
-    <button class="help-close" id="helpClose" type="button" aria-label="Close help">×</button>
-  </div>
-
-  <div class="help-body" id="helpBody" aria-live="polite">
-    <div class="help-msg bot">
-      Hi 👋 Are you a player or a Group Admin?
-    </div>
-    <div class="help-quick" id="helpQuick">
-      <button type="button" data-help="player">🏌️ I'm a player</button>
-      <button type="button" data-help="organiser">🔐 I'm a Group Admin</button>
-      <button type="button" data-help="start">➕ I want to start a group</button>
-      <button type="button" data-help="stuck">🛠️ I'm stuck</button>
-    </div>
-  </div>
-
-  <form class="help-input-wrap" id="helpForm">
-    <input class="help-input" id="helpInput" type="text" placeholder="Ask a question…" autocomplete="off" aria-label="Ask a help question">
-    <button class="help-send" type="submit">Send</button>
-  </form>
-  <div class="help-note">Ask me anything about using I'm In Golf.</div>
-</section>
-
+<button class="help-launcher" id="helpLauncher" type="button" aria-controls="helpPanel" aria-expanded="false">Need help?</button>
+<section class="help-panel" id="helpPanel" aria-labelledby="helpTitle" role="dialog" aria-modal="false" hidden>
+<div class="help-head"><div><h3 id="helpTitle">I’m In Golf Help</h3><p>Ask a question or choose a quick guide.</p></div><button class="help-close" id="helpClose" type="button" aria-label="Close help">×</button></div>
+<div class="help-body" id="helpBody"><p>New here? Start with one of these.</p><div class="help-quick" id="helpQuick"><button type="button" data-help="start">Start a group</button><button type="button" data-help="invite">Invite friends</button><button type="button" data-help="join">Join a group</button><button type="button" data-help="pay">Pay & confirm</button></div><div id="helpAnswer" aria-live="polite"></div></div>
+<form class="help-input-wrap" id="helpForm"><label class="visually-hidden" for="helpInput">Ask AI Help</label><input class="help-input" id="helpInput" type="text" placeholder="Ask a question…" autocomplete="off" maxlength="240"><button class="help-send" type="submit">Send</button></form>
+<div class="help-note">AI Help answers general app questions. Don’t share sign-in codes or private account details.</div></section>
 <script>
 (() => {
-  const launcher = document.getElementById("helpLauncher");
-  const panel = document.getElementById("helpPanel");
-  const closeBtn = document.getElementById("helpClose");
-  const body = document.getElementById("helpBody");
-  const form = document.getElementById("helpForm");
-  const input = document.getElementById("helpInput");
-
-  const answers = {
-    player: {
-      q: "🏌️ I'm a player",
-      a: `<b>Player help</b><br><br>• <b>Join:</b> Open My Group → enter your Group PIN → choose your name.<br>• <b>Pay:</b> Open <b>Pay</b> and use your group's payment link. Payments go directly to your Group Admin. Return to I'm In Golf to see your payment status.<br>• <b>Score:</b> Open <b>Scores</b>, enter your final Stableford or Net score and submit it.<br><br>You can also type your question below.`
-    },
-    organiser: {
-      q: "🔐 I'm a Group Admin",
-      a: `<b>Group Admin help</b><br><br>• <b>Set up:</b> Round → choose Points Game, Group Game or Trip Mode.<br>• <b>Points Game:</b> Choose Stableford or Net; league points are awarded automatically to the top three.<br>• <b>Group Game:</b> Set the entry fee and competition. Players can use your payment link to pay you directly. I'm In Golf records the payment status, scores and results.<br>• <b>Scores:</b> Players submit one final Stableford or Net score; Admin can correct genuine mistakes.<br>• <b>Finish:</b> When all entered players have submitted, finish the round and share the result.<br>• <b>Trip:</b> Choose Stableford or Net, set up the rounds and see full daily results plus overall score totals.<br><br>For full step-by-step help, unlock Admin in the app and open <b>Settings → Admin Help</b>. Or type your question below.`
-    },
-    join: {
-      q: "How do I join a group?",
-      a: `Tap <b>Open My Group</b>, enter the Group PIN your Admin sent you, then tap your name. If your name is not listed, choose <b>Add myself to the group</b>.`
-    },
-    pay: {
-      q: "How do I pay?",
-      a: `Open your group and tap <b>Pay</b>. Use the payment link provided by your Group Admin. Once you've made the payment, return to I'm In Golf and you'll be marked paid automatically. The Pay screen shows how much has been paid into the pot and the expected pot if everybody pays.`
-    },
-    score: {
-      q: "How do I enter my score?",
-      a: `After your round, tap <b>Scores</b>. Enter your final Stableford or Net score and tap <b>Submit score</b>. That's it — there is no hole-by-hole scoring.`
-    },
-    trip: {
-      q: "How does Trip Mode work?",
-      a: `Your Group Admin sets up the trip once and chooses Stableford or Net. Each day's full leaderboard is saved and every golfer's scores are totalled across the trip. After the final round, I'm In Golf shows the champion, full final standings and a shareable tournament result.`
-    },
-    start: {
-      q: "How do I start a group?",
-      a: `Use the <b>Start Your Group</b> button on this website. It will open an email to the I'm In Golf team so we can get your group set up.`
-    },
-    stuck: {
-      q: "I'm stuck",
-      a: `Try reopening I'm In Golf first. If the wrong player is selected, go to <b>Players → Change who I am</b>. If you still need help, email <a href="mailto:hello@imingolf.co.uk">hello@imingolf.co.uk</a>.`
-    }
-  };
-
-  function addMessage(html, who="bot"){
-    const div = document.createElement("div");
-    div.className = "help-msg " + who;
-    div.innerHTML = html;
-    const quick = document.getElementById("helpQuick");
-    body.insertBefore(div, quick);
-    requestAnimationFrame(() => {
-      div.scrollIntoView({behavior:"smooth", block:"nearest"});
-    });
-  }
-
-  function answerKey(key){
-    const item = answers[key];
-    if(!item) return;
-    addMessage(item.q, "user");
-    setTimeout(() => addMessage(item.a, "bot"), 120);
-  }
-
-  async function answerTyped(text){
-  const q = text.trim();
-  if(!q) return;
-
-  addMessage(q, "user");
-  addMessage("Thinking…", "bot");
-
-  const thinking = body.querySelector(".help-msg.bot:last-of-type");
-
+ 'use strict';
+ const $=id=>document.getElementById(id);
+ const launcher=$('helpLauncher'),panel=$('helpPanel'),input=$('helpInput'),answer=$('helpAnswer');
+ const guides=[...document.querySelectorAll('[data-topic]')];
+ let requestId=0,controller=null;
+ const send=$('helpForm').querySelector('button[type=submit]');
+ function cancelRequest(){requestId++;controller?.abort();controller=null;send.disabled=false;}
+ function openHelp(){panel.hidden=false;panel.classList.add('open');launcher.setAttribute('aria-expanded','true');input.focus();}
+ function closeHelp(){cancelRequest();panel.hidden=true;panel.classList.remove('open');launcher.setAttribute('aria-expanded','false');launcher.focus();}
+ function renderGuide(guide){
+  cancelRequest();answer.replaceChildren();
+  const heading=document.createElement('h4');heading.textContent=guide.querySelector('summary').textContent;
+  answer.append(heading,guide.querySelector('.guide-answer').cloneNode(true));
+  $('helpBody').scrollTop=0;
+ }
+ function revealHash(){
+  const guide=document.getElementById(location.hash.slice(1));
+  if(guide?.matches('[data-topic]')){guide.open=true;guide.scrollIntoView({block:'start'});}
+ }
+ launcher.addEventListener('click',()=>panel.hidden?openHelp():closeHelp());
+ $('helpClose').addEventListener('click',closeHelp);
+ $('helpQuick').addEventListener('click',e=>{const button=e.target.closest('[data-help]');if(button)renderGuide(guides.find(g=>g.dataset.topic===button.dataset.help));});
+ $('helpForm').addEventListener('submit',async e=>{
+  e.preventDefault();const question=input.value.trim();if(!question||send.disabled)return;
+  cancelRequest();const id=requestId;controller=new AbortController();const activeController=controller;send.disabled=true;
+  answer.replaceChildren();const asked=document.createElement('p');asked.textContent=question;
+  const response=document.createElement('p');response.style.whiteSpace='pre-wrap';response.textContent='Thinking…';answer.append(asked,response);$('helpBody').scrollTop=0;
+  const timer=setTimeout(()=>activeController.abort(),20000);
   try{
-    const response = await fetch(
-      "https://kzzzputsqxdntfqpprnz.supabase.co/functions/v1/help-assistant",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "text/plain",         
-                  
-        },
-        body: JSON.stringify({ question: q })
-      }
-    );
-
-    const data = await response.json();
-
-    if(thinking) thinking.remove();
-
-    if(!response.ok){
-      throw new Error(data?.error || "Help Assistant unavailable");
-    }
-
-    addMessage(
-      data.answer || "I don't have that information yet.",
-      "bot"
-    );
-
-  }catch(err){
-    if(thinking) thinking.remove();
-
-    addMessage(
-      `Sorry, the Help Assistant is temporarily unavailable. Please try again.`,
-      "bot"
-    );
-  }
-}
-
-  function openHelp(){
-    panel.classList.add("open");
-    launcher.setAttribute("aria-expanded","true");
-    setTimeout(() => input.focus(), 50);
-  }
-  function closeHelp(){
-    panel.classList.remove("open");
-    launcher.setAttribute("aria-expanded","false");
-  }
-
-  launcher.addEventListener("click", () => panel.classList.contains("open") ? closeHelp() : openHelp());
-  closeBtn.addEventListener("click", closeHelp);
-  document.getElementById("helpQuick").addEventListener("click", (e) => {
-    const btn = e.target.closest("[data-help]");
-    if(btn) answerKey(btn.dataset.help);
-  });
-  form.addEventListener("submit", (e) => {
-    e.preventDefault();
-    answerTyped(input.value);
-    input.value = "";
-  });
-  document.addEventListener("keydown", (e) => {
-    if(e.key === "Escape" && panel.classList.contains("open")) closeHelp();
-  });
+   const result=await fetch('https://kzzzputsqxdntfqpprnz.supabase.co/functions/v1/help-assistant',{
+    method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({question}),signal:activeController.signal
+   });
+   if(!result.ok)throw new Error('Help unavailable');
+   const data=await result.json();if(typeof data.answer!=='string'||!data.answer.trim())throw new Error('No answer');
+   if(id===requestId)response.textContent=data.answer;
+  }catch(error){
+   if(id===requestId){response.textContent='AI Help couldn’t answer just now. Please try again, choose a quick guide above, or email support.';const contact=document.createElement('a');contact.href='mailto:hello@imingolf.co.uk';contact.textContent='Email support';answer.append(contact);}
+  }finally{clearTimeout(timer);if(id===requestId){controller=null;send.disabled=false;}}
+ });
+ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!panel.hidden)closeHelp();});
+ document.addEventListener('click',e=>{const link=e.target.closest('a[href^="#guide-"]');if(link){const guide=document.getElementById(link.hash.slice(1));if(guide)guide.open=true;}});
+ window.addEventListener('hashchange',revealHash);revealHash();
 })();
 </script>
-
-</body>
-</html>
+</body></html>

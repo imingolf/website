@@ -144,6 +144,42 @@ body:not(.admin-mode) nav button.active:not(.hidden) {
 body:not(.admin-mode) nav button:not(.hidden):active {
   background: #91c7a0; border-color: #579568;
 }
+/* First-visit welcome and guided group entry */
+#setupOverlay{background:radial-gradient(ellipse at 80% 0%,#e1efdd 0,transparent 50%),#f7f9f4;padding:calc(30px + env(safe-area-inset-top)) 22px calc(28px + env(safe-area-inset-bottom))}
+.welcome-shell{width:min(540px,100%);margin:auto 0}
+.welcome-brand{display:flex;align-items:center;gap:13px;font-size:23px;font-weight:850;margin-bottom:38px}
+.welcome-brand img{border-radius:17px;box-shadow:0 5px 18px #173b1b18}
+.welcome-eyebrow{font-size:11px;font-weight:800;letter-spacing:1.7px;color:#356246}
+.welcome-shell h1{font-size:clamp(36px,7vw,52px);line-height:1.06;letter-spacing:-1.8px;margin:15px 0 18px}
+.welcome-shell h1 span{color:#176b3a}
+.welcome-intro,.welcome-panel>p{font-size:18px;line-height:1.55;color:#526157;margin:0 0 22px}
+.welcome-benefits{display:flex;flex-wrap:wrap;gap:8px 16px;font-size:13px;color:#285b38;margin-bottom:29px}
+.welcome-choices{display:grid;gap:12px}
+.welcome-choice{width:100%;text-align:left;padding:20px 22px;border-radius:18px;cursor:pointer;min-height:91px}
+.welcome-choice>span{display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:19px;font-weight:800}
+.welcome-choice small{display:block;font-size:14px;font-weight:400;margin-top:7px;line-height:1.4}
+.welcome-start{background:#176b3a;color:#fff;box-shadow:0 8px 20px #176b3a1a}
+.welcome-join{background:white;color:#193b27;border:1px solid #cad9cc}
+.welcome-link{display:block;background:transparent;color:#176b3a;padding:14px 0;min-height:48px;text-align:left;font-size:14px;text-decoration:underline;text-underline-offset:4px;cursor:pointer}
+.welcome-footnote{font-size:13px!important;line-height:1.65!important;color:#667268!important;margin:16px 0 0!important}
+.welcome-footnote a{color:#176b3a}
+.welcome-panel{background:#fff;padding:26px;border:1px solid #dae4d8;border-radius:24px;box-shadow:0 10px 40px #183b2010}
+.welcome-panel h1{font-size:34px;letter-spacing:-1px}
+.welcome-back{padding:0;background:transparent;color:#526157;cursor:pointer;min-height:44px}
+.welcome-panel input{margin-top:10px;padding:16px;font-size:20px}
+.welcome-panel .primary{padding:17px;font-size:16px;cursor:pointer}
+.welcome-help{border-top:1px solid #e1e7df;margin-top:24px;padding-top:18px;font-size:14px;line-height:1.6}
+.welcome-help summary{cursor:pointer;font-weight:750;color:#176b3a;min-height:32px}
+.welcome-steps{padding-left:22px;margin:24px 0}
+.welcome-steps li{padding-left:6px;margin-bottom:21px;color:#176b3a}
+.welcome-steps b{display:block;color:#203a29;font-size:16px}
+.welcome-steps span{display:block;color:#58665c;font-size:14px;line-height:1.6;margin-top:5px}
+.welcome-email{display:block;background:#176b3a;color:white;text-align:center;text-decoration:none;padding:17px;border-radius:13px;font-weight:750}
+.welcome-note{background:#f0f6ec;padding:14px;border-radius:12px;font-size:14px!important}
+.welcome-shell :focus-visible{outline:3px solid #8a6500;outline-offset:4px}
+@media(max-width:380px){.welcome-brand{margin-bottom:25px}.welcome-choice{padding:17px}.welcome-choice>span{font-size:17px}.welcome-panel{padding:20px}}
+@media(min-width:760px){.welcome-shell{padding:35px 0}.welcome-brand{margin-bottom:42px}}
+
 </style>
 <script>
 if(/iPhone|iPod/.test(navigator.userAgent) &&
@@ -151,6 +187,8 @@ if(/iPhone|iPod/.test(navigator.userAgent) &&
   document.documentElement.classList.add("iig-ios-fullscreen");
 }
 </script>
+<script src="handicap-input.js"></script>
+<link rel="stylesheet" href="simple-clean.css">
 </head>
 <body>
 
@@ -255,24 +293,74 @@ if(/iPhone|iPod/.test(navigator.userAgent) &&
 
 
 <div id="setupOverlay">
- <div class="setup">
-  <div class="card">
-   <h1 style="margin-top:0">⛳ I'm In Golf</h1>
-   <p>Golf. Mates. You're In.</p>
-   <div id="configMissing" class="notice warning hidden"><b>One-time setup needed.</b><br>This shared version needs your Supabase project details added to <code>config.js</code>.</div>
-   <label><b>Group PIN</b></label>
-<input id="pinInput" inputmode="numeric" autocomplete="off" placeholder="Enter your shared PIN">
-<button class="primary full" onclick="connect()">Open I'm In Golf</button>
-<div id="connectMsg" class="muted" style="margin-top:10px"></div>
-     </div>
+ <div class="setup welcome-shell">
+  <div class="welcome-brand"><img src="icon-192.png" alt="I'm In Golf" width="64" height="64"><span>I’m In Golf</span></div>
+  <div id="welcomeHome">
+   <span class="welcome-eyebrow">Golf made simple.</span>
+   <h1>Your golf group.<br><span>All organised.</span></h1>
+   <p class="welcome-intro">Golf competitions made simple.</p>
+   <div class="welcome-benefits"><span>✓ See who’s playing</span><span>✓ Enter one final score</span><span>✓ Follow the results</span></div>
+   <div class="welcome-choices">
+    <button type="button" class="welcome-choice welcome-start" onclick="window.iigStartGroup?window.iigStartGroup():showWelcomePanel('start')"><span>Start a golf group <b aria-hidden="true">→</b></span><small>Organise your golf group with ease.</small></button>
+    <button type="button" class="welcome-choice welcome-join" onclick="window.iigJoinGroup?window.iigJoinGroup():showWelcomePanel('join')"><span>Join my golf group <b aria-hidden="true">→</b></span><small>Join your group and get playing.</small></button>
+    <button type="button" class="welcome-choice welcome-join" onclick="window.iigAdminSignIn?.()"><span>Admin sign in <b aria-hidden="true">→</b></span><small>Open and manage your golf group.</small></button>
+   </div>
+   <p class="welcome-footnote">For friends, societies and golf trips.<br>No hole-by-hole scoring. Just enjoy your round.</p>
+  </div>
+  <section id="welcomeJoin" class="welcome-panel hidden" aria-labelledby="welcomeJoinTitle">
+   <button type="button" class="welcome-back" onclick="window.iigCancelGroupChange?window.iigCancelGroupChange():showWelcomePanel('home')">← Back</button>
+   <h1 id="welcomeJoinTitle" tabindex="-1">Join your group.</h1>
+   <p>Enter the PIN from your organiser.</p>
+   <form onsubmit="event.preventDefault();connect()">
+    <label for="pinInput"><b>Group PIN</b></label>
+    <input id="pinInput" inputmode="numeric" autocomplete="off" placeholder="Enter your group PIN" aria-describedby="connectMsg">
+    <button class="primary full" type="submit">Open my group →</button>
+   </form>
+   <div id="connectMsg" class="muted" role="status" aria-live="polite" style="margin-top:10px"></div>
+   <details class="welcome-help"><summary>I don’t have a PIN</summary><p>Ask the person organising your golf for the group PIN. If you want to organise your own group, we can help you get started.</p><button class="welcome-link" type="button" onclick="showWelcomePanel('start')">Start a golf group →</button><button class="welcome-link" type="button" onclick="showWelcomePanel('how')">How it works</button></details>
+  </section>
+  <section id="welcomeStart" class="welcome-panel hidden" aria-labelledby="welcomeStartTitle">
+   <button type="button" class="welcome-back" onclick="showWelcomePanel('home')">← Back</button>
+   <h1 id="welcomeStartTitle" tabindex="-1">Start a golf group</h1>
+   <p>Organise your golf group with ease.</p>
+   <div id="registrationAuth"><p>Loading group setup…</p></div>
+  </section>
+  <section id="welcomeHow" class="welcome-panel hidden" aria-labelledby="welcomeHowTitle">
+   <button type="button" class="welcome-back" onclick="showWelcomePanel('home')">← Back</button>
+   <h1 id="welcomeHowTitle" tabindex="-1">Less organising.<br>More golf.</h1>
+   <ol class="welcome-steps"><li><b>Get your group together</b><span>Join with your organiser’s PIN, or create your own group in the app.</span></li><li><b>See what’s coming up</b><span>Check the competition, course and date, then join the round.</span></li><li><b>Play. Score. Enjoy the results.</b><span>Enter your final Stableford or Net score. Follow the leaderboard, leagues and golf trips.</span></li></ol>
+   <p class="welcome-note">You keep your usual scorecard. I’m In Golf only needs your final total.</p>
+   <button type="button" class="primary full" onclick="showWelcomePanel('join')">Join my golf group →</button>
+   <button type="button" class="welcome-link" onclick="showWelcomePanel('start')">Start a golf group →</button>
+  </section>
+  <div id="configMissing" class="notice warning hidden">We’re having trouble getting things ready. Please try again shortly or contact hello@imingolf.co.uk.</div>
  </div>
 </div>
+<script>
+function showWelcomePanel(panel, moveFocus=true){
+ // Explicit Start leaves invitation/player mode; ownership is checked after reload.
+ const route=new URLSearchParams((location.hash||'').replace(/^#/,''));
+ if(panel==='start' && moveFocus && window.IIG_ACCOUNT_BUILD?.release==='focused-v1' &&
+    window.IIG_ACCOUNT_ACCESS && (route.has('pin') || route.has('invite') || route.has('admin'))){
+  location.assign(location.pathname+location.search);
+  return;
+ }
+ const names={home:'welcomeHome',join:'welcomeJoin',start:'welcomeStart',how:'welcomeHow'};
+ Object.entries(names).forEach(([key,id])=>document.getElementById(id).classList.toggle('hidden',key!==panel));
+ document.getElementById('setupOverlay').scrollTop=0;
+ if(moveFocus){
+  const target=panel==='join'?document.getElementById('pinInput'):document.querySelector('#'+names[panel]+' h1');
+  if(target){if(target.tagName!=='INPUT')target.setAttribute('tabindex','-1');target.focus({preventScroll:true});}
+ }
+}
+</script>
 
 <div class="app">
 <header class="app-header">
   <div class="app-header-brand">
     <img id="mainHeaderLogo" src="icon-192.png" alt="I'm In Golf" class="app-header-logo">
-    <span id="adminModeBadge" class="admin-mode-badge hidden" onclick="show('settings');window.scrollTo(0,0)" style="cursor:pointer;"><span style="display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;"><span style="font-size:20px;line-height:1;margin-bottom:3px;">⚙️</span><span>ADMIN<br>SETTINGS</span></span></span>
+    <span class="ui-app-name">I’m In Golf</span>
+    <button type="button" id="adminModeBadge" class="admin-mode-badge hidden" onclick="show('settings');window.scrollTo(0,0)" aria-label="Organiser settings">Settings</button>
     <span id="demoBadge" class="demo-mode-badge hidden">DEMO</span>
   </div>
   <p id="syncText" class="sync-status" aria-live="polite">Shared golf group</p>
@@ -288,12 +376,26 @@ if(/iPhone|iPod/.test(navigator.userAgent) &&
 </nav>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.4"></script>
 <script src="./config.js"></script>
+<script src="./full-release.production.js"></script>
+<script src="./entry-guard-client.js"></script>
 <script>
+// Account registration is inert until a separately approved, exact TEST build.
+window.IIG_ACCOUNT_ACCESS=null;
+if(window.IIG_ACCOUNT_BUILD!==undefined){
+ try{
+  if(window.IIG_CLOSED_ENTRY_BUILD!==undefined)throw Error('Choose one TEST adapter');
+  IIGEntryGuard.validateBuild(window.IIG_ACCOUNT_BUILD,TENS_IN_CONFIG,location.origin);
+  if(typeof TENS_IN_CONFIG.supabaseKey!=='string'||!TENS_IN_CONFIG.supabaseKey)throw Error('Missing key');
+  window.IIG_ACCOUNT_ACCESS=Object.freeze({url:TENS_IN_CONFIG.supabaseUrl,key:TENS_IN_CONFIG.supabaseKey});
+ }catch(_){document.getElementById('configMissing').classList.remove('hidden');}
+}
 let db=null, pin="", page="round", poller=null, groupPlanType="";
+let iigEntryBridge=null;
 let leagueView="points";
 let selectedPastTripIndex=0;
+let leaguePastTripSelection=null;
 
 function demoReadOnly(){
   return pin==="2026";
@@ -353,7 +455,7 @@ function ensureDemoMoneyHistory(){
   state.history.push({
     demoMoneyExample:true,
     date:"2026-08-15",
-    course:"Sunningdale — Demo Group Game",
+    course:"Sunningdale — Demo Money Game",
     stake:5,
     gameType:"money",
     stablefordPot:players.length*5,
@@ -408,7 +510,7 @@ function chooseMyPlayer(){
           <b>Already in the group?</b><br>Tap your name below.
         </div>
         ${[...state.players].sort((a,b)=>a.name.localeCompare(b.name)).map(p=>`
-          <button class="secondary full" onclick="selectMyPlayer('${p.id}')">
+          <button class="secondary full" onclick="selectMyPlayer(${escAttr(JSON.stringify(p.id))})">
             ${esc(p.name)}
           </button>
         `).join("")}
@@ -445,7 +547,7 @@ function iosShareIcon(){
 
 function showInstallHelp(playerName){
   // The native app and installed web app already have a launcher icon.
-  const alreadyInstalled=!!window.IigPurchase || navigator.standalone===true ||
+  const alreadyInstalled=!!window.IigNativeApp || !!window.IigPurchase || navigator.standalone===true ||
     !!window.matchMedia?.("(display-mode: standalone)")?.matches;
   if(alreadyInstalled){
     finishInstallHelp();
@@ -525,7 +627,7 @@ function showFirstWelcome(role){
       <div class="muted">You're added as a player. Finish setting up your first game.</div>
       <div class="notice" style="text-align:left;margin-top:18px;"><b>1. ⛳ Set up your first round</b><br>Add the course, date, competition and optional stake.</div>
       <button class="primary full" onclick="document.querySelector('nav').style.display='';show('round')">⛳ Set Up First Round</button>
-      <div class="notice" style="text-align:left;margin-top:18px;"><b>2. 👥 Invite your players</b><br>Once the round is ready, share your group invite so your mates can join.</div>
+      <div class="notice" style="text-align:left;margin-top:18px;"><b>2. 👥 Invite your players</b><br>Once the round is ready, share your invitation so others can join.</div>
       <button class="secondary full" onclick="document.querySelector('nav').style.display='';show('players')">👥 Invite Players</button>
     </div>`;
   }else{
@@ -539,6 +641,8 @@ function showFirstWelcome(role){
 }
 
 function selectMyPlayer(id){
+  // A device name selection never transfers another player's authority.
+  if(typeof iigEntryBridge!=="undefined" && iigEntryBridge)iigEntryBridge.clearCredential();
   const player=state.players.find(p=>p.id===id);
   if(!player)return;
 
@@ -579,6 +683,7 @@ window.addEventListener("load",()=>{
   const saved=localStorage.getItem("tensInPin");
 
   if(urlPin){
+    showWelcomePanel("join",false);
     $("pinInput").value=urlPin;
     connect();
   }else if(saved){
@@ -587,10 +692,41 @@ window.addEventListener("load",()=>{
 });
 
 async function connect(){
+ if(window.IIG_ACCOUNT_BUILD!==undefined && !(window.IIG_ACCOUNT_ACCESS && window.IIG_ACCOUNT_BUILD.release==='focused-v1' && $("pinInput").value.trim()==='2026')){
+  const value=$("pinInput").value.trim();
+  if(!window.IIG_ACCOUNT_ACCESS){$("connectMsg").textContent="This TEST build is not configured. Group access is unavailable.";return;}
+  if(!/^\d{4}$/.test(value)){$("connectMsg").textContent="Enter your four-digit group PIN.";return;}
+  // Account-bound membership is checked after sign-in. A PIN grants no authority.
+  const target='#pin='+encodeURIComponent(value);
+  // Changed hashes are reloaded by the existing account-route listener after
+  // navigation commits. An immediate reload can discard the new PIN.
+  if(location.hash===target)location.reload();else location.assign(location.pathname+target);
+  return;
+ }
  if(!configured()){ $("connectMsg").textContent="Please complete the one-time database setup first."; return; }
  pin=$("pinInput").value.trim(); if(!pin){$("connectMsg").textContent="Enter your group PIN.";return}
  $("connectMsg").textContent="Opening shared group…";
- db=supabase.createClient(TENS_IN_CONFIG.supabaseUrl,TENS_IN_CONFIG.supabaseKey);
+ try{
+  const guarded=window.IIG_CLOSED_ENTRY_BUILD!==undefined;
+  if(guarded){
+   if(!window.IIGEntryGuard)throw Error('Guard client missing');
+   IIGEntryGuard.validateBuild(window.IIG_CLOSED_ENTRY_BUILD,TENS_IN_CONFIG,location.origin);
+  }
+  if(iigEntryBridge)iigEntryBridge.clear();
+  const rawDb=supabase.createClient(TENS_IN_CONFIG.supabaseUrl,TENS_IN_CONFIG.supabaseKey);
+  iigEntryBridge=guarded?IIGEntryGuard.create(rawDb,{
+   uuid:()=>crypto.randomUUID(),
+   promptCredential:({kind})=>appPrompt(kind==='player'?'Secure player access':'Secure organiser access','Enter the private credential issued for this group and identity.','',{type:'password',maxlength:64,okLabel:'Unlock'})
+  }):null;
+  db=iigEntryBridge?iigEntryBridge.db:rawDb;
+  if(window.IIG_ACCOUNT_ACCESS && window.IIG_ACCOUNT_BUILD?.release==='focused-v1' && pin==='2026'){
+   db={rpc:async(name,args)=>{
+    if(name==='get_group_access_status'&&args?.p_pin==='2026')return {data:[{group_pin:'2026',group_name:'Website demo',plan_type:'internal',access_allowed:true}],error:null};
+    if(name==='get_group_state'&&args?.p_pin==='2026')return rawDb.rpc('iig_read_demo_group');
+    return {data:null,error:{message:'The website demo is read only.'}};
+   }};
+  }
+ }catch(_){db=null;$("connectMsg").textContent="The guarded TEST build is not configured correctly.";return;}
 
  const {data:accessRows,error:accessError}=await db.rpc(
    "get_group_access_status",
@@ -664,7 +800,7 @@ const staleBlankRound =
     p.scoreSubmitted!==true
   );
 
-if(staleBlankRound){
+if(staleBlankRound && !demoReadOnly()){
   state.roundOpen=false;
 
   const {error:cleanupError}=await db.rpc(
@@ -695,7 +831,7 @@ if(!state.adminPin && setupTokenFromUrl){
   // Keep the chosen display name in the shared group state immediately.
   // The Owner Dashboard reads this same live state, so the renamed group
   // appears everywhere without changing the permanent Group PIN.
-  const nameSaved=await save();
+  const nameSaved=await save("settings");
   if(!nameSaved){
     alert("The group name could not be saved. Please reopen the private setup link and try again.");
     return;
@@ -707,7 +843,7 @@ if(!state.adminPin && setupTokenFromUrl){
 
   state.adminPin=clean;
   state.adminSetupToken="";
-  const saved=await save();
+  const saved=await save("settings");
 
   if(!saved){
     state.adminPin="";
@@ -722,7 +858,7 @@ if(!state.adminPin && setupTokenFromUrl){
   if(setupPayment?.link){
     state.paymentLink=setupPayment.link;
     state.paymentProvider=setupPayment.provider;
-    await save();
+    await save("settings");
   }
   await organiserAdminSetupComplete(state.groupName||currentSetupName,pin);
 }
@@ -741,6 +877,12 @@ startPolling();
 // focus/pageshow handlers are useful. Re-check once group + player state are loaded.
 setTimeout(recognisePaymentReturn,500);
  }
+function cancelProtectedDialogs(){
+ for(const id of ['appConfirmNo','appPromptCancel','cancelWinnerPayout','newRoundCancel','roundCompCancel','normalSetupCancel','tripSetupCancel','cancelTripDay'])document.getElementById(id)?.click();
+ document.querySelectorAll('.player-big-message,.app-toast').forEach(el=>el.remove());
+}
+function sideGameToday(){return typeof window!=="undefined" && window.iigSecurePlayer?.active && state.sideGameDate ? state.sideGameDate : new Date().toLocaleDateString("en-CA");}
+function sideGameBackToGolf(){sideGameOpen=false;sideGameHomeOpen=false;show("round");}
 function ensureSideGameState(){
   if(!state.sideGame || typeof state.sideGame!=="object"){
     state.sideGame={};
@@ -756,17 +898,23 @@ let saveQueue=Promise.resolve();
 let stateSaveVersion=0;
 let refreshRequestVersion=0;
 
-async function save(){
+async function save(operation="save"){
   if(!db)return false;
   if(demoReadOnly()){
     $("syncText").textContent="Demo • read only";
     return false;
   }
   state.lastActivityAt=new Date().toISOString();
+  const sourceState=state;
+  let entryCapture=null;
+  const savedBridge=typeof iigEntryBridge!=="undefined"?iigEntryBridge:null;
+  if(savedBridge){
+    try{entryCapture=savedBridge.capture(sourceState,pin);}catch(_){$("syncText").textContent="Reload the group before saving";return false;}
+  }
   const savedState=JSON.parse(JSON.stringify(state));
   const savedPin=pin;
   const savedDb=db;
-  stateSaveVersion++;
+  const savedVersion=++stateSaveVersion;
   savePending++;
   saveActive=true;
   $("syncText").textContent="Saving…";
@@ -775,8 +923,18 @@ async function save(){
   const request=saveQueue.then(async()=>{
     let ok=false;
     try{
-      const {data,error}=await savedDb.rpc("save_group_state",{p_pin:savedPin,p_state:savedState});
+      const {data,error}=entryCapture
+        ? await savedBridge.commit(operation,savedPin,savedState,entryCapture,sourceState)
+        : await savedDb.rpc("save_group_state",{p_pin:savedPin,p_state:savedState});
       ok=!error && data!==false;
+      if(!ok && savedBridge && iigEntryBridge===savedBridge && pin===savedPin && stateSaveVersion===savedVersion){
+        // Restore authoritative display after a rejected/ambiguous save, never
+        // replay or attach a new revision to this phone's stale proposal.
+        const latest=await savedBridge.db.rpc("get_group_state",{p_pin:savedPin});
+        if(!latest.error && latest.data && iigEntryBridge===savedBridge && pin===savedPin && stateSaveVersion===savedVersion){
+          state=latest.data;render();
+        }
+      }
       return ok;
     }catch(error){
       return false;
@@ -790,6 +948,29 @@ async function save(){
   });
   saveQueue=request.catch(()=>false);
   return request;
+}
+
+async function applyGuardedOperation(operation,selection=null){
+ if(typeof window!=="undefined" && window.iigSecureOrganiser?.active)return window.iigSecureOrganiser.maintain(operation,selection);
+  if(!isAdmin || !iigEntryBridge || saveActive || scoreDraftActive){
+    alert("Finish saving or submitting your current changes first.");return false;
+  }
+  const bridge=iigEntryBridge,source=state,groupPin=pin;
+  const proposal=await bridge.prepare(operation,groupPin,source,selection);
+  if(proposal.error || bridge!==iigEntryBridge || source!==state || pin!==groupPin){
+    alert(proposal.error?.message||"This change was not confirmed. Reload the latest group before continuing.");return false;
+  }
+  for(const key of Object.keys(source))if(!(key in proposal.data))delete source[key];
+  Object.assign(source,proposal.data);
+  return await save(operation);
+}
+
+async function recoverGuardedSave(){
+  if(!iigEntryBridge || !iigEntryBridge.hasPending())return;
+  const recovered=await iigEntryBridge.recover();
+  if(recovered.error){alert("The last save could not be confirmed. Do not repeat it yet; reload and check the latest group.");return;}
+  state=recovered.data;render();
+  $("syncText").textContent="Shared • confirmed";
 }
 
 function refreshBlocked(){
@@ -824,7 +1005,7 @@ async function refresh(){
 let finishRoundActive=false;
 let normalFinishInProgress=false;
 let scoreDraftActive=false;
-let sideGameOpen=false;
+let sideGameOpen=false,sideGameHomeOpen=false;
 
 async function refreshSideGameLive(){
   if(!db || !sideGameOpen || !sideGameHomeOpen || refreshBlocked())return;
@@ -888,6 +1069,18 @@ function show(p){
 
   render();
 }
+// A live update may replace markup, but must not discard the current panel or choice.
+function renderLiveUpdate(draw,preserveChoices=true){
+  const screen=document.getElementById('screen');
+  const folds=[...(screen?.querySelectorAll('details.ui-fold')||[])].map(el=>({key:el.querySelector('summary')?.textContent,open:el.open}));
+  const choices=[...(preserveChoices?screen?.querySelectorAll('select')||[]:[])].map(el=>({key:el.id||el.getAttribute('data-manual-player'),value:el.value,options:[...el.options].map(o=>[o.value,o.disabled])}));
+  const scroll=window.scrollY;
+  draw();
+  window.iigDecorateLive?.();
+  for(const el of screen?.querySelectorAll('details.ui-fold')||[]){const saved=folds.find(x=>x.key===el.querySelector('summary')?.textContent);if(saved)el.open=saved.open;}
+  for(const el of screen?.querySelectorAll('select')||[]){const key=el.id||el.getAttribute('data-manual-player'),saved=choices.find(x=>key&&x.key===key);if(saved&&JSON.stringify(saved.options)===JSON.stringify([...el.options].map(o=>[o.value,o.disabled])))el.value=saved.value;}
+  window.scrollTo(0,scroll);
+}
 function render(){
   updateAdminUI();
 
@@ -907,7 +1100,13 @@ function render(){
   if(page==="tripsummary")showTripSummary();
   if(page==="adminhelp")adminHelpPage();
 }
+function accountEntryStatus(){
+ if(typeof window==='undefined')return null;
+ return window.iigSecureOrganiser?.entryStatus || window.iigSecurePlayer?.entryStatus || null;
+}
 function roundLocked(){
+ if(typeof accountEntryStatus==='function' && accountEntryStatus()?.closed)return true;
+  if(typeof iigEntryBridge!=="undefined" && iigEntryBridge && iigEntryBridge.entryStatus(state,pin).closed)return true;
   return Object.values(state.trip?.currentTeamScores||{}).some(v=>v!=null && v!=="") || state.players.some(p=>
     p.stableford!=null ||
     p.netScore!=null ||
@@ -915,7 +1114,35 @@ function roundLocked(){
   );
 }
 
+function sameEntryRound(a,b){
+  const key=x=>JSON.stringify([x.roundId||"",x.course||"",x.date||"",Number(x.stake||0),x.gameType||"",x.trip?.currentRound||null]);
+  return key(a)===key(b);
+}
+function entryClosed(){return !roundOpenNow() || roundLocked();}
+function entryClosedMessage(){
+  clearPaymentJourney();
+  showAppToast("Entries Closed","Entry and payment status cannot change after scoring starts.",4200);
+}
+async function refreshEntryState(){
+  const requestPin=pin,requestState=state;
+  try{
+    const {data,error}=await db.rpc("get_group_state",{p_pin:requestPin});
+    if(error || !data || !Array.isArray(data.players) || pin!==requestPin || !sameEntryRound(data,requestState)){
+      showAppToast("Entry not saved","Couldn’t verify the current competition. Reload and try again.",4200);
+      return false;
+    }
+    state=data;
+    if(entryClosed()){entryClosedMessage();render();return false;}
+    return true;
+  }catch(error){
+    showAppToast("Entry not saved","Couldn’t verify the current competition. Please try again.",4200);
+    return false;
+  }
+}
+
 function roundOpenNow(){
+ if(typeof accountEntryStatus==='function' && accountEntryStatus())return accountEntryStatus().open;
+  if(typeof iigEntryBridge!=="undefined" && iigEntryBridge)return iigEntryBridge.entryStatus(state,pin).open;
   if(state.roundOpen===false)return false;
   if(state.roundOpen===true)return true;
 
@@ -975,13 +1202,13 @@ async function setupFirstRound(){
 
   if(!course){ alert("Please enter the course."); $("firstRoundCourse")?.focus(); return; }
   if(!date){ alert("Please choose the date."); $("firstRoundDate")?.focus(); return; }
-  if(!Number.isFinite(stake) || stake<0){ alert("Please enter a valid entry amount, or leave it blank for no Group Game."); return; }
+  if(!Number.isFinite(stake) || stake<0){ alert("Please enter a valid entry amount, or leave it blank for no Money Game."); return; }
   if(splitPrizes && (!Number.isInteger(secondPrize) || !Number.isInteger(thirdPrize) || secondPrize<0 || thirdPrize<0)){
     alert("Please enter 2nd and 3rd payments as whole £ amounts.");
     return;
   }
   if(stake>0 && !String(state.paymentLink||"").trim()){
-    alert("Please add your payment link in Admin / Settings before starting a Group Game.");
+    alert("Please add your payment link in Organiser settings before starting a Money Game.");
     return;
   }
 
@@ -998,9 +1225,9 @@ async function setupFirstRound(){
   state.roundId=createRoundId();
   state.players.forEach(p=>{
     p.paid=false; p.competition=null; p.stableford=null; p.netScore=null;
-    p.noReturn=false; p.scoreSubmitted=false;
+    p.noReturn=false; p.scoreSubmitted=false; p.playingThisRound=false;
   });
-  await save();
+  if(!await save("start")){alert("The first round was not confirmed. Reload the group before continuing.");return;}
   render();
 }
 
@@ -1025,11 +1252,11 @@ function base64UrlToUint8Array(value){
 }
 function notificationCardHtml(){
   if(!notificationsAvailableForGroup() || !myPlayerId)return "";
-  if(window.IigPurchase && typeof window.IigPurchase.postMessage==="function")return "";
-  if(!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window))return `<div class="card"><b>🔔 Competition updates</b><div class="muted" style="margin-top:6px;">Notifications are not supported by this browser.</div></div>`;
-  if(Notification.permission==="denied")return `<div class="card"><b>🔕 Notifications are blocked</b><div class="muted" style="margin-top:6px;">Allow notifications for I’m In Golf in your phone or browser settings.</div></div>`;
-  if(notificationDeviceEnabled() && Notification.permission==="granted")return `<div class="card"><div class="row"><div><b>🔔 Competition updates are on</b><div class="muted" style="margin-top:4px;">This phone will receive friendly reminders for your golf group.</div></div><button class="secondary small" onclick="disableIigNotifications()">Turn off</button></div></div>`;
-  return `<div class="card"><h2>🔔 Competition updates</h2><div class="muted" style="margin-bottom:14px;">Get a friendly message when a competition is ready and before golf day.</div><button class="primary full" onclick="enableIigNotifications()">Turn on notifications</button><div class="muted" style="font-size:12px;text-align:center;margin-top:10px;">You can turn these off anytime</div></div>`;
+  if(window.IigNativeApp || (window.IigPurchase && typeof window.IigPurchase.postMessage==="function"))return "";
+  if(!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window))return "";
+  if(Notification.permission==="denied")return `<div class="card ui-notifications"><b>🔕 Notifications are blocked</b><div class="muted" style="margin-top:6px;">Allow notifications for I’m In Golf in your phone or browser settings.</div></div>`;
+  if(notificationDeviceEnabled() && Notification.permission==="granted")return `<div class="card ui-notifications"><div class="row"><div><b>🔔 Competition updates are on</b><div class="muted" style="margin-top:4px;">This phone will receive friendly reminders for your golf group.</div></div><button class="secondary small" onclick="disableIigNotifications()">Turn off</button></div></div>`;
+  return `<div class="card ui-notifications"><h2>🔔 Competition updates</h2><div class="muted" style="margin-bottom:14px;">Get a friendly message when a competition is ready and before golf day.</div><button class="primary full" onclick="enableIigNotifications()">Turn on notifications</button><div class="muted" style="font-size:12px;text-align:center;margin-top:10px;">You can turn these off anytime</div></div>`;
 }
 async function enableIigNotifications(){
   if(!notificationsAvailableForGroup() || !myPlayerId)return;
@@ -1067,12 +1294,12 @@ function sideGameEntranceHtml(){
     <div class="card" style="text-align:center;">
       <div style="font-size:34px;">🤝</div>
       <h2 style="margin:5px 0 7px;">SIDE GAME</h2>
-      <h2 style="margin:5px 0 7px;">Challenge your mates</h2>
+      <h2 style="margin:5px 0 7px;">Play a side game</h2>
       <div style="font-weight:600;color:#40564a;line-height:1.4;">
-        Playing in the group comp? Start a friendly Side Game with a mate in your group. Agree an amount, enter your scores, and we’ll keep track of the result.
+        Add a friendly side game with someone in your group. Agree an amount and enter your final scores.
       </div>
       <button class="primary full" style="margin-top:14px;" onclick="iigFreePlan() ? showIigPlusUpgrade('sidegame') : sideGameHome()">
-        ${iigFreePlan() ? "🔒 Side Game — I’m In Golf+" : "🤝 Open Side Game"}
+        ${iigFreePlan() ? "🔒 Side Game — I’m In Golf+" : "Play a side game"}
       </button>
     </div>
   `;
@@ -1084,7 +1311,7 @@ function waitingScreen(section="round"){
       icon:"⛳",
       label:"ROUND",
       title:"No round open yet",
-      message:"Your Group Admin will set up the next competition."
+      message:"Your organiser will set up the next competition."
     },
     pay: {
       icon:"💷",
@@ -1112,7 +1339,7 @@ function waitingScreen(section="round"){
         <div style="font-size:17px;line-height:1.45;font-weight:600;color:#40564a;margin-top:12px;">
           Choose your game and add the details for your first competition.
         </div>
-        <button class="primary full" style="margin-top:18px;" onclick="newRound()">➕ Start First Competition</button>
+        <button class="primary full" style="margin-top:18px;" onclick="newRound()">➕ Set up competition</button>
       </div>
       ${sideGameEntranceHtml()}`;
     return;
@@ -1125,8 +1352,8 @@ function waitingScreen(section="round"){
     <div class="card" style="text-align:center;padding:28px 18px;">
       <div style="font-size:46px;">${playerWaitingFeedback?.icon || "⛳"}</div>
       <div class="muted">${playerWaitingFeedback?.label || (first ? "NEXT ROUND" : "NEXT COMPETITION")}</div>
-      <h2 style="font-size:28px;margin:8px 0;">${playerWaitingFeedback?.title || (isAdmin ? "Ready for the next one?" : (first ? "Your first round is coming soon" : "Coming soon…"))}</h2>
-      <div style="font-size:17px;line-height:1.45;font-weight:600;color:#40564a;margin-top:12px;">${playerWaitingFeedback?.message || (isAdmin ? "Set up your group's next competition." : (first ? "Your Group Admin hasn't set up the first round yet." : "Your Group Admin will set up the next competition."))}</div>
+      <h2 style="font-size:28px;margin:8px 0;">${playerWaitingFeedback?.title || (isAdmin ? "Ready for the next round?" : (first ? "Your first round is coming soon" : "Coming soon…"))}</h2>
+      <div style="font-size:17px;line-height:1.45;font-weight:600;color:#40564a;margin-top:12px;">${playerWaitingFeedback?.message || (isAdmin ? "Set up your group's next competition." : (first ? "Your organiser hasn't set up the first round yet." : "Your organiser will set up the next competition."))}</div>
       ${isAdmin
         ? `<button class="primary full" style="margin-top:18px;" onclick="newRound()">➕ Set Up Next Competition</button>`
         : (adminDeviceRecognised()
@@ -1158,7 +1385,16 @@ function tripTeamRoundActive(){return tripBetterBallActive() || tripPairsAggrega
 function tripFormatLabel(format=tripRoundFormat()){
   return format==="betterball" ? "Better Ball" : format==="pairsaggregate" ? "Pairs Aggregate" : "Individual";
 }
-function currentRoundPlayers(){return state.players.filter(p=>tripPlayerIsPlaying(p));}
+function currentRoundPlayers(){
+  const players=state.players.filter(p=>tripPlayerIsPlaying(p));
+  const account=typeof accountEntryStatus==='function'?accountEntryStatus():null;
+  if(account?.closed && Array.isArray(account.entrantIds))return players.filter(p=>account.entrantIds.includes(p.id));
+  if(typeof iigEntryBridge!=="undefined" && iigEntryBridge){
+    const status=iigEntryBridge.entryStatus(state,pin);
+    if(status.closed && Array.isArray(status.entrantIds))return players.filter(p=>status.entrantIds.includes(p.id));
+  }
+  return players;
+}
 function tripTeamName(team){
   return (team?.playerIds||[]).map(id=>state.players.find(p=>p.id===id)?.name).filter(Boolean).join(" & ") || team?.name || "Pair";
 }
@@ -1269,7 +1505,7 @@ function tripStandingPositionLabel(sorted,index){
   return String(tripStandingPosition(sorted,index))+(tied?"=":"");
 }
 
-function tripRoundWinner(record){
+function tripRoundWinner(record,trip=state.trip){
   if(!record)return null;
 
   if(record.tripFormat==="betterball" || record.tripFormat==="pairsaggregate"){
@@ -1291,7 +1527,7 @@ function tripRoundWinner(record){
     };
   }
 
-  const comp=state.trip?.competition || "stableford";
+  const comp=record.pointsCompetition || trip?.competition || "stableford";
 
   if(comp==="net"){
     const names=record.netWinnerNames||[];
@@ -1413,7 +1649,7 @@ function showTripSummary(){
       ${rounds.length ? rounds.map((r,i)=>{
         const w=tripRoundWinner(r);
         const isTeam=r.tripFormat==="betterball" || r.tripFormat==="pairsaggregate";
-        const gameLabel=isTeam ? `🤝 ${tripFormatLabel(r.tripFormat)}` : (r.gameType==="points" ? "✈️ Trip Round" : "💷 Group Game");
+        const gameLabel=isTeam ? `🤝 ${tripFormatLabel(r.tripFormat)}` : (r.gameType==="points" ? "✈️ Trip Round" : "💷 Money Game");
         const compLabel=isTeam ? "Team-event points" : r.gameType==="points"
           ? (r.pointsCompetition==="net" ? "Net" : "Stableford")
           : (trip.competition==="net" ? "Net" : "Stableford");
@@ -1443,10 +1679,10 @@ function showTripSummary(){
       ${performanceRows.length ? performanceRows.map((s,i)=>`
         <div class="player row">
           <div>
-            <b>${tripPerformancePosition(performanceRows,i)===1 && performanceTop.length===1 ? "👑 " : tripPerformancePosition(performanceRows,i)===2 ? "🥈 " : tripPerformancePosition(performanceRows,i)===3 ? "🥉 " : ""}${tripPerformancePositionLabel(performanceRows,i)}. ${esc(s.name)}</b>
+            <b>${tripPerformancePosition(performanceRows,i)===1 && performanceTop.length===1 ? "👑 " : tripPerformancePosition(performanceRows,i)===2 ? "🥈 " : tripPerformancePosition(performanceRows,i)===3 ? "🥉 " : ""}${tripPerformancePositionLabel(performanceRows,i)}. ${esc(s.name)}${playerYouMarker(s)}</b>
             <div class="muted">Played ${s.played}</div>
           </div>
-          <div class="money">${trip.competition==="net" ? "Net "+Number(s.total) : Number(s.total)+" pts"}</div>
+          <div class="money">${trip.competition==="net" ? "Cumulative Net "+Number(s.total) : Number(s.total)+" pts total"}</div>
         </div>
       `).join("") : `<div class="muted">No individual Trip scores recorded.</div>`}
     </div>
@@ -1456,7 +1692,7 @@ function showTripSummary(){
       <h2>🤝 Team-event standings</h2>
       <div class="muted" style="margin-bottom:10px;">Each player keeps the points earned in pairs rounds, even with a different partner.</div>
       ${teamStandings.map((s,i)=>`
-        <div class="player row"><div><b>${tripStandingPosition(teamStandings,i)===1?"🏆 ":tripStandingPosition(teamStandings,i)===2?"🥈 ":tripStandingPosition(teamStandings,i)===3?"🥉 ":""}${tripStandingPositionLabel(teamStandings,i)}. ${esc(s.name)}</b></div><div class="money">${s.points} pts</div></div>
+        <div class="player row"><div><b>${tripStandingPosition(teamStandings,i)===1?"🏆 ":tripStandingPosition(teamStandings,i)===2?"🥈 ":tripStandingPosition(teamStandings,i)===3?"🥉 ":""}${tripStandingPositionLabel(teamStandings,i)}. ${esc(s.name)}${playerYouMarker(s)}</b></div><div class="money">${s.points} pts</div></div>
       `).join("")}
     </div>` : ""}
 
@@ -1466,7 +1702,7 @@ function showTripSummary(){
       ${standings.length ? standings.map((s,i)=>`
         <div class="player row">
           <div>
-            <b>${i===0?"🏅 ":i===1?"🥈 ":i===2?"🥉 ":""}${i+1}. ${esc(s.name)}</b>
+            <b>${i===0?"🏅 ":i===1?"🥈 ":i===2?"🥉 ":""}${i+1}. ${esc(s.name)}${playerYouMarker(s)}</b>
           </div>
           <div class="money">${s.points} pts</div>
         </div>
@@ -1529,8 +1765,10 @@ async function enterNormalPointsGame(){
   const player=latestState.players?.find(p=>p.id===myPlayerId);
   if(!player)return;
 
-  player.playingThisRound=true;
+  if(!sameEntryRound(state,latestState)){entryClosedMessage();return;}
   state=latestState;
+  if(entryClosed()){entryClosedMessage();render();return;}
+  player.playingThisRound=true;
   await save();
 
   const {data:verifiedState,error:verifyError}=await db.rpc("get_group_state",{p_pin:pin});
@@ -1555,6 +1793,15 @@ function playerNextActionHtml(){
   if(state.trip?.active && !tripPlayerIsPlaying(me)){
     return `<div class="card" style="text-align:center;"><div class="muted">TODAY'S ROUND</div><div style="font-size:30px;margin:8px;">☕</div><b>Not playing today</b><div class="muted" style="margin-top:5px;">You are still part of the Trip and can follow today's result.</div></div>`;
   }
+  if(iigEntryBridge || accountEntryStatus()){
+    const entry=accountEntryStatus() || iigEntryBridge.entryStatus(state,pin);
+    if(entry.closed && Array.isArray(entry.entrantIds)){
+      const ids=entry.entrantIds;
+      const team=tripTeamRoundActive() && (state.trip.currentTeams||[]).find(t=>(t.playerIds||[]).includes(me.id));
+      const entered=ids.includes(me.id) && (!tripTeamRoundActive() || (team && team.playerIds.length===2 && team.playerIds.every(id=>ids.includes(id))));
+      if(!entered)return `<div class="card" style="text-align:center;"><div class="muted">CURRENT ROUND</div><button class="secondary full" style="font-size:18px;margin-top:8px;" disabled>🔒 Entries closed — scoring has started</button></div>`;
+    }
+  }
   if(tripTeamRoundActive()){
     const team=(state.trip.currentTeams||[]).find(t=>(t.playerIds||[]).includes(me.id));
     const submitted=team && state.trip.currentTeamScores?.[team.id]!=null;
@@ -1568,11 +1815,11 @@ function playerNextActionHtml(){
   const normalPointsGame=state.gameType==="points" && !state.trip?.active;
 
   if(normalPointsGame && !me.playingThisRound && !roundLocked()){
-    return `<div class="card" style="text-align:center;"><div class="muted">YOUR NEXT STEP</div><button class="primary full" style="font-size:18px;margin-top:8px;" onclick="enterNormalPointsGame()">🏆 I’m Playing</button></div>`;
+    return `<div class="card" style="text-align:center;"><div class="muted">YOUR NEXT STEP</div><button class="primary full" style="font-size:18px;margin-top:8px;" onclick="enterNormalPointsGame()">🏆 I’m playing</button></div>`;
   }
 
   if(normalPointsGame && !me.playingThisRound && roundLocked()){
-    return `<div class="card" style="text-align:center;"><div class="muted">CURRENT ROUND</div><button class="secondary full" style="font-size:18px;margin-top:8px;" disabled>🔒 Entries Closed — Scoring Has Started</button></div>`;
+    return `<div class="card" style="text-align:center;"><div class="muted">CURRENT ROUND</div><button class="secondary full" style="font-size:18px;margin-top:8px;" disabled>🔒 Entries closed — scoring has started</button></div>`;
   }
 
   if(moneyGame && !me.paid && !roundLocked()){
@@ -1588,7 +1835,7 @@ function playerNextActionHtml(){
     return "";
   }
   if(moneyGame && !me.paid && roundLocked()){
-    return `<div class="card" style="text-align:center;"><div class="muted">CURRENT ROUND</div><button class="secondary full" style="font-size:18px;margin-top:8px;" disabled>🔒 Entries Closed — Scoring Has Started</button></div>`;
+    return `<div class="card" style="text-align:center;"><div class="muted">CURRENT ROUND</div><button class="secondary full" style="font-size:18px;margin-top:8px;" disabled>🔒 Entries closed — scoring has started</button></div>`;
   }
 
   return `<div class="card" style="text-align:center;"><div class="muted">YOUR NEXT STEP</div><button class="secondary full" style="font-size:18px;margin-top:8px;" disabled>✅ You’re In — Good Luck! ⛳</button></div>`;
@@ -1641,7 +1888,7 @@ function sideGamePickPlayer(playerId){
   if(!me || !player)return;
 
   ensureSideGameState();
-  const today=new Date().toLocaleDateString("en-CA");
+  const today=sideGameToday();
   const existingBet=state.sideGame.bets.find(b=>
     b.date===today &&
     (b.status==="pending" || b.status==="active") &&
@@ -1712,7 +1959,7 @@ function sideGameAgreedInPerson(playerId,mode="in_person"){
     existingBets=[];
   }
 
-  const today=new Date().toLocaleDateString("en-CA");
+  const today=sideGameToday();
   ensureSideGameState();
 
   const todaysExistingBet=state.sideGame.bets.find(b=>
@@ -1776,9 +2023,10 @@ function sideGameAgreedInPerson(playerId,mode="in_person"){
         Net
       </button>
 
+      ${window.iigSecurePlayer?.active ? `<button id="sideGameMatch" class="${savedFormat==="match" ? "primary" : "secondary"} full" onclick="sideGameSelectFormat('${escAttr(player.id)}','match')" ${formatLocked ? "disabled" : ""}>Match Play</button>` : ""}
       <div class="muted" style="margin-top:10px;">
         ${formatLocked
-          ? `Today's Side Games use <b>${savedFormat==="net" ? "Net" : "Stableford"}</b>, so you'll only need to enter one score.`
+          ? `Today's Side Games use <b>${savedFormat==="match" ? "Match Play" : savedFormat==="net" ? "Net" : "Stableford"}</b>.`
           : "Your first Side Game today sets the scoring format for your Side Games today."}
       </div>
 
@@ -1807,6 +2055,7 @@ function sideGameSelectFormat(playerId,format){
 
   const stableford=$("sideGameStableford");
   const net=$("sideGameNet");
+  if($("sideGameMatch"))$("sideGameMatch").className=(format==="match" ? "primary full" : "secondary full");
 
   if(stableford)stableford.className=(format==="stableford" ? "primary full" : "secondary full");
   if(net)net.className=(format==="net" ? "primary full" : "secondary full");
@@ -1826,7 +2075,7 @@ function sideGameUpdateConfirm(playerId){
   }
 }
 
-function sideGameConfirmBet(playerId){
+async function sideGameConfirmBet(playerId){
   const me=state.players.find(p=>p.id===myPlayerId);
   const player=state.players.find(p=>p.id===playerId);
   const stake=Number($("sideGameStake")?.value||0);
@@ -1848,13 +2097,13 @@ function sideGameConfirmBet(playerId){
   let bets=[];
 
   try{
-    bets=JSON.parse(localStorage.getItem(key)||"[]");
+    bets=iigEntryBridge?[]:JSON.parse(localStorage.getItem(key)||"[]");
     if(!Array.isArray(bets))bets=[];
   }catch{
     bets=[];
   }
 
-  const today=new Date().toLocaleDateString("en-CA");
+  const today=sideGameToday();
 
   const duplicate=bets.some(b=>
     b.playerId===playerId &&
@@ -1878,7 +2127,7 @@ function sideGameConfirmBet(playerId){
     setup:"in_person"
   });
 
-  localStorage.setItem(key,JSON.stringify(bets));
+  if(!iigEntryBridge)localStorage.setItem(key,JSON.stringify(bets));
   localStorage.setItem("iig_sidegame_stake_"+myPlayerId,String(stake));
   localStorage.setItem("iig_sidegame_format_"+myPlayerId,format);
 
@@ -1909,13 +2158,13 @@ function sideGameConfirmBet(playerId){
       createdAt:new Date().toISOString()
     });
 
-    save();
+    if(!await save("sidegame"))return;
   }
 
   sideGameHome();
 }
 
-function sideGameSendChallenge(playerId){
+async function sideGameSendChallenge(playerId){
   const stakeInput=$("sideGameStake");
 
   if(!stakeInput){
@@ -1942,7 +2191,7 @@ function sideGameSendChallenge(playerId){
     return;
   }
 
-  const today=new Date().toLocaleDateString("en-CA");
+  const today=sideGameToday();
 
   const duplicate=state.sideGame.bets.some(b=>
     b.date===today &&
@@ -1975,13 +2224,13 @@ function sideGameSendChallenge(playerId){
   localStorage.setItem("iig_sidegame_stake_"+myPlayerId,String(stake));
   localStorage.setItem("iig_sidegame_format_"+myPlayerId,format);
 
-  save();
+  if(!await save("sidegame"))return;
   sideGameHome();
 
   alert(`Challenge sent to ${player.name}.`);
 }
 
-function sideGameAcceptChallenge(betId){
+async function sideGameAcceptChallenge(betId){
   ensureSideGameState();
 
   const bet=state.sideGame.bets.find(b=>
@@ -1997,7 +2246,7 @@ function sideGameAcceptChallenge(betId){
     return;
   }
 
-  const today=new Date().toLocaleDateString("en-CA");
+  const today=sideGameToday();
 
   const todaysExistingBet=state.sideGame.bets.find(b=>
     b.id!==bet.id &&
@@ -2019,13 +2268,13 @@ function sideGameAcceptChallenge(betId){
   bet.status="active";
   bet.acceptedAt=new Date().toISOString();
 
-  save();
+  if(!await save("sidegame"))return;
   sideGameHome();
 
   alert(`Challenge with ${bet.player1Name} accepted.`);
 }
 
-function sideGameDeclineChallenge(betId){
+async function sideGameDeclineChallenge(betId){
   ensureSideGameState();
 
   const bet=state.sideGame.bets.find(b=>
@@ -2044,7 +2293,7 @@ function sideGameDeclineChallenge(betId){
   bet.status="declined";
   bet.declinedAt=new Date().toISOString();
 
-  save();
+  if(!await save("sidegame"))return;
   sideGameHome();
 
   alert(`Challenge from ${bet.player1Name} declined.`);
@@ -2053,10 +2302,10 @@ function sideGameDeclineChallenge(betId){
 function sideGameResolveBetsForToday(){
   ensureSideGameState();
 
-  const today=new Date().toLocaleDateString("en-CA");
+  const today=sideGameToday();
 
   state.sideGame.bets.forEach(b=>{
-    if(b.date!==today || b.status!=="active")return;
+    if(b.format==="match" || b.date!==today || b.status!=="active")return;
 
     const score1=state.sideGame.scores.find(x=>
       x.playerId===b.player1Id &&
@@ -2106,7 +2355,7 @@ async function sideGameSaveScore(format){
   }
   const score=Number(raw);
 
-  const today=new Date().toLocaleDateString("en-CA");
+  const today=sideGameToday();
 
   ensureSideGameState();
 
@@ -2134,7 +2383,7 @@ async function sideGameSaveScore(format){
 
   sideGameResolveBetsForToday();
 
-  const ok=await save();
+  const ok=await save("sidegame");
 
   if(!ok){
     alert("Your Side Game score could not be saved. Please try again.");
@@ -2150,7 +2399,7 @@ function sideGameScoreEntry(){
 
   ensureSideGameState();
 
-  const today=new Date().toLocaleDateString("en-CA");
+  const today=sideGameToday();
 
   const todaysBets=state.sideGame.bets.filter(b=>
     b.date===today &&
@@ -2204,7 +2453,7 @@ function sideGameScoreEntry(){
   window.scrollTo(0,0);
 }
 
-function sideGameRequestSettlement(otherPlayerId, amount){
+async function sideGameRequestSettlement(otherPlayerId, amount){
   ensureSideGameState();
 
   const otherPlayer=state.players.find(p=>p.id===otherPlayerId);
@@ -2234,13 +2483,13 @@ function sideGameRequestSettlement(otherPlayerId, amount){
     requestedAt:new Date().toISOString()
   });
 
-  save();
+  if(!await save("sidegame"))return;
   sideGameHome();
 
   alert(`Settlement sent to ${otherPlayer.name} for confirmation.`);
 }
 
-function sideGameConfirmSettlement(settlementId){
+async function sideGameConfirmSettlement(settlementId){
   ensureSideGameState();
 
   const settlement=state.sideGame.settlements.find(x=>
@@ -2258,7 +2507,7 @@ function sideGameConfirmSettlement(settlementId){
   settlement.status="confirmed";
   settlement.confirmedAt=new Date().toISOString();
 
-  save();
+  if(!await save("sidegame"))return;
   sideGameHome();
 
   alert(`Settlement with ${settlement.debtorName} confirmed.`);
@@ -2291,7 +2540,7 @@ function sideGameSettlementConfirmationsHtml(){
   </div>`;
 }
 
-function sideGameHome(){
+async function sideGameHome(){
   sideGameOpen=true;
   sideGameHomeOpen=true;
 
@@ -2314,7 +2563,7 @@ function sideGameHome(){
   sideGameResolveBetsForToday();
 
   if(hadActiveCompletedBet){
-    save();
+    if(!await save("sidegame"))return;
   }
   if(!myPlayerId){
     alert("Please select who you are first.");
@@ -2330,7 +2579,7 @@ function sideGameHome(){
       <div class="muted">SIDE GAME</div>
       <h2 style="margin:6px 0;">${esc(me.name)}</h2>
       <div style="font-weight:600;color:#40564a;line-height:1.45;">
-        Challenge your mates, enter one score and keep track of who owes who.
+        Play a friendly side game and keep track of scores and payments.
       </div>
     </div>
 
@@ -2338,7 +2587,7 @@ function sideGameHome(){
       ${(()=>{
         ensureSideGameState();
 
-        const today=new Date().toLocaleDateString("en-CA");
+        const today=sideGameToday();
 
         const todaysBets=state.sideGame.bets
           .filter(b=>
@@ -2411,7 +2660,7 @@ function sideGameHome(){
             <div class="muted">YOUR SIDE GAME</div>
             <h2 style="margin:5px 0;">No Side Games today</h2>
             <div style="color:#40564a;line-height:1.45;margin-bottom:14px;">
-              Start a Side Game whenever you're playing. Previous balances stay outstanding until settlement is confirmed.
+              Start a friendly challenge. Previous balances remain in your statement.
             </div>
           ` : ""}
           ${outgoingChallenges.length ? `
@@ -2424,7 +2673,7 @@ function sideGameHome(){
                 </div>
 
                 <div style="font-weight:700;text-align:center;margin-top:5px;color:#40564a;">
-                  £${Number(b.stake)} · ${b.format==="net" ? "Net" : "Stableford"}
+                  £${Number(b.stake)} · ${b.format==="match" ? "Match Play" : b.format==="net" ? "Net" : "Stableford"}
                 </div>
               `).join("")}
             </div>
@@ -2440,16 +2689,16 @@ function sideGameHome(){
                 </div>
 
                 <div style="font-weight:700;text-align:center;margin-top:5px;color:#40564a;">
-                  £${Number(b.stake)} · ${b.format==="net" ? "Net" : "Stableford"}
+                  £${Number(b.stake)} · ${b.format==="match" ? "Match Play" : b.format==="net" ? "Net" : "Stableford"}
                 </div>
 
                 <button class="primary full" style="margin-top:12px;"
-                  onclick="sideGameAcceptChallenge('${b.id}')">
+                  onclick="sideGameAcceptChallenge(${escAttr(JSON.stringify(b.id))})">
                   ✓ Accept
                 </button>
 
                 <button class="secondary full" style="margin-top:8px;"
-                  onclick="sideGameDeclineChallenge('${b.id}')">
+                  onclick="sideGameDeclineChallenge(${escAttr(JSON.stringify(b.id))})">
                   Decline
                 </button>
               `).join("")}
@@ -2501,7 +2750,9 @@ function sideGameHome(){
 
             let resultText="Active";
 
-            if(myScore && theirScore){
+            if(b.format==="match"){
+              if(b.status==="resolved")resultText=b.result==="draw" ? "Match halved" : b.winnerId===myPlayerId ? "You won" : "Your opponent won";
+            }else if(myScore && theirScore){
               const mine=Number(myScore.score);
               const theirs=Number(theirScore.score);
 
@@ -2521,7 +2772,10 @@ function sideGameHome(){
             return `
               <div class="notice" style="margin-top:10px;">
                 <b>🤝 ${esc(b.playerName)}</b><br>
-                £${Number(b.stake)} · ${b.format==="net" ? "Net" : "Stableford"} · <b>${resultText}</b>
+                £${Number(b.stake)} · ${b.format==="match" ? "Match Play" : b.format==="net" ? "Net" : "Stableford"} · <b>${resultText}</b>
+                ${b.format==="match" && b.status==="active" ? `<p>How did the match finish?</p>
+                  ${[["won","I won"],["lost","My opponent won"],["halved","Match halved"]].map(([value,label])=>
+                    `<button class="secondary full" onclick="sideGameMatchResult('${escAttr(b.id)}','${value}')">${label}</button>`).join("")}` : ""}
               </div>
             `;
           }).join("")}
@@ -2532,9 +2786,9 @@ function sideGameHome(){
       ${(()=>{
         ensureSideGameState();
 
-        const today=new Date().toLocaleDateString("en-CA");
+        const today=sideGameToday();
 
-        const hasBet=state.sideGame.bets.some(b=>
+        const hasBet=state.sideGame.bets.some(b=>b.format!=="match" &&
           b.date===today &&
           b.status==="active" &&
           (b.player1Id===myPlayerId || b.player2Id===myPlayerId)
@@ -2552,16 +2806,11 @@ function sideGameHome(){
         ` : "";
       })()}
 
-      <button class="secondary full" onclick="sideGameStatement()">
-        📊 My Side Game Statement
-      </button>
-
-      <button class="secondary full" style="margin-top:10px;" onclick="sideGameChoosePlayer()">
-        ➕ Challenge another player
-      </button>
+      <button class="${state.sideGame.bets.some(b=>b.date===sideGameToday()&&(b.status==='active'||b.status==='pending')&&(b.player1Id===myPlayerId||b.player2Id===myPlayerId))?'secondary':'primary'} full" style="margin-top:10px;" onclick="sideGameChoosePlayer()">Play a side game</button>
+      <button class="secondary full" onclick="sideGameStatement()">My Side Game Statement</button>
     </div>
 
-    <button class="secondary full" onclick="sideGameOpen=false;round()">← Back to Golf</button>
+    <button class="secondary full" onclick="sideGameBackToGolf()">← Back to Golf</button>
   `;
 
   window.scrollTo(0,0);
@@ -2664,6 +2913,7 @@ function sideGameStatement(){
       <h2 style="text-align:center;margin:4px 0;">SIDE GAME STATEMENT</h2>
       <div class="muted" style="text-align:center;margin-bottom:18px;">${esc(state.players.find(p=>p.id===myPlayerId)?.name||"")}</div>
 
+      ${!owed.length&&!owe.length ? `<div class="notice">No outstanding balance.</div>` : `
       <div class="notice" style="margin-bottom:14px;">
         <div class="muted">YOU ARE OWED</div>
         ${owed.length
@@ -2682,23 +2932,24 @@ function sideGameStatement(){
         <div style="font-weight:900;margin-top:10px;">Total you owe £${totalOwe}</div>
       </div>
 
+      `}
       ${sideGameSettlementConfirmationsHtml()}
 
-      <div class="notice" style="text-align:center;margin-bottom:14px;">
+      <div class="notice" style="text-align:center;margin-bottom:14px;" ${!owed.length&&!owe.length?'hidden':''}>
         <div class="muted">NET POSITION</div>
         <div style="font-size:24px;font-weight:900;margin-top:6px;">
           ${net>0 ? "+" : net<0 ? "-" : ""}£${Math.abs(net)}
         </div>
       </div>
 
-      <div class="muted">RECENT ACTIVITY</div>
+      <h3>Previous activity</h3>
       ${activity.length
         ? activity.slice(0,20).map(x=>`
             <div class="notice" style="margin-top:8px;">
               ${esc(x.text)}
             </div>
           `).join("")
-        : `<div class="notice" style="margin-top:8px;">No Side Game activity yet.</div>`
+        : `<div class="notice" style="margin-top:8px;">No previous activity yet.</div>`
       }
 
       <button class="secondary full" style="margin-top:14px;" onclick="sideGameHome()">
@@ -2738,11 +2989,11 @@ function round(){
           <div class="muted">NEXT ROUND</div>
           <h2>${esc(planned.course||"Round "+nextNo)}</h2>
           <div class="muted">${planned.date ? esc(formatDate(planned.date)) : ""}</div>
-          <div style="margin-top:10px;"><span class="pill paid">${planned.gameType==="points" ? "🏆 POINTS GAME" : "💷 GROUP GAME"}</span></div>
+          <div style="margin-top:10px;"><span class="pill paid">${planned.gameType==="points" ? "🏆 POINTS GAME" : "💷 MONEY GAME"}</span></div>
           <div class="notice" style="margin-top:12px;"><b>Competition: ${planned.format==="betterball"?"🤝 Better Ball Stableford":planned.format==="pairsaggregate"?`➕ Pairs Aggregate ${state.trip.competition==="net"?"Net":"Stableford"}`:(state.trip.competition==="net" ? "⛳ Net" : "🏆 Stableford")}</b>${planned.gameType==="money" ? `<br>Entry amount: £${Number(planned.stake||0)}` : (planned.format!=="individual"?`<br>Team round • builds Team-event standings`:`<br>Trip points: 10 / 6 / 3`)}</div>
         </div>` : ""}
         <div style="font-weight:800;margin-bottom:10px;">Round ${nextNo-1} is complete.</div>
-        ${isAdmin ? `<button class="primary full" onclick="nextTripRound()">✈️ Start Round ${nextNo}</button>` : `<div class="notice">Waiting for the Group Admin to start Round ${nextNo}.</div>`}
+        ${isAdmin ? `<button class="primary full" onclick="nextTripRound()">✈️ Start Round ${nextNo}</button>` : `<div class="notice">Waiting for the organiser to start Round ${nextNo}.</div>`}
       </div>`;
     window.scrollTo(0,0);
     return;
@@ -2767,7 +3018,7 @@ $("screen").innerHTML=`
 
   ${prizeNextActionHtml()}
 
-  ${playerNextActionHtml()}
+  <div id="uiRoundNext">${playerNextActionHtml()}</div>
 
   ${state.trip?.active ? `
     <div class="card" style="text-align:center;">
@@ -2796,21 +3047,21 @@ $("screen").innerHTML=`
           <span>${esc(formatDate(state.date))}</span>
           <span>•</span>
           <span style="display:inline-flex;align-items:center;padding:4px 9px;border-radius:999px;background:#e5f5e9;color:var(--green);font-weight:900;">👥 ${(()=>{
-  const n=state.gameType==="money" && Number(state.stake||0)>0
+  const n=window.IIGRelease?.active ? currentRoundPlayers().filter(p=>window.IIGRelease.entered(p)).length : state.gameType==="money" && Number(state.stake||0)>0
     ? paidCount()
     : (state.gameType==="points" && !state.trip?.active
         ? currentRoundPlayers().filter(p=>p.playingThisRound===true).length
         : currentRoundPlayers().length);
-  return `${n} ${n===1?"PLAYER":"PLAYERS"} IN`;
+  return `${n} entered`;
 })()}</span>
         </div>
 
         <div style="margin-top:8px;display:flex;gap:7px;flex-wrap:wrap;">
           <span class="pill paid">
-            ${tripTeamRoundActive() ? `🤝 ${esc(tripFormatLabel().toUpperCase())}` : (state.gameType==="points" ? "🏆 POINTS GAME" : (Number(state.stake||0)>0 ? "💷 GROUP GAME" : "⛳ NO STAKE"))}
+            ${tripTeamRoundActive() ? `🤝 ${esc(tripFormatLabel().toUpperCase())}` : (state.gameType==="points" ? "🏆 POINTS GAME" : (Number(state.stake||0)>0 ? "💷 MONEY GAME" : "⛳ NO STAKE"))}
           </span>
           ${state.gameType==="money" && Number(state.stake||0)>0 ? `
-            <span class="pill" style="background:#edf5ef;color:var(--green);">£${state.stake} entry</span>
+            <span class="pill" style="background:#edf5ef;color:var(--green);">£${state.stake} entry fee</span>
           ` : ``}
         </div>
       </div>
@@ -2825,23 +3076,23 @@ $("screen").innerHTML=`
   <div class="card" style="text-align:center;border:2px solid var(--green);padding:13px;">
     <div style="font-weight:900;font-size:16px;">🔐 MANAGING: ${esc(state.groupName||"My Golf Group")}</div>
     <div style="margin-top:7px;font-weight:800;">⛳ ${esc(state.course||"Course not set")} · ${esc(formatDate(state.date))}</div>
-    <div class="muted" style="margin-top:5px;font-weight:800;">${state.gameType==="money"?"💷 Group Game":"🏆 Points Game"} · ${(state.pointsCompetition||state.trip?.competition||"stableford")==="net"?"Net":"Stableford"}</div>
+    <div class="muted" style="margin-top:5px;font-weight:800;">${state.gameType==="money"?"💷 Money Game":"🏆 Points Game"} · ${(state.pointsCompetition||state.trip?.competition||"stableford")==="net"?"Net":"Stableford"}</div>
   </div>
   <div class="card">
     <h2>Edit round details</h2>
 
       <label class="muted">Course</label>
-      <input value="${escAttr(state.course)}" onchange="state.course=this.value;save()">
+      <input value="${escAttr(state.course)}" onchange="state.course=this.value;save('configure')">
 
       <div>
         <label class="muted">Date</label>
-        <input type="date" value="${escAttr(state.date)}" onchange="state.date=this.value;save();render()">
+        <input type="date" value="${escAttr(state.date)}" onchange="state.date=this.value;save('configure');render()">
 
         <div class="notice"><b>Competition: ${tripTeamRoundActive()?`🤝 ${esc(tripFormatLabel())}`:(state.pointsCompetition==="stableford" ? "🏆 Stableford" : "⛳ Net")}</b></div>
 
         ${state.gameType==="money" ? `
-          <label class="muted">Entry amount per player (£)</label>
-          <input type="number" min="0" step="1" value="${Number(state.stake||0)>0 ? state.stake : ""}" placeholder="No stake" onchange="state.stake=this.value==='' ? 0 : +this.value;save();render()">
+          <label class="muted">Entry fee per player (£)</label>
+          <input type="number" min="0" step="1" value="${Number(state.stake||0)>0 ? state.stake : ""}" placeholder="No stake" onchange="state.stake=this.value==='' ? 0 : +this.value;save('configure');render()">
         ` : `
           <div class="notice">
             <b>${tripTeamRoundActive()?`🤝 ${esc(tripFormatLabel())}`:(state.pointsCompetition==="stableford" ? "🏆 Stableford" : "⛳ Net")}</b><br>
@@ -2853,8 +3104,8 @@ $("screen").innerHTML=`
   ` : ``}
 
   ${state.gameType==="money" && Number(state.stake||0)>0 ? `
-    <div class="card" style="text-align:center;">
-      <div class="muted" style="font-weight:800;letter-spacing:.4px;">💰 CURRENT TOTAL</div>
+    <div class="card" id="uiRoundTotals" style="text-align:center;">
+      <div class="muted" style="font-weight:800;letter-spacing:.4px;">Declared paid total</div>
       <div class="big" style="font-size:36px;margin:4px 0 2px;">£${pot()}</div>
       ${state.splitPrizes ? `
         <div style="margin-top:10px;font-weight:800;">
@@ -2867,16 +3118,16 @@ $("screen").innerHTML=`
   ` : ``}
 
   ${state.gameType==="money" && Number(state.stake||0)>0 && !isAdmin && currentPlayerPaid ? `
-    <div class="card">
+    <div class="card" id="uiRoundPayments">
       <div class="row">
         <div>
-          <b>✅ You’re paid — £${state.stake} entry confirmed. You’re in — good luck! ⛳</b>
+          <b>${window.IIGRelease?.active && !window.IIGRelease.entered(state.players.find(p=>p.id===myPlayerId)) ? "Marked paid · not entered in this round" : "Marked paid · entry confirmed"}</b>
         </div>
         <button class="secondary small" onclick="show('pay')">View payments</button>
       </div>
     </div>
   ` : state.gameType==="money" && Number(state.stake||0)>0 ? `
-    <div class="card">
+    <div class="card" id="uiRoundPayments">
       <h2>💷 Payment</h2>
 
       <div class="row">
@@ -2909,7 +3160,7 @@ $("screen").innerHTML=`
     ?"Add both partners’ final scores and enter the combined total."
     :(state.trip?.active
       ?"Everyone plays the same competition."
-      :"Tap I’m Playing to enter this competition.")}
+      :"Tap I’m playing to enter this competition.")}
       </div>
 
       ${tripTeamRoundActive()?"":`<div class="player row">
@@ -2943,12 +3194,12 @@ $("screen").innerHTML=`
     <div class="card" style="text-align:center;">
       <div style="font-size:34px;">🤝</div>
       <h2 style="margin:5px 0 7px;">SIDE GAME</h2>
-      <h2 style="margin:5px 0 7px;">Challenge your mates</h2>
+      <h2 style="margin:5px 0 7px;">Play a side game</h2>
       <div style="font-weight:600;color:#40564a;line-height:1.4;">
-        Playing in the group comp? Start a friendly Side Game with a mate in your group. Agree an amount, enter your scores, and we’ll keep track of the result.
+        Add a friendly side game with someone in your group. Agree an amount and enter your final scores.
       </div>
       <button class="primary full" style="margin-top:14px;" onclick="iigFreePlan() ? showIigPlusUpgrade('sidegame') : sideGameHome()">
-        ${iigFreePlan() ? "🔒 Side Game — I’m In Golf+" : "🤝 Open Side Game"}
+        ${iigFreePlan() ? "🔒 Side Game — I’m In Golf+" : "Play a side game"}
       </button>
     </div>
   ` : ""}
@@ -2983,6 +3234,11 @@ Group PIN: ${pin}`;
 }
 function pay(){
 
+ if(window.IIGRelease?.active&&state.roundOpen!==true){
+   $("screen").innerHTML='<div class="card"><h2>No competition is open</h2><p>Previous results and payment records are unchanged.</p><button class="secondary full" onclick="show(\'round\')">Back to round</button></div>';
+   return;
+ }
+
  if(waitingForNextCompetition()){
    waitingScreen("pay");
    return;
@@ -2991,6 +3247,11 @@ function pay(){
  const sortedPlayers=[...currentRoundPlayers()]
    .sort((a,b)=>a.name.localeCompare(b.name));
  const me=state.players.find(p=>p.id===myPlayerId);
+ if(!isAdmin && !me?.paid && entryClosed()){
+   const existingEntrant=window.IIGRelease?.entered(me)===true;
+   $("screen").innerHTML='<div class="card"><h2>'+(existingEntrant?'Entry payment':'Entries Closed')+'</h2><div class="notice">'+(existingEntrant?'You’re already entered. Confirm your entry fee below. Your submitted score stays locked.':'You are not entered in this competition. Entry and payment confirmation are closed.')+'</div><button class="secondary full" onclick="show(\'round\')">Back to round</button></div>';
+   return;
+ }
 
  if(state.trip?.active && me && !tripPlayerIsPlaying(me) && !isAdmin){
    if(state.gameType==="points" || Number(state.stake||0)<=0){
@@ -2999,21 +3260,22 @@ function pay(){
        <div style="font-size:42px;">✅</div>
        <h2 style="margin:8px 0;">No payment needed</h2>
        <div class="notice">${state.gameType==="points" ? "<b>This is a Points Game.</b><br>Everyone playing today can enter their score — there is no payment step." : "<b>This round has no entry fee.</b><br>There is nothing to pay for this competition."}</div>
-       <button class="secondary full" onclick="show('round')">← Back to Round</button>
+       <button class="secondary full" onclick="show('round')">← Back to round</button>
      </div>`;
    return;
  }
 
- $("screen").innerHTML=`<div class="card" style="text-align:center;"><div style="font-size:42px;">☕</div><h2>Not playing today</h2><div class="notice">You do not need to pay or enter a score for this round. You are still part of the Trip.</div><button class="secondary full" onclick="show('round')">← Back to Round</button></div>`;
+ $("screen").innerHTML=`<div class="card" style="text-align:center;"><div style="font-size:42px;">☕</div><h2>Not playing today</h2><div class="notice">You do not need to pay or enter a score for this round. You are still part of the Trip.</div><button class="secondary full" onclick="show('round')">← Back to round</button></div>`;
    return;
  }
 
  $("screen").innerHTML=`
  <div class="card">
    <h2>💷 ${isAdmin ? "Manage Payments" : (me?.paid ? "Payments" : "Pay & Join")}</h2>
+   ${entryClosed()?'<div class="notice"><b>Entries closed</b> — new entries are closed. Existing entrants can confirm their entry fee and submit scores; submitted scores stay locked.</div>':""}
    <div class="notice">${isAdmin
      ? "<b>Players pay you directly.</b><br>I'm In Golf does not receive, hold or manage your group's money."
-     : "<b>Pay your Group Admin directly.</b><br>I'm In Golf does not receive or hold your money."
+     : "<b>Pay your organiser directly.</b><br>I'm In Golf does not receive or hold your money."
    }</div>
    <div class="big">£${pot()}</div>
    <div class="muted"><b>Current pot</b></div>
@@ -3031,7 +3293,7 @@ function pay(){
      </div>
    ` : ``}
 
-   <div class="muted" style="margin-top:8px;">Full pot if everyone enters: £${potentialPot()} • Entry: £${state.stake}</div>
+   <div class="muted" style="margin-top:8px;">${entryClosed()?`Entry: £${state.stake}`:`Full pot if everyone enters: £${potentialPot()} • Entry: £${state.stake}`}</div>
  </div>
 
  <div class="card">
@@ -3044,13 +3306,13 @@ function pay(){
          <div class="row">
            <div>
              <b>${esc(p.name)}${p.id===myPlayerId ? ` <span class="pill paid" style="margin-left:6px;">👤 You</span>` : ""}</b>
-             <div class="muted">£${state.stake} stake</div>
+
            </div>
 
            ${isAdmin
              ? (Number(state.stake||0)<=0
                 ? `<span class="pill paid">No payment required</span>`
-                : `<button class="${p.paid?'secondary':'primary'} small" onclick="togglePaid(${i})">${p.paid?'✓ Paid':'Mark paid'}</button>`)
+                : `<button class="${p.paid?'secondary':'primary'} small" onclick="togglePaid(${i})" ${entryClosed()&&!window.iigSecureOrganiser?.active?"disabled":""}>${p.paid?'✓ Paid':'Mark paid'}</button>`)
              : (Number(state.stake||0)<=0
                 ? `<span class="pill paid">No payment required</span>`
                 : `<span class="pill ${p.paid?'paid':'pending'}">${p.paid?'✓ Paid':'Not paid'}</span>`)
@@ -3074,7 +3336,7 @@ function pay(){
    }
  </div>
 
- ${!isAdmin && Number(state.stake||0)>0 && !(me && me.paid) ? `
+ ${!isAdmin && !entryClosed() && Number(state.stake||0)>0 && !(me && me.paid) ? `
    <div class="pay-screen-spacer"></div>
    <div class="pay-sticky">
      ${pin==="2026"
@@ -3083,7 +3345,7 @@ function pay(){
            ? (adminDeviceRecognised()
               ? `<button class="primary full" onclick="adminSelfEnter()">🔑 Enter & Mark Myself Paid</button>`
               : `<div><button class="primary full" onclick="beginPlayerPayment()">💳 Pay £${Number(state.stake||0)} & Join</button><div style="font-size:16px;font-weight:600;color:#263b30;margin-top:14px;line-height:1.55;text-align:center;"><strong>After paying:</strong> Return to I’m In Golf using the back link at the top of your iPhone, or reopen the app.<div style="margin-top:8px;"><strong>Then confirm whether you’ve paid.</strong></div></div></div>`)
-           : `<button class="secondary full" disabled>Payment link not set up — ask your Group Admin</button>`)
+           : `<button class="secondary full" disabled>Payment link not set up — ask your organiser</button>`)
      }
    </div>
  ` : ""}`;
@@ -3153,7 +3415,7 @@ async function adminSelfEnter(){
 
   const confirmed=await appConfirm(
     "Enter yourself?",
-    `You are the Group Admin and a player in this competition.\n\nMark your £${Number(state.stake||0)} entry as paid without opening your own payment link?`,
+    `You are the organiser and a player in this competition.\n\nMark your £${Number(state.stake||0)} entry as paid without opening your own payment link?`,
     "Enter & Mark Paid"
   );
   if(!confirmed)return;
@@ -3170,7 +3432,9 @@ async function adminSelfEnter(){
     return;
   }
 
+  if(!sameEntryRound(state,latestState)){entryClosedMessage();return;}
   state=latestState;
+  if(entryClosed()){entryClosedMessage();render();return;}
   latestPlayer.paid=true;
   latestPlayer.paymentMarkedAt=new Date().toISOString();
   latestPlayer.paymentMarkMethod="admin-self-entry";
@@ -3199,7 +3463,7 @@ async function adminSelfEnter(){
 
 let paymentLaunchBusy=false;
 
-function beginPlayerPayment(){
+async function beginPlayerPayment(){
   console.count("IIG PAYMENT BUTTON FIRED");
   if(paymentLaunchBusy)return;
   paymentLaunchBusy=true;
@@ -3209,8 +3473,12 @@ function beginPlayerPayment(){
   const me=state.players.find(p=>p.id===myPlayerId);
   if(!me)return;
   if(me.paid){alert("You're already marked paid.");return;}
+  if(entryClosed()){entryClosedMessage();return;}
+  if(!await refreshEntryState())return;
+  const latestMe=state.players.find(p=>p.id===myPlayerId);
+  if(!latestMe || latestMe.paid)return;
   const savedLink=String(state.paymentLink||"").trim();
-  if(!savedLink){alert("Your Group Admin hasn't added a payment link yet.");return;}
+  if(!savedLink){alert("Your organiser hasn't added a payment link yet.");return;}
   const link=paymentLinkForStake(savedLink,state.stake);
   rememberPaymentJourney({
     playerId:me.id,
@@ -3272,6 +3540,7 @@ function appPrompt(title,message="",initial="",options={}){
         <h2 style="font-size:22px;margin:0 0 8px;text-align:center;">${esc(title)}</h2>
         ${message ? `<div class="muted" style="text-align:center;margin-bottom:14px;white-space:pre-line;">${esc(message)}</div>` : ""}
         <input id="appPromptInput" type="${escAttr(inputType)}" ${inputMode?`inputmode="${escAttr(inputMode)}"`:""} ${options.maxlength?`maxlength="${Number(options.maxlength)}"`:""} placeholder="${escAttr(placeholder)}" value="${escAttr(String(initial??""))}">
+        <p id="appPromptError" role="alert" hidden></p>
         <button id="appPromptOk" class="primary full">${esc(options.okLabel||"Continue")}</button>
         <button id="appPromptCancel" class="ghost full">Cancel</button>
       </div>`;
@@ -3281,9 +3550,17 @@ function appPrompt(title,message="",initial="",options={}){
       input.addEventListener("input",()=>{input.value=limitHandicapText(input.value);});
     }
     const finish=value=>{overlay.remove();resolve(value);};
-    overlay.querySelector("#appPromptOk").onclick=()=>finish(input.value);
+    const submit=()=>{
+      const error=typeof options.validate==="function" ? options.validate(input.value) : "";
+      if(error){
+        const note=overlay.querySelector("#appPromptError");note.textContent=error;note.hidden=false;
+        input.setAttribute("aria-invalid","true");input.setAttribute("aria-describedby","appPromptError");input.focus();return;
+      }
+      finish(input.value);
+    };
+    overlay.querySelector("#appPromptOk").onclick=submit;
     overlay.querySelector("#appPromptCancel").onclick=()=>finish(null);
-    input.addEventListener("keydown",e=>{if(e.key==="Enter")finish(input.value);});
+    input.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();submit();}});
     overlay.addEventListener("click",e=>{if(e.target===overlay)finish(null);});
     setTimeout(()=>{input.focus();input.select();},50);
   });
@@ -3337,7 +3614,10 @@ const sameRound=
   const player=state.players.find(p=>p.id===journey.playerId);
   if(!player){clearPaymentJourney();return;}
   if(player.paid){clearPaymentJourney();return;}
+  if(entryClosed()){entryClosedMessage();return;}
   paymentReturnBusy=true;
+  if(!await refreshEntryState()){paymentReturnBusy=false;return;}
+  if(state.players.find(p=>p.id===journey.playerId)?.paid){clearPaymentJourney();paymentReturnBusy=false;return;}
   const confirmed=await new Promise(resolve=>{
     const overlay=document.createElement("div");
     overlay.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.42);z-index:11000;display:flex;align-items:center;justify-content:center;padding:20px;";
@@ -3388,7 +3668,19 @@ const sameRound=
     return;
   }
 
+  const entryRoundChanged=!sameEntryRound(state,latestState);
   state=latestState;
+  if(!entryRoundChanged && latestPlayer.paid){
+    clearPaymentJourney();paymentReturnBusy=false;
+    if(pollingWasActive)startPolling();
+    render();showAppToast("Entry already confirmed","Your saved payment status has been kept.",3000);
+    return;
+  }
+  if(entryRoundChanged || entryClosed()){
+    paymentReturnBusy=false;
+    if(pollingWasActive)startPolling();
+    entryClosedMessage();render();return;
+  }
   latestPlayer.paid=true;
   latestPlayer.paymentMarkedAt=new Date().toISOString();
   latestPlayer.paymentMarkMethod="player-confirmed-payment-return";
@@ -3434,13 +3726,17 @@ async function togglePaid(i){
 
   if(!demoCanEdit())return;
 
-  const p=state.players[i];
+  const playerId=state.players[i]?.id;
 
  if(!isAdmin){
-   alert("Only the Group Admin can change payment status.");
+   alert("Only the organiser can change payment status.");
    return;
  }
 
+ if(entryClosed()){entryClosedMessage();return;}
+ if(!await refreshEntryState())return;
+ const p=state.players.find(player=>player.id===playerId);
+ if(!p)return;
  p.paid=!p.paid;
  p.paymentMarkedAt=p.paid ? new Date().toISOString() : null;
  p.paymentMarkMethod=p.paid ? "admin-confirmed" : null;
@@ -3451,6 +3747,7 @@ async function togglePaid(i){
 function reminder(){const names=currentRoundPlayers().filter(p=>!p.paid).map(p=>p.name).join(", ");const txt=`I'm In Golf: ${names} — your £${state.stake} golf stake is still due for ${state.course}. Please pay before tee-off.`;navigator.clipboard?.writeText(txt);alert("Reminder copied. Paste it into WhatsApp.");}
 function tripBetterBallEligibleTeams(){
   const teams=state.trip?.currentTeams||[];
+  if(window.IIGRelease?.active)return teams.filter(team=>(team.playerIds||[]).every(id=>window.IIGRelease.entered(state.players.find(p=>p.id===id))));
   if(state.gameType!=="money" || Number(state.stake||0)<=0)return teams;
   return teams.filter(team=>(team.playerIds||[]).every(id=>state.players.find(p=>p.id===id)?.paid));
 }
@@ -3506,7 +3803,7 @@ async function editTripTeamScore(teamId){
   const value=Number(String(answer).trim());
   if(!Number.isFinite(value)||value<0){alert("Please enter a valid score.");return;}
   state.trip.currentTeamScores[teamId]=value;
-  render();await save();
+  render();await save("correct");
 }
 function scores(){
 
@@ -3532,11 +3829,13 @@ function scores(){
 
   const roundPlayers=currentRoundPlayers();
   const normalPointsGame=isPointsGame && !state.trip?.active;
-  const eligiblePlayers=normalPointsGame
+  const eligiblePlayers=window.IIGRelease?.active
+    ? roundPlayers.filter(p=>window.IIGRelease.entered(p))
+    : normalPointsGame
     ? roundPlayers.filter(p=>p.playingThisRound===true)
     : isPointsGame
       ? [...roundPlayers]
-      : (Number(state.stake||0)>0 ? roundPlayers.filter(p=>p.paid) : [...roundPlayers]);
+      : (Number(state.stake||0)>0 ? roundPlayers.filter(p=>window.IIGRelease?.active?window.IIGRelease.entered(p):p.paid) : [...roundPlayers]);
 
   const stillToEnter=eligiblePlayers.filter(p=>{
     const type=pointsComp;
@@ -3585,13 +3884,14 @@ function scores(){
   $("screen").innerHTML=`
     <div class="card">
       <h2>🏌️ Scores</h2>
+      ${!isAdmin&&state.roundOpen===true&&state.gameType==='money'&&Number(state.stake||0)>0&&state.players.some(p=>p.id===myPlayerId&&(!p.paid||window.IIGRelease?.paymentIsExplicitlyUnpaid(p))&&window.IIGRelease?.entered(p))?'<div class="notice">Your entry fee is still due. Your submitted score stays locked.<button class="secondary full" onclick="show(\'pay\')">Go to Pay</button></div>':''}
 
       ${roundLocked() ? `
         ${eligiblePlayers.length ? `
           <div class="notice ${stillToEnter.length ? "warning" : ""}">
             ${stillToEnter.length
-              ? `<b>⏳ Still to enter — ${stillToEnter.length}</b><br>${stillToEnter.map(p=>esc(p.name)).join(" • ")}`
-              : `<b>✅ All scores are in</b>${!isAdmin ? `<br><span class="muted">Waiting for the Group Admin to finish the round.</span>` : ``}`
+              ? `<b>⏳ Awaiting scores — ${stillToEnter.length}</b><br>${stillToEnter.map(p=>esc(p.name)).join(" • ")}`
+              : `<b>✅ All scores are in</b>${!isAdmin ? `<br><span class="muted">Waiting for the organiser to finish the round.</span>` : ``}`
             }
           </div>
         ` : ""}
@@ -3604,7 +3904,7 @@ function scores(){
         ` : `
           <div class="notice">
             <b>${isAdmin ? "CURRENT COMPETITION — " : ""}${pointsComp==="stableford" ? "🏆 STABLEFORD" : "⛳ NET"}</b><br>
-            ${isAdmin ? "Enter or correct player scores below." : "Your Group Admin chose the competition for everyone."}
+            ${isAdmin ? "Enter or correct player scores below." : "Your organiser chose the competition for everyone."}
           </div>
           ${Number(state.stake||0)>0 ? `<div class="notice">💷 Only players marked as paid are included in the final result.</div>` : ""}
         `}
@@ -3612,7 +3912,7 @@ function scores(){
         ${eligiblePlayers.length ? `
           <div class="notice ${stillToEnter.length ? "warning" : ""}">
             ${stillToEnter.length
-              ? (isPointsGame ? `<b>⏳ ${stillToEnter.length} score${stillToEnter.length===1?"":"s"} still to enter</b>` : `<b>⏳ ${stillToEnter.length} paid player${stillToEnter.length===1?"":"s"} still to enter a score</b>`)
+              ? `<b>⏳ Awaiting scores — ${stillToEnter.length}</b><br>${stillToEnter.map(p=>esc(p.name)).join(" • ")}`
               : `<b>✅ All entered players have submitted.</b>`
             }
           </div>
@@ -3624,19 +3924,19 @@ function scores(){
         const i=state.players.findIndex(x=>x.id===p.id);
         const type=pointsComp;
         const isSubmitted=type ? submitted(p,type) : false;
-        const canControl=isAdmin || p.id===myPlayerId;
+        const canControl=(isAdmin || p.id===myPlayerId) && (!window.IIGRelease?.active || window.IIGRelease.entered(p));
 
         return `
         <div class="player">
           <div>
             <b>${esc(p.name)}</b>
-            <div class="muted">HCP ${p.handicap}</div>
+            <div class="muted">HCP ${esc(String(p.handicap??"—"))}</div>
           </div>
 
           ${canControl ? `
             <div style="margin-top:10px;">
 
-              ${!isPointsGame && Number(state.stake||0)>0 && !p.paid ? `
+              ${!isPointsGame && Number(state.stake||0)>0 && !p.paid && !(window.IIGRelease?.active&&window.IIGRelease.entered(p)) ? `
                 ${roundLocked() ? `` : `
                   <div class="notice warning">
                     💷 <b>Pay before entering the competition or a score.</b>
@@ -3644,13 +3944,13 @@ function scores(){
                 `}
               ` : isSubmitted ? `
                 <div class="notice">
-                  ✅ <b>Score submitted</b><br>
+                  ✅ <b>Score submitted</b><br><span class="ui-submitted-total">
                   ${p.noReturn===true
                     ? "NR — No Return"
                     : type==="stableford"
                     ? esc(String(p.stableford))+" pts"
                     : "Net "+esc(String(p.netScore))
-                  }
+                  }</span><p class="muted">Contact your organiser if a correction is needed.</p>
                 </div>
                 ${isAdmin ? `
                   <button class="secondary small" onclick="adminEditSubmittedScore(${i},'${type}')">
@@ -3703,7 +4003,7 @@ function scores(){
 
     ${pointsComp==="stableford" ? `
       <div class="card">
-        <h2>🏆 Stableford Leaderboard</h2>
+        <h2>Round scores · Stableford</h2>
 
         ${stablefordRanked.length
           ? stablefordRanked.map((p,i)=>`
@@ -3713,7 +4013,7 @@ function scores(){
                 <b>${esc(p.name)}</b>
                 ${!isPointsGame ? `
                   <div class="muted">
-                    ${Number(state.stake||0)<=0 ? "✓ No payment required • Eligible" : p.paid ? "✓ Paid • Eligible" : "⚠️ Unpaid • Not eligible"}
+                    ${Number(state.stake||0)<=0 ? "✓ No payment required • Eligible" : p.paid ? "✓ Paid • Eligible" : (window.IIGRelease?.active&&window.IIGRelease.entered(p)?"Entry fee due • Entered":"⚠️ Unpaid • Not eligible")}
                   </div>
                 ` : ""}
               </div>
@@ -3737,7 +4037,7 @@ function scores(){
                 <b>${esc(p.name)}</b>
                 ${!isPointsGame ? `
                   <div class="muted">
-                    ${Number(state.stake||0)<=0 ? "✓ No payment required • Eligible" : p.paid ? "✓ Paid • Eligible" : "⚠️ Unpaid • Not eligible"}
+                    ${Number(state.stake||0)<=0 ? "✓ No payment required • Eligible" : p.paid ? "✓ Paid • Eligible" : (window.IIGRelease?.active&&window.IIGRelease.entered(p)?"Entry fee due • Entered":"⚠️ Unpaid • Not eligible")}
                   </div>
                 ` : ""}
               </div>
@@ -3844,14 +4144,15 @@ async function submitPlayerScore(i,type){
 
   const p=state.players[i];
   if(!p)return;
+  if(window.IIGRelease?.paymentBlocksInitialScore(p)){alert('Declare I’ve paid before submitting an initial score.');return;}
   if(!isAdmin && p.id!==myPlayerId)return;
 
   if(!isAdmin && state.gameType==="points" && !state.trip?.active && p.playingThisRound!==true){
-    alert("Tap I’m Playing before entering your score.");
+    alert("Tap I’m playing before entering your score.");
     return;
   }
 
-  if(state.gameType==="money" && Number(state.stake||0)>0 && !p.paid){
+  if(state.gameType==="money" && Number(state.stake||0)>0 && !p.paid && !(window.IIGRelease?.active&&window.IIGRelease.entered(p))){
     alert("Pay before entering a score.");
     return;
   }
@@ -3898,6 +4199,7 @@ async function submitNoReturn(i){
 
   const p=state.players[i];
   if(!p)return;
+  if(window.IIGRelease?.paymentBlocksInitialScore(p)){alert('Declare I’ve paid before submitting an initial score.');return;}
   if(!isAdmin && p.id!==myPlayerId)return;
 
   const type=state.pointsCompetition||"stableford";
@@ -3961,7 +4263,7 @@ async function adminEditSubmittedScore(i,type){
     p.noReturn=true;
     p.scoreSubmitted=true;
     render();
-    await save();
+    await save("correct");
     return;
   }
 
@@ -3985,7 +4287,7 @@ async function adminEditSubmittedScore(i,type){
   p.scoreSubmitted=true;
 
   render();
-  await save();
+  await save("correct");
 }
 
 function resolveTripTeamTie(teams,score){
@@ -4048,7 +4350,7 @@ async function finishTripBetterBallRound(){
   state.trip.currentTeamScores={};
   if(state.trip.currentRound<state.trip.totalRounds){state.trip.currentRound+=1;state.roundOpen=false;}
   else{state.trip.completed=true;state.trip.active=false;setTripChampion();}
-  await save();
+  if(!await save("finish")){alert("The finished round was not confirmed. Reload the group before continuing.");return;}
   if(state.trip?.completed)showTripSummary();else showTripBetterBallResult(record);
 }
 
@@ -4057,7 +4359,7 @@ function showTripBetterBallResult(record){
   const winnerText=(record.winnerNames||[]).join(" & ");
   const each=(record.winnerPlayerNames||[]).length?Number(record.teamPot||0)/(record.winnerPlayerNames||[]).length:0;
   page="winner";
-  $("screen").innerHTML=`<div class="card" style="text-align:center;"><div style="font-size:54px;">🏆</div><div class="muted">${esc(tripFormatLabel(record.tripFormat).toUpperCase())} RESULT</div><h2 style="font-size:25px;margin:7px 0;">${esc(winnerText)}</h2><div class="big">${Number(results[0]?.score||0)} ${record.pointsCompetition==="net"?"combined net":"pts"}</div>${Number(record.teamPot||0)>0?`<div class="notice" style="margin-top:12px;">💷 £${Number(record.teamPot).toFixed(2).replace(/\.00$/,"")} total • £${each.toFixed(2).replace(/\.00$/,"")} per player</div>`:""}<div class="notice">Team-event points added • Individual standings unchanged</div></div><div class="card"><h2>📊 Pair standings</h2>${results.map((r,i)=>`<div class="player row"><span class="pos">${i+1}</span><div style="flex:1"><b>${esc(r.name)}</b></div><span class="money">${r.score}</span></div>`).join("")}</div><div class="card">${state.trip?.active&&state.roundOpen===false?`<div class="notice"><b>Round ${Number(state.trip.currentRound)-1} complete!</b><br>Next: Round ${state.trip.currentRound} of ${state.trip.totalRounds}.</div>${isAdmin?`<button class="primary full" onclick="nextTripRound()">✈️ Move on to Round ${state.trip.currentRound}</button>`:`<div class="notice">Waiting for the Group Admin to start the next round.</div>`}`:`<button class="secondary full" onclick="show('round')">Continue</button>`}</div>`;
+  $("screen").innerHTML=`<div class="card" style="text-align:center;"><div style="font-size:54px;">🏆</div><div class="muted">${esc(tripFormatLabel(record.tripFormat).toUpperCase())} RESULT</div><h2 style="font-size:25px;margin:7px 0;">${esc(winnerText)}</h2><div class="big">${Number(results[0]?.score||0)} ${record.pointsCompetition==="net"?"combined net":"pts"}</div>${Number(record.teamPot||0)>0?`<div class="notice" style="margin-top:12px;">💷 £${Number(record.teamPot).toFixed(2).replace(/\.00$/,"")} total • £${each.toFixed(2).replace(/\.00$/,"")} per player</div>`:""}<div class="notice">Team-event points added • Individual standings unchanged</div></div><div class="card"><h2>📊 Pair standings</h2>${results.map((r,i)=>`<div class="player row"><span class="pos">${i+1}</span><div style="flex:1"><b>${esc(r.name)}</b></div><span class="money">${r.score}</span></div>`).join("")}</div><div class="card">${state.trip?.active&&state.roundOpen===false?`<div class="notice"><b>Round ${Number(state.trip.currentRound)-1} complete!</b><br>Next: Round ${state.trip.currentRound} of ${state.trip.totalRounds}.</div>${isAdmin?`<button class="primary full" onclick="nextTripRound()">✈️ Move on to Round ${state.trip.currentRound}</button>`:`<div class="notice">Waiting for the organiser to start the next round.</div>`}`:`<button class="secondary full" onclick="show('round')">Continue</button>`}</div>`;
   window.scrollTo(0,0);
 }
 
@@ -4078,6 +4380,10 @@ async function finishRound(){
 }
 
 async function finishRoundImpl(){
+ if(typeof window!=="undefined" && window.iigSecureOrganiser?.active){
+  try{await window.iigSecureOrganiser.prepareFinish();}catch(error){alert(error.message);return;}
+ }
+
 
 
   const isPointsGame=state.gameType==="points";
@@ -4091,7 +4397,7 @@ async function finishRoundImpl(){
 
   // Normal rounds: refresh from Supabase before finalising so the
   // Admin cannot finish using a stale copy while a player is submitting.
-  if(!isTrip && db){
+  if(!isTrip && db && !(typeof window!=="undefined" && window.iigSecureOrganiser?.active)){
     const {data:latestState,error:latestError}=await db.rpc(
       "get_group_state",
       {p_pin:pin}
@@ -4412,7 +4718,7 @@ if(isTrip){
     setTripChampion();
   }
 }
-        const finishSaved=await save();
+        const finishSaved=await save("finish");
         if(!finishSaved){
           alert("The finished round could not be saved. Please check your connection and try again.");
           return;
@@ -4744,7 +5050,7 @@ if(isTrip){
     setTripChampion();
   }
 }
-  const moneyFinishSaved=await save();
+  const moneyFinishSaved=await save("finish");
   if(!moneyFinishSaved){
     alert("The finished round could not be saved. Please check your connection and try again.");
     return;
@@ -4829,9 +5135,15 @@ function winnerPayouts(record){
   return Array.isArray(record?.payouts) ? record.payouts : createWinnerPayouts(record);
 }
 
-function currentPlayerMatchesPayout(payout){
+function currentPlayerMatchesPayout(payout,record){
   const me=(state.players||[]).find(p=>p.id===myPlayerId);
   if(!me)return false;
+  if(iigEntryBridge && !payout.winnerPlayerId){
+    const historic=Array.isArray(record?.players)?record.players:[];
+    const matches=historic.filter(p=>p.name===payout.winnerName);
+    if(matches.length!==1 || !matches[0].id || historic.filter(p=>p.id===matches[0].id).length!==1)return false;
+    return matches[0].id===me.id;
+  }
   return payout.winnerPlayerId
     ? String(payout.winnerPlayerId)===String(me.id)
     : String(payout.winnerName||"").trim().toLowerCase()===String(me.name||"").trim().toLowerCase();
@@ -4842,7 +5154,7 @@ function nextPrizeAction(){
   (state.history||[]).forEach((record,historyIndex)=>{
     winnerPayouts(record).forEach(payout=>{
       if(payout.status==="paid")return;
-      if(isAdmin || currentPlayerMatchesPayout(payout))candidates.push({record,historyIndex,payout});
+      if(isAdmin || currentPlayerMatchesPayout(payout,record))candidates.push({record,historyIndex,payout});
     });
   });
   if(isAdmin){
@@ -4853,16 +5165,30 @@ function nextPrizeAction(){
 
 function prizeNextActionHtml(){
   const action=nextPrizeAction();
+  if(isAdmin){
+    const history=state.history||[];
+    const index=action ? action.historyIndex : history.findIndex(record=>winnerPayouts(record).length>0);
+    if(index<0)return "";
+    const record=history[index],payouts=winnerPayouts(record);
+    const labels={paid:"Marked paid",ready:"Payment details received",bank_details_needed:"Private bank transfer",awaiting_details:"Awaiting payment details"};
+    return `<div class="card ui-previous-winnings ui-winner-summary">
+      <p class="muted">Previous round · ${esc(record.course||"Completed round")}${record.date?" · "+esc(formatDate(record.date)):""}</p>
+      <h2>Result payments</h2>
+      <ul class="ui-winner-list">${payouts.map(p=>`<li>
+        <div class="ui-winner-line"><strong>${esc(p.winnerName)}</strong><strong>£${moneyText(p.amount)}</strong></div>
+        <span class="ui-winner-status ${p.status==="paid"?"ui-winner-paid":""}">${p.status==="paid"?"✓ ":""}${esc(labels[p.status]||"Awaiting payment details")}</span>
+      </li>`).join("")}</ul>
+      <button class="secondary full" onclick="showRoundHistory(${Number(index)})">View Payment Status</button>
+    </div>`;
+  }
   if(!action)return "";
   const p=action.payout;
+  const context=`<p class="muted">Previous round · ${esc(action.record.course||"Completed round")}${action.record.date?" · "+esc(formatDate(action.record.date)):""}</p>`;
   const amount=moneyText(p.amount);
   const open=`showRoundHistory(${Number(action.historyIndex)})`;
-  if(isAdmin && p.status==="ready")return `<div class="card" style="border:2px solid var(--green);text-align:center;"><div style="font-size:34px;">💷</div><div class="muted">RESULT PAYMENT READY</div><h2 style="font-size:23px;margin:6px 0;">${esc(p.winnerName)} has submitted payment details</h2><button class="primary full" onclick="${open}">Pay ${esc(p.winnerName)} £${amount}</button></div>`;
-  if(isAdmin && p.status==="bank_details_needed")return `<div class="card" style="border:2px solid var(--green);text-align:center;"><div style="font-size:34px;">🏦</div><div class="muted">RESULT PAYMENT READY</div><h2 style="font-size:23px;margin:6px 0;">${esc(p.winnerName)} needs a private bank transfer</h2><button class="primary full" onclick="${open}">View £${amount} Payment</button></div>`;
-  if(isAdmin)return `<div class="card" style="text-align:center;"><div style="font-size:30px;">⏳</div><div class="muted">RESULT PAYMENT</div><h2 style="font-size:21px;margin:6px 0;">£${amount} awaiting ${esc(p.winnerName)}'s payment details</h2><button class="secondary full" onclick="${open}">View Payment Status</button></div>`;
-  if(p.status==="awaiting_details")return `<div class="card" style="border:2px solid var(--green);text-align:center;"><div style="font-size:38px;">🏆</div><div class="muted">RESULT CONFIRMED</div><h2 style="font-size:24px;margin:6px 0;">Your £${amount} payment is ready</h2><button class="primary full" onclick="${open}">Set Up My £${amount} Payment</button></div>`;
-  if(p.status==="ready")return `<div class="card" style="text-align:center;"><div style="font-size:30px;">✅</div><h2 style="font-size:21px;margin:6px 0;">Your payment details have been sent</h2><div class="muted">Your Group Admin can now send your £${amount} payment.</div><button class="secondary full" onclick="${open}">View Payment Status</button></div>`;
-  return `<div class="card" style="text-align:center;"><div style="font-size:30px;">✅</div><h2 style="font-size:21px;margin:6px 0;">Private bank transfer selected</h2><div class="muted">Contact your Group Admin privately and send them your bank details. Never enter your bank details into I'm In Golf.</div><button class="secondary full" onclick="${open}">View Payment Status</button></div>`;
+  if(p.status==="awaiting_details")return `<div class="card ui-previous-winnings" style="border:2px solid var(--green);text-align:center;">${context}<div style="font-size:38px;">🏆</div><div class="muted">RESULT CONFIRMED</div><h2 style="font-size:24px;margin:6px 0;">Your £${amount} payment is ready</h2><button class="primary full" onclick="${open}">Set Up My £${amount} Payment</button></div>`;
+  if(p.status==="ready")return `<div class="card ui-previous-winnings" style="text-align:center;">${context}<div style="font-size:30px;">✅</div><h2 style="font-size:21px;margin:6px 0;">Your payment details have been sent</h2><div class="muted">Your organiser can now send your £${amount} payment.</div><button class="secondary full" onclick="${open}">View Payment Status</button></div>`;
+  return `<div class="card ui-previous-winnings" style="text-align:center;">${context}<div style="font-size:30px;">✅</div><h2 style="font-size:21px;margin:6px 0;">Private bank transfer selected</h2><div class="muted">Contact your organiser privately and send them your bank details. Never enter your bank details into I'm In Golf.</div><button class="secondary full" onclick="${open}">View Payment Status</button></div>`;
 }
 
 function showPrizeStatusAlert(){
@@ -4897,6 +5223,20 @@ function payoutProvider(link){
   return "";
 }
 
+function winnerPaymentLinkError(value,method){
+  const clean=String(value||"").trim(),provider=payoutProvider(clean);
+  try{
+    const url=new URL(clean);
+    const hosts={monzo:["monzo.me","monzo.com"],revolut:["revolut.me","revolut.com"],paypal:["paypal.me","paypal.com"],starling:["starlingbank.com"],wise:["wise.com"]};
+    if(url.protocol==="https:"&&!url.username&&!url.password&&url.pathname!=="/"&&
+       (hosts[method]||[]).some(host=>url.hostname===host||url.hostname.endsWith("."+host))&&
+       provider.toLowerCase()===method)return "";
+  }catch(_){}
+  return method==="wise"
+    ? "Nothing sent. Paste your full Wise payment link starting https://wise.com/ — a Wisetag on its own won’t work."
+    : "Nothing sent. Paste the full secure "+(PAYMENT_PROVIDERS[method]?.label||"payment")+" link, starting https://.";
+}
+
 function chooseWinnerPayoutMethod(winnerName,amount){
   return new Promise(resolve=>{
     const overlay=document.createElement("div");
@@ -4905,7 +5245,7 @@ function chooseWinnerPayoutMethod(winnerName,amount){
     overlay.innerHTML=`<div class="card" style="width:min(470px,100%);margin:auto;padding:24px;border-radius:20px;box-shadow:0 18px 50px rgba(0,0,0,.18);">
       <div style="font-size:40px;text-align:center;">💷</div>
       <h2 style="text-align:center;margin:7px 0;">Set up your £${moneyText(amount)} payment</h2>
-      <div class="muted" style="text-align:center;margin-bottom:18px;">${esc(winnerName)}, how would you like your Group Admin to pay you?</div>
+      <div class="muted" style="text-align:center;margin-bottom:18px;">${esc(winnerName)}, how would you like your organiser to pay you?</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
         ${methods.map(key=>{const item=PAYMENT_PROVIDERS[key];return `<button type="button" class="secondary" data-payout-method="${key}" style="min-height:68px;font-size:16px;"><span style="font-size:21px;">${item.icon}</span><br>${esc(item.label)}</button>`}).join("")}
       </div>
@@ -4924,17 +5264,24 @@ function chooseWinnerPayoutMethod(winnerName,amount){
 function payoutCardHtml(record,historyIndex){
   const payouts=winnerPayouts(record);
   if(!payouts.length)return "";
-  const visible=isAdmin ? payouts : payouts.filter(currentPlayerMatchesPayout);
+  const visible=isAdmin ? payouts : payouts.filter(p=>currentPlayerMatchesPayout(p,record));
   if(!visible.length)return "";
-  return `<div class="card"><h2>💷 Result payment</h2>${visible.map(p=>{
+  return `<div class="card ui-result-payment"><h2>💷 Result payment</h2>${visible.map(p=>{
     const key=escAttr(p.id);
     const amount=moneyText(p.amount);
     if(p.status==="paid")return `<div class="notice"><b>✅ £${amount} paid to ${esc(p.winnerName)}</b><br><span class="muted">Paid ${esc(formatDate(String(p.paidAt||"").slice(0,10)))}</span></div>`;
     if(isAdmin && p.status==="ready")return `<div class="notice"><b>Payment details received from ${esc(p.winnerName)}</b><br>Payment: £${amount} via ${esc(p.paymentProvider)}</div><button class="primary full" onclick="openWinnerPaymentLink(${Number(historyIndex)},'${key}')">Pay ${esc(p.winnerName)} £${amount}</button><button class="secondary full" onclick="markWinnerPaid(${Number(historyIndex)},'${key}')">✅ Mark £${amount} as paid</button>`;
     if(isAdmin && p.status==="bank_details_needed")return `<div class="notice warning"><b>${esc(p.winnerName)} needs a private bank transfer</b><br>They have been asked to contact you privately with their bank details. Do not enter those details into I'm In Golf.</div><button class="secondary full" onclick="markWinnerPaid(${Number(historyIndex)},'${key}')">✅ Mark £${amount} as paid</button>`;
-    if(isAdmin)return `<div class="notice"><b>£${amount} owed to ${esc(p.winnerName)}</b><br>Waiting for the player to choose Monzo, Revolut, PayPal, Starling, Wise or a private bank transfer.</div><button class="secondary full" onclick="markWinnerPaid(${Number(historyIndex)},'${key}',true)">✅ Mark £${amount} as paid</button>`;
-    if(p.status==="ready")return `<div class="notice"><b>✅ Payment details sent</b><br>Your Group Admin can now send your £${amount} payment.</div>`;
-    if(p.status==="bank_details_needed")return `<div class="notice"><b>✅ Private bank transfer selected</b><br>Contact your Group Admin privately and send them your bank details. Never enter your bank details into I'm In Golf.</div>`;
+    if(isAdmin){
+      const snapshots=(record.players||[]).filter(person=>person.name===p.winnerName);
+      const linked=p.winnerPlayerId || (snapshots.length===1 && snapshots[0].id);
+      const instruction=iigEntryBridge && !linked
+        ? "Arrange this older result payment privately with the player, then mark it paid."
+        : "Waiting for the player to choose Monzo, Revolut, PayPal, Starling, Wise or a private bank transfer.";
+      return `<div class="notice"><b>£${amount} owed to ${esc(p.winnerName)}</b><br>${instruction}</div><button class="secondary full" onclick="markWinnerPaid(${Number(historyIndex)},'${key}',true)">✅ Mark £${amount} as paid</button>`;
+    }
+    if(p.status==="ready")return `<div class="notice"><b>✅ Payment details sent</b><br>Your organiser can now send your £${amount} payment.</div>`;
+    if(p.status==="bank_details_needed")return `<div class="notice"><b>✅ Private bank transfer selected</b><br>Contact your organiser privately and send them your bank details. Never enter your bank details into I'm In Golf.</div>`;
     return `<div class="notice"><b>Result confirmed for ${esc(p.winnerName)} — £${amount} payment</b><br>Add a payment link only when a result payment is due. We do not ask every player for payment details.</div><button class="primary full" onclick="claimWinnerPrize(${Number(historyIndex)},'${key}')">Set up your £${amount} payment</button>`;
   }).join("")}</div>`;
 }
@@ -4945,7 +5292,7 @@ async function claimWinnerPrize(historyIndex,payoutId){
   if(!record)return;
   if(!Array.isArray(record.payouts))record.payouts=createWinnerPayouts(record);
   const payout=record.payouts.find(p=>p.id===payoutId);
-  if(!payout || !currentPlayerMatchesPayout(payout)){alert("This payment can only be set up by the named player.");return;}
+  if(!payout || !currentPlayerMatchesPayout(payout,record)){alert("This payment can only be set up by the named player.");return;}
   const method=await chooseWinnerPayoutMethod(payout.winnerName,payout.amount);
   if(method===null)return;
   if(method==="bank_transfer"){
@@ -4953,14 +5300,14 @@ async function claimWinnerPrize(historyIndex,payoutId){
     payout.paymentProvider="Private bank transfer";
     payout.status="bank_details_needed";
     payout.claimedAt=new Date().toISOString();
-    if(await save()){
+    if(await save("claim")){
       show("round");
       window.scrollTo(0,0);
     }
     return;
   }
   const item=PAYMENT_PROVIDERS[method];
-  const link=await appPrompt(`Add your ${item.label} link`,`${item.hint}\n\nPaste the secure link below. Your Group Admin will use it to send £${moneyText(payout.amount)}.`,"",{type:"url",okLabel:"Send to Admin"});
+  const link=await appPrompt(`Add your ${item.label} link`,`${item.hint}\n\nPaste the secure link below. Your organiser will use it to send £${moneyText(payout.amount)}.`,"",{type:"url",okLabel:"Send to Admin",validate:value=>winnerPaymentLinkError(value,method)});
   if(link===null)return;
   const clean=String(link).trim();
   const provider=payoutProvider(clean);
@@ -4969,7 +5316,7 @@ async function claimWinnerPrize(historyIndex,payoutId){
   payout.paymentProvider=provider;
   payout.status="ready";
   payout.claimedAt=new Date().toISOString();
-  if(await save()){
+  if(await save("claim")){
     show("round");
     window.scrollTo(0,0);
   }
@@ -4995,7 +5342,7 @@ if(!allowed.includes(payout.status))return;
   if(!confirm(`Confirm that £${moneyText(payout.amount)} has been sent to ${payout.winnerName}?`))return;
   payout.status="paid";
   payout.paidAt=new Date().toISOString();
-  if(await save())showRoundHistory(historyIndex);
+  if(await save("settle"))showRoundHistory(historyIndex);
 }
 
 function resultCompetition(record){
@@ -5187,7 +5534,7 @@ function showRoundHistory(historyIndex){
       <div class="muted">
         ${h.date ? esc(formatDate(h.date)) : ""}
         ${h.date ? " • " : ""}
-        ${isPoints ? "🏆 Points Game" : "💷 Group Game"}
+        ${isPoints ? "🏆 Points Game" : "💷 Money Game"}
       </div>
     </div>
 
@@ -5254,8 +5601,8 @@ function showRoundHistory(historyIndex){
     </div>
 
     <div class="card">
-      <button class="primary full" onclick="shareHistoricalResult(${Number(historyIndex)})">📤 Share Result Again</button>
-      <button class="secondary full" onclick="league()">← Back to League</button>
+      <button class="primary full" onclick="shareHistoricalResult(${Number(historyIndex)})">Share result</button>
+      <button class="secondary full" onclick="league()">← Back to league</button>
     </div>
   `;
 
@@ -5357,7 +5704,7 @@ function showWinnerScreen(record){
             Share today's result with the group, then move on to Round ${state.trip.currentRound} of ${state.trip.totalRounds}.
           </div>
           <button class="primary full" onclick="shareWinnerImage()">📤 Share Round ${Number(state.trip.currentRound)-1} Result</button>
-          ${isAdmin ? `<button class="secondary full" onclick="nextTripRound()">✈️ Move on to Round ${state.trip.currentRound}</button>` : `<div class="notice" style="margin-top:10px;">Waiting for the Group Admin to start Round ${state.trip.currentRound}.</div>`}
+          ${isAdmin ? `<button class="secondary full" onclick="nextTripRound()">✈️ Move on to Round ${state.trip.currentRound}</button>` : `<div class="notice" style="margin-top:10px;">Waiting for the organiser to start Round ${state.trip.currentRound}.</div>`}
         ` : `
           <button class="primary full" onclick="shareWinnerImage()">📤 Share Result</button>
           <button class="secondary full" onclick="show('league')">View League</button>
@@ -5521,7 +5868,7 @@ function showWinnerScreen(record){
           Share today's result with the group, then move on to Round ${state.trip.currentRound} of ${state.trip.totalRounds}.
         </div>
         <button class="primary full" onclick="shareWinnerImage()">📤 Share Round ${Number(state.trip.currentRound)-1} Result</button>
-        ${isAdmin ? `<button class="secondary full" onclick="nextTripRound()">✈️ Move on to Round ${state.trip.currentRound}</button>` : `<div class="notice" style="margin-top:10px;">Waiting for the Group Admin to start Round ${state.trip.currentRound}.</div>`}
+        ${isAdmin ? `<button class="secondary full" onclick="nextTripRound()">✈️ Move on to Round ${state.trip.currentRound}</button>` : `<div class="notice" style="margin-top:10px;">Waiting for the organiser to start Round ${state.trip.currentRound}.</div>`}
       ` : `
         <button class="primary full" onclick="shareWinnerImage()">📤 Share Result</button>
         <button class="secondary full" onclick="show('league')">View League</button>
@@ -5577,7 +5924,7 @@ async function shareWinnerImage(){
     ctx.font='900 58px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';
     ctx.fillText("I’M IN GOLF",72,88);
     ctx.fillStyle=lime;ctx.font='800 24px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';
-    ctx.fillText("GOLF. MATES. YOU’RE IN.",74,126);
+    ctx.fillText("GOLF. FRIENDS. YOU’RE IN.",74,126);
     ctx.font='52px Arial';ctx.textAlign="right";ctx.fillStyle=white;ctx.fillText("⛳",986,105);
 
     centreText(ctx,"🏆 TODAY’S RESULT",230,47,"900",green);
@@ -5586,7 +5933,7 @@ async function shareWinnerImage(){
     const course=String(record.course||"Completed Round").toUpperCase();
     centreText(ctx,course,322,fitText(ctx,course,920,38,22,"900"),"900",dark);
 
-    const gameLabel=(state.trip?.active||state.trip?.completed) ? "Trip Round" : (record.gameType==="points" ? "Points Game" : "Group Game");
+    const gameLabel=(state.trip?.active||state.trip?.completed) ? "Trip Round" : (record.gameType==="points" ? "Points Game" : "Money Game");
     centreText(ctx,`${state.groupName||"I’m In Golf"}  •  ${gameLabel}  •  ${competition==="net"?"Net":"Stableford"}`,360,22,"700",muted);
 
     let tableTop;
@@ -5714,16 +6061,39 @@ async function shareWinnerImage(){
     if(err.name!=="AbortError")alert("Couldn't share the result image. Please try again.");
   }
 }
+// Read-only, group-bound Trip navigation; never replace state.trip to view history.
+function tripViewKey(trip){
+ if(trip?.id||trip?.tripId)return JSON.stringify(['id',String(trip.id||trip.tripId)]);
+ return JSON.stringify([trip?.name||'',trip?.startedAt||'',trip?.completedAt||'',(trip?.rounds||[]).map(r=>[r.id||r.roundId||'',r.course||'',r.date||'',r.tripFormat||'',r.pointsCompetition||''])]);
+}
+function resolveLeagueTrip(){
+ const past=Array.isArray(state.trip?.pastTrips)?state.trip.pastTrips:[];
+ const current=state.trip&&(state.trip.active||state.trip.completed||(state.trip.rounds||[]).length)?state.trip:null;
+ let index=Number.isSafeInteger(selectedPastTripIndex)&&selectedPastTripIndex>=0&&selectedPastTripIndex<past.length?selectedPastTripIndex:0,chosen=false;
+ if(leaguePastTripSelection){
+  if(leaguePastTripSelection.pin===pin){
+   if(past[index]&&tripViewKey(past[index])===leaguePastTripSelection.key)chosen=true;
+   else{const matches=past.map((t,i)=>tripViewKey(t)===leaguePastTripSelection.key?i:-1).filter(i=>i>=0);if(matches.length===1){index=matches[0];chosen=true;}}
+  }else index=0;
+ }
+ const isPast=Boolean(past[index]&&(chosen||!current));
+ return {current,past,index,isPast,trip:isPast?past[index]:current};
+}
+function tripViewPlayers(trip){
+ const players=new Map();
+ for(const r of trip?.rounds||[])for(const p of r.players||[])if(typeof p.name==='string'&&p.name.trim())players.set(p.name,{...p});
+ for(const name of Object.keys(trip?.standings||{}))if(!players.has(name))players.set(name,{name});
+ for(const id of trip?.playerIds||[]){const p=state.players.find(p=>p.id===id);if(p&&!players.has(p.name))players.set(p.name,{...p});}
+ return [...players.values()];
+}
 async function shareTripSummary(){
-  const past=state.trip?.pastTrips||[];
-  const live=Boolean(state.trip&&(state.trip.active||state.trip.completed||(state.trip.rounds||[]).length));
-  const safeIndex=(selectedPastTripIndex>=0 && selectedPastTripIndex<past.length)
-    ? selectedPastTripIndex : 0;
-  const trip=live?state.trip:(past[safeIndex]||null);
+  const choice=resolveLeagueTrip();
+  const trip=page==='league'&&leagueView==='trip'?choice.trip:(choice.current||choice.trip);
   if(!trip){alert("No Trip is available to share.");return;}
 
   const rounds=trip.rounds||[];
-  const names=[...new Set([...state.players.map(p=>p.name),...Object.keys(trip.standings||{})])];
+  const participants=choice.isPast&&trip===choice.trip?tripViewPlayers(trip):state.players;
+  const names=[...new Set([...participants.map(p=>p.name),...Object.keys(trip.standings||{})])];
   const standings=names.map(name=>({name,points:Number(trip.standings?.[name]||0)}))
     .sort((a,b)=>b.points-a.points||a.name.localeCompare(b.name));
 
@@ -5731,6 +6101,7 @@ async function shareTripSummary(){
   const money={}; names.forEach(n=>money[n]=0);
   rounds.forEach(r=>{
     if(r.gameType!=="money")return;
+    if(r.tripFormat==='betterball'||r.tripFormat==='pairsaggregate'){const winners=Array.isArray(r.winnerPlayerNames)?r.winnerPlayerNames:[];const share=winners.length?Number(r.teamPot||0)/winners.length:0;winners.forEach(n=>money[n]=(money[n]||0)+share);return;}
     const sf=r.stablefordWinnerNames||[], net=r.netWinnerNames||[];
     const sfShare=sf.length?Number(r.stablefordPot||0)/sf.length:0;
     const netShare=net.length?Number(r.netPot||0)/net.length:0;
@@ -5738,14 +6109,7 @@ async function shareTripSummary(){
     net.forEach(n=>money[n]=(money[n]||0)+netShare);
   });
 
-  const roundWinner=r=>{
-    if(r.gameType==="points"&&r.pointsResults?.length){
-      return {name:r.pointsResults[0].name||"",score:r.pointsResults[0].score??""};
-    }
-    const ws=[...(r.stablefordWinnerNames||[]),...(r.netWinnerNames||[])];
-    const p=(r.players||[]).find(x=>x.name===ws[0]);
-    return {name:ws.join(" & ")||"Result saved",score:p?.stableford??p?.netScore??""};
-  };
+  const roundWinner=r=>tripRoundWinner(r,trip)||{name:'Result saved',score:''};
 
   const W=1080, rowH=92, roundsH=Math.max(1,rounds.length)*76;
   const H=720 + standings.length*rowH + roundsH + 260;
@@ -5816,6 +6180,25 @@ async function shareTripSummary(){
   },"image/png");
 }
 
+// Display-only marker derived from the existing account-bound player ID.
+function playerYouMarker(player){
+ const ownId=window.iigOwnPlayerId?.(pin)||myPlayerId,own=state.players.find(p=>p.id===ownId);
+ if(!own)return '';
+ const same=player.id?player.id===own.id:player.name===own.name&&state.players.filter(p=>p.name===own.name).length===1;
+ return same?' <span class="pill">You</span>':'';
+}
+function selectLeagueView(view){
+  if(!['points','money','trip'].includes(view))return;
+  leagueView=view;league();
+}
+function selectPastTripLeague(index){
+  if(!Number.isSafeInteger(index)||index<0||index>=(state.trip?.pastTrips||[]).length)return;
+  selectedPastTripIndex=index;leaguePastTripSelection={pin,key:tripViewKey(state.trip.pastTrips[index])};selectLeagueView('trip');
+}
+function selectCurrentTripLeague(){
+ if(!resolveLeagueTrip().current)return;
+ leaguePastTripSelection=null;selectLeagueView('trip');
+}
 function league(){
 
   // Count games played separately
@@ -5847,7 +6230,7 @@ function league(){
     }).length;
   };
 
-  // Points League
+  // Points league
   const pointsSorted=[...state.players].sort((a,b)=>{
     const pointsDiff=
       Number(b.leaguePoints||0)-
@@ -5906,21 +6289,11 @@ const moneyWon=(playerName)=>{
   });
 // Trip League
 const pastTrips=state.trip?.pastTrips || [];
-const currentTripAvailable=Boolean(
-  state.trip &&
-  (
-    state.trip.active ||
-    state.trip.completed ||
-    (state.trip.rounds||[]).length
-  )
-);
-const hasTrip=Boolean(currentTripAvailable || pastTrips.length);
-if(selectedPastTripIndex<0 || selectedPastTripIndex>=pastTrips.length){
-  selectedPastTripIndex=0;
-}
-const leagueTrip=currentTripAvailable
-  ? state.trip
-  : (pastTrips[selectedPastTripIndex] || null);
+const tripChoice=resolveLeagueTrip();
+const currentTripAvailable=Boolean(tripChoice.current)&&!tripChoice.isPast;
+const hasTrip=Boolean(tripChoice.trip);
+selectedPastTripIndex=tripChoice.index;
+const leagueTrip=tripChoice.trip;
 
 if(leagueView==="trip" && !hasTrip){
   leagueView="points";
@@ -5945,7 +6318,7 @@ const tripPlayed=(playerName)=>{
 
 const tripPerformanceRows=tripIndividualScoreRows(leagueTrip);
 const tripPerformanceMap=new Map(tripPerformanceRows.map((r,i)=>[r.name,{...r,rank:i+1}]));
-const tripSorted=[...state.players].sort((a,b)=>{
+const tripSorted=[...(tripChoice.isPast?tripViewPlayers(leagueTrip):state.players)].sort((a,b)=>{
   const ar=tripPerformanceMap.get(a.name);
   const br=tripPerformanceMap.get(b.name);
   if(ar && br)return ar.rank-br.rank;
@@ -5966,20 +6339,20 @@ const tripSorted=[...state.players].sort((a,b)=>{
 
     <button
       class="${leagueView==="points" ? "primary" : "secondary"}"
-      onclick="leagueView='points';league()">
+      aria-pressed="${leagueView==='points'}" onclick="selectLeagueView('points')">
       🏆 Points
     </button>
 
     <button
       class="${leagueView==="money" ? "primary" : "secondary"}"
-      onclick="leagueView='money';league()">
-      💷 Money
+      aria-pressed="${leagueView==='money'}" onclick="selectLeagueView('money')">
+      💷 Money Game
     </button>
 
     ${hasTrip ? `
       <button
         class="${leagueView==="trip" ? "primary" : "secondary"}"
-        onclick="leagueView='trip';league()">
+        aria-pressed="${leagueView==='trip'}" onclick="selectLeagueView('trip')">
         ✈️ Trip
       </button>
     ` : ""}
@@ -5991,8 +6364,8 @@ const tripSorted=[...state.players].sort((a,b)=>{
       leagueView==="trip"
         ? "✈️ Trip League"
         : leagueView==="money"
-        ? "💷 Money League"
-        : "🏆 Points League"
+        ? "💷 Money Game league"
+        : "🏆 Points league"
     }
   </h2>
 
@@ -6006,6 +6379,7 @@ const tripSorted=[...state.players].sort((a,b)=>{
     }
   </div>
 
+${leagueView!=='trip'&&!state.history?.length&&!state.players.some(p=>Number(p.leaguePoints||0)>0||moneyWon(p.name)>0)?'<div class="notice" role="status">No completed rounds yet. Your standings will appear here.</div>':''}
 ${leagueView==="points" ? `
 
   ${pointsSorted.map((p,i)=>`
@@ -6013,18 +6387,12 @@ ${leagueView==="points" ? `
       <div>
 <b>
   ${i===0 && Number(p.leaguePoints||0)>0 ? "👑 " : ""}
-  <span onclick="showPlayerStats('${p.id}')" style="cursor:pointer;text-decoration:underline;">
-    ${pointsPlayed(p.name)>0 ? (i+1)+". " : ""}${esc(p.name)}
+  <span onclick="showPlayerStats(${escAttr(JSON.stringify(p.id))})" style="cursor:pointer;text-decoration:underline;">
+    ${pointsPlayed(p.name)>0 ? (i+1)+". " : ""}${esc(p.name)}${p.id===(window.iigOwnPlayerId?.(pin)||myPlayerId)?' <span class="pill">You</span>':''}
   </span>
-</b>
-               <div class="muted">
-          Handicap ${p.handicap}
-        </div>
-      </div>
-
-      <div style="text-align:right;">
+</b><div class="muted">Handicap ${esc(String(p.handicap??"—"))}</div></div><div style="text-align:right;">
         <div class="money">
-          ${Number(p.leaguePoints||0)} pts
+          ${Number(p.leaguePoints||0)} league pts
         </div>
 
         <div style="font-weight:800;">
@@ -6040,16 +6408,10 @@ ${leagueView==="points" ? `
     <div class="player row">
       <div>
         <b>
-  <span onclick="showPlayerStats('${p.id}')" style="cursor:pointer;text-decoration:underline;">
-    ${moneyPlayed(p.name)>0 ? (i+1)+". " : ""}${esc(p.name)}
+  <span onclick="showPlayerStats(${escAttr(JSON.stringify(p.id))})" style="cursor:pointer;text-decoration:underline;">
+    ${moneyPlayed(p.name)>0 ? (i+1)+". " : ""}${esc(p.name)}${p.id===(window.iigOwnPlayerId?.(pin)||myPlayerId)?' <span class="pill">You</span>':''}
   </span>
-</b>
-
-        <div class="muted">
-          Handicap ${p.handicap}
-        </div>
-      </div>
-<div style="text-align:right;">
+</b><div class="muted">Handicap ${esc(String(p.handicap??"—"))}</div></div><div style="text-align:right;">
   <div class="money" style="font-size:18px;font-weight:900;color:var(--green);">
     £${moneyWon(p.name)} WON
   </div>
@@ -6081,17 +6443,10 @@ ${tripSorted.map((p,i)=>{
     <div>
       <b>
         ${i===0 && perf ? "👑 " : ""}
-        ${perf ? (i+1)+". " : ""}${esc(p.name)}
-      </b>
-
-      <div class="muted">
-        Handicap ${p.handicap}
-      </div>
-    </div>
-
-    <div style="text-align:right;">
+        ${perf ? (i+1)+". " : ""}${esc(p.name)}${p.id===(window.iigOwnPlayerId?.(pin)||myPlayerId)?' <span class="pill">You</span>':''}
+      </b><div class="muted">Handicap ${esc(String(p.handicap??"—"))}</div></div><div style="text-align:right;">
       <div class="money" style="font-size:18px;font-weight:900;">
-        ${perf ? (leagueTrip?.competition==="net" ? "Net "+Number(perf.total) : Number(perf.total)+" pts") : "—"}
+        ${perf ? (leagueTrip?.competition==="net" ? "Cumulative Net "+Number(perf.total) : Number(perf.total)+" pts total") : "—"}
       </div>
 
       <div style="font-weight:800;">
@@ -6100,19 +6455,23 @@ ${tripSorted.map((p,i)=>{
     </div>
   </div>`}).join("")}
 
+    <section class="ui-trip-rounds"><h3>${currentTripAvailable?'Current trip':'Selected past trip'} rounds</h3>
+      ${(leagueTrip?.rounds||[]).map((r,i)=>{const w=tripRoundWinner(r,leagueTrip);return `<details class="ui-fold"><summary>Round ${i+1} · ${esc(r.course||"Course not recorded")}${r.date?" · "+esc(formatDate(r.date)):""}</summary><p>${r.gameType==="money"?"Money Game":"Points Game"} · ${esc(r.tripFormat?tripFormatLabel(r.tripFormat):(r.pointsCompetition==="net"?"Net":"Stableford"))}</p><p>${w?"Round winner: "+esc(w.name)+(w.score?" · Round score: "+esc(String(w.score)):""):"No winner recorded"}</p></details>`;}).join('')||'<p class="muted">No completed trip rounds yet.</p>'}
+    </section>
     <div style="margin-top:16px">
       <button class="primary full" onclick="shareTripSummary()">📤 Share Trip Summary</button>
     </div>
 
     ${pastTrips.length ? `
       <div style="margin-top:18px;border-top:1px solid #d9e2dc;padding-top:16px;">
+        ${tripChoice.current?`<button class="${tripChoice.isPast?'secondary':'primary'} full" aria-pressed="${!tripChoice.isPast}" onclick="selectCurrentTripLeague()">Current trip · ${esc(tripChoice.current.name||"Golf Trip")}</button>`:''}
         <h3 style="margin:0 0 10px;">📚 Past Trips</h3>
         ${pastTrips.map((pt,i)=>`
           <button
-            class="${!currentTripAvailable && i===selectedPastTripIndex ? "primary" : "secondary"} full"
+            class="${!currentTripAvailable && i===selectedPastTripIndex ? "primary" : "secondary"} full" aria-pressed="${!currentTripAvailable && i===selectedPastTripIndex}"
             style="margin-top:8px;text-align:left;"
-            onclick="selectedPastTripIndex=${i};leagueView='trip';league()">
-            ${esc(pt.name || ("Trip "+(i+1)))}
+            onclick="selectPastTripLeague(${i})">
+            ${!currentTripAvailable&&i===selectedPastTripIndex?"Selected · ":""}${esc(pt.name || ("Trip "+(i+1)))}
             ${pt.champion ? ` — 👑 ${esc(pt.champion)}` : (pt.tripTieNames?.length ? ` — 🤝 Tied: ${pt.tripTieNames.map(n=>esc(n)).join(" & ")}` : "")}
             ${pt.totalRounds ? ` • ${pt.totalRounds} rounds` : ""}
           </button>
@@ -6125,7 +6484,7 @@ ${tripSorted.map((p,i)=>{
 </div>
 
     <div class="card">
-      <h2>Previous rounds</h2>
+      <h2>All previous rounds</h2>
 
       ${(state.history&&state.history.length)
         ? state.history.slice(0,10).map(h=>`
@@ -6141,7 +6500,7 @@ ${tripSorted.map((p,i)=>{
               •
               ${h.gameType==="points"
                 ? "🏆 Points Game"
-                : "💷 Group Game"}
+                : "💷 Money Game"}
             </div>
 
             ${h.gameType==="points" ? `
@@ -6305,7 +6664,7 @@ const bestNet=
       </h2>
 
       <div class="muted">
-        Handicap ${p.handicap}
+        Handicap ${esc(String(p.handicap??"—"))}
       </div>
     </div>
 
@@ -6380,7 +6739,7 @@ const bestNet=
 
     <div class="card">
       <button class="secondary full" onclick="show('league')">
-        ← Back to League
+        ← Back to league
       </button>
     </div>
   `;
@@ -6427,7 +6786,7 @@ function playersPage(){
      ⚙️ Admin Settings
    </button>
    <button class="primary full" onclick="returnToPlayerView()">
-     👤 Return to Player View
+     👤 Switch to player view
    </button>` : ""}
 
    <button class="secondary full" onclick="changeMyPlayer()">
@@ -6453,7 +6812,7 @@ function playersPage(){
          <div class="row">
            <div>
              <b>${esc(p.name)}</b>
-             <div class="muted">Handicap ${p.handicap}</div>
+             <div class="muted">Handicap ${esc(String(p.handicap??"—"))}</div>
            </div>
 
            ${isAdmin ? `
@@ -6531,7 +6890,7 @@ if(!validGolfHandicap(handicapText)){
 p.handicap=newHandicap;
 
  render();
- await save();
+ await save(isAdmin?"members":"profile");
 }
 function playerJoinForm(){
   return new Promise(resolve=>{
@@ -6577,7 +6936,7 @@ async function addPlayer(){
   const newPlayer={id:Date.now().toString(36),name:cleanName,handicap:details.handicap,competition:null,paid:false,stableford:null,netScore:null,noReturn:false,scoreSubmitted:false,wins:0,leaguePoints:0,netWinnings:0};
   state.players.push(newPlayer); myPlayerId=newPlayer.id; saveMyPlayerForGroup();
   pendingFirstWelcome=isAdmin?"admin":"player";
-  render(); await save(); document.querySelector("nav").style.display=""; showInstallHelp(newPlayer.name);
+  render(); if(!await save("join")){myPlayerId=null;clearMyPlayerForGroup();render();return;} document.querySelector("nav").style.display=""; showInstallHelp(newPlayer.name);
 }
 
 async function adminAddPlayer(){
@@ -6630,13 +6989,13 @@ async function adminAddPlayer(){
     netWinnings:0
   });
 
-  await save();
+  if(!await save("members"))return;
   render();
   alert("✅ " + cleanName + " added to the group.");
 }
 
-async function editPlayer(i){const p=state.players[i];const name=prompt("Player name",p.name);if(!name)return;const h=prompt("Handicap",p.handicap);if(h===null)return;const handicapText=String(h).trim();if(!validGolfHandicap(handicapText)){alert("Enter a handicap between -10 and 60, with up to 1 decimal place.");return}p.name=name.trim();p.handicap=Number(handicapText);render();await save()}
-async function removePlayer(i){const p=state.players[i];if(!p)return;if(!await appConfirm("Remove Player","Remove "+p.name+" from this group? Their past round history will stay saved.","Remove Player",true))return;state.players.splice(i,1);render();await save()}
+async function editPlayer(i){const p=state.players[i];const name=prompt("Player name",p.name);if(!name)return;const h=prompt("Handicap",p.handicap);if(h===null)return;const handicapText=String(h).trim();if(!validGolfHandicap(handicapText)){alert("Enter a handicap between -10 and 60, with up to 1 decimal place.");return}p.name=name.trim();p.handicap=Number(handicapText);render();await save("members")}
+async function removePlayer(i){const p=state.players[i];if(!p)return;if(!await appConfirm("Remove Player","Remove "+p.name+" from this group? Their past round history will stay saved.","Remove Player",true))return;state.players.splice(i,1);render();await save("members")}
 
 
 let isAdmin=false;
@@ -6671,6 +7030,7 @@ function saveAdminForGroup(){
 }
 
 function clearAdminForGroup(){
+  if(typeof iigEntryBridge!=="undefined" && iigEntryBridge)iigEntryBridge.clearCredential();
   if(pin)sessionStorage.removeItem(adminSessionKey(pin));
   isAdmin=false;
 }
@@ -6718,6 +7078,7 @@ function openAdminFromPlayers(){
 }
 
 function returnToPlayerView(){
+  if(typeof iigEntryBridge!=="undefined" && iigEntryBridge)iigEntryBridge.clearCredential();
   isAdmin=false;
   isOwner=false;
   ownerCreationCode="";
@@ -6898,7 +7259,7 @@ async function changeAdminPin(){
   if(!clean)return;
   const previous=state.adminPin;
   state.adminPin=clean;
-  const ok=await save();
+  const ok=await save("settings");
   if(!ok){
     state.adminPin=previous;
     showAppToast("PIN not changed","Please try again.",3000);
@@ -6907,6 +7268,7 @@ async function changeAdminPin(){
   showAppToast("✅ Admin PIN changed","Your new 4-digit PIN is ready to use.",3000);
 }
 function adminLogout(){
+  if(typeof iigEntryBridge!=="undefined" && iigEntryBridge)iigEntryBridge.clearCredential();
  isAdmin=false;
  isOwner=false;
  ownerCreationCode="";
@@ -6929,7 +7291,7 @@ async function changeGroupName(){
   }
   const previousName=state.groupName;
   state.groupName=clean;
-  const ok=await save();
+  const ok=await save("settings");
   if(!ok){
     state.groupName=previousName;
     alert("The group name could not be saved. Please try again.");
@@ -6961,7 +7323,7 @@ async function changeCurrentRoundCompetition(){
       p.competition=next;
     }
   });
-  await save();
+  if(!await save("configure"))return;
   alert(`✅ Competition changed to ${nextLabel}.`);
   settingsPage();
 }
@@ -6980,7 +7342,7 @@ async function changeCurrentPrizePayout(){
   }
 
   if(state.gameType!=="money"){
-    alert("Payment split is only available for Group Games.");
+    alert("Payment split is only available for Money Games.");
     return;
   }
 
@@ -6999,7 +7361,7 @@ async function changeCurrentPrizePayout(){
     state.secondPrize=0;
     state.thirdPrize=0;
 
-    const saved=await save();
+    const saved=await save("configure");
     if(!saved){
       showAppToast("Change not saved","Please try again.",4000);
       return;
@@ -7041,7 +7403,7 @@ async function changeCurrentPrizePayout(){
   state.secondPrize=secondPrize;
   state.thirdPrize=thirdPrize;
 
-  const saved=await save();
+  const saved=await save("configure");
   if(!saved){
     showAppToast("Change not saved","Please try again.",4000);
     return;
@@ -7052,10 +7414,17 @@ async function changeCurrentPrizePayout(){
 }
 
 function settingsPage(){
+  if(typeof iigEntryBridge!=="undefined" && iigEntryBridge && iigEntryBridge.hasPending()){
+    if(!document.getElementById("guardRecoveryButton")){
+      const button=document.createElement("button");button.id="guardRecoveryButton";
+      button.textContent="Check last save";button.onclick=recoverGuardedSave;
+      document.getElementById("app").prepend(button);
+    }
+  }
  if(!isAdmin){adminLogin();return}
- $("screen").innerHTML=`<div class="card"><h2>⚙️ Admin / Settings</h2>
+ $("screen").innerHTML=`<div class="card"><h2>⚙️ Organiser settings</h2>
  <div class="muted">Shared controls for your golf group.</div>
- <button class="primary full" onclick="returnToPlayerView()">👤 Return to Player View</button>
+ <button class="primary full" onclick="returnToPlayerView()">👤 Switch to player view</button>
  <div class="notice" style="margin-top:12px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
    <div>
      <div class="muted">GROUP NAME</div>
@@ -7067,8 +7436,8 @@ function settingsPage(){
  ${iigFreePlan() ? `
  <div class="notice" style="margin-top:12px;padding:14px;border:1px solid rgba(25,120,60,.25);">
    <div class="muted">YOUR PLAN</div>
-   <b style="font-size:18px;">I’m In Golf Free</b>
-   <div class="muted" style="margin-top:3px;">Up to 10 players · Group Game · Points Game</div>
+   <b style="font-size:18px;">Group access needs checking</b>
+   <div class="muted" style="margin-top:3px;">Up to 10 players · Money Game · Points Game</div>
 
    <div style="border-top:1px solid rgba(0,0,0,.10);margin:12px 0;"></div>
 
@@ -7078,15 +7447,13 @@ function settingsPage(){
      Plus all new premium features as they’re released
    </div>
 
-   <button class="primary full" style="margin-bottom:0;" onclick="showIigPlusUpgrade()">
-     Upgrade — £29.99/year
-   </button>
+   <p class="muted">Plus is included free for now. Reload your group to check its access.</p>
  </div>
  ` : `
  <div class="notice" style="margin-top:12px;">
    <div class="muted">YOUR PLAN</div>
    <b>⭐ I’m In Golf+</b><br>
-   <span class="muted">Unlimited players · All game modes · New premium features</span>
+   <span class="muted">Unlimited players · All game modes · Included free for now</span>
  </div>
  `}
 
@@ -7201,7 +7568,7 @@ ${isOwner ? `
 
 <div class="card">
   <button class="red full" onclick="adminLogout()">
-    Log out of Admin
+    Sign out
   </button>
 </div>`;
  }
@@ -7228,12 +7595,12 @@ function adminHelpBack(){
 
 function adminHelpTopicContent(topic){
   const topics={
-    setup:`<h2>⛳ Set up the next competition</h2><div class="notice"><b>1.</b> Go to <b>Round</b>.<br><br><b>2.</b> A remembered Admin can tap <b>Admin — Set Up Next Competition</b>. On a new device, use <b>Players → Admin Login</b> and enter the 4-digit Admin PIN.<br><br><b>3.</b> Choose Group Game, Points Game or Trip Mode.<br><br><b>4.</b> Enter the course, date and choose <b>Stableford or Net</b> for everyone.<br><br><b>5.</b> For a Group Game, set the entry fee and payment amount.</div><div class="notice warning">Once the first score is submitted, entries close automatically.</div>`,
+    setup:`<h2>⛳ Set up the next competition</h2><div class="notice"><b>1.</b> Go to <b>Round</b>.<br><br><b>2.</b> A remembered Admin can tap <b>Admin — Set Up Next Competition</b>. On a new device, use <b>Players → Admin Login</b> and enter the 4-digit Admin PIN.<br><br><b>3.</b> Choose Money Game, Points Game or Trip Mode.<br><br><b>4.</b> Enter the course, date and choose <b>Stableford or Net</b> for everyone.<br><br><b>5.</b> For a Money Game, set the entry fee and payment amount.</div><div class="notice warning">Once the first score is submitted, entries close automatically.</div>`,
     players:`<h2>👥 Add or edit players</h2><div class="notice">Go to <b>Players</b>.<br><br>Players can join themselves, or the Admin can manage names and handicaps while Admin is unlocked.<br><br>A player can use <b>Change who I am</b> if the wrong name is selected on their phone.</div>`,
-    payments:`<h2>💷 Payments</h2><div class="notice"><b>What is a payment link?</b><br><br>It is your personal web address that lets players pay money directly to your chosen account. You copy it from your banking or payment app and paste it into I’m In Golf once.</div><div class="notice"><b>Set yours up:</b><br><br><b>1.</b> Go to <b>Admin / Settings → Set Up Player Payments</b>.<br><br><b>2.</b> Choose Monzo, Revolut, PayPal, Starling, Wise or Other secure link.<br><br><b>3.</b> Follow the instructions shown for that provider.<br><br><b>4.</b> Paste the link, test it and save.</div><div class="notice">In a Group Game, players tap <b>Pay & Join</b> and use the Group Admin’s payment link to pay the Group Admin directly.<br><br>I’m In Golf records the payment status. Once scoring starts, entries close.</div><div class="muted">Payments go directly to the Group Admin. I’m In Golf does not receive, verify or hold the money.</div>`,
+    payments:`<h2>💷 Payments</h2><div class="notice"><b>What is a payment link?</b><br><br>It is your personal web address that lets players pay money directly to your chosen account. You copy it from your banking or payment app and paste it into I’m In Golf once.</div><div class="notice"><b>Set yours up:</b><br><br><b>1.</b> Go to <b>Organiser settings → Set Up Player Payments</b>.<br><br><b>2.</b> Choose Monzo, Revolut, PayPal, Starling, Wise or Other secure link.<br><br><b>3.</b> Follow the instructions shown for that provider.<br><br><b>4.</b> Paste the link, test it and save.</div><div class="notice">In a Money Game, players tap <b>Pay & Join</b> and use the organiser’s payment link to pay the organiser directly.<br><br>I’m In Golf records the payment status. Once scoring starts, entries close.</div><div class="muted">Payments go directly to the organiser. I’m In Golf does not receive, verify or hold the money.</div>`,
     scoring:`<h2>🏌️ Scores</h2><div class="notice">Players enter their own score and tap <b>Submit My Score</b>.<br><br>The app asks <b>Are you sure?</b> before saving.<br><br>Once submitted, the player's score is locked.</div><div class="notice">Admin can use <b>Correct score</b> if a genuine mistake needs fixing.</div>`,
-    nr:`<h2>NR — No Return</h2><div class="notice">In a <b>Net</b> competition, a player who does not return a score should tap <b>NR — No Return</b>.<br><br>NR counts as submitted, removes the player from <b>Still to enter</b>, and the player cannot win the Net competition.</div>`,
-    waiting:`<h2>⏳ Still to enter</h2><div class="notice">Once scoring starts, the Scores screen shows the names of everyone who still needs to submit.<br><br>For a Group Game, the Scores screen includes players who entered before scoring started.<br><br>The list updates automatically as scores or NR results are submitted.</div>`,
+    nr:`<h2>NR — No Return</h2><div class="notice">In a <b>Net</b> competition, a player who does not return a score should tap <b>NR — No Return</b>.<br><br>NR counts as submitted, removes the player from <b>Awaiting scores</b>, and the player cannot win the Net competition.</div>`,
+    waiting:`<h2>⏳ Awaiting scores</h2><div class="notice">Once scoring starts, the Scores screen shows the names of everyone who still needs to submit.<br><br>For a Money Game, the Scores screen includes players who entered before scoring started.<br><br>The list updates automatically as scores or NR results are submitted.</div>`,
     finish:`<h2>🏁 Finish a round</h2><div class="notice">When every entered player has submitted a score or valid NR, Admin will see <b>Finish Round</b> at the bottom of Scores.<br><br>Check the leaderboard, tap the button and confirm the result.<br><br>The winner and <b>full final standings</b> are saved in <b>League → Previous rounds</b> and can be shared as an I’m In Golf results image.</div><div class="notice">After a normal round finishes, players see <b>Next Competition — Coming soon…</b>. A remembered Admin can tap <b>Admin — Set Up Next Competition</b>. On a new device, use <b>Players → Admin Login</b>.</div>`,
     points:`<h2>🏆 Points Games</h2><div class="notice">Everyone plays the same competition — Stableford or Net.<br><br>There is no payment step.<br><br>Players enter their score in the normal Scores screen and the top three receive league points based on the value chosen when the round is set up.</div>`,
     trip:`<h2>✈️ Trip Mode</h2><div class="notice">Choose <b>Trip Mode</b>, enter the trip name, choose the Trip players and plan each round.<br><br>Rounds can be <b>Individual</b>, <b>Better Ball</b> or <b>Pairs Aggregate</b>. Before each round, mark anyone <b>Not Playing Today</b>, then use <b>Randomise Fourballs</b> or <b>Pick Fourballs Myself</b>.</div><div class="notice"><b>Pairs rounds:</b> either partner enters the pair’s one final score. Better Ball uses the pair’s final Better Ball Stableford total. Pairs Aggregate combines both partners’ final scores. These rounds build the separate <b>Team-event standings</b>.</div><div class="notice"><b>Individual rounds</b> build the Individual Trip Championship standings. After the final round, the Trip Summary shows daily winners, Individual and Team-event standings, any Trip money summary and the Trip champion. The organiser then taps <b>Save Trip & Return to Normal Golf</b>.</div>`,
@@ -7270,7 +7637,7 @@ function adminHelpPage(){
     ["payments","💷","Payments"],
     ["scoring","🏌️","Entering & correcting scores"],
     ["nr","NR","No Return"],
-    ["waiting","⏳","Still to enter"],
+    ["waiting","⏳","Awaiting scores"],
     ["finish","🏁","Finish a round"],
     ["points","🏆","Points Games"],
     ["trip","✈️","Trip Mode"],
@@ -7840,6 +8207,10 @@ https://imingolf.co.uk/app/?pin=${encodeURIComponent(newPin)}&adminsetup=${encod
 }
 
 function competitionReminder(){
+if(!roundOpenNow()){
+  showAppToast('No competition currently open','Set up your next competition before sending a reminder.',3000);
+  return;
+}
 if(roundLocked()){
     alert("🔒 Entries are closed — scoring has started.");
     return;
@@ -8143,7 +8514,7 @@ async function changePaymentLink(){
   const previousProvider=state.paymentProvider;
   if(result.remove){state.paymentLink="";state.paymentProvider="";}
   else{state.paymentLink=result.link;state.paymentProvider=result.provider;}
-  const saved=await save();
+  const saved=await save("settings");
   if(!saved){state.paymentLink=previousLink;state.paymentProvider=previousProvider;alert("The payment method could not be saved. Please try again.");return;}
   render();
   alert(result.remove ? "Payment method removed." : `✅ ${paymentProviderLabel(result.provider)} payment link saved.`);
@@ -8161,7 +8532,7 @@ function organiserAdminSetupComplete(groupName,groupPin){
         <div class="notice" style="margin-top:18px;text-align:left;">
           <b>Group PIN: ${esc(groupPin)}</b><br>
           Keep your Admin PIN private.<br><br>
-          ${state.paymentLink ? "💷 Your player payment link is ready. Payments will go directly to you." : "💷 No payment link added yet. You can add one later in Admin / Settings."}
+          ${state.paymentLink ? "💷 Your player payment link is ready. Payments will go directly to you." : "💷 No payment link added yet. You can add one later in Organiser settings."}
         </div>
         <button class="primary full" id="continueAfterAdminSetup">Continue</button>
       </div>`;
@@ -8284,7 +8655,7 @@ async function cancelCurrentRound(){
 
   scoreDraftActive=false;
 
-  const ok=await save();
+  const ok=await save("cancel");
   if(!ok){
     alert("The current round could not be cancelled. Please try again.");
     return;
@@ -8294,48 +8665,8 @@ async function cancelCurrentRound(){
   show("round");
 }
 
-function showIigPlusUpgrade(reason="feature"){
-  const plus=document.createElement("div");
-  plus.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.48);z-index:10001;display:flex;align-items:center;justify-content:center;padding:20px;";
-  plus.innerHTML=`
-    <div class="card" style="width:min(430px,100%);margin:0;padding:26px;border-radius:20px;text-align:center;">
-      <div style="font-size:42px;margin-bottom:6px;">🔒</div>
-      <h2 style="margin:0 0 8px;">Unlock I’m In Golf+</h2>
-      <div class="muted" style="margin-bottom:18px;">Unlock everything for your whole golf group.</div>
-      <div class="notice" style="text-align:left;line-height:1.8;margin-bottom:18px;">
-        ✓ Unlimited players<br>
-        ✓ Trip Mode<br>
-        ✓ Side Game<br>
-        ✓ New premium features as they’re released
-      </div>
-      <div style="font-size:25px;font-weight:800;">£29.99 <span style="font-size:14px;font-weight:500;">/ year</span></div>
-      <div class="muted" style="margin:4px 0 18px;">One subscription covers the whole group.</div>
-      ${isAdmin
-        ? `<button id="plusUpgrade" class="primary full">Upgrade to I’m In Golf+</button>`
-        : `<div class="notice" style="margin-bottom:10px;"><strong>${
-          reason==="playerlimit"
-            ? "This group has reached its 10-player Free limit."
-            : reason==="sidegame"
-              ? "Side Game is included with I’m In Golf+."
-              : reason==="trip"
-                ? "Trip Mode is included with I’m In Golf+."
-                : "This feature is included with I’m In Golf+."
-        }</strong><br>Ask your Group Admin to upgrade to I’m In Golf+.</div>`
-      }
-      <button id="plusNotNow" class="secondary full" style="margin-top:10px;">Not now</button>
-    </div>`;
-  document.body.appendChild(plus);
-  const upgradeBtn=plus.querySelector("#plusUpgrade");
-  if(upgradeBtn){
-    upgradeBtn.onclick=()=>{
-      if(window.IigPurchase){
-        window.IigPurchase.postMessage("purchaseIigPlus:" + pin);
-      }else{
-        alert("I’m In Golf+ purchasing is available in the iPhone app.");
-      }
-    };
-  }
-  plus.querySelector("#plusNotNow").onclick=()=>plus.remove();
+function showIigPlusUpgrade(){
+  showAppToast("I’m In Golf+", "Plus is included free for now. Reload your group; if access is restricted, ask your organiser to check its status.", 5000);
 }
 
 function chooseNewRoundGameType(){
@@ -8349,8 +8680,8 @@ function chooseNewRoundGameType(){
         <p class="muted" style="margin:0 0 20px;text-align:center;">What type of game are you playing?</p>
 
         <button id="newRoundMoney" class="primary" style="width:100%;padding:15px 16px;margin:0 0 10px;text-align:left;">
-          <span style="display:block;font-size:17px;font-weight:800;">💷 Group Game</span>
-          <span style="display:block;font-size:13px;font-weight:500;margin-top:3px;">Players pay the Group Admin directly and play the competition.</span>
+          <span style="display:block;font-size:17px;font-weight:800;">💷 Money Game</span>
+          <span style="display:block;font-size:13px;font-weight:500;margin-top:3px;">Players pay the organiser directly and play the competition.</span>
         </button>
 
         <button id="newRoundPoints" class="primary" style="width:100%;padding:15px 16px;margin:0 0 10px;text-align:left;">
@@ -8420,7 +8751,7 @@ function normalRoundSetup(selectedType, selectedCompetition){
     overlay.innerHTML=`
       <div class="card" style="width:min(500px,100%);margin:auto;padding:24px;border-radius:20px;box-shadow:0 18px 50px rgba(0,0,0,.18);">
         <div style="font-size:34px;text-align:center;margin-bottom:6px;">${isPoints ? "🏆" : "💷"}</div>
-        <h2 style="margin:0 0 6px;text-align:center;">Set up ${isPoints ? "Points Game" : "Group Game"}</h2>
+        <h2 style="margin:0 0 6px;text-align:center;">Set up ${isPoints ? "Points Game" : "Money Game"}</h2>
         <p class="muted" style="margin:0 0 18px;text-align:center;">Add the round details, then start the game.</p>
 
         <label style="display:block;margin:0 0 6px;">Course</label>
@@ -8438,7 +8769,7 @@ function normalRoundSetup(selectedType, selectedCompetition){
             🥇 1st — 10 pts&nbsp;&nbsp; 🥈 2nd — 6 pts&nbsp;&nbsp; 🥉 3rd — 3 pts
           </div>
         ` : `
-          <label style="display:block;margin:0 0 6px;">Entry amount per player (£)</label>
+          <label style="display:block;margin:0 0 6px;">Entry fee per player (£)</label>
           <input id="normalSetupStake" type="text" inputmode="numeric" pattern="[0-9]*" oninput="this.value=this.value.replace(/[^0-9]/g,'')" value="" placeholder="Enter amount" style="width:100%;margin-bottom:16px;">
 
           <div class="notice" style="margin-bottom:16px;">
@@ -8507,19 +8838,19 @@ function tripSetupScreen(){
     overlay.innerHTML=`
       <div class="card" style="width:min(720px,100%);margin:18px auto;padding:24px;border-radius:20px;box-shadow:0 18px 50px rgba(0,0,0,.18);">
         <div style="font-size:34px;text-align:center;margin-bottom:6px;">✈️</div>
-        <h2 style="margin:0 0 6px;text-align:center;">Set Up Golf Trip</h2>
+        <button id="tripSetupClose" class="ghost ui-close">Close</button><h2 style="margin:0 0 6px;text-align:center;">Set up golf trip</h2>
         <p class="muted" style="margin:0 0 20px;text-align:center;">Set up the trip once. Each round will be ready when you get to it.</p>
 
-        <label style="display:block;margin:0 0 6px;">Trip name</label>
+        <label for="tripSetupName" style="display:block;margin:0 0 6px;">Trip name</label>
         <input id="tripSetupName" type="text" value="${String(state.trip?.name||'Golf Trip').replace(/"/g,'&quot;')}" style="width:100%;margin-bottom:14px;">
 
-        <label style="display:block;margin:0 0 6px;">Number of rounds</label>
+        <label for="tripSetupRounds" style="display:block;margin:0 0 6px;">Number of rounds</label>
         <input id="tripSetupRounds" type="number" min="1" max="12" step="1" value="${Number(state.trip?.totalRounds||3)}" style="width:100%;margin-bottom:16px;">
 
         <div style="margin-bottom:8px;font-weight:800;">Trip players</div>
         <div class="muted" style="margin-bottom:10px;">Choose everyone going on the trip. You can mark anyone Not Playing Today before each round.</div>
         <div class="notice" id="tripPlayerChoices" style="margin-bottom:18px;max-height:230px;overflow:auto;">
-          ${[...state.players].sort((a,b)=>a.name.localeCompare(b.name)).map(p=>`<label style="display:flex;align-items:center;gap:10px;padding:8px 2px;"><input type="checkbox" data-trip-player="${escAttr(p.id)}" checked style="width:22px;height:22px;margin:0;"><span><b>${esc(p.name)}</b> <span class="muted">HCP ${p.handicap}</span></span></label>`).join("")}
+          ${[...state.players].sort((a,b)=>a.name.localeCompare(b.name)).map(p=>`<label style="display:flex;align-items:center;gap:10px;padding:8px 2px;"><input type="checkbox" data-trip-player="${escAttr(p.id)}" checked style="width:22px;height:22px;margin:0;"><span><b>${esc(p.name)}</b> <span class="muted">HCP ${esc(String(p.handicap??"—"))}</span></span></label>`).join("")}
         </div>
 
         <div style="margin-bottom:8px;font-weight:800;">Main Trip scoring</div>
@@ -8529,7 +8860,7 @@ function tripSetupScreen(){
           <button id="tripCompNet" class="secondary">⛳ Net</button>
         </div>
 
-        <div style="margin-bottom:8px;font-weight:800;">Optional Trip points</div>
+        <details class="ui-options"><summary>Optional Trip points</summary>
         <div class="muted" style="margin-bottom:10px;">Keep a separate 10 / 6 / 3 points championship as a bonus, or turn it off and base the Trip purely on golf scores.</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
           <button id="tripPointsOn" class="primary">✅ Trip points on</button>
@@ -8537,7 +8868,7 @@ function tripSetupScreen(){
         </div>
         <div id="tripPointsInfo" class="notice" style="margin-bottom:18px;"><b>🏆 Trip points</b><br>🥇 1st — 10 pts&nbsp;&nbsp; 🥈 2nd — 6 pts&nbsp;&nbsp; 🥉 3rd — 3 pts</div>
 
-        <div id="tripRoundsWrap"></div>
+        </details><div id="tripRoundsWrap"></div>
         <div id="tripSetupError" class="notice warning" style="display:none;margin:10px 0 12px;"></div>
         <button id="tripSetupStart" class="primary" style="width:100%;padding:14px 16px;margin-bottom:10px;">✈️ Start Golf Trip</button>
         <button id="tripSetupCancel" class="secondary" style="width:100%;">Cancel</button>
@@ -8547,6 +8878,7 @@ function tripSetupScreen(){
     let tripCompetition='stableford';
     let tripPointsEnabled=true;
     let drafts=[];
+    const expandedRounds=new Map();
     const roundsInput=overlay.querySelector('#tripSetupRounds');
     const wrap=overlay.querySelector('#tripRoundsWrap');
     const err=overlay.querySelector('#tripSetupError');
@@ -8558,6 +8890,7 @@ function tripSetupScreen(){
     };
     const readExisting=()=>{
       [...wrap.querySelectorAll('[data-trip-round]')].forEach(card=>{
+        expandedRounds.set(Number(card.dataset.tripRound),card.open);
         const i=Number(card.dataset.tripRound);
         drafts[i]=drafts[i]||{};
         drafts[i].course=card.querySelector('[data-course]')?.value||'';
@@ -8577,14 +8910,15 @@ function tripSetupScreen(){
       for(let i=0;i<count;i++){
         const d=drafts[i]||{course:'',date:'',stake:'',gameType:'money',format:'individual'};
         drafts[i]=d;
-        const card=document.createElement('div');
+        const card=document.createElement('details');
+        card.open=expandedRounds.has(i)?expandedRounds.get(i):i===0;
         card.dataset.tripRound=i;
         card.dataset.gameType=d.gameType||'money';
         card.dataset.format=d.format||'individual';
         card.className='notice';
         card.style.cssText='margin:0 0 14px;padding:16px;';
         card.innerHTML=`
-          <div style="font-weight:900;font-size:17px;margin-bottom:12px;">Round ${i+1}</div>
+          <summary>Round ${i+1}</summary>
           <label style="display:block;margin:0 0 5px;">Course</label>
           <input data-course type="text" value="${String(d.course||'').replace(/"/g,'&quot;')}" placeholder="Course" style="width:100%;margin-bottom:10px;">
           <label style="display:block;margin:0 0 5px;">Date</label>
@@ -8597,12 +8931,12 @@ function tripSetupScreen(){
           </div>
           <div style="font-weight:700;margin-bottom:6px;">Game</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
-            <button type="button" data-money class="${card.dataset.gameType==='money'?'primary':'secondary'}">💷 Group Game</button>
+            <button type="button" data-money class="${card.dataset.gameType==='money'?'primary':'secondary'}">💷 Money Game</button>
             <button type="button" data-points class="${card.dataset.gameType==='points'?'primary':'secondary'}">⛳ No Money</button>
           </div>
           <div data-comp-label style="margin-bottom:10px;"><b>Competition:</b> ${card.dataset.format==='betterball'?'🤝 Better Ball Stableford':card.dataset.format==='pairsaggregate'?`➕ Pairs Aggregate ${tripCompetition==='net'?'Net':'Stableford'}`:(tripCompetition==='net'?'⛳ Net':'🏆 Stableford')}</div>
           <div data-stake-wrap style="${card.dataset.gameType==='money'?'':'display:none;'}">
-            <label style="display:block;margin:0 0 5px;">Entry amount per player (£)</label>
+            <label style="display:block;margin:0 0 5px;">Entry fee per player (£)</label>
             <input data-stake type="number" min="0" step="0.01" value="${d.stake==='' ? '' : (Number.isFinite(Number(d.stake)) ? Number(d.stake) : '')}" placeholder="Enter amount" style="width:100%;margin-bottom:10px;">
 
             <label style="display:flex;align-items:center;gap:10px;margin:8px 0;">
@@ -8666,7 +9000,7 @@ function tripSetupScreen(){
     overlay.querySelector('#tripPointsOn').onclick=()=>setTripPoints(true);
     overlay.querySelector('#tripPointsOff').onclick=()=>setTripPoints(false);
     const finish=value=>{ overlay.remove(); resolve(value); };
-    overlay.querySelector('#tripSetupCancel').onclick=()=>finish(null);
+    overlay.querySelector('#tripSetupCancel').onclick=()=>finish(null);overlay.querySelector('#tripSetupClose').onclick=()=>finish(null);
     overlay.querySelector('#tripSetupStart').onclick=()=>{
       readExisting();
       const name=overlay.querySelector('#tripSetupName').value.trim();
@@ -8702,7 +9036,7 @@ function tripSetupScreen(){
           });
         }
       }
-      if(msg){ err.textContent=msg; err.style.display='block'; return; }
+      if(msg){ err.textContent=msg; err.style.display='block';const round=msg.match(/Round ([0-9]+)/);if(round){const card=wrap.querySelector('[data-trip-round="'+(Number(round[1])-1)+'"]');if(card)card.open=true;}err.scrollIntoView({block:'nearest'});return; }
       finish({name,totalRounds,competition:tripCompetition,tripPointsEnabled,tripPointsValue:10,playerIds,rounds});
     };
     overlay.addEventListener('click',e=>{ if(e.target===overlay) finish(null); });
@@ -8852,7 +9186,7 @@ async function newRound(){
       p.paid=false;p.stableford=null;p.netScore=null;p.noReturn=false;p.scoreSubmitted=false;p.competition=null;
       p.tripNotPlayingToday=!daySetup.playingIds.includes(p.id);
     });
-    await save();
+    if(!await save("start")){alert("The new round was not confirmed. Reload the group before continuing.");return;}
     show('round');
     return;
   }
@@ -8880,7 +9214,7 @@ async function newRound(){
     p.paid=false;p.stableford=null;p.netScore=null;p.noReturn=false;p.scoreSubmitted=false;p.competition=null;
     p.playingThisRound=false;
   });
-  await save();
+  if(!await save("start")){alert("The new round was not confirmed. Reload the group before continuing.");return;}
   show('round');
 }
 async function nextTripRound(){
@@ -8923,7 +9257,7 @@ async function nextTripRound(){
       p.competition=null;
       p.tripNotPlayingToday=!daySetup.playingIds.includes(p.id);
     });
-    await save();
+    if(!await save("start")){alert("The new round was not confirmed. Reload the group before continuing.");return;}
     show("round");
     return;
   }
@@ -8951,7 +9285,7 @@ if(tripDate===null)return;
     "✈️ " + state.trip.name +
     "\nRound " + roundNumber + " of " + state.trip.totalRounds +
     "\n\nChoose Game Type:\n\n" +
-    "1. 💷 Group Game\n" +
+    "1. 💷 Money Game\n" +
     "2. 🏆 Points Game\n\n" +
     "Enter 1 or 2"
   );
@@ -8959,7 +9293,7 @@ if(tripDate===null)return;
   if(game===null)return;
 
   if(game!=="1" && game!=="2"){
-    alert("Please enter 1 for Group Game or 2 for Points Game.");
+    alert("Please enter 1 for Money Game or 2 for Points Game.");
     return;
   }
 
@@ -9011,7 +9345,7 @@ if(tripDate===null)return;
     "\n\n" +
     (selectedType==="points"
       ? "🏆 Points Game"
-      : "💷 Group Game") +
+      : "💷 Money Game") +
     "\n" +
     (selectedCompetition==="stableford"
       ? "🏆 Stableford"
@@ -9038,6 +9372,7 @@ if(tripDate===null)return;
   state.thirdPrize=0;
 
   state.trip.competition=selectedCompetition;
+  state.pointsCompetition=selectedCompetition;
   state.trip.tripPointsValue=tripPointsValue;
 
   if(selectedType==="points"){
@@ -9054,7 +9389,7 @@ if(tripDate===null)return;
     p.competition=null;
   });
 
-  await save();
+  if(!await save("start")){alert("The new round was not confirmed. Reload the group before continuing.");return;}
   show("round");
 }
 async function deletePastTrip(){
@@ -9093,6 +9428,10 @@ async function deletePastTrip(){
     "Normal leagues, players and current round will not be changed."
   ))return;
 
+  if(iigEntryBridge || (typeof window!=="undefined" && window.iigSecureOrganiser?.active)){
+    if(await applyGuardedOperation("deletepasttrip",index)){render();alert("Change saved.");}
+    return;
+  }
   pastTrips.splice(index,1);
 
   state.trip.pastTrips=pastTrips;
@@ -9117,6 +9456,10 @@ async function finishTrip(){
     "Your normal round will then be restored."
   ))return;
 
+  if(iigEntryBridge || (typeof window!=="undefined" && window.iigSecureOrganiser?.active)){
+    if(await applyGuardedOperation("tripreturn")){show("round");alert("Trip saved. Your normal golf group is ready.");}
+    return;
+  }
   // Find the normal round backup
   const backup=
     state.trip?.normalRoundBackup ||
@@ -9229,8 +9572,12 @@ async function cancelTrip(){
   if(!confirm(
     "Cancel " + tripName + "?\n\n" +
     "This will remove the current Trip setup and Trip standings.\n\n" +
-    "Your normal Points League, Money League and previous rounds will not be changed."
+    "Your normal Points league, Money League and previous rounds will not be changed."
   ))return;
+  if(iigEntryBridge || (typeof window!=="undefined" && window.iigSecureOrganiser?.active)){
+    if(await applyGuardedOperation("tripcancel")){show("round");alert("Trip saved. Your normal golf group is ready.");}
+    return;
+  }
 const backup=state.trip?.normalRoundBackup;
 const pastTrips=state.trip?.pastTrips || [];
 
@@ -9276,14 +9623,22 @@ show("round");
 
 alert("Trip cancelled. Your normal round has been restored.");
 }
-  async function resetPayments(){
+async function resetPayments(){
  if(!confirm("Mark everyone unpaid?"))return;
+  if(iigEntryBridge || (typeof window!=="undefined" && window.iigSecureOrganiser?.active)){
+    if(await applyGuardedOperation("resetpayments")){render();alert("Change saved.");}
+    return;
+  }
  state.players.forEach(p=>p.paid=false);
  render();
  await save();
 }
 async function resetScores(){
  if(!confirm("Clear all scores?"))return;
+  if(iigEntryBridge || (typeof window!=="undefined" && window.iigSecureOrganiser?.active)){
+    if(await applyGuardedOperation("resetscores")){render();alert("Change saved.");}
+    return;
+  }
  state.players.forEach(p=>{
    p.stableford=null;
    p.netScore=null;
@@ -9323,6 +9678,10 @@ async function deleteLastRound(){
 
   if(!confirm(deleteMessage))return;
 
+  if(iigEntryBridge || (typeof window!=="undefined" && window.iigSecureOrganiser?.active)){
+    if(await applyGuardedOperation("deletelast")){render();alert("Change saved.");}
+    return;
+  }
   // Undo winner win
   (lastRound.winners||[]).forEach(name=>{
     const p=state.players.find(x=>x.name===name);
@@ -9357,7 +9716,7 @@ async function deleteLastRound(){
 async function clearLeague(){
  if(!confirm(
   "⚠️ DANGER — PERMANENT DELETION ⚠️\n\n" +
-  "Delete the Points League and all Money & Points round history?\n\n" +
+  "Delete the Points league and all Money & Points round history?\n\n" +
   "Past Trips are SAFE.\n\n" +
   "THIS CANNOT BE UNDONE.\n\n" +
   "Press OK for FINAL WARNING."
@@ -9367,9 +9726,13 @@ if(!confirm(
   "🚨 FINAL WARNING 🚨\n\n" +
   "There is NO undo.\n\n" +
   "Past Trips will be kept.\n\n" +
-  "Press OK again to PERMANENTLY DELETE the Points League and Money & Points round history."
+  "Press OK again to PERMANENTLY DELETE the Points league and Money & Points round history."
 ))return;
 
+  if(iigEntryBridge || (typeof window!=="undefined" && window.iigSecureOrganiser?.active)){
+    if(await applyGuardedOperation("clearleague")){render();alert("Change saved.");}
+    return;
+  }
  state.players.forEach(p=>{
    p.wins=0;
    p.leaguePoints=0;
@@ -9406,4 +9769,13 @@ function formatDate(d){
 function esc(s){return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
 function escAttr(s){return esc(s)}
 </script>
+<script src="secure-organiser.js"></script>
+<script src="secure-player.js"></script>
+<script src="account-controls.js"></script>
+<script src="focused-release.js"></script>
+<script src="account-session.js"></script>
+<script src="self-service.js"></script>
+<script src="simple-clean.js"></script>
+<script src="player-access.js"></script>
+<script src="pay-to-enter.js"></script>
 </body></html>
