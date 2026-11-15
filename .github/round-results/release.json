@@ -1,0 +1,23 @@
+{
+  "status": "LIVE",
+  "scope": "Admin Round display only",
+  "productionCommit": "83e80011f84eb80b9194c3e5e3c870638a217d11",
+  "deploy": {
+    "id": "6af9b1f2aba90e35f43a9f1b",
+    "state": "ready",
+    "commit_ref": "83e80011f84eb80b9194c3e5e3c870638a217d11",
+    "published_at": "2026-11-15T13:22:00.477Z"
+  },
+  "pr": "https://github.com/imingolf/website/pull/12",
+  "changedProductionFiles": [
+    "app/index.html"
+  ],
+  "change": "Hide fully paid historical result card when a new competition is open; retain all outstanding prize actions.",
+  "databaseChanges": false,
+  "customerDataChanged": false,
+  "appleSubmission": false,
+  "validation": "verification.md",
+  "liveFileCheck": "live-file.json",
+  "reviewScreenshot": "admin-preview.jpg",
+  "previousProductionCommit": "7c68d5deb6eb07504305575d84e4b4209c416882"
+}
