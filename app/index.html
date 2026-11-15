@@ -5166,6 +5166,8 @@ function nextPrizeAction(){
 function prizeNextActionHtml(){
   const action=nextPrizeAction();
   if(isAdmin){
+    // A new competition only needs previous results that still require payment.
+    if(state.roundOpen===true && !action)return "";
     const history=state.history||[];
     const index=action ? action.historyIndex : history.findIndex(record=>winnerPayouts(record).length>0);
     if(index<0)return "";
