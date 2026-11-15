@@ -45,7 +45,7 @@
       function captured() { return {epoch, owner: account()?.user?.id, pin: current?.group_pin}; }
       function still(ctx) { return ctx.epoch === epoch && ctx.owner === account()?.user?.id && ctx.pin === current?.group_pin; }
       async function fresh(ctx) {
-        const group = await request('/rest/v1/rpc/iig_read_entry_group', {}, true);
+        const group = await request('/rest/v1/rpc/iig_read_owned_entry_group', {p_pin:ctx.pin}, true);
         if (!still(ctx)) throw Error('Your account changed. Reopen your group.');
         if (!validGroup(group) || group.group_pin !== ctx.pin) throw Error('Your group changed. Reopen your group before continuing.');
         return group;
@@ -141,6 +141,7 @@
           if (!saved || saved.owner !== account()?.user?.id || saved.pin !== group?.group_pin || ![2, 3, 4].includes(saved.step) || !validGroup(group)) return false;
           const entering = !current; current = group; if (!opening) render(saved.step, entering); return true;
         },
+        get pendingPin() { const saved = marker(); return saved?.owner === account()?.user?.id && [2, 3, 4].includes(saved.step) ? saved.pin : null; },
         get pending() { const saved = marker(); return !!saved && saved.owner === account()?.user?.id && [2, 3, 4].includes(saved.step); }
       };
     }

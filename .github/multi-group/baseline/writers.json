@@ -1,0 +1,7 @@
+[
+  {
+    "signature": "iig_operate_owned_group(text,text,jsonb,bigint)",
+    "definition": "CREATE OR REPLACE FUNCTION public.iig_operate_owned_group(p_pin text, p_operation text, p_state jsonb, p_revision bigint)\n RETURNS bigint\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'pg_catalog'\nAS $function$\nDECLARE g record;\nBEGIN\n IF p_operation IS NULL OR p_operation NOT IN ('payment','finish','start','correct','cancel','settings','members','settle','tripreturn','tripcancel','resetscores','resetpayments','deletelast','clearleague','deletepasttrip','configure')\n THEN RAISE EXCEPTION 'EXPLICIT_ORGANISER_OPERATION_REQUIRED';END IF;\n SELECT * INTO g FROM iig_closed_entry.lock_authenticated(p_pin,p_revision,'owner');\n IF p_operation IN ('start','tripreturn','tripcancel') THEN p_state:=jsonb_set(p_state,'{roundId}',to_jsonb(gen_random_uuid()::text));END IF;\n RETURN iig_closed_entry.write_authenticated(g.group_id,g.revision,p_operation,p_state);\nEND $function$\n",
+    "acl": "{postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}"
+  }
+]

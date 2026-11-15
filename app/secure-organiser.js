@@ -114,7 +114,7 @@
    if(!['stableford','net'].includes(competition)){get('guidedError').textContent='Choose Stableford or Net.';return;}
    saving=true;overlay.querySelectorAll('button,input,select').forEach(el=>el.disabled=true);get('guidedError').textContent='Checking your saved group…';
    try{
-    const g=await current.request('/rest/v1/rpc/iig_read_entry_group',{},true);
+    const g=await current.request('/rest/v1/rpc/iig_read_owned_entry_group',{p_pin:current.pin},true);
     if(e!==epoch||pending||blocked)throw Error('Your group changed. Reload it before continuing.');
     apply(g);
     if(!firstRoundNotYetCreated())throw Error('A competition has already been created. Close this form and reload your group.');
@@ -149,7 +149,7 @@
    if(e!==epoch)return;
    if(pending){if(manual)status('Another save is in progress. Tap Reload saved group once it finishes.');return;}
    const version=stateSaveVersion;
-   const g=await current.request('/rest/v1/rpc/iig_read_entry_group',{},true);
+   const g=await current.request('/rest/v1/rpc/iig_read_owned_entry_group',{p_pin:current.pin},true);
    if(e!==epoch || sequence!==readSequence)return;
    if(pending || stateSaveVersion!==version){if(manual)status('Your group changed while loading. Tap Reload saved group again.');return;}
    if(!manual && (refreshBlocked()||page!==requestPage||sideGameOpen!==requestSide||sideGameHomeOpen!==requestHome))return;
@@ -170,6 +170,7 @@
   reconnect:relinkPlayers,
   firstCompetition,
   get active(){return !!active;},
+  get groupPin(){return active?.pin||null;},
   get canSwitchView(){return !!active&&!pending&&!blocked&&!manualLoading&&!scoreDraftActive;},
   get entryStatus(){return active?clone(active.group.entry):null;},
   async maintain(operation,selection=null){
@@ -186,7 +187,7 @@
    if(pending || blocked)throw Error('Reload the saved group before finishing the round.');
    const current=active,e=epoch,v=stateSaveVersion;
    readSequence++;
-   const group=await current.request('/rest/v1/rpc/iig_read_entry_group',{},true);
+   const group=await current.request('/rest/v1/rpc/iig_read_owned_entry_group',{p_pin:current.pin},true);
    if(e!==epoch || pending || stateSaveVersion!==v)throw Error('Your group changed. Reload it before finishing the round.');
    if(!valid(group)||group.group_pin!==current.pin)throw Error('Could not confirm your saved group.');
    if(group.state.roundOpen!==true)throw Error('This round is already closed. Check League → Previous rounds.');
@@ -233,7 +234,7 @@
     if(e!==epoch)return false;
     if(!Number.isSafeInteger(next)||next!==expected+1)throw Error('Save response could not be confirmed.');
     // Never infer the new round ID or closure from the submitted snapshot.
-    const latest=await current.request('/rest/v1/rpc/iig_read_entry_group',{},true);
+    const latest=await current.request('/rest/v1/rpc/iig_read_owned_entry_group',{p_pin:current.pin},true);
     if(e!==epoch)return false;
     if(latest?.revision<next)throw Error('Saved revision could not be read back.');
     apply(latest);status('Saved to your group.');document.getElementById('syncText').textContent='Group saved';return true;
@@ -265,7 +266,7 @@
   if(pending||blocked)return false;
   const current=active,e=epoch,v=stateSaveVersion;
   try{
-   const g=await current.request('/rest/v1/rpc/iig_read_entry_group',{},true);
+   const g=await current.request('/rest/v1/rpc/iig_read_owned_entry_group',{p_pin:current.pin},true);
    if(e!==epoch||pending||stateSaveVersion!==v)return false;
    apply(g);const player=state.players.find(p=>p.id===id);if(!player)return false;
    if(Object.keys(patch).some(k=>!['stableford','netScore','scoreSubmitted','noReturn','competition'].includes(k)))throw Error('Unsupported score correction');

@@ -1,0 +1,4 @@
+node_modules
+tests/fixture.sql
+supabase/.temp/
+supabase/config.toml
