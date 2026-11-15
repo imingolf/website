@@ -1,0 +1,25 @@
+/* Scoped to first-time setup; returning and Join screens retain their existing styles. */
+.onboarding-steps{display:flex;list-style:none;padding:0;gap:8px;margin:14px 0 24px;counter-reset:setup}
+.onboarding-steps li{counter-increment:setup;flex:1;font-size:11px;color:#5b6b60;border-top:3px solid #dce5de;padding-top:8px}
+.onboarding-steps li::before{content:counter(setup) ". ";font-weight:700}
+.onboarding-steps li[aria-current]{border-color:#176b3a;color:#10452e;font-weight:750}
+.onboarding-steps li.done{border-color:#83b493;color:#41674d}
+#registrationAuth.onboarding-active>details,#registrationAuth.onboarding-active>#regPasswordOption{display:none!important}
+#registrationAuth.onboarding-after-create>#regSignedIn,#registrationAuth.onboarding-after-create>#regReturning{display:none!important}
+#registrationAuth.onboarding-active input,#registrationAuth.onboarding-active select{width:100%;min-height:50px;border-radius:12px;background:white;padding:12px}
+#registrationAuth.onboarding-active #regGroupForm>p{font-size:12px;margin-top:14px}
+#registrationAuth.onboarding-active .primary{min-height:50px;border-radius:12px;background:#10452e}
+.onboarding-group{display:flex;flex-direction:column;gap:5px;background:#e7f1e9;border:1px solid #cdddce;border-radius:14px;padding:16px 18px;margin:16px 0 22px;font-size:14px}
+#onboardingGroupName{font-size:19px;font-weight:750;overflow-wrap:anywhere}
+#onboardingPin{font-size:18px;letter-spacing:.08em;margin-left:5px}
+#organiserOnboarding p{font-size:15px;line-height:1.55}
+#organiserOnboarding .onboarding-later{border:0;background:transparent;color:#516259;text-decoration:underline;text-underline-offset:3px;margin-top:8px}
+#organiserOnboarding textarea{width:100%;box-sizing:border-box;font-size:14px;padding:12px;margin-top:10px}
+#onboardingMessage:empty{display:none}
+#onboardingMessage:not(:empty){background:#eef4ef;border-radius:10px;padding:12px;color:#174a2e}
+.onboarding-help{font-size:13px;color:#516259;margin:0 0 20px}
+.onboarding-help summary{cursor:pointer;padding:10px 0;font-weight:650}
+.onboarding-ready{background:#e4f2e8;color:#176b3a;width:58px;height:58px;border-radius:50%;display:grid;place-items:center;font-size:30px;margin:20px 0}
+@media(max-width:360px){.onboarding-steps{gap:6px}.onboarding-steps li{font-size:10px}}
+
+#organiserOnboarding #onboardingPinHelp{font-size:13px;line-height:1.5;margin:6px 0 0}

@@ -75,10 +75,13 @@
     <details id="regPasswordOption"><summary>Sign in with an existing password</summary><form id="regPasswordForm"><label for="regPasswordEmail">Your email address</label><input id="regPasswordEmail" type="email" autocomplete="username" maxlength="254" required><label for="regPassword">Password</label><input id="regPassword" type="password" autocomplete="current-password" required><button class="primary full">Sign in</button><p class="muted">Sensitive changes still need a fresh email code.</p></form></details>
     <form id="regCodeForm" hidden><label for="regCode">Code from your email</label><p id="regSentTo"></p><input id="regCode" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6,10}" minlength="6" maxlength="10" required><button class="primary full" id="regVerify">Verify email</button><button id="regResend" type="button" class="secondary full">Send another code</button><button id="regChangeEmail" type="button" class="ghost full">Use a different email</button></form>
     <section id="regSignedIn" hidden><p id="regAccount" class="muted"></p>
-    <form id="regGroupForm" hidden><label for="regName">Your name</label><input id="regName" autocomplete="name" maxlength="80" required><label for="regGroupName">Group name</label><input id="regGroupName" maxlength="80" required placeholder="e.g. Sunday Golfers"><label for="regSetupEmail" id="regSetupEmailLabel">Your email</label><input id="regSetupEmail" type="email" autocomplete="email" maxlength="254"><button id="regCreate" class="primary full">Create my group</button><p class="muted">I’m In Golf+ is included free for now. Your name and email are shared with I’m In Golf to manage your group.</p></form>
+    <form id="regGroupForm" hidden><label for="regName">Your name</label><input id="regName" autocomplete="name" maxlength="80" required><label for="regSetupEmail" id="regSetupEmailLabel">Your email</label><input id="regSetupEmail" type="email" autocomplete="email" maxlength="254"><label for="regGroupName">Group name</label><input id="regGroupName" maxlength="80" required placeholder="e.g. Sunday Golfers"><button id="regCreate" class="primary full">Create my group</button><p class="muted">I’m In Golf+ is included free for now. Your name and email are shared with I’m In Golf to manage your group.</p></form>
     <section id="regAccessHelp" hidden><p id="regAccessHelpText"></p><button id="regReconnectOwned" class="primary full" type="button" hidden>Reconnect my existing player</button><button id="regOtherPin" class="secondary full" type="button">Enter group PIN</button></section><form id="regJoinForm" hidden><p id="regJoinGroupName" class="ui-invited-group"></p><label for="regPlayerName">Your name</label><input id="regPlayerName" autocomplete="name" maxlength="80" required><label for="regHandicap">Handicap</label><input id="regHandicap" type="text" inputmode="decimal" maxlength="5" pattern="-?[0-9]{1,2}([.][0-9])?" aria-describedby="regHandicapHelp" required><small id="regHandicapHelp">Example: 11.2.</small><p id="regAppJoinHelp" class="muted" hidden></p><p id="regJoinError" role="alert" tabindex="-1"></p><button class="primary full">Join my group</button></form>
     <section id="regCreated" hidden><h2>Your group is ready</h2><p id="regCreatedName"></p><p>Group PIN: <strong id="regPin"></strong></p><button id="regOpenGroup" type="button" class="primary full">Open my group</button><button id="regInvite" type="button" class="secondary full">Invite players</button><button id="regPlayerView" type="button" class="secondary full">Open my player account</button><details class="ui-options" hidden><summary>Competition options</summary><button id="regFirstCompetition" type="button" class="secondary full">Create first competition</button></details><details id="regOwnerPlayerSetup" class="ui-options" hidden><summary>I’m playing too</summary><form id="regOwnerPlayerForm"><label for="regOwnerPlayerName">Your player name</label><input id="regOwnerPlayerName" autocomplete="name" maxlength="80" required><label for="regOwnerHandicap">Your handicap</label><input id="regOwnerHandicap" inputmode="decimal" required><small>Up to two digits and one decimal place, e.g. 11.2.</small><button class="secondary full">Add me as a player</button></form><p id="regOwnerPlayerStatus" role="status"></p></details></section>
     <button id="regReload" type="button" class="secondary full">${dashboard ? 'Open dashboard' : 'Check my group'}</button><details id="regAccountOptions" class="ui-options"><summary>My account</summary><p id="regAccountReference" class="muted"></p><button id="regAccountControls" type="button" class="secondary full">Account settings</button><button id="regSignout" type="button" class="ghost full">Sign out</button></details></section>`;
+  // Onboarding is eligible only on the new-organiser route. All auth stays below.
+  const onboarding = !dashboard && !playerMode && !adminMode && window.IIGOrganiserOnboarding
+    ? window.IIGOrganiserOnboarding.create({root, account:()=>session, request, run:action, openGroup:openOwnedGroup}) : null;
   // The same verified-email API serves both guided creation and returning users.
   if(playerMode)root.classList.add('iig-player-access');
   const guided = !dashboard && !playerMode;
@@ -103,8 +106,8 @@
     $('regSetupEmail').required=true;$('regCreate').textContent='Email me a sign-in code';
     const returning=document.createElement('button');returning.id='regReturning';returning.type='button';returning.className='ghost full';returning.textContent='Already registered? Sign in';
     form.after(returning);
-    returning.onclick=()=>{creating=false;form.hidden=true;$('regEmailForm').hidden=false;returning.hidden=true;progress('Sign in with your existing email');$('regEmail').focus();};
-    progress('1 of 3 · Your group and details');
+    returning.onclick=()=>{onboarding?.suspend();creating=false;form.hidden=true;$('regEmailForm').hidden=false;returning.hidden=true;progress('Sign in with your existing email');$('regEmail').focus();};
+    progress('1 of 3 · Your group and details');onboarding?.details();
     try{const draft=JSON.parse(sessionStorage.getItem('iig-group-draft')||'null');if(draft){$('regName').value=draft.organiser||'';$('regGroupName').value=draft.name||'';$('regSetupEmail').value=draft.email||'';}}catch(_){}
   }
   const nativeApp=()=>!!window.IigNativeApp||typeof window.IigPurchase?.postMessage==='function';
@@ -133,6 +136,7 @@
     $('regResend').disabled = value || Date.now() < resendAt;
   };
   function reset() {
+    onboarding?.suspend();
     changingGroup=false;
     traceStep('account.reset');accessTrace.enabled=false;$('iigReadOnlyAccessTrace')?.remove();
     accessReadSession=null;
@@ -236,6 +240,7 @@
     if($('regReturning'))$('regReturning').hidden=true;
     message('');
     if(firstDisplay)$('regCreated').scrollIntoView?.({block:'start'});
+    if(onboarding && !onboarding.resume(group))onboarding.suspend();
   }
   async function loadGroup() {
     const group = await request('/rest/v1/rpc/iig_read_entry_group', {}, true);
@@ -263,7 +268,7 @@
     if($('regReturning'))$('regReturning').hidden=true;
     $('regVerify').textContent=creating?'Verify email & create my group':'Verify email';
     $('regSentTo').textContent = 'Email address: ' + email + '.';
-    const heading=$('welcomeStartTitle');if(heading){heading.textContent='Check your email';if(heading.nextElementSibling)heading.nextElementSibling.textContent='Enter your latest sign-in code.';}message('Check Inbox or Junk. You can resend after one minute.'); $('regCodeForm').scrollIntoView?.({block:'start'}); $('regCode').focus();
+    const heading=$('welcomeStartTitle');if(heading){heading.textContent='Check your email';if(heading.nextElementSibling)heading.nextElementSibling.textContent='Enter your latest sign-in code.';}if(creating)onboarding?.details(true);message('Check Inbox or Junk. You can resend after one minute.'); $('regCodeForm').scrollIntoView?.({block:'start'}); $('regCode').focus();
   }
   if ($('regReturnForm')) $('regReturnForm').onsubmit = event => {
     event.preventDefault();
@@ -286,7 +291,7 @@
     });
   };
   $('regResend').onclick = () => action(sendCode);
-  $('regChangeEmail').onclick = () => { $('regCodeForm').hidden = true; $('regEmailForm').hidden = creating; $('regPasswordOption').hidden=creating; $('regGroupForm').hidden=!creating; $('regCode').value = '';progress(creating?'1 of 3 · Your group and details':'Sign in'); message('Check your email address. You can request another code after the one-minute wait.'); };
+  $('regChangeEmail').onclick = () => { $('regCodeForm').hidden = true; $('regEmailForm').hidden = creating; $('regPasswordOption').hidden=creating; $('regGroupForm').hidden=!creating; $('regCode').value = '';progress(creating?'1 of 3 · Your group and details':'Sign in'); if(creating)onboarding?.details(); message('Check your email address. You can request another code after the one-minute wait.'); };
   $('regCodeForm').onsubmit = event => {
     event.preventDefault(); action(async () => {
       const token = $('regCode').value.trim();
@@ -312,7 +317,7 @@
       traceEnable(data);traceStep('signin.verified');
       message(playerMode?'Opening your player account…':'Opening your group…');
       if(playerMode)progress('Your player account');
-      if (dashboard) { offset = 0; await loadDashboard(); } else if(adminMode){showWelcomePanel('start',false);await openOwnedGroup();} else if(playerMode) await loadPlayer(); else { if(await restorePlayerHome(true))return;const group=await loadGroup();if(group){if(!dashboard)showWelcomePanel('start',false);}else if(creating)await createGroup();else await restorePlayerHome(); }
+      if (dashboard) { offset = 0; await loadDashboard(); } else if(adminMode){showWelcomePanel('start',false);await openOwnedGroup();} else if(playerMode) await loadPlayer(); else { if(!onboarding?.pending && await restorePlayerHome(true))return;const group=await loadGroup();if(group){if(!dashboard)showWelcomePanel('start',false);}else if(creating)await createGroup();else await restorePlayerHome(); }
   }
   function groupDetails(){
     const name=$('regGroupName').value.trim(),organiser=$('regName').value.trim();
@@ -327,6 +332,7 @@
     if(!pending||pending.name!==name||!/^[0-9a-f-]{36}$/i.test(pending.id||''))pending={name,id:crypto.randomUUID()};
     try{sessionStorage.setItem(storageKey,JSON.stringify(pending));}catch(_){}
     const result=await request('/rest/v1/rpc/iig_create_owned_group',{p_name:name,p_organiser_name:organiser,p_request_id:pending.id},true);
+    onboarding?.begin(result);
     // The RPC acknowledges creation; only readback supplies the name and full saved group.
     showGroup({...result,state:{groupName:name}});
     try{await loadGroup();try{sessionStorage.removeItem('iig-group-draft');}catch(_){}}
@@ -422,7 +428,7 @@
     showWelcomePanel('home');
   };
   window.iigAdminSignIn=()=>{if(!adminMode){location.assign(location.pathname+location.search+'#admin=1');return;}showWelcomePanel('start',false);if(session)action(openOwnedGroup);else{$('regGroupForm').hidden=true;$('regEmailForm').hidden=false;progress('Sign in');$('regEmail').focus();}};
-  window.iigStartGroup=()=>{if(playerMode||adminMode){showWelcomePanel('start');return;}showWelcomePanel('start');if(session&&!homeOwned){$('regGroupForm').hidden=false;$('regSetupEmail').hidden=true;$('regSetupEmailLabel').hidden=true;$('regSetupEmail').required=false;$('regCreate').textContent='Create my group';}};
+  window.iigStartGroup=()=>{if(playerMode||adminMode){showWelcomePanel('start');return;}showWelcomePanel('start');if(!session && $('regCodeForm').hidden){$('regGroupForm').hidden=false;$('regEmailForm').hidden=true;$('regSetupEmail').hidden=false;$('regSetupEmailLabel').hidden=false;$('regSetupEmail').required=true;$('regCreate').textContent='Email me a sign-in code';$('regReturning').hidden=false;onboarding?.details();}if(session&&!homeOwned){$('regGroupForm').hidden=false;$('regSetupEmail').hidden=true;$('regSetupEmailLabel').hidden=true;$('regSetupEmail').required=false;$('regCreate').textContent='Create my group';onboarding?.details();}};
   window.iigJoinGroup=()=>{
     if(changingGroup){showWelcomePanel('join',false);$('setupOverlay').classList.remove('hidden');return;}
     // Opening the PIN/sign-in screen is navigation, not a concurrent account action.
