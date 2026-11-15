@@ -1,0 +1,93 @@
+{
+  "status": "LIVE",
+  "approval": "User explicitly approved publishing this fix and its database update; reported deleting Pam's group.",
+  "pr": "https://github.com/imingolf/website/pull/11",
+  "head": "17bd666f8c2233bd6cf235092cd798c970c6e8f5",
+  "merge": {
+    "sha": "7c68d5deb6eb07504305575d84e4b4209c416882",
+    "merged": true,
+    "message": "Pull Request successfully merged"
+  },
+  "deploy": {
+    "id": "6af9a9ca34e5f94d68695ca8",
+    "state": "ready",
+    "commit_ref": "7c68d5deb6eb07504305575d84e4b4209c416882",
+    "published_at": "2026-11-15T12:47:14.518Z"
+  },
+  "backend": {
+    "migration": "create_owned_playing_group",
+    "installed": true,
+    "before": {
+      "groups": 12,
+      "accounts": 22,
+      "groups_digest": "402a9bba5fff62f6c2bd25f18298488d",
+      "functions_digest": "be289c224ebe15d1c798d9963059355a",
+      "new_rpc": null,
+      "previous_pam_group_remaining": 0
+    },
+    "after": {
+      "groups": 12,
+      "accounts": 22,
+      "groups_digest": "402a9bba5fff62f6c2bd25f18298488d",
+      "functions_digest": "be289c224ebe15d1c798d9963059355a",
+      "new_rpc": {
+        "body_md5": "d5f5deb46b9f3e81ef03bcccfa588784",
+        "settings": [
+          "search_path=pg_catalog"
+        ],
+        "anon_execute": false,
+        "security_definer": false,
+        "authenticated_execute": true
+      }
+    },
+    "anonymousHttp": {
+      "status": 401,
+      "code": "42501",
+      "message": "permission denied for function iig_create_owned_playing_group"
+    },
+    "advisors": [
+      {
+        "name": "rls_enabled_no_policy",
+        "level": "INFO",
+        "count": 27,
+        "newFunctionFinding": false
+      },
+      {
+        "name": "anon_security_definer_function_executable",
+        "level": "WARN",
+        "count": 17,
+        "newFunctionFinding": false
+      },
+      {
+        "name": "authenticated_security_definer_function_executable",
+        "level": "WARN",
+        "count": 41,
+        "newFunctionFinding": false
+      },
+      {
+        "name": "auth_leaked_password_protection",
+        "level": "WARN",
+        "count": 1,
+        "newFunctionFinding": false
+      }
+    ]
+  },
+  "validation": {
+    "databaseChecks": 12,
+    "browserChecks": 67,
+    "liveUi": [
+      "Opening screen has Start and Join only",
+      "Step 1 has name, email, group name and required handicap",
+      "Four-step progress displayed",
+      "Automatic player explanation displayed"
+    ],
+    "liveFiles": "live-files.json",
+    "screenshot": "live-step-one.jpg",
+    "noRealSignupClaimed": true
+  },
+  "rollback": {
+    "commit": "5d644901ea54805020542960989ed2a4c72becba",
+    "deploy": "6af9a3fb420f2975ae66abfb"
+  },
+  "appleSubmission": false
+}

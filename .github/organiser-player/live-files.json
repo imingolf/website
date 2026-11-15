@@ -1,0 +1,54 @@
+{
+  "files": [
+    {
+      "path": "app/self-service.js",
+      "status": 200,
+      "match": true,
+      "sha256": "da55a6dbfcd3c6077f83e042268593b43f30de8bd65a1830e23c072c0b340914"
+    },
+    {
+      "path": "app/index.html",
+      "status": 200,
+      "match": true,
+      "sha256": "dd3a25f31c7f64b9539b54a0d0b4ff7ef44068b111c12aa5beb9580bce256fb5"
+    },
+    {
+      "path": "app/config.js",
+      "status": 200,
+      "match": true,
+      "sha256": "d3426d99f8e94e64ef234061f994e6d2b7e63ef7a96070be739415d9e4888bee"
+    },
+    {
+      "path": "app/account-session.js",
+      "status": 200,
+      "match": true,
+      "sha256": "59e56c5a92737ad484080e6e55627365f267cc50367865ac6d12d2ddde5a8b40"
+    },
+    {
+      "path": "app/secure-player.js",
+      "status": 200,
+      "match": true,
+      "sha256": "ae77d109c934a44c782a0015222bcaee6e3c1ec446900eb327bc615acd940fbc"
+    },
+    {
+      "path": "app/secure-organiser.js",
+      "status": 200,
+      "match": true,
+      "sha256": "d68f2aba5156d927fbc1aae5412a30180b02e5fe466c6b519274f84fee34c9fb"
+    },
+    {
+      "path": "app/organiser-onboarding.js",
+      "status": 200,
+      "match": true,
+      "sha256": "0a8360b5f2f277bed76e229b8f6f6a14d1b296162b2ba5df0be0872112037ce9"
+    },
+    {
+      "path": "app/player-access.js",
+      "status": 200,
+      "match": true,
+      "sha256": "7785d097a08f10821019f2152aee5387524adfec0e4b44502c65cbff56af390a"
+    }
+  ],
+  "all_match": true,
+  "test_fixture_status": 404
+}
