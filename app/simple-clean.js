@@ -43,8 +43,8 @@
     }
    }
   }
-  if(!screen)return;
-  if(currentPage==='players'&&!screen.querySelector('#iigGroupHelp')){
+  const groupPanel=document.getElementById('secureOrganiserBanner')||document.getElementById('securePlayerBanner');
+  if(groupPanel&&!groupPanel.querySelector('#iigGroupHelp')){
    const card=document.createElement('div');card.id='iigGroupHelp';card.className='card';
    const button=document.createElement('button');button.type='button';button.className='secondary full';button.textContent='❓ Group Help';card.append(button);
    const panel=document.createElement('div');panel.hidden=true;
@@ -61,8 +61,9 @@
    };panel.append(send);
    const note=document.createElement('p');note.className='muted';note.textContent='Opens your email app. Please press Send there to deliver your message to I’m In Golf support.';panel.append(note);
    button.onclick=()=>{panel.hidden=!panel.hidden;button.setAttribute('aria-expanded',String(!panel.hidden));};button.setAttribute('aria-expanded','false');
-   card.append(panel);screen.append(card);
+   card.append(panel);groupPanel.append(card);
   }
+  if(!screen)return;
   const me=typeof state==='object'?state.players?.find(p=>p.id===myPlayerId):null;
   if(currentPage==='pay'&&!window.IIGPaidEntry?.applicable()&&state.roundOpen===true&&window.iigSecurePlayer?.active&&me&&!screen.querySelector('#uiOwnPayment')){
    const card=document.createElement('div');card.id='uiOwnPayment';card.className='card ui-own-payment';
