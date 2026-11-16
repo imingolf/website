@@ -36,7 +36,7 @@
   const members=Array.isArray(state?.players)?new Set(state.players.filter(p=>p&&p.id!=null).map(p=>String(p.id))).size:0;
   if(groupName&&members>=0){
    const label=members+' '+(members===1?'member':'members');
-   if(brand){brand.textContent=groupName+' · '+label;}
+   if(brand&&brand.textContent!==groupName+' · '+label){brand.textContent=groupName+' · '+label;}
    for(const el of document.querySelectorAll('#screen .notice b')){
     if(el.textContent.trim()===groupName && !el.nextElementSibling?.classList.contains('iig-member-count')){
      const badge=document.createElement('span');badge.className='iig-member-count muted';badge.textContent=' · '+label;el.after(badge);
