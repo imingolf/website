@@ -54,9 +54,9 @@
    const email=document.createElement('input');email.type='email';email.placeholder='Your email (for a reply)';email.setAttribute('aria-label','Your email for a reply');panel.append(email);
    const message=document.createElement('textarea');message.rows=4;message.placeholder='Tell us how we can help';message.setAttribute('aria-label','Your message');panel.append(message);
    const send=document.createElement('button');send.type='button';send.className='primary full';send.textContent='Open email to send';send.onclick=()=>{
-    if(!message.value.trim()||!/^\\S+@\\S+\\.\\S+$/.test(email.value.trim())){alert('Please enter your email and a message.');return;}
+    if(!message.value.trim()||!/^\S+@\S+\.\S+$/.test(email.value.trim())){alert('Please enter your email and a message.');return;}
     const subject="I'm In Golf — "+choice.value;
-    const body='Group: '+String(state?.groupName||'')+'\\nGroup PIN: '+String(typeof pin==='string'?pin:'')+'\\nReply email: '+email.value.trim()+'\\n\\n'+message.value.trim();
+    const body='Group: '+String(state?.groupName||'')+'\nGroup PIN: '+String(typeof pin==='string'?pin:'')+'\nReply email: '+email.value.trim()+'\n\n'+message.value.trim();
     location.href='mailto:hello@imingolf.co.uk?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body);
    };panel.append(send);
    const note=document.createElement('p');note.className='muted';note.textContent='Opens your email app. Please press Send there to deliver your message to I’m In Golf support.';panel.append(note);
