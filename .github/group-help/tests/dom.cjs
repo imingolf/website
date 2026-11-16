@@ -1,0 +1,32 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const {JSDOM}=require(process.env.IIG_JSDOM_PATH||'jsdom');
+const source=fs.readFileSync('app/simple-clean.js','utf8');
+const dom=new JSDOM(`<body><div class="app"><header class="app-header-brand"><b class="ui-app-name">I’m In Golf</b></header><main><div id="securePlayerBanner"><details class="ui-options" hidden><summary>My entry</summary><button id="securePlayerWithdraw">Withdraw</button></details><details class="ui-options"><summary>Account</summary><button id="securePlayerAccount">Account</button></details></div><div id="screen"><div class="notice"><b>Test Golf</b></div></div></main></div></body>`,{url:'https://imingolf.co.uk'});
+const d=dom.window.document,location={href:''},alerts=[];let passes=0;
+const context={document:d,window:dom.window,MutationObserver:dom.window.MutationObserver,queueMicrotask,page:'round',myPlayerId:'a',state:{groupName:'Test Golf',players:[{id:'a'},{id:'b'},{id:'b'},{id:0},{id:'0'},{id:''},{id:null},null]},pin:'4827',location,alert:m=>alerts.push(m)};
+vm.createContext(context);vm.runInContext(source,context);
+const check=(name,ok)=>{assert.ok(ok,name);passes++;console.log('PASS '+name)};
+const decorate=()=>dom.window.iigDecorateLive(),brand=()=>d.querySelector('.ui-app-name').textContent,badge=()=>d.querySelector('.iig-member-count')?.textContent;
+check('Counts unique nonempty IDs, including numeric/string equivalents',brand()==='Test Golf · 3 members');
+check('Count badge matches header',badge()===' · 3 members');
+check('Help lives in account options, outside hidden entry controls',d.querySelector('#iigGroupHelp').parentElement.querySelector('#securePlayerAccount'));
+context.state.players=[{id:'a'}];decorate();check('Updated total and singular label reach existing badge',brand()==='Test Golf · 1 member'&&badge()===' · 1 member');
+context.state.players=[];decorate();check('Confirmed empty roster shows zero',brand()==='Test Golf · 0 members');
+context.state.players=null;decorate();check('Unknown roster has no misleading zero or stale badge',brand()==='Test Golf'&&!badge());
+context.state={groupName:'Test Golf Extended',players:[{id:'x'},{id:'y'}]};decorate();check('Switching similarly named groups replaces old count',brand()==='Test Golf Extended · 2 members'&&!badge());
+context.state={players:[]};decorate();check('Sign-out clears previous group and count',brand()==='I’m In Golf');
+context.state={groupName:'Test Golf',players:[{id:'a'}]};decorate();
+const help=d.querySelector('#iigGroupHelp'),toggle=help.querySelector('button'),panel=toggle.nextElementSibling;
+toggle.click();check('Help expands accessibly',!panel.hidden&&toggle.getAttribute('aria-expanded')==='true');
+const send=panel.querySelector('button'),email=panel.querySelector('input'),message=panel.querySelector('textarea'),choice=panel.querySelector('select');
+send.click();check('Blank request is blocked',alerts.length===1&&!location.href);
+email.value='invalid';message.value='Example';send.click();check('Invalid email is blocked',alerts.length===2&&!location.href);
+email.value='test@example.com';message.value='A & B\nPlus + percent % question ?';
+for(const kind of ['Ask for help','Report a problem','Send feedback']){
+ choice.value=kind;send.click();const url=new URL(location.href);
+ check(kind+' targets support with encoded group, PIN, reply email and message',url.protocol==='mailto:'&&url.pathname==='hello@imingolf.co.uk'&&url.searchParams.get('subject')==="I'm In Golf — "+kind&&url.searchParams.get('body')==='Group: Test Golf\nGroup PIN: 4827\nReply email: test@example.com\n\nA & B\nPlus + percent % question ?');
+}
+toggle.click();check('Help closes accessibly',panel.hidden&&toggle.getAttribute('aria-expanded')==='false');
+const before=JSON.stringify(context.state);let mutations=0;const observer=new dom.window.MutationObserver(r=>mutations+=r.length);observer.observe(d.querySelector('main'),{childList:true,subtree:true,characterData:true});
+for(let i=0;i<100;i++)decorate();
+setTimeout(()=>{check('Repeated decoration has no child/text mutation loop',mutations===0);check('Repeated decoration creates only one Help card',d.querySelectorAll('#iigGroupHelp').length===1);check('Presentation never changes the group data',JSON.stringify(context.state)===before);observer.disconnect();dom.window.close();console.log('PASS '+passes+' focused DOM checks');},50);
