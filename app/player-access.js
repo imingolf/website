@@ -35,7 +35,7 @@
   if(!window.iigCanReturnToOrganiser?.(targetPin))return;
   if(window.iigSecurePlayer?.active)await window.iigReturnToOrganiser?.();
   if(pin!==targetPin||!window.iigCanReturnToOrganiser?.(targetPin)||!window.iigSecureOrganiser?.active)return;
-  if(!window.iigSecureOrganiser.canSwitchView){showAppToast('Finish your current action','Finish saving or cancel your current entry before opening Admin settings.');return;}
+  if(!window.iigSecureOrganiser.canSwitchView){showAppToast('Finish your current action','Finish saving or cancel your current entry before opening Organiser settings.');return;}
   show('settings');window.scrollTo(0,0);
  }
  function showMemberList(){
@@ -80,7 +80,7 @@
    const playersTab=document.getElementById('nplayers');playersTab.hidden=false;playersTab.onclick=showMemberList;
    document.getElementById('nsettings').hidden=true;
    let controls=document.getElementById('simplerAdminControls');
-   if(!controls&&header){controls=document.createElement('details');controls.id='simplerAdminControls';controls.className='ui-group-admin';const summary=document.createElement('summary');summary.textContent='Group Admin';controls.append(summary);header.append(controls);}
+   if(!controls&&header){controls=document.createElement('details');controls.id='simplerAdminControls';controls.className='ui-group-admin';const summary=document.createElement('summary');summary.textContent='Group organiser';controls.append(summary);header.append(controls);}
    const canManage=!!window.iigCanReturnToOrganiser?.(pin);
    if(controls)controls.hidden=!canManage;
    let settings=document.getElementById('simplerAdminSettings');
@@ -89,7 +89,7 @@
    const canReturn=player&&window.iigCanReturnToOrganiser?.(pin);
    if(!switcher&&controls){switcher=document.createElement('button');switcher.id='simplerRoleSwitch';switcher.type='button';switcher.className='secondary';controls.append(switcher);}
    if(switcher&&controls&&switcher.parentElement!==controls)controls.append(switcher);
-   if(switcher){switcher.hidden=!owner&&!canReturn;text(switcher,owner?'Player view':'Admin view');switcher.onclick=()=>{
+   if(switcher){switcher.hidden=!owner&&!canReturn;text(switcher,owner?'Player view':'Organiser view');switcher.onclick=()=>{
     controls.open=false;closeGroup();
     if(window.iigSecureOrganiser?.active){if(ownPlayerId())returnToPlayerView();else showMemberList();}
     else if(window.iigCanReturnToOrganiser?.(pin))window.iigReturnToOrganiser?.();

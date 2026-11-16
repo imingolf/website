@@ -57,7 +57,7 @@
         $('regGroupForm').hidden = true; $('regCreated').hidden = true;
         const headings = {
           2: ['Invite your friends', 'Your group is ready. Get your friends together.'],
-          3: ['Set up payments', 'Optional — you can add this later in Group Admin.'],
+          3: ['Set up payments', 'Optional — you can add this later in Group organiser.'],
           4: ['You’re ready to go', 'Your group is set up. Time to get playing.']
         };
         chrome(step, ...headings[step]);
