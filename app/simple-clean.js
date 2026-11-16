@@ -139,7 +139,7 @@
    const primary=screen.querySelectorAll('button.primary');
    if(primary.length>1)for(const button of primary){
     // Navigation/help remain reachable, but do not compete with golf actions.
-    if(/^(?:❓\s*)?(?:Admin Help|View payments|Manage payments)$/i.test(button.textContent.trim()))button.classList.add('ui-secondary-action');
+    if(/^(?:❓\s*)?(?:Organiser guide|View payments|Manage payments)$/i.test(button.textContent.trim()))button.classList.add('ui-secondary-action');
    }
   }
   for(const input of document.querySelectorAll('input:not([type=hidden]),select,textarea')){

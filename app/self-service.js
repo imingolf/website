@@ -69,7 +69,7 @@
       if(title){title.textContent='Join your group';if(title.nextElementSibling)title.nextElementSibling.textContent=session?'Add your name and handicap.':'We’ll email you a sign-in code.';}
       return;
     }
-    if(adminMode&&!additionalGroup){const title=$('welcomeStartTitle');if(title){title.textContent='Admin sign in';if(title.nextElementSibling)title.nextElementSibling.textContent='';}return;}
+    if(adminMode&&!additionalGroup){const title=$('welcomeStartTitle');if(title){title.textContent='Organiser sign-in';if(title.nextElementSibling)title.nextElementSibling.textContent='';}return;}
     if(dashboard || !guided)return;
     const title=$('welcomeStartTitle');
     if(!title)return;

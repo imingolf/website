@@ -9,6 +9,7 @@ button{font-size:15px;font-weight:700;line-height:1.3;cursor:pointer}
 .small,.small-btn{min-height:44px}
 button:disabled{cursor:default;opacity:.65}
 input,select,textarea{font-size:16px;max-width:100%;border-color:#aebfb2;border-radius:12px}
+#iigGroupHelp textarea{display:block;width:100%;padding:11px;border:1px solid #aebfb2;background:white;margin:5px 0 11px;resize:vertical}
 input:focus,select:focus,textarea:focus{outline:2px solid var(--ui-green);outline-offset:2px}
 :where(button,a,summary,[tabindex]):focus-visible{outline:3px solid #c2a123;outline-offset:3px}
 [hidden],.hidden{display:none!important}
