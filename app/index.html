@@ -2436,7 +2436,6 @@ function sideGameScoreEntry(){
         inputmode="numeric"
         maxlength="${format==="net" ? 3 : 2}"
         pattern="${format==="net" ? "[0-9]{1,3}" : "[0-9]{1,2}"}"
-        placeholder="${format==="net" ? "e.g. 72" : "e.g. 36"}"
         style="font-size:28px;font-weight:800;text-align:center;"
       >
 
@@ -7459,7 +7458,7 @@ function settingsPage(){
  </div>
  `}
 
- <button class="primary full" onclick="openAdminHelp()">❓ Admin Help</button>
+ <button class="primary full" onclick="openAdminHelp()">❓ Organiser guide</button>
  </div>
  <div class="card">
    <h2>💷 Player payments</h2>
@@ -7622,12 +7621,12 @@ function adminHelpPage(){
     $("screen").innerHTML=`
       <div class="card">
         <div class="muted">I'M IN GOLF</div>
-        <h2 style="font-size:24px;margin:4px 0 8px;">❓ Admin Help</h2>
+        <h2 style="font-size:24px;margin:4px 0 8px;">❓ Organiser guide</h2>
         <div class="muted">Simple help for Admins.</div>
       </div>
       <div class="card">${topicHtml}</div>
       <div class="card">
-        <button class="secondary full" onclick="adminHelpBack()">← Back to Admin Help</button>
+        <button class="secondary full" onclick="adminHelpBack()">← Back to Organiser guide</button>
         <button class="ghost full" onclick="show('settings')">⚙️ Back to Settings</button>
       </div>`;
     return;
@@ -7653,7 +7652,7 @@ function adminHelpPage(){
       <div style="text-align:center;">
         <div style="font-size:44px;">❓</div>
         <div class="muted">I'M IN GOLF</div>
-        <h2 style="font-size:26px;margin:5px 0;">Admin Help</h2>
+        <h2 style="font-size:26px;margin:5px 0;">Organiser guide</h2>
         <div class="muted">What do you need help with?</div>
       </div>
     </div>
@@ -8423,7 +8422,7 @@ function organiserPaymentSetup(groupName,options={}){
     const finish=value=>{overlay.remove();resolve(value);};
     const closeLabel=options.allowRemove ? "Close without changing" : "Save and set this up later";
     const stepHeader=(step,title,subtitle)=>`
-      <div class="muted" style="font-weight:900;letter-spacing:.04em;">${step==="HELP" ? "ADMIN HELP" : `STEP ${step} OF 3`}</div>
+      <div class="muted" style="font-weight:900;letter-spacing:.04em;">${step==="HELP" ? "ORGANISER GUIDE" : `STEP ${step} OF 3`}</div>
       <h2 style="font-size:25px;margin:6px 0;">${title}</h2>
       <div class="muted" style="font-size:16px;margin-bottom:18px;">${subtitle}</div>`;
     const renderChoose=()=>{
@@ -8452,7 +8451,7 @@ function organiserPaymentSetup(groupName,options={}){
         <input id="setupPaymentLink" type="url" inputmode="url" autocomplete="url" value="${escAttr(link)}" placeholder="${escAttr(item.placeholder)}">
         <div id="setupPaymentMsg" class="muted" style="min-height:20px;color:var(--red);"></div>
         <button class="primary full" id="continueSetupPayment">Continue</button>
-        <button class="secondary full" id="helpSetupPayment">❓ Not sure? Open Admin Help</button>
+        <button class="secondary full" id="helpSetupPayment">❓ Not sure? Open Organiser guide</button>
         <button class="ghost full" id="backSetupPayment">← Back</button>
         <button class="ghost full" id="closeSetupPayment">${closeLabel}</button>`;
       const input=card.querySelector("#setupPaymentLink");

@@ -226,7 +226,7 @@ setTimeout(function(){
       var screen=document.getElementById('screen');
       if(!screen)return;
       var adminOn=(typeof isAdmin!=='undefined'&&isAdmin);
-      var helpHeading=Array.from(screen.querySelectorAll('h2')).find(function(h2){return (h2.textContent||'').indexOf('Admin Help')!==-1;});
+      var helpHeading=Array.from(screen.querySelectorAll('h2')).find(function(h2){return (h2.textContent||'').indexOf('Organiser guide')!==-1;});
       if(!adminOn||!helpHeading)return;
       if(screen.querySelector('[data-iig-contact-support]'))return;
       var card=document.createElement('div');
