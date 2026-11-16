@@ -1,6 +1,7 @@
 /* Presentation helpers. Never read tokens, call APIs, or change gameplay state. */
 (() => {
  'use strict';
+ const defaultAppName=document.querySelector('.ui-app-name')?.textContent||'I’m In Golf';
  const folded=new WeakSet();
  const folds=new Map([
   ['Edit round details','Round details'],['Round controls','Round controls'],
@@ -18,8 +19,13 @@
  }
  function polish(screen){
   const currentPage=typeof page==='string'?page:'';document.body.dataset.uiPage=currentPage;
-  const groupName=typeof state==='object'?state.groupName:'';
-  const brand=document.querySelector('.ui-app-name');if(brand&&groupName&&!brand.textContent.startsWith(groupName))brand.textContent=groupName;
+  const groupName=typeof state==='object'&&state?state.groupName:'';
+  const players=typeof state==='object'&&state&&Array.isArray(state.players)?state.players:null;
+  const members=players?new Set(players.filter(p=>p&&p.id!=null&&String(p.id).trim()).map(p=>String(p.id))).size:null;
+  const memberLabel=members===null?'':members+' '+(members===1?'member':'members');
+  const brand=document.querySelector('.ui-app-name');
+  const brandLabel=groupName?groupName+(memberLabel?' · '+memberLabel:''):defaultAppName;
+  if(brand&&brand.textContent!==brandLabel)brand.textContent=brandLabel;
   for(const id of ['secureOrganiserBanner','securePlayerBanner']){
    const banner=document.getElementById(id);if(!banner)continue;
    const status=banner.querySelector('p[role=status]');
@@ -33,18 +39,20 @@
    button.onclick=()=>window.iigPlayerAccess?.toggleGroup(playerBanner);header.append(button);
   }
   // Presentation-only membership label: count the current group's unique player IDs.
-  const members=Array.isArray(state?.players)?new Set(state.players.filter(p=>p&&p.id!=null).map(p=>String(p.id))).size:0;
-  if(groupName&&Array.isArray(state?.players)){
-   const label=members+' '+(members===1?'member':'members');
-   if(brand&&brand.textContent!==groupName+' · '+label){brand.textContent=groupName+' · '+label;}
+  for(const badge of document.querySelectorAll('#screen .iig-member-count')){
+   if(!memberLabel||badge.previousElementSibling?.textContent.trim()!==groupName)badge.remove();
+  }
+  if(groupName&&memberLabel){
    for(const el of document.querySelectorAll('#screen .notice b')){
-    if(el.textContent.trim()===groupName && !el.nextElementSibling?.classList.contains('iig-member-count')){
-     const badge=document.createElement('span');badge.className='iig-member-count muted';badge.textContent=' · '+label;el.after(badge);
+    if(el.textContent.trim()===groupName){
+     let badge=el.nextElementSibling;
+     if(!badge?.classList.contains('iig-member-count')){badge=document.createElement('span');badge.className='iig-member-count muted';el.after(badge);}
+     if(badge.textContent!==' · '+memberLabel)badge.textContent=' · '+memberLabel;
     }
    }
   }
   const groupBanner=document.getElementById('secureOrganiserBanner')||document.getElementById('securePlayerBanner');
-  const groupPanel=groupBanner?.querySelector('details.ui-options')||groupBanner;
+  const groupPanel=groupBanner?.querySelector('#secureOrganiserAccount, #securePlayerAccount')?.closest('details.ui-options');
   if(groupPanel&&!groupPanel.querySelector('#iigGroupHelp')){
    const card=document.createElement('div');card.id='iigGroupHelp';card.className='card';
    const button=document.createElement('button');button.type='button';button.className='secondary full';button.textContent='❓ Group Help';card.append(button);
