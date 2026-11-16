@@ -117,6 +117,7 @@
     dismissGroupPicker?.(null);additionalGroup=false;selectedOwnedPin=null;
     $('regCancelAdditional')?.remove();
     changingGroup=false;
+    window.iigNativeReminders?.clear();
     accessReadSession=null;
     $('iigPlayerProfileDialog')?.remove();ownerReturnPin=null;ownerPlayerId=null;ownerPlayerGroupPin=null;viewOwnerCheckedPin=null;viewLookup++;
     $('iigAppHandover')?.remove();playerJoinOptions=null;
@@ -386,6 +387,7 @@
     changingGroup=false;
     window.iigSecurePlayer?.close();
     window.iigSecureOrganiser.open(group, request, () => action(signout), access.plan_type);
+    window.iigNativeReminders?.connect(session.user.id,request);
     return group;
   }
   $('regOpenGroup').onclick=()=>action(openOwnedGroup);
@@ -409,6 +411,7 @@
   function openPlayerData(data,pin){
     if(!window.iigSecurePlayer)throw new Error('Reload the app to open your player account.');
     window.iigSecurePlayer.open(data,pin,request,()=>action(signout));
+    window.iigNativeReminders?.connect(session.user.id,request);
     homePin=pin;homeOwned=false;rememberGroup(pin);
     $('regJoinForm').hidden=true;$('regAccessHelp').hidden=true;showAppHandover(pin);
     if(ownerReturnPin!==pin&&viewOwnerCheckedPin!==pin){ownerReturnPin=null;confirmPlayerOwnership(pin);}
