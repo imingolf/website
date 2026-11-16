@@ -32,7 +32,37 @@
    const button=document.createElement('button');button.id='uiPlayerOptions';button.className='secondary';button.textContent='Options';button.setAttribute('aria-expanded','false');
    button.onclick=()=>window.iigPlayerAccess?.toggleGroup(playerBanner);header.append(button);
   }
+  // Presentation-only membership label: count the current group's unique player IDs.
+  const members=Array.isArray(state?.players)?new Set(state.players.filter(p=>p&&p.id!=null).map(p=>String(p.id))).size:0;
+  if(groupName&&members>=0){
+   const label=members+' '+(members===1?'member':'members');
+   if(brand){brand.textContent=groupName+' · '+label;}
+   for(const el of document.querySelectorAll('#screen .notice b')){
+    if(el.textContent.trim()===groupName && !el.nextElementSibling?.classList.contains('iig-member-count')){
+     const badge=document.createElement('span');badge.className='iig-member-count muted';badge.textContent=' · '+label;el.after(badge);
+    }
+   }
+  }
   if(!screen)return;
+  if(currentPage==='players'&&!screen.querySelector('#iigGroupHelp')){
+   const card=document.createElement('div');card.id='iigGroupHelp';card.className='card';
+   const button=document.createElement('button');button.type='button';button.className='secondary full';button.textContent='❓ Group Help';card.append(button);
+   const panel=document.createElement('div');panel.hidden=true;
+   const heading=document.createElement('h2');heading.textContent='Group Help';panel.append(heading);
+   const choice=document.createElement('select');choice.setAttribute('aria-label','Help request type');
+   for(const label of ['Ask for help','Report a problem','Send feedback']){const option=document.createElement('option');option.value=label;option.textContent=label;choice.append(option);}panel.append(choice);
+   const email=document.createElement('input');email.type='email';email.placeholder='Your email (for a reply)';email.setAttribute('aria-label','Your email for a reply');panel.append(email);
+   const message=document.createElement('textarea');message.rows=4;message.placeholder='Tell us how we can help';message.setAttribute('aria-label','Your message');panel.append(message);
+   const send=document.createElement('button');send.type='button';send.className='primary full';send.textContent='Open email to send';send.onclick=()=>{
+    if(!message.value.trim()||!/^\\S+@\\S+\\.\\S+$/.test(email.value.trim())){alert('Please enter your email and a message.');return;}
+    const subject="I'm In Golf — "+choice.value;
+    const body='Group: '+String(state?.groupName||'')+'\\nGroup PIN: '+String(typeof pin==='string'?pin:'')+'\\nReply email: '+email.value.trim()+'\\n\\n'+message.value.trim();
+    location.href='mailto:hello@imingolf.co.uk?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body);
+   };panel.append(send);
+   const note=document.createElement('p');note.className='muted';note.textContent='Opens your email app. Please press Send there to deliver your message to I’m In Golf support.';panel.append(note);
+   button.onclick=()=>{panel.hidden=!panel.hidden;button.setAttribute('aria-expanded',String(!panel.hidden));};button.setAttribute('aria-expanded','false');
+   card.append(panel);screen.append(card);
+  }
   const me=typeof state==='object'?state.players?.find(p=>p.id===myPlayerId):null;
   if(currentPage==='pay'&&!window.IIGPaidEntry?.applicable()&&state.roundOpen===true&&window.iigSecurePlayer?.active&&me&&!screen.querySelector('#uiOwnPayment')){
    const card=document.createElement('div');card.id='uiOwnPayment';card.className='card ui-own-payment';
