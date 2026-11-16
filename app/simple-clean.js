@@ -34,7 +34,7 @@
   }
   // Presentation-only membership label: count the current group's unique player IDs.
   const members=Array.isArray(state?.players)?new Set(state.players.filter(p=>p&&p.id!=null).map(p=>String(p.id))).size:0;
-  if(groupName&&members>=0){
+  if(groupName&&Array.isArray(state?.players)){
    const label=members+' '+(members===1?'member':'members');
    if(brand&&brand.textContent!==groupName+' · '+label){brand.textContent=groupName+' · '+label;}
    for(const el of document.querySelectorAll('#screen .notice b')){
@@ -43,7 +43,8 @@
     }
    }
   }
-  const groupPanel=document.getElementById('secureOrganiserBanner')||document.getElementById('securePlayerBanner');
+  const groupBanner=document.getElementById('secureOrganiserBanner')||document.getElementById('securePlayerBanner');
+  const groupPanel=groupBanner?.querySelector('details.ui-options')||groupBanner;
   if(groupPanel&&!groupPanel.querySelector('#iigGroupHelp')){
    const card=document.createElement('div');card.id='iigGroupHelp';card.className='card';
    const button=document.createElement('button');button.type='button';button.className='secondary full';button.textContent='❓ Group Help';card.append(button);
