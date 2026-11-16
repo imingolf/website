@@ -1,3 +1,17 @@
+# Native competition reminders — deployment status
+
+## Current status — 16 November 2026
+
+Greg approved deployment with reminders disabled, followed by a small real-iPhone pilot. Credential setup was completed in the Mac session: dedicated Firebase send-only service identity and Supabase secret configured; no private credential is in this repository.
+
+The additive native_competition_reminders migration is applied to LIVE. Sender v15 is deployed; its existing Web Push behaviour is preserved (v14 matched the saved v13 baseline). Database readback confirms enabled=false, zero pilot accounts, zero devices and zero deliveries. All four private tables have RLS enabled and no anon/authenticated direct read grants. The native path remains unavailable until explicitly configured for a verified pilot account. No native notifications were sent by this deployment.
+
+The three modified existing web assets matched production before publication. The web companion is being released through PR 19. The Mac unsigned build passed; signed installation and real-phone delivery/tap/off remain pending. No Apple submission or broad activation is authorised by this release. Preserve the existing cron and legacy notifications.
+
+The earlier preparation record below is historical; its statements about missing credentials, absent migration and pending deployment approval are superseded by this status.
+
+---
+
 # Automatic native competition reminders — prepared, not deployed
 
 Prepared 15 November 2026; refreshed 16 November against website main 4c2812cc46d6af083ba74b74695997f13166efe5, retaining the published Group Help and Group organiser changes; sender v13. The existing five-minute cron and competition event trigger are retained. Native delivery uses the existing competition-created, three-days-before and night-before events (18:00 in the group's timezone for timed reminders). The unrelated first-player-joined alert is not sent to native devices by this change.
