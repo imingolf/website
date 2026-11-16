@@ -95,7 +95,7 @@ setTimeout(function(){
       if(!badge){
         badge=document.createElement('div');
         badge.setAttribute('data-iig-admin-header','1');
-        badge.innerHTML='<b>⚙️ Admin mode</b><span>You are managing this golf group.</span>';
+        badge.innerHTML='<b>⚙️ Organiser view</b><span>You are managing this golf group.</span>';
         badge.style.cssText='margin-top:12px;background:#e3f5e8;color:#145f34;border:1px solid #c6ead1;border-radius:12px;padding:9px 11px;display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;font-size:13px;line-height:1.25;';
         var b=badge.querySelector('b'); if(b)b.style.fontSize='14px';
         var s=badge.querySelector('span'); if(s)s.style.opacity='.95';
@@ -216,7 +216,7 @@ setTimeout(function(){
   }
   function contactAdminSupport(){
     var groupName=getGroupName();
-    var subject="I'm In Golf - Admin Support - "+groupName;
+    var subject="I'm In Golf - Group organiser support - "+groupName;
     var body="Hi I'm In Golf,\n\nI need some help with my golf group.\n\nGroup: "+groupName+"\n\nPlease describe the issue below:\n\n";
     window.location.href='mailto:hello@imingolf.co.uk?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body);
   }
@@ -226,7 +226,7 @@ setTimeout(function(){
       var screen=document.getElementById('screen');
       if(!screen)return;
       var adminOn=(typeof isAdmin!=='undefined'&&isAdmin);
-      var helpHeading=Array.from(screen.querySelectorAll('h2')).find(function(h2){return (h2.textContent||'').indexOf('Admin Help')!==-1;});
+      var helpHeading=Array.from(screen.querySelectorAll('h2')).find(function(h2){return (h2.textContent||'').indexOf('Organiser guide')!==-1;});
       if(!adminOn||!helpHeading)return;
       if(screen.querySelector('[data-iig-contact-support]'))return;
       var card=document.createElement('div');
@@ -387,7 +387,7 @@ setTimeout(function(){
         return;
       }
       if(typeof ownerLogin==='function')ownerLogin=async function(){
-        if(!isAdmin){showAppToast('Admin access required','Open Admin Mode first.',3000);return;}
+        if(!isAdmin){showAppToast('Group organiser access required','Open organiser view first.',3000);return;}
         var entered=await appPrompt('Owner Access',"Enter your private I'm In Golf owner creation code",'',{type:'password',okLabel:'Open Owner Controls'});
         if(entered===null)return;
         var clean=String(entered).trim();
@@ -398,24 +398,24 @@ setTimeout(function(){
         if(!db||!isAdmin||!isOwner||!ownerCreationCode){showAppToast('Owner access required','Open Owner Controls first.',3000);return;}
         var groupPin=String(ownerEditGroupPin||'');
         if(!groupPin){showAppToast('Group not found','The group could not be identified.',3000);return;}
-        var first=await appPrompt('Reset Admin PIN','Choose a new 4-digit Admin PIN for group '+groupPin,'',{type:'password',inputmode:'numeric',okLabel:'Next'});
+        var first=await appPrompt('Reset Organiser PIN','Choose a new 4-digit Organiser PIN for group '+groupPin,'',{type:'password',inputmode:'numeric',okLabel:'Next'});
         if(first===null)return;
         var clean=String(first).trim();
         if(!validAdminPin(clean)){showAppToast('4 digits needed','Please choose exactly 4 numbers.',3000);return;}
-        var second=await appPrompt('Confirm Admin PIN','Enter the new 4-digit PIN again','',{type:'password',inputmode:'numeric',okLabel:'Continue'});
+        var second=await appPrompt('Confirm Organiser PIN','Enter the new 4-digit PIN again','',{type:'password',inputmode:'numeric',okLabel:'Continue'});
         if(second===null)return;
         if(String(second).trim()!==clean){showAppToast('PINs do not match','Please try again.',3000);return;}
-        var ok=await appConfirm('Reset Admin PIN','Reset the Admin PIN for group '+groupPin+'?','Reset Admin PIN',true);
+        var ok=await appConfirm('Reset Organiser PIN','Reset the Organiser PIN for group '+groupPin+'?','Reset Organiser PIN',true);
         if(!ok)return;
         var result=await db.rpc('owner_reset_admin_pin',{p_creation_code:ownerCreationCode,p_group_pin:groupPin,p_new_admin_pin:clean});
         if(result.error||result.data!==true){showAppToast('PIN not reset',result.error&&result.error.message?result.error.message:'Please try again.',3600);return;}
         if(groupPin===String(pin)){state.adminPin=clean;state.adminSetupToken='';}
-        showAppToast('✅ Admin PIN reset','Group '+groupPin+' is ready.',3000);
+        showAppToast('✅ Organiser PIN reset','Group '+groupPin+' is ready.',3000);
       };
       if(typeof copyAdminInvite==='function')copyAdminInvite=async function(){
         if(!lastAdminInvite){showAppToast('No invite yet','Create a new group first.',3000);return;}
-        try{await navigator.clipboard.writeText(lastAdminInvite);showAppToast('✅ Admin invite copied','Paste it into WhatsApp or your message app.',3000);}
-        catch(e){await appPrompt('Copy Admin Invite','Copy the message below.',lastAdminInvite,{okLabel:'Done'});}
+        try{await navigator.clipboard.writeText(lastAdminInvite);showAppToast('✅ Organiser invite copied','Paste it into WhatsApp or your message app.',3000);}
+        catch(e){await appPrompt('Copy organiser invite','Copy the message below.',lastAdminInvite,{okLabel:'Done'});}
       };
       if(typeof createNewGolfGroup==='function')createNewGolfGroup=async function(){
         if(!isAdmin||!isOwner||!ownerCreationCode){showAppToast('Owner access required','Open Owner Controls first.',3000);return;}
@@ -431,12 +431,12 @@ setTimeout(function(){
         var setupToken=crypto.randomUUID?crypto.randomUUID():(Date.now().toString(36)+Math.random().toString(36).slice(2));
         var createdState=Object.assign({},newState,{adminSetupToken:setupToken});
         var setup=await db.rpc('save_group_state',{p_pin:newPin,p_state:createdState});
-        if(setup.error){showAppToast('Group created','Admin setup could not be prepared. Please try again before sending the invite.',4200);return;}
-        lastAdminInvite='⛳ I\'m In Golf\n\nYou\'ve been invited to manage '+cleanGroupName+'.\n\nGroup PIN: '+newPin+'\n\nTap below to set up your 4-digit Admin PIN:\nhttps://imingolf.co.uk/app/?pin='+encodeURIComponent(newPin)+'&adminsetup='+encodeURIComponent(setupToken)+'\n\n🔒 Keep this link private.';
+        if(setup.error){showAppToast('Group created','Organiser setup could not be prepared. Please try again before sending the invite.',4200);return;}
+        lastAdminInvite='⛳ I\'m In Golf\n\nYou\'ve been invited to manage '+cleanGroupName+'.\n\nGroup PIN: '+newPin+'\n\nTap below to set up your 4-digit Organiser PIN:\nhttps://imingolf.co.uk/app/?pin='+encodeURIComponent(newPin)+'&adminsetup='+encodeURIComponent(setupToken)+'\n\n🔒 Keep this link private.';
         page='admininvite';adminInvitePage();window.scrollTo(0,0);
       };
       if(typeof cancelCurrentRound==='function')cancelCurrentRound=async function(){
-        if(!isAdmin){showAppToast('Admin only','Only the Group Admin can cancel the current round.',3200);return;}
+        if(!isAdmin){showAppToast('Group organiser only','Only the Group organiser can cancel the current round.',3200);return;}
         if(state.trip&&state.trip.active){showAppToast('Trip active','Use Cancel Current Trip instead.',3000);return;}
         var hasRound=Boolean(String(state.course||'').trim())||Boolean(state.date)||state.players.some(function(p){return p.paid||p.scoreSubmitted||p.stableford!=null||p.netScore!=null||p.noReturn===true||Boolean(p.competition);});
         if(!hasRound){showAppToast('No current round','There is nothing to cancel.',3000);return;}

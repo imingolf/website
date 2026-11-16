@@ -634,7 +634,7 @@ function showFirstWelcome(role){
     $("screen").innerHTML=`<div class="card" style="text-align:center;padding:26px 18px;">
       <div style="font-size:46px;">👋</div><h2 style="font-size:25px;margin:8px 0;">Welcome to I'm In Golf, ${esc(name)}!</h2>
       <div class="muted">You're now part of <b>${esc(state.groupName||"your golf group")}</b>.</div>
-      <div class="notice" style="text-align:left;margin-top:18px;">Your Admin will set up the rounds.<br><br><b>💷 Pay → ⛳ Play → ✍️ Enter your score</b><br><br>Everyone in the group sees the same game.</div>
+      <div class="notice" style="text-align:left;margin-top:18px;">Your group organiser will set up the rounds.<br><br><b>💷 Pay → ⛳ Play → ✍️ Enter your score</b><br><br>Everyone in the group sees the same game.</div>
       <button class="primary full" onclick="document.querySelector('nav').style.display='';show('round')">Got it — take me to the group</button>
     </div>`;
   }
@@ -760,7 +760,7 @@ async function connect(){
        <h2>Group access suspended</h2>
        <p class="muted">${esc(access.group_name||"This group")} is currently suspended.</p>
        <div class="notice warning">
-         Please contact the I'm In Golf administrator if you believe this is a mistake.
+         Please contact I’m In Golf support if you believe this is a mistake.
        </div>
        <button class="secondary full" onclick="location.reload()">
          ← Use a different Group PIN
@@ -821,7 +821,7 @@ const setupTokenFromUrl=
 
 if(!state.adminPin && setupTokenFromUrl){
   if(String(state.adminSetupToken||"")!==String(setupTokenFromUrl)){
-    alert("This Admin setup link is no longer valid.");
+    alert("This organiser setup link is no longer valid.");
     return;
   }
 
@@ -847,7 +847,7 @@ if(!state.adminPin && setupTokenFromUrl){
 
   if(!saved){
     state.adminPin="";
-    alert("Admin PIN could not be saved. Please reopen the setup link and try again.");
+    alert("Organiser PIN could not be saved. Please reopen the setup link and try again.");
     return;
   }
 
@@ -1357,7 +1357,7 @@ function waitingScreen(section="round"){
       ${isAdmin
         ? `<button class="primary full" style="margin-top:18px;" onclick="newRound()">➕ Set Up Next Competition</button>`
         : (adminDeviceRecognised()
-            ? `<button class="primary full" style="margin-top:18px;" onclick="openRememberedAdminFromWaiting()">🔐 Admin — Set Up Next Competition</button>`
+            ? `<button class="primary full" style="margin-top:18px;" onclick="openRememberedAdminFromWaiting()">🔐 Group organiser — Set up next competition</button>`
             : "")
       }
     </div>
@@ -1734,7 +1734,7 @@ function showTripSummary(){
         </div>
         ${demoReadOnly() || !adminDeviceRecognised() ? "" : `
         <button class="ghost full" onclick="adminLogin()">
-          🔐 Organiser / Admin
+          🔐 Group organiser
         </button>`}
       </div>
     `}
@@ -2436,7 +2436,6 @@ function sideGameScoreEntry(){
         inputmode="numeric"
         maxlength="${format==="net" ? 3 : 2}"
         pattern="${format==="net" ? "[0-9]{1,3}" : "[0-9]{1,2}"}"
-        placeholder="${format==="net" ? "e.g. 72" : "e.g. 36"}"
         style="font-size:28px;font-weight:800;text-align:center;"
       >
 
@@ -3458,7 +3457,7 @@ async function adminSelfEnter(){
 
   state=verifiedState;
   render();
-  showBigPlayerMessage("✅ YOU’RE IN!","Admin entry confirmed — good luck! ⛳",3000);
+  showBigPlayerMessage("✅ YOU’RE IN!","Your entry is confirmed — good luck! ⛳",3000);
 }
 
 let paymentLaunchBusy=false;
@@ -5309,7 +5308,7 @@ async function claimWinnerPrize(historyIndex,payoutId){
     return;
   }
   const item=PAYMENT_PROVIDERS[method];
-  const link=await appPrompt(`Add your ${item.label} link`,`${item.hint}\n\nPaste the secure link below. Your organiser will use it to send £${moneyText(payout.amount)}.`,"",{type:"url",okLabel:"Send to Admin",validate:value=>winnerPaymentLinkError(value,method)});
+  const link=await appPrompt(`Add your ${item.label} link`,`${item.hint}\n\nPaste the secure link below. Your organiser will use it to send £${moneyText(payout.amount)}.`,"",{type:"url",okLabel:"Send to organiser",validate:value=>winnerPaymentLinkError(value,method)});
   if(link===null)return;
   const clean=String(link).trim();
   const provider=payoutProvider(clean);
@@ -5568,7 +5567,7 @@ function showRoundHistory(historyIndex){
               ${h.stablefordWinnerNames.map(esc).join(", ")}
               ${h.stablefordPot!=null ? `<br><span class="money">Pot £${Number(h.stablefordPot||0)}</span>` : ""}
               ${h.stablefordWinnerNames.length>1 ? `<br><span class="muted">Split equally • £${(Number(h.stablefordPot||0)/h.stablefordWinnerNames.length).toFixed(2).replace(/\.00$/,"")} each</span>` : ""}
-              ${h.stablefordCountback ? `<br><span class="muted">Won on countback — Admin declared</span>` : ""}
+              ${h.stablefordCountback ? `<br><span class="muted">Won on countback — declared by group organiser</span>` : ""}
             </div>` : ""}
 
           ${h.netWinnerNames?.length ? `
@@ -5577,7 +5576,7 @@ function showRoundHistory(historyIndex){
               ${h.netWinnerNames.map(esc).join(", ")}
               ${h.netPot!=null ? `<br><span class="money">Pot £${Number(h.netPot||0)}</span>` : ""}
               ${h.netWinnerNames.length>1 ? `<br><span class="muted">Split equally • £${(Number(h.netPot||0)/h.netWinnerNames.length).toFixed(2).replace(/\.00$/,"")} each</span>` : ""}
-              ${h.netCountback ? `<br><span class="muted">Won on countback — Admin declared</span>` : ""}
+              ${h.netCountback ? `<br><span class="muted">Won on countback — declared by group organiser</span>` : ""}
             </div>` : ""}
         `}
       </div>
@@ -5686,7 +5685,7 @@ function showWinnerScreen(record){
 
           ${r.countback ? `
             <div class="notice" style="margin-top:12px;">
-              Winner on countback — decided by Admin
+              Winner on countback — decided by group organiser
             </div>
           ` : ""}
         </div>
@@ -5822,7 +5821,7 @@ function showWinnerScreen(record){
 
         ${record.stablefordCountback ? `
           <div class="notice" style="margin-top:12px;">
-            Winner on countback — decided by Admin
+            Winner on countback — decided by group organiser
           </div>
         ` : ""}
       </div>
@@ -5850,7 +5849,7 @@ function showWinnerScreen(record){
 
         ${record.netCountback ? `
           <div class="notice" style="margin-top:12px;">
-            Winner on countback — decided by Admin
+            Winner on countback — decided by group organiser
           </div>
         ` : ""}
       </div>
@@ -5981,7 +5980,7 @@ async function shareWinnerImage(){
 
         if(decidedOnCountback){
           ctx.fillStyle=green;ctx.font='800 19px Arial';ctx.textAlign="left";
-          ctx.fillText("🏆 Winner on countback — decided by Admin",108,530);
+          ctx.fillText("🏆 Winner on countback — decided by group organiser",108,530);
         }
         tableTop=decidedOnCountback?628:590;
       }
@@ -6536,7 +6535,7 @@ ${tripSorted.map((p,i)=>{
                   🏆 Stableford:
                   ${h.stablefordWinnerNames.map(esc).join(", ")}
                   ${h.stablefordCountback
-                    ? " • Winner on countback — decided by Admin"
+                    ? " • Winner on countback — decided by group organiser"
                     : ""}
                 </div>
               ` : ""}
@@ -6546,7 +6545,7 @@ ${tripSorted.map((p,i)=>{
                   ⛳ Net:
                   ${h.netWinnerNames.map(esc).join(", ")}
                   ${h.netCountback
-                    ? " • Winner on countback — decided by Admin"
+                    ? " • Winner on countback — decided by group organiser"
                     : ""}
                 </div>
               ` : ""}
@@ -6785,7 +6784,7 @@ function playersPage(){
 
    ${isAdmin ? `
    <button class="secondary full" onclick="show('settings');window.scrollTo(0,0)">
-     ⚙️ Admin Settings
+     ⚙️ Organiser settings
    </button>
    <button class="primary full" onclick="returnToPlayerView()">
      👤 Switch to player view
@@ -6802,7 +6801,7 @@ function playersPage(){
 
    ${!isAdmin && !demoReadOnly() ? `
    <button class="ghost full" onclick="openAdminFromPlayers()">
-     🔐 ${adminDeviceRecognised() ? "Open Admin Mode" : "Admin Login"}
+     🔐 ${adminDeviceRecognised() ? "Open organiser view" : "Organiser sign-in"}
    </button>` : ""}
 
    ${sortedPlayers.map(p=>{
@@ -7088,7 +7087,7 @@ function returnToPlayerView(){
   updateAdminUI();
   show("round");
   window.scrollTo(0,0);
-  showAppToast("👤 Player View","Admin controls are hidden.",2600);
+  showAppToast("👤 Player View","Organiser controls are hidden.",2600);
 }
 function adminPinForGroup(){
   if(Object.prototype.hasOwnProperty.call(state,"adminPin")){
@@ -7099,7 +7098,7 @@ function adminPinForGroup(){
 function validAdminPin(value){
   return /^\d{4}$/.test(String(value||""));
 }
-function adminPinEntryModal(title="Admin Access",subtitle="Enter your 4-digit Admin PIN"){
+function adminPinEntryModal(title="Group organiser access",subtitle="Enter your 4-digit Organiser PIN"){
   return new Promise(resolve=>{
     const overlay=document.createElement("div");
     overlay.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.42);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;";
@@ -7108,7 +7107,7 @@ function adminPinEntryModal(title="Admin Access",subtitle="Enter your 4-digit Ad
         <div style="font-size:36px;text-align:center;margin-bottom:6px;">🔐</div>
         <h2 style="text-align:center;margin:0 0 6px;">${esc(title)}</h2>
         <p class="muted" style="text-align:center;margin:0 0 20px;">${esc(subtitle)}</p>
-        <input id="adminAccessPin" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="one-time-code" placeholder="4 digits" aria-label="4-digit Admin PIN" style="text-align:center;font-size:28px;letter-spacing:10px;font-weight:800;-webkit-text-security:disc;">
+        <input id="adminAccessPin" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="one-time-code" placeholder="4 digits" aria-label="4-digit Organiser PIN" style="text-align:center;font-size:28px;letter-spacing:10px;font-weight:800;-webkit-text-security:disc;">
         <div id="adminAccessMsg" class="muted" style="min-height:22px;text-align:center;color:var(--red);margin-top:4px;"></div>
         <button class="primary full" id="adminAccessContinue">Continue</button>
         <button class="ghost full" id="adminAccessCancel" style="margin-top:8px;">Cancel</button>
@@ -7126,7 +7125,7 @@ function adminPinEntryModal(title="Admin Access",subtitle="Enter your 4-digit Ad
     const submit=()=>{
       const entered=String(input.value||"").trim();
       if(!validAdminPin(entered)){
-        msg.textContent="Enter your 4-digit Admin PIN.";
+        msg.textContent="Enter your 4-digit Organiser PIN.";
         input.focus();
         return;
       }
@@ -7152,10 +7151,10 @@ function adminPinEntryModal(title="Admin Access",subtitle="Enter your 4-digit Ad
 
 async function adminLoginFromWaiting(){
  if(demoReadOnly()){
-   showAppToast("👀 Demo Mode","Admin access is disabled in the demo.",3200);
+   showAppToast("👀 Demo Mode","Group organiser access is disabled in the demo.",3200);
    return;
  }
- const ok=await adminPinEntryModal("Admin Access","Enter your Admin PIN to set up the next competition.");
+ const ok=await adminPinEntryModal("Group organiser access","Enter your Organiser PIN to set up the next competition.");
  if(!ok)return;
  isAdmin=true;
  saveAdminForGroup();
@@ -7177,10 +7176,10 @@ function openRememberedAdminFromWaiting(){
 
 async function adminLogin(){
  if(demoReadOnly()){
-   showAppToast("👀 Demo Mode","Admin access is disabled in the demo.",3200);
+   showAppToast("👀 Demo Mode","Group organiser access is disabled in the demo.",3200);
    return;
  }
- const ok=await adminPinEntryModal("Admin Access","Enter your Admin PIN to manage this golf group.");
+ const ok=await adminPinEntryModal("Group organiser access","Enter your Organiser PIN to manage this golf group.");
  if(!ok)return;
  isAdmin=true;
  saveAdminForGroup();
@@ -7196,7 +7195,7 @@ function changeAdminPinModal(){
     overlay.innerHTML=`
       <div class="card" style="width:min(420px,100%);margin:0;padding:24px;border-radius:20px;box-shadow:0 18px 50px rgba(0,0,0,.18);">
         <div style="font-size:36px;text-align:center;margin-bottom:6px;">🔐</div>
-        <h2 style="text-align:center;margin:0 0 6px;">Change Admin PIN</h2>
+        <h2 style="text-align:center;margin:0 0 6px;">Change Organiser PIN</h2>
         <p class="muted" style="text-align:center;margin:0 0 20px;">Choose a new private 4-digit PIN for this group.</p>
 
         <label><b>Current PIN</b></label>
@@ -7229,7 +7228,7 @@ function changeAdminPinModal(){
       const two=String(confirmPin.value||"").trim();
 
       if(cur!==adminPinForGroup()){
-        msg.textContent="Current Admin PIN is incorrect.";
+        msg.textContent="Current Organiser PIN is incorrect.";
         current.value="";
         current.focus();
         return;
@@ -7267,7 +7266,7 @@ async function changeAdminPin(){
     showAppToast("PIN not changed","Please try again.",3000);
     return;
   }
-  showAppToast("✅ Admin PIN changed","Your new 4-digit PIN is ready to use.",3000);
+  showAppToast("✅ Organiser PIN changed","Your new 4-digit PIN is ready to use.",3000);
 }
 function adminLogout(){
   if(typeof iigEntryBridge!=="undefined" && iigEntryBridge)iigEntryBridge.clearCredential();
@@ -7459,7 +7458,7 @@ function settingsPage(){
  </div>
  `}
 
- <button class="primary full" onclick="openAdminHelp()">❓ Admin Help</button>
+ <button class="primary full" onclick="openAdminHelp()">❓ Organiser guide</button>
  </div>
  <div class="card">
    <h2>💷 Player payments</h2>
@@ -7542,7 +7541,7 @@ ${state.trip?.completed ? `
     📋 Copy invite message
   </button>
   <button class="secondary full" onclick="changeAdminPin()">
-    🔐 Change Admin PIN
+    🔐 Change Organiser PIN
   </button>
 </div>
 
@@ -7597,18 +7596,18 @@ function adminHelpBack(){
 
 function adminHelpTopicContent(topic){
   const topics={
-    setup:`<h2>⛳ Set up the next competition</h2><div class="notice"><b>1.</b> Open <b>Group Admin → Organiser settings</b>.<br><br><b>2.</b> When the previous round is finished, tap <b>Start new round</b>.<br><br><b>3.</b> Choose Money Game, Points Game or Trip Mode.<br><br><b>4.</b> Enter the course, date and choose <b>Stableford or Net</b> for everyone.<br><br><b>5.</b> For a Money Game, set the entry fee and payment amount.</div><div class="notice">On a new device, choose <b>Start a golf group → Already registered? Sign in</b>. Use the email you created your group with and enter the code emailed to you.</div><div class="notice warning">Once the first score is submitted, entries close automatically.</div>`,
-    players:`<h2>👥 Add or edit players</h2><div class="notice">Go to <b>Players</b>.<br><br>Players can join themselves, or the organiser can manage names and handicaps in Admin view.<br><br>Your player profile is linked to the email you used to join. To reopen it, choose <b>Join my golf group</b>, enter your <b>Group PIN</b> and sign in with <b>the same email</b>. If another account is open, sign out first.</div>`,
+    setup:`<h2>⛳ Set up the next competition</h2><div class="notice"><b>1.</b> Open <b>Group organiser → Organiser settings</b>.<br><br><b>2.</b> When the previous round is finished, tap <b>Start new round</b>.<br><br><b>3.</b> Choose Money Game, Points Game or Trip Mode.<br><br><b>4.</b> Enter the course, date and choose <b>Stableford or Net</b> for everyone.<br><br><b>5.</b> For a Money Game, set the entry fee and payment amount.</div><div class="notice">On a new device, choose <b>Start a golf group → Already registered? Sign in</b>. Use the email you created your group with and enter the code emailed to you.</div><div class="notice warning">Once the first score is submitted, entries close automatically.</div>`,
+    players:`<h2>👥 Add or edit players</h2><div class="notice">Go to <b>Players</b>.<br><br>Players can join themselves, or the organiser can manage names and handicaps in Organiser view.<br><br>Your player profile is linked to the email you used to join. To reopen it, choose <b>Join my golf group</b>, enter your <b>Group PIN</b> and sign in with <b>the same email</b>. If another account is open, sign out first.</div>`,
     payments:`<h2>💷 Payments</h2><div class="notice"><b>What is a payment link?</b><br><br>It is your personal web address that lets players pay money directly to your chosen account. You copy it from your banking or payment app and paste it into I’m In Golf once.</div><div class="notice"><b>Set yours up:</b><br><br><b>1.</b> Go to <b>Organiser settings → Set Up Player Payments</b>.<br><br><b>2.</b> Choose Monzo, Revolut, PayPal, Starling, Wise or Other secure link.<br><br><b>3.</b> Follow the instructions shown for that provider.<br><br><b>4.</b> Paste the link, test it and save.</div><div class="notice">In a Money Game, players tap <b>Pay & Join</b> and use the organiser’s payment link to pay the organiser directly.<br><br>I’m In Golf records the payment status. Once scoring starts, entries close.</div><div class="muted">Payments go directly to the organiser. I’m In Golf does not receive, verify or hold the money.</div>`,
-    scoring:`<h2>🏌️ Scores</h2><div class="notice">Players enter their own score and tap <b>Submit My Score</b>.<br><br>The app asks <b>Are you sure?</b> before saving.<br><br>Once submitted, the player's score is locked.</div><div class="notice">Admin can use <b>Correct score</b> if a genuine mistake needs fixing.</div>`,
+    scoring:`<h2>🏌️ Scores</h2><div class="notice">Players enter their own score and tap <b>Submit My Score</b>.<br><br>The app asks <b>Are you sure?</b> before saving.<br><br>Once submitted, the player's score is locked.</div><div class="notice">The group organiser can use <b>Correct score</b> if a genuine mistake needs fixing.</div>`,
     nr:`<h2>NR — No Return</h2><div class="notice">In a <b>Net</b> competition, a player who does not return a score should tap <b>NR — No Return</b>.<br><br>NR counts as submitted, removes the player from <b>Awaiting scores</b>, and the player cannot win the Net competition.</div>`,
     waiting:`<h2>⏳ Awaiting scores</h2><div class="notice">Once scoring starts, the Scores screen shows the names of everyone who still needs to submit.<br><br>For a Money Game, the Scores screen includes players who entered before scoring started.<br><br>The list updates automatically as scores or NR results are submitted.</div>`,
-    finish:`<h2>🏁 Finish a round</h2><div class="notice">When every entered player has submitted a score or valid NR, Admin will see <b>Finish Round</b> at the bottom of Scores.<br><br>Check the leaderboard, tap the button and confirm the result.<br><br>The winner and <b>full final standings</b> are saved in <b>League → Previous rounds</b> and can be shared as an I’m In Golf results image.</div><div class="notice">After a normal round finishes, players see <b>Next Competition — Coming soon…</b>. To set up the next competition, open <b>Group Admin → Organiser settings → Start new round</b>.<br><br>On a new device, choose <b>Start a golf group → Already registered? Sign in</b> and sign in with your organiser email and the code emailed to you.</div>`,
+    finish:`<h2>🏁 Finish a round</h2><div class="notice">When every entered player has submitted a score or valid NR, the group organiser will see <b>Finish Round</b> at the bottom of Scores.<br><br>Check the leaderboard, tap the button and confirm the result.<br><br>The winner and <b>full final standings</b> are saved in <b>League → Previous rounds</b> and can be shared as an I’m In Golf results image.</div><div class="notice">After a normal round finishes, players see <b>Next Competition — Coming soon…</b>. To set up the next competition, open <b>Group organiser → Organiser settings → Start new round</b>.<br><br>On a new device, choose <b>Start a golf group → Already registered? Sign in</b> and sign in with your organiser email and the code emailed to you.</div>`,
     points:`<h2>🏆 Points Games</h2><div class="notice">Everyone plays the same competition — Stableford or Net.<br><br>There is no payment step.<br><br>Players enter their score in the normal Scores screen and the top three receive league points based on the value chosen when the round is set up.</div>`,
     trip:`<h2>✈️ Trip Mode</h2><div class="notice">Choose <b>Trip Mode</b>, enter the trip name, choose the Trip players and plan each round.<br><br>Rounds can be <b>Individual</b>, <b>Better Ball</b> or <b>Pairs Aggregate</b>. Before each round, mark anyone <b>Not Playing Today</b>, then use <b>Randomise Fourballs</b> or <b>Pick Fourballs Myself</b>.</div><div class="notice"><b>Pairs rounds:</b> either partner enters the pair’s one final score. Better Ball uses the pair’s final Better Ball Stableford total. Pairs Aggregate combines both partners’ final scores. These rounds build the separate <b>Team-event standings</b>.</div><div class="notice"><b>Individual rounds</b> build the Individual Trip Championship standings. After the final round, the Trip Summary shows daily winners, Individual and Team-event standings, any Trip money summary and the Trip champion. The organiser then taps <b>Save Trip & Return to Normal Golf</b>.</div>`,
-    pin:`<h2>🔐 Organiser sign-in</h2><div class="notice"><b>On a new device:</b><br><br><b>1.</b> Choose <b>Start a golf group</b>.<br><br><b>2.</b> Tap <b>Already registered? Sign in</b>.<br><br><b>3.</b> Use the email you created your group with and enter the sign-in code emailed to you.<br><br><b>4.</b> Open your group, then use <b>Group Admin → Organiser settings</b> to manage it.</div><div class="notice">Your shared <b>Group PIN</b> helps players find your group. Your email sign-in code is private — do not share it.</div>`,
+    pin:`<h2>🔐 Organiser sign-in</h2><div class="notice"><b>On a new device:</b><br><br><b>1.</b> Choose <b>Start a golf group</b>.<br><br><b>2.</b> Tap <b>Already registered? Sign in</b>.<br><br><b>3.</b> Use the email you created your group with and enter the sign-in code emailed to you.<br><br><b>4.</b> Open your group, then use <b>Group organiser → Organiser settings</b> to manage it.</div><div class="notice">Your shared <b>Group PIN</b> helps players find your group. Your email sign-in code is private — do not share it.</div>`,
     install:`<h2>📱 Install on a phone</h2><div class="notice"><b>iPhone:</b> <a href="https://apps.apple.com/gb/app/im-in-golf/id6808349916" target="_blank" rel="noopener noreferrer">Download I’m In Golf from the App Store</a>.<br><br>Open the app and choose <b>Start a golf group</b> or <b>Join my golf group</b>. Already joined? Use your group PIN and the same email.<br><br><b>Android:</b> Chrome → <b>⋮</b> → <b>Add to Home screen</b> or <b>Install app</b>.</div>`,
-    problems:`<h2>🛠️ Something isn't working</h2><div class="notice"><b>1.</b> Check the Group PIN.<br><br><b>2.</b> Refresh or fully close and reopen the app.<br><br><b>3.</b> On a laptop, use <b>Ctrl + F5</b>.<br><br><b>4.</b> Wrong player account? Sign out, choose <b>Join my golf group</b>, enter your <b>Group PIN</b> and sign in with <b>the email you used to join</b>.<br><br><b>5.</b> Can’t see Group Admin? Sign in with the email you created your group with. See <b>Organiser sign-in</b> in this Help menu.</div><div class="muted">The app will not redraw while someone is typing a score.</div>`
+    problems:`<h2>🛠️ Something isn't working</h2><div class="notice"><b>1.</b> Check the Group PIN.<br><br><b>2.</b> Refresh or fully close and reopen the app.<br><br><b>3.</b> On a laptop, use <b>Ctrl + F5</b>.<br><br><b>4.</b> Wrong player account? Sign out, choose <b>Join my golf group</b>, enter your <b>Group PIN</b> and sign in with <b>the email you used to join</b>.<br><br><b>5.</b> Can’t see Group organiser? Sign in with the email you created your group with. See <b>Organiser sign-in</b> in this Help menu.</div><div class="muted">The app will not redraw while someone is typing a score.</div>`
   };
   return topics[topic] || "";
 }
@@ -7622,12 +7621,12 @@ function adminHelpPage(){
     $("screen").innerHTML=`
       <div class="card">
         <div class="muted">I'M IN GOLF</div>
-        <h2 style="font-size:24px;margin:4px 0 8px;">❓ Admin Help</h2>
-        <div class="muted">Simple help for Admins.</div>
+        <h2 style="font-size:24px;margin:4px 0 8px;">❓ Organiser guide</h2>
+        <div class="muted">Simple help for group organisers.</div>
       </div>
       <div class="card">${topicHtml}</div>
       <div class="card">
-        <button class="secondary full" onclick="adminHelpBack()">← Back to Admin Help</button>
+        <button class="secondary full" onclick="adminHelpBack()">← Back to Organiser guide</button>
         <button class="ghost full" onclick="show('settings')">⚙️ Back to Settings</button>
       </div>`;
     return;
@@ -7653,7 +7652,7 @@ function adminHelpPage(){
       <div style="text-align:center;">
         <div style="font-size:44px;">❓</div>
         <div class="muted">I'M IN GOLF</div>
-        <h2 style="font-size:26px;margin:5px 0;">Admin Help</h2>
+        <h2 style="font-size:26px;margin:5px 0;">Organiser guide</h2>
         <div class="muted">What do you need help with?</div>
       </div>
     </div>
@@ -7664,7 +7663,7 @@ function adminHelpPage(){
         </button>`).join("")}
     </div>
     <div class="card">
-      <div class="notice"><b>Tip:</b> Open this help from <b>Group Admin → Organiser settings</b> when signed in as the organiser.</div>
+      <div class="notice"><b>Tip:</b> Open this help from <b>Group organiser → Organiser settings</b> when signed in as the organiser.</div>
       <button class="ghost full" onclick="show('settings')">← Back to Settings</button>
     </div>`;
 }
@@ -7749,7 +7748,7 @@ async function manageGroupsPage(){
 
           ${(g.admin_name||g.admin_contact) ? `
             <div class="player">
-              ${g.admin_name?`<div><span class="muted">Admin/Customer: </span><b>${esc(g.admin_name)}</b></div>`:""}
+              ${g.admin_name?`<div><span class="muted">Group organiser: </span><b>${esc(g.admin_name)}</b></div>`:""}
               ${g.admin_contact?`<div class="muted" style="margin-top:4px;">Contact: ${esc(g.admin_contact)}</div>`:""}
             </div>
           ` : ""}
@@ -7886,7 +7885,7 @@ function editGroupPage(){
     </div>
 
     <div class="card">
-      <label class="muted">Admin / customer name</label>
+      <label class="muted">Group organiser name</label>
       <input id="ownerAdminName" value="${escAttr(g.admin_name||"")}" placeholder="Name">
 
       <label class="muted">Contact</label>
@@ -7921,7 +7920,7 @@ function editGroupPage(){
       <input id="ownerNotes" value="${escAttr(g.notes||"")}" placeholder="Optional notes">
 
       <button class="primary full" onclick="saveOwnerGroupEdit()">💾 Save Changes</button>
-      <button class="secondary full" onclick="ownerResetAdminPin()">🔐 Reset Admin PIN</button>
+      <button class="secondary full" onclick="ownerResetAdminPin()">🔐 Reset Organiser PIN</button>
       <button class="ghost full" onclick="backToManageGroups()">← Cancel</button>
     </div>`;
 }
@@ -7938,7 +7937,7 @@ async function ownerResetAdminPin(){
     return;
   }
 
-  const first=prompt("Choose a new 4-digit Admin PIN for group " + groupPin);
+  const first=prompt("Choose a new 4-digit Organiser PIN for group " + groupPin);
   if(first===null)return;
 
   const clean=String(first).trim();
@@ -7947,7 +7946,7 @@ async function ownerResetAdminPin(){
     return;
   }
 
-  const second=prompt("Enter the new 4-digit Admin PIN again");
+  const second=prompt("Enter the new 4-digit Organiser PIN again");
   if(second===null)return;
 
   if(String(second).trim()!==clean){
@@ -7955,7 +7954,7 @@ async function ownerResetAdminPin(){
     return;
   }
 
-  const ok=confirm("Reset the Admin PIN for group " + groupPin + "?");
+  const ok=confirm("Reset the Organiser PIN for group " + groupPin + "?");
   if(!ok)return;
 
   const {data,error}=await db.rpc(
@@ -7969,7 +7968,7 @@ async function ownerResetAdminPin(){
 
   if(error || data!==true){
     alert(
-      "Admin PIN could not be reset.\n\n" +
+      "Organiser PIN could not be reset.\n\n" +
       (error?.message || "Please try again.")
     );
     return;
@@ -7980,7 +7979,7 @@ async function ownerResetAdminPin(){
     state.adminSetupToken="";
   }
 
-  alert("✅ Admin PIN reset for group " + groupPin + ".");
+  alert("✅ Organiser PIN reset for group " + groupPin + ".");
 }
 
 async function saveOwnerGroupEdit(){
@@ -8035,7 +8034,7 @@ function formatOwnerDate(value){
 
 function ownerLogin(){
   if(!isAdmin){
-    alert("Admin access required first.");
+    alert("Group organiser access required first.");
     return;
   }
 
@@ -8080,17 +8079,17 @@ function adminInvitePage(){
       <div class="big">${esc(groupName || "New Golf Group")}</div>
       <div class="notice">
         <b>Group PIN: ${esc(newPin)}</b><br>
-        Send the private Admin invite to the person who will manage this group.
+        Send the private organiser invite to the person who will manage this group.
       </div>
     </div>
 
     <div class="card">
-      <h2>📤 Admin invite</h2>
+      <h2>📤 Organiser invite</h2>
       <button class="primary full" onclick="shareAdminInvite()">
-        📤 Share Admin Invite
+        📤 Share organiser invite
       </button>
       <button class="secondary full" onclick="copyAdminInvite()">
-        📋 Copy Admin Invite
+        📋 Copy organiser invite
       </button>
       <button class="ghost full" onclick="show('settings')">
         Back to Settings
@@ -8102,16 +8101,16 @@ async function copyAdminInvite(){
   if(!lastAdminInvite){ alert("Create a new group first."); return; }
   try{
     await navigator.clipboard.writeText(lastAdminInvite);
-    alert("✅ Admin invite copied.");
+    alert("✅ Organiser invite copied.");
   }catch(e){
-    prompt("Copy this Admin invite:",lastAdminInvite);
+    prompt("Copy this organiser invite:",lastAdminInvite);
   }
 }
 async function shareAdminInvite(){
   if(!lastAdminInvite){ alert("Create a new group first."); return; }
   if(navigator.share){
     try{
-      await navigator.share({title:"I'm In Golf – Admin Invite",text:lastAdminInvite});
+      await navigator.share({title:"I'm In Golf – Organiser invite",text:lastAdminInvite});
       return;
     }catch(e){
       if(e && e.name==="AbortError")return;
@@ -8186,7 +8185,7 @@ async function createNewGolfGroup(){
   );
 
   if(setupError){
-    alert("The group was created, but Admin setup could not be prepared. Please try again before sending the invite.");
+    alert("The group was created, but organiser setup could not be prepared. Please try again before sending the invite.");
     return;
   }
 
@@ -8197,7 +8196,7 @@ You've been invited to manage ${cleanGroupName}.
 
 Group PIN: ${newPin}
 
-Tap below to set up your 4-digit Admin PIN:
+Tap below to set up your 4-digit Organiser PIN:
 https://imingolf.co.uk/app/?pin=${encodeURIComponent(newPin)}&adminsetup=${encodeURIComponent(setupToken)}
 
 🔒 Keep this link private.`;
@@ -8321,16 +8320,16 @@ function organiserAdminPinSetup(groupName){
     overlay.innerHTML=`
       <div class="card" style="width:min(440px,100%);margin:0;padding:24px;border-radius:20px;box-shadow:0 18px 50px rgba(0,0,0,.18);">
         <div style="font-size:34px;margin-bottom:8px;">🔐</div>
-        <h2 style="margin:0 0 8px;">Create your Admin PIN</h2>
+        <h2 style="margin:0 0 8px;">Create your Organiser PIN</h2>
         <p class="muted" style="margin-top:0;">Choose a private 4-digit PIN for <b>${esc(groupName)}</b>. You'll use it whenever you need to manage your group.</p>
 
         <div style="margin-top:20px;">
-          <label><b>Admin PIN</b></label>
+          <label><b>Organiser PIN</b></label>
           <input id="setupAdminPin1" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="new-password" placeholder="4 digits">
           <label><b>Confirm PIN</b></label>
           <input id="setupAdminPin2" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="new-password" placeholder="Enter the same 4 digits again">
           <div id="setupAdminPinMsg" class="muted" style="min-height:18px;color:var(--red);"></div>
-          <button class="primary full" id="createSetupAdminPin">Create Admin PIN</button>
+          <button class="primary full" id="createSetupAdminPin">Create Organiser PIN</button>
         </div>
       </div>`;
 
@@ -8423,7 +8422,7 @@ function organiserPaymentSetup(groupName,options={}){
     const finish=value=>{overlay.remove();resolve(value);};
     const closeLabel=options.allowRemove ? "Close without changing" : "Save and set this up later";
     const stepHeader=(step,title,subtitle)=>`
-      <div class="muted" style="font-weight:900;letter-spacing:.04em;">${step==="HELP" ? "ADMIN HELP" : `STEP ${step} OF 3`}</div>
+      <div class="muted" style="font-weight:900;letter-spacing:.04em;">${step==="HELP" ? "ORGANISER GUIDE" : `STEP ${step} OF 3`}</div>
       <h2 style="font-size:25px;margin:6px 0;">${title}</h2>
       <div class="muted" style="font-size:16px;margin-bottom:18px;">${subtitle}</div>`;
     const renderChoose=()=>{
@@ -8452,7 +8451,7 @@ function organiserPaymentSetup(groupName,options={}){
         <input id="setupPaymentLink" type="url" inputmode="url" autocomplete="url" value="${escAttr(link)}" placeholder="${escAttr(item.placeholder)}">
         <div id="setupPaymentMsg" class="muted" style="min-height:20px;color:var(--red);"></div>
         <button class="primary full" id="continueSetupPayment">Continue</button>
-        <button class="secondary full" id="helpSetupPayment">❓ Not sure? Open Admin Help</button>
+        <button class="secondary full" id="helpSetupPayment">❓ Not sure? Open Organiser guide</button>
         <button class="ghost full" id="backSetupPayment">← Back</button>
         <button class="ghost full" id="closeSetupPayment">${closeLabel}</button>`;
       const input=card.querySelector("#setupPaymentLink");
@@ -8529,11 +8528,11 @@ function organiserAdminSetupComplete(groupName,groupPin){
     overlay.innerHTML=`
       <div class="card" style="width:min(440px,100%);margin:0;padding:26px;border-radius:20px;box-shadow:0 18px 50px rgba(0,0,0,.18);text-align:center;">
         <div style="font-size:46px;margin-bottom:8px;">✅</div>
-        <h2 style="font-size:24px;margin:0 0 8px;">Admin PIN created</h2>
-        <p class="muted" style="margin:0;">You're now the Admin for <b>${esc(groupName)}</b>.</p>
+        <h2 style="font-size:24px;margin:0 0 8px;">Organiser PIN created</h2>
+        <p class="muted" style="margin:0;">You're now the group organiser for <b>${esc(groupName)}</b>.</p>
         <div class="notice" style="margin-top:18px;text-align:left;">
           <b>Group PIN: ${esc(groupPin)}</b><br>
-          Keep your Admin PIN private.<br><br>
+          Keep your Organiser PIN private.<br><br>
           ${state.paymentLink ? "💷 Your player payment link is ready. Payments will go directly to you." : "💷 No payment link added yet. You can add one later in Organiser settings."}
         </div>
         <button class="primary full" id="continueAfterAdminSetup">Continue</button>
@@ -8607,7 +8606,7 @@ function pickTripDate(title,initialValue=""){
 }
 async function cancelCurrentRound(){
   if(!isAdmin){
-    alert("🔒 Only the group Admin can cancel the current round.");
+    alert("🔒 Only the group organiser can cancel the current round.");
     return;
   }
 
@@ -9121,7 +9120,7 @@ function tripRoundDaySetup(roundNumber,format,tripPlayerIds){
 
 async function newRound(){
   if(!isAdmin){
-    alert("🔒 Only the group Admin can set up the next competition.");
+    alert("🔒 Only the group organiser can set up the next competition.");
     return;
   }
 

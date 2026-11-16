@@ -1,6 +1,6 @@
 # Automatic native competition reminders — prepared, not deployed
 
-15 November 2026. Base: website main c9c5a39642fdedc4b42cdbc937f7c2203e888511; sender v13. The existing five-minute cron and competition event trigger are retained. Native delivery uses the existing competition-created, three-days-before and night-before events (18:00 in the group's timezone for timed reminders). The unrelated first-player-joined alert is not sent to native devices by this change.
+Prepared 15 November 2026; refreshed 16 November against website main 4c2812cc46d6af083ba74b74695997f13166efe5, retaining the published Group Help and Group organiser changes; sender v13. The existing five-minute cron and competition event trigger are retained. Native delivery uses the existing competition-created, three-days-before and night-before events (18:00 in the group's timezone for timed reminders). The unrelated first-player-joined alert is not sent to native devices by this change.
 
 ## Changes
 
@@ -24,7 +24,11 @@ npm --prefix .github/native-reminders test
 
 14 browser integration assertions passed using the actual account dialog/reminder module with mocked native/API adapters and a CSP blocking external requests. Checks cover On/Off persistence, permission denial/recovery, save failure, sign-out and absence in an ordinary browser. This is not an iPhone delivery test.
 
-Native preservation checks passed: dependencies, version/build, signing entitlements, Firebase project plist, purchase handlers and navigation logic are unchanged. Info.plist has only the FID feature flag added. Flutter/Xcode compilation, APNs delivery and notification taps on a real iPhone remain unverified.
+Native preservation checks passed: dependencies, version/build, signing entitlements, Firebase project plist, purchase handlers and navigation logic are unchanged. Info.plist has only the FID feature flag added. On 16 November Greg supplied the Mac result: guarded patch applied with verified original backup, `flutter pub get` and unsigned iOS debug build passed, dependencies/lockfile and signing unchanged, version/build 1.0.1+4. Analysis reported no errors or warnings and one informational missing-braces lint at `lib/competition_notifications.dart:85` (exit 1). This is a reported Mac result, not a build run in this checkout. Signed installation, APNs delivery and notification taps on a real iPhone remain unverified.
+
+The refreshed checkout passed all 26 reminder tests, 18 Group Help DOM checks, 10 existing sync/gameplay checks, JavaScript syntax and whitespace checks. These are isolated checks, not real notification delivery.
+
+Read-only LIVE checks on 16 November confirmed the private rollout table is absent and the sender remains v13, matching the saved baseline apart from a trailing newline. Firebase console access is blocked by its Google two-step-verification prerequisite; APNs and service-account configuration have not been verified. No migration, server deployment, device installation, send, production website publication or Apple submission was performed for this refresh.
 
 ## Release sequence — not executed
 
