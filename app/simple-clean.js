@@ -19,7 +19,7 @@
  function polish(screen){
   const currentPage=typeof page==='string'?page:'';document.body.dataset.uiPage=currentPage;
   const groupName=typeof state==='object'?state.groupName:'';
-  const brand=document.querySelector('.ui-app-name');if(brand&&groupName&&brand.textContent!==groupName)brand.textContent=groupName;
+  const brand=document.querySelector('.ui-app-name');if(brand&&groupName&&!brand.textContent.startsWith(groupName))brand.textContent=groupName;
   for(const id of ['secureOrganiserBanner','securePlayerBanner']){
    const banner=document.getElementById(id);if(!banner)continue;
    const status=banner.querySelector('p[role=status]');
