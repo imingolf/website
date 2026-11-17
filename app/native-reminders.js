@@ -4,6 +4,21 @@
  if(typeof document==='undefined')return;
  let current=null,account=null;
  const bridge=()=>window.IigNotifications;
+ const taps=api.createTapRouter({
+  storage:()=>sessionStorage,
+  user:()=>account,
+  player:()=>window.iigSecurePlayer,
+  organiser:()=>window.iigSecureOrganiser,
+  openPlayer:pin=>window.iigOpenOwnPlayer?.(pin),
+  navigate:pin=>{if(location.hash!=='#pin='+pin)location.assign(location.pathname+'#pin='+pin);},
+  pending:()=>typeof sideGamePendingInvites==='function'?sideGamePendingInvites():[],
+  openInvite:async()=>{
+   await window.sideGameHome();
+   document.getElementById('sideGameIncomingChallenges')?.scrollIntoView({block:'start'});
+  },
+  warn:()=>window.showAppToast?.('Finish your current action','Save or cancel your entry, then tap the notification again.')
+ });
+ window.addEventListener('iig-player-ready',()=>{void taps.resume();});
  const notify=()=>{const box=document.getElementById('iigReminderSettings');if(box)render(box);};
  function render(box){
   const state=current?.state;box.hidden=!(state?.available||state?.sideAvailable);if(box.hidden)return;
@@ -33,20 +48,14 @@
  window.iigNativeReminders={
   connect(userId,request){
    if(!bridge()?.postMessage||account===userId)return;
-   current?.dispose();account=userId;
+   current?.dispose();account=userId;taps.accountChanged();
    current=api.create({userId,request:(name,body)=>request('/rest/v1/rpc/'+name,{...body,p_account:userId},true),
     send:message=>bridge().postMessage(JSON.stringify(message)),changed:notify});
-   current.refresh();
+   current.refresh();void taps.resume();
   },
-  clear(){current?.dispose();current=null;account=null;try{bridge()?.postMessage(JSON.stringify({action:'clear',requestId:'clear'}));}catch(_){}notify();},
+  clear(){taps.clear();current?.dispose();current=null;account=null;try{bridge()?.postMessage(JSON.stringify({action:'clear',requestId:'clear'}));}catch(_){}notify();},
   mount(parent){if(!bridge()?.postMessage||!current)return;const box=document.createElement('section');box.id='iigReminderSettings';parent.append(box);render(box);},
-  handleTap(pin){
-   if(!/^\d{4}$/.test(pin||''))return;
-   const adapter=window.iigSecureOrganiser?.active?window.iigSecureOrganiser:window.iigSecurePlayer;
-   if(adapter?.active&&!adapter.canSwitchView){window.showAppToast?.('Finish your current action','Save or cancel your entry before opening another competition.');return;}
-   if(location.hash==='#pin='+pin)return;
-   location.assign(location.pathname+'#pin='+pin);
-  }
+  handleTap(pin){return taps.open(pin);}
  };
  window.addEventListener('iig-native-notifications',event=>{
   if(event.detail?.type==='ready'){current?.nativeReady();return;}
@@ -112,5 +121,49 @@
    dispose(){disposed=true;generation++;clear();}
   };
  }
- return {create};
+ // Build 7 supplies only the group PIN. Open this recipient's current pending
+ // invitations after a verified read; never infer a particular invite or sender.
+ function createTapRouter({storage,user,player,organiser,openPlayer,navigate,pending,openInvite,warn,now=Date.now}){
+  const key='iig-notification-route-v1';let running=false,sequence=0;
+  const read=()=>{try{return JSON.parse(storage().getItem(key)||'null');}catch(_){return null;}};
+  const clear=()=>{sequence++;try{storage().removeItem(key);}catch(_){}};
+  const valid=route=>route&&/^\d{4}$/.test(route.pin)&&Number.isFinite(route.at)&&now()-route.at>=0&&now()-route.at<600000&&(!route.user||route.user===user());
+  async function resume(){
+   if(running)return;
+   const route=read();if(!route)return;
+   if(!user())return;
+   if(!valid(route)){clear();return;}
+   let p=player(),o=organiser();
+   if(!p?.active||p.identity?.groupPin!==route.pin){
+    if(o?.active&&o.groupPin===route.pin){
+     if(!o.canSwitchView){clear();warn();return;}
+     await openPlayer(route.pin);if(running||!read())return;p=player();
+    }
+    if(!p?.active||p.identity?.groupPin!==route.pin)return;
+   }
+   if(!p.canSwitchView){clear();warn();return;}
+   running=true;const token=sequence,account=user();
+   try{
+    // This existing helper performs only an authenticated reload, not payment.
+    const loaded=await p.reloadForPayment();
+    if(token!==sequence||account!==user())return;
+    if(!loaded||!p.canSwitchView||p.identity?.groupPin!==route.pin){clear();warn();return;}
+    clear();
+    if(pending().length)await openInvite();
+   }catch(_){clear();warn();}finally{running=false;}
+  }
+  return {resume,clear,
+   accountChanged(){const r=read();if(r?.user&&r.user!==user())clear();},
+   async open(pin){
+    if(!/^\d{4}$/.test(pin||''))return;
+    const current=organiser()?.active?organiser():player();
+    if(current?.active&&!current.canSwitchView){warn();return;}
+    clear();try{storage().setItem(key,JSON.stringify({pin,user:user(),at:now()}));}catch(_){warn();return;}
+    const p=player(),o=organiser();
+    if(p?.active&&p.identity?.groupPin===pin||o?.active&&o.groupPin===pin)await resume();
+    else navigate(pin);
+   }
+  };
+ }
+ return {create,createTapRouter};
 });
