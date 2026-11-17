@@ -143,7 +143,7 @@
    if(el.id==='nplayers'&&handler==="show('players')"){el.hidden=!window.iigPlayerAccess?.openMembers;continue;}
    if(handler==='selectCurrentTripLeague()')continue;
    if(/^selectLeagueView\('(points|money|trip)'\)$/.test(handler)||/^selectPastTripLeague\(\d+\)$/.test(handler))continue;
-   if(!/^(iigFreePlan\(\) \? showIigPlusUpgrade\('sidegame'\) : sideGameHome\(\)|enterNormalPointsGame\(|submitPlayerScore\(|show\(['"](?:round|scores|pay|league|tripsummary)['"]\)|league\(|showRoundHistory\(|showPlayerStats\(|shareHistoricalResult\(|submitNoReturn\(|submitTripTeamScore\(|beginPlayerPayment\(|sideGame(?:BackToGolf|Home|Statement|ChoosePlayer|PickPlayer|AgreedInPerson|SelectFormat|UpdateConfirm|ConfirmBet|SendChallenge|AcceptChallenge|DeclineChallenge|ScoreEntry|SaveScore|MatchResult|RequestSettlement|ConfirmSettlement)\(|showTripSummary\(|shareTripSummary\(|claimWinnerPrize\()/.test(handler))el.hidden=true;
+   if(!/^(iigFreePlan\(\) \? showIigPlusUpgrade\('sidegame'\) : sideGameHome\(\)|enterNormalPointsGame\(|submitPlayerScore\(|show\(['"](?:round|scores|pay|league|tripsummary)['"]\)|league\(|showRoundHistory\(|showPlayerStats\(|shareHistoricalResult\(|submitNoReturn\(|submitTripTeamScore\(|beginPlayerPayment\(|sideGame(?:BackToGolf|Home|ShareInvite|Statement|ChoosePlayer|PickPlayer|AgreedInPerson|SelectFormat|UpdateConfirm|ConfirmBet|SendChallenge|AcceptChallenge|DeclineChallenge|ScoreEntry|SaveScore|MatchResult|RequestSettlement|ConfirmSettlement)\(|showTripSummary\(|shareTripSummary\(|claimWinnerPrize\()/.test(handler))el.hidden=true;
   }
   // Hide unavailable feature cards, rather than showing misleading empty actions.
   for(const button of document.querySelectorAll('#screen button[onclick]')){

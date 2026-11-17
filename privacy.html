@@ -79,6 +79,15 @@ footer{padding:26px 0 42px;color:var(--muted);font-size:13px;border-top:1px soli
   </section>
 
   <section class="card">
+    <h2>Competition reminders and technical information</h2>
+    <p>The iPhone app uses Google Firebase and Apple’s notification service to support competition reminders.</p>
+    <p>Firebase processes an app-installation identifier and an Apple push-notification token to deliver notifications. When reminder registration is enabled, I’m In Golf connects the installation identifier and your reminder preference to your signed-in account and session. This helps us send reminders to the correct account and golf group.</p>
+    <p>Notification delivery also processes the notification’s text and group information. I’m In Golf records delivery status and attempts to operate the reminder service and diagnose failures.</p>
+    <p>The bundled Firebase SDKs also process technical and diagnostic information, including app, platform, operating-system and SDK-version information, to operate and improve their services. Their privacy manifests describe this SDK telemetry as not linked to your identity and not used for tracking. The installation identifier stored by I’m In Golf is linked to your account, as explained above.</p>
+    <p>Turning Competition reminders Off prevents competition reminders for your account. It does not necessarily delete existing installation records or stop all SDK technical processing. You can also manage notification permission in iPhone Settings.</p>
+  </section>
+
+  <section class="card">
     <h2>3. How we use personal information</h2>
     <p>We use personal information to:</p>
     <ul>
@@ -122,6 +131,7 @@ footer{padding:26px 0 42px;color:var(--muted);font-size:13px;border-top:1px soli
       <li>other members of the same golf group where that information is part of the normal group experience,
       such as player names, competition status, scores, results and league standings;</li>
       <li><b>Supabase</b>, which provides database and backend services used by I'm In Golf;</li>
+      <li>Google Firebase and Apple, which provide native notification delivery and related installation and diagnostic services.</li>
       <li>our website/app hosting and infrastructure providers, including services used to make I'm In Golf
       available online;</li>
       <li>service providers used to operate support functions, including the Help Assistant; and</li>
