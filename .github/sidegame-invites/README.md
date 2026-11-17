@@ -1,4 +1,4 @@
-# Side Game invite delivery — prepared for pilot review
+# Side Game invite delivery — pilot installation
 
 ## Scope
 
@@ -21,7 +21,7 @@ Run root `node tests/sidegame-invites.cjs` and `node tests/sync-regression.cjs` 
 
 A separate `tests/browser.cjs` mobile smoke test uses Playwright and a local Chromium (`CHROMIUM_PATH`). It could not run in the preparation shell: Chromium's socket creation was blocked by the environment. This is **not** a browser pass or a real-iPhone pass.
 
-## Deployment order and outstanding acceptance
+## Deployment order and outstanding acceptance\n\nSteps 1–3 are complete for the pilot installation; step 4 account eligibility is configured, but the owner must opt in on the phone. The sequence below is retained as the deployment procedure.
 
 1. Confirm latest LIVE and PR heads. Apply `supabase/migrations/20261117090927_side_game_invites.sql` only after deployment approval. It is dormant: rollout false, empty pilot list, preferences default Off. Existing preferences, golf records and competition gates are not modified.
 2. Deploy the existing sender entrypoint with its added `side-invites.mjs` module, preserving all current files/configuration and JWT setting. Keep `IIG_SIDEGAME_INVITES_ENABLED` absent/false; do not enable competition sending.
@@ -32,4 +32,4 @@ A separate `tests/browser.cjs` mobile smoke test uses Playwright and a local Chr
 
 ## Current state
 
-Code prepared; automated checks passed. Not deployed, no notification sent, no settings activated, no Apple action. Visual and real-iPhone verification remain pending.
+17 November 2026: PR #23 merged as 0e99620e96a1cad11052da9930e55581a2f91815. Migration applied; sender v16 readback matched all three source files and preserved verify_jwt=false with its existing secret-header authentication. Netlify production deployment 6afc22868f7f890b86393d76 is ready; all three changed web assets match LIVE. The 39-file previous production archive was compared, and its privacy notice was preserved exactly. The manual artifact normalizes netlify.toml to a Mac publish path; the repository Git publish configuration is retained. The production origin renders the normal Start/Join landing page. Preview-origin sign-in is intentionally rejected by the existing production origin guard and has not been relaxed.\n\nOnly the previously verified owner account is Side Game pilot-eligible. Broad rollout remains false; zero Side Game preferences, events and deliveries were present at verification. No preference was enabled on the owner’s behalf and no Side Game notification was sent. The new worker environment gate remains unactivated. Existing competition rollout remains false; no Apple action or native source change.\n\nPending: owner turns Side Game invites On on the installed Build 7 app, then one authorized fresh invite checks actual arrival/tap, Accept/Decline and saved Off before any broader rollout. Automated tests pass; browser interaction smoke test and real-phone acceptance are not claimed.
