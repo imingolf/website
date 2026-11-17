@@ -137,6 +137,7 @@
    document.getElementById('setupOverlay').classList.add('hidden');document.getElementById('demoBadge').classList.add('hidden');
    document.getElementById('syncText').textContent='Player • signed in';
    banner();show('round');message('You are signed in as '+state.players.find(p=>p.id===myPlayerId).name+'.');startPolling();setTimeout(recognisePaymentReturn,500);
+   window.dispatchEvent(new Event('iig-player-ready'));
   },
   close(){
    window.IIGPaidEntry?.close();
