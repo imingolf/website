@@ -1099,6 +1099,7 @@ function render(){
   if(page==="editgroup")editGroupPage();
   if(page==="tripsummary")showTripSummary();
   if(page==="adminhelp")adminHelpPage();
+  sideGameInviteNotice();
 }
 function accountEntryStatus(){
  if(typeof window==='undefined')return null;
@@ -1285,6 +1286,44 @@ async function disableIigNotifications(){
     if(subscription){await db.rpc("disable_iig_push_subscription",{p_group_pin:pin,p_player_id:myPlayerId,p_endpoint:subscription.endpoint});await subscription.unsubscribe();}
   }catch(error){console.error("Notification disable failed",error);}
   localStorage.removeItem(notificationDeviceKey());render();
+}
+
+function sideGamePendingInvites(){
+  if(!myPlayerId)return [];
+  return (state.sideGame?.bets||[]).filter(b=>b.date===sideGameToday() &&
+    b.status==="pending" && b.setup==="challenge" && b.player2Id===myPlayerId);
+}
+function sideGameInviteNotice(){
+  document.getElementById("sideGameInviteNotice")?.remove();
+  const invites=sideGamePendingInvites();
+  if(!invites.length || sideGameOpen)return;
+  const screen=document.getElementById("screen");
+  if(!screen)return;
+  const notice=document.createElement("div");
+  notice.id="sideGameInviteNotice";
+  notice.className="notice";
+  notice.setAttribute("role","status");
+  notice.innerHTML=`<strong>🤝 ${invites.length===1 ? "You have a Side Game invite" : `${invites.length} Side Game invites`}</strong>
+    <button class="primary full" style="margin-top:10px" onclick="sideGameHome()">View ${invites.length===1 ? "invite" : "invites"}</button>`;
+  screen.prepend(notice);
+}
+function sideGameInviteMessage(id){
+  const bet=(state.sideGame?.bets||[]).find(b=>b.id===id && b.player1Id===myPlayerId &&
+    b.status==="pending" && b.setup==="challenge" && b.date===sideGameToday());
+  if(!bet || !/^\d{4}$/.test(String(pin)))return null;
+  const format=bet.format==="match" ? "Match Play" : bet.format==="net" ? "Net" : "Stableford";
+  return `${bet.player1Name} has invited you to a Side Game in ${state.groupName||"I'm In Golf"}.\n${format} · £${Number(bet.stake)}\nOpen your group and tap View invite to accept or decline.\nhttps://imingolf.co.uk/app/?pin=${encodeURIComponent(pin)}`;
+}
+async function sideGameShareInvite(id){
+  const text=sideGameInviteMessage(id);
+  if(!text){alert("This invite is no longer waiting for a reply.");return;}
+  try{
+    if(navigator.share){await navigator.share({title:"Side Game invite",text});return;}
+    if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(text);alert("Invite copied. Paste it into WhatsApp and send it to your opponent.");return;}
+    alert(text);
+  }catch(error){
+    if(error?.name!=="AbortError")alert("Could not share the invite. Please try again.");
+  }
 }
 
 function sideGameEntranceHtml(){
@@ -2670,6 +2709,9 @@ async function sideGameHome(){
                 <div style="font-size:20px;font-weight:900;text-align:center;margin-top:8px;">
                   Waiting for ${esc(b.player2Name)} to accept
                 </div>
+                <button class="secondary full" style="margin-top:10px"
+                  onclick="sideGameShareInvite(${escAttr(JSON.stringify(b.id))})">Share invite</button>
+                <div class="muted" style="text-align:center;margin-top:6px">Choose WhatsApp to let them know.</div>
 
                 <div style="font-weight:700;text-align:center;margin-top:5px;color:#40564a;">
                   £${Number(b.stake)} · ${b.format==="match" ? "Match Play" : b.format==="net" ? "Net" : "Stableford"}
