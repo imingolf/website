@@ -6,7 +6,18 @@
  let navVisibility=new Map();
  let confirming=false;
  let active=null,busy=false,blocked=false,version=0,revision=0,entry=null;
- function message(text){const el=document.getElementById('securePlayerStatus');if(el)el.textContent=text;}
+ function message(text){
+  const el=document.getElementById('securePlayerStatus');if(el)el.textContent=text;
+  const response=document.getElementById('sideGameChallengeResponse');
+  if(response){
+   response.textContent=text;
+   if(blocked){
+    const button=document.createElement('button');button.type='button';button.className='secondary full';button.textContent='Reload challenges';
+    button.onclick=async()=>{await reload(true);if(active&&!blocked&&!busy)sideGameHome();};
+    response.appendChild(button);
+   }
+  }
+ }
  function apply(data){
   const e=data?.entry;
   if(!e||typeof e.open!=='boolean'||typeof e.closed!=='boolean'||!(e.entrantIds===null&&(!e.closed||!e.open)||Array.isArray(e.entrantIds)&&e.entrantIds.every(id=>typeof id==='string')))throw Error('Reload to confirm competition entry status.');
@@ -59,7 +70,8 @@
   finally{busy=false;}
  }
  async function write(rpc,params){
-  if(!active||busy)return false;
+  if(!active)return false;
+  if(busy){message('Please wait for the current update, then try again.');return false;}
   if(blocked){message('Reload group before trying another change.');return false;}
   const current=active,v=version;busy=true;message('Saving…');
   try{
