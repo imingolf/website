@@ -1,0 +1,40 @@
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> test
+> node --test tests/*.test.mjs
+
+✔ phone registers only after permission; quiet delivery explained (2.083687ms)
+✔ off persists across reopening without phone registration (0.547787ms)
+✔ denied permission unregisters phone and gives Settings instructions (0.316853ms)
+✔ stale callbacks cannot register after another request or sign-out (0.290212ms)
+✔ disabled rollout does not prompt; failed save does not falsely confirm off (0.47643ms)
+✔ malformed or failed native registration never claims readiness (0.458915ms)
+▶ native reminder database contract
+  ✔ migration preserves golf, payments, memberships and existing notification records (4.664217ms)
+  ✔ rollout starts dormant; default preference is on (16.723164ms)
+  ✔ verified membership and current session required; stale account rejected (10.617246ms)
+  ✔ one current-round delivery per device; legacy cancelled status does not lose native reminder (47.376175ms)
+  ✔ opt-out persists, cannot be undone by registration, blocks an already claimed delivery (20.875848ms)
+  ✔ three days and night-before types work; first player notification is excluded (10.52579ms)
+  ✔ not-due, old, pre-registration and replaced-round events are excluded (7.540888ms)
+  ✔ group off, closed or retired blocks delivery; outsider cannot receive (8.98407ms)
+  ✔ changed membership is rechecked immediately before sending (4.015059ms)
+  ✔ retries rotate claims, reject stale completion and stop after three attempts (10.850985ms)
+  ✔ sign-out removes the session-bound device and queued deliveries (7.973813ms)
+  ✔ API permissions expose no devices or send functions to app users (1.854877ms)
+✔ native reminder database contract (2416.333586ms)
+✔ FID payload has validated group, bounded expiry, collapse ID and no arbitrary URL (1.662048ms)
+✔ provider failures: retry transient errors; unregister only confirmed invalid installations (0.907743ms)
+✔ disabled sender or absent credentials never claims or sends (0.535669ms)
+✔ permission revoked after claim prevents provider request (0.403642ms)
+✔ successful delivery finishes its claim without exposing identifiers (0.637671ms)
+✔ network failure requests bounded retry without false success (0.336482ms)
+✔ OAuth signed with fixed Google endpoint and messaging-only scope (46.474152ms)
+ℹ tests 26
+ℹ suites 0
+ℹ pass 26
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2604.108823
