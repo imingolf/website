@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { sendSideInvites } from "./side-invites.mjs";
 import { sendNativeReminders } from "./native-reminders.mjs";
 import webpush from "npm:web-push@3.6.7";
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -177,7 +178,8 @@ export default {
   }
 
   const native = await sendNativeReminders({ db, env: (name: string) => Deno.env.get(name) });
-  return new Response(JSON.stringify({ processed: results.length, results, native }), {
+  const sideInvites = await sendSideInvites({ db, env: (name: string) => Deno.env.get(name) });
+  return new Response(JSON.stringify({ processed: results.length, results, native, sideInvites }), {
     status: 200,
     headers: jsonHeaders,
   });
