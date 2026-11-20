@@ -110,6 +110,10 @@
   }finally{confirming=false;}
  }
  window.iigSecurePlayer={
+  async updateHandicap(value){
+   if(!Number.isFinite(value)||value< -10||value>60||Math.round(value*10)!==value*10)return false;
+   return write('iig_player_action',{p_action:'handicap',p_payload:{handicap:value}});
+  },
   get paymentReady(){return !!active&&!busy&&!blocked&&!confirming;},
   confirmExistingPayment:confirmPayment,
   async reloadForPayment(){if(!active||busy)return false;await reload(true);return !!active&&!blocked&&!busy;},
