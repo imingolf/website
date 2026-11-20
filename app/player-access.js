@@ -67,7 +67,21 @@
     handicapButton.type='button';handicapButton.className='secondary full simpler-member-handicap';
     handicapButton.textContent='Change my handicap';
     handicapButton.setAttribute('aria-label','Change my golf handicap');
-    handicapButton.onclick=()=>{const playerIndex=state.players.findIndex(p=>p.id===member.id);if(playerIndex>=0)changeMyHandicap(playerIndex);};
+    handicapButton.onclick=async()=>{
+     const playerIndex=state.players.findIndex(p=>p.id===member.id);
+     if(playerIndex<0)return;
+     handicapButton.disabled=true;
+     const notice=document.getElementById('simplerMemberMessage');
+     text(notice,'Saving your handicap…');
+     try{
+      await changeMyHandicap(playerIndex);
+      const latest=state.players.find(p=>p.id===member.id);
+      const status=document.getElementById('securePlayerStatus')?.textContent||'';
+      const changed=latest&&latest.handicap!==member.handicap;
+      text(notice,changed?'Handicap updated and confirmed.':(status&&status!=='Saving…'?status:'Handicap not confirmed as saved. Please reload the group and try again.'));
+     }catch(error){text(notice,'Handicap could not be saved: '+(error?.message||'Unknown error'));}
+     finally{handicapButton.disabled=false;}
+    };
     list.append(handicapButton);
    }
   }
