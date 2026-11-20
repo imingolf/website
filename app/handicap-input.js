@@ -30,7 +30,7 @@
  const bound=new WeakSet();
  function bind(input){
   if(!input || bound.has(input))return;
-  bound.add(input);input.type='text';input.inputMode='text';input.setAttribute('inputmode','decimal');
+  bound.add(input);input.type='text';input.inputMode='text';input.setAttribute('inputmode','text');
   input.setAttribute('autocomplete','off');input.setAttribute('pattern','[+-]?[0-9]{1,2}([.][0-9])?');
   input.removeAttribute('maxlength');
   let previous=String(input.value||''),start=previous.length,end=start;
