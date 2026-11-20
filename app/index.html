@@ -6922,7 +6922,11 @@ if(!validGolfHandicap(handicapText)){
   alert("Enter a handicap up to 60, or a plus handicap up to +10, with up to 1 decimal place.");
   return;
 }
-p.handicap=newHandicap;
+if(window.iigSecurePlayer?.active){
+  await window.iigSecurePlayer.updateHandicap(newHandicap);
+  return;
+ }
+ p.handicap=newHandicap;
 
  render();
  await save(isAdmin?"members":"profile");
