@@ -6857,7 +6857,7 @@ function playersPage(){
                  <button class="red small" onclick="removePlayer(${i})">Remove</button>
                ` : ""}
              </div>
-           ` : p.id===myPlayerId ? `
+           ` : p.id===(window.iigOwnPlayerId?.(pin)||myPlayerId) ? `
              <button class="secondary small" onclick="changeMyHandicap(${i})">
                ✏️ Change Handicap
              </button>
@@ -6911,7 +6911,7 @@ async function changeMyHandicap(i){
  if(!demoCanEdit())return;
  const p=state.players[i];
 
- if(p.id!==myPlayerId && !isAdmin)return;
+ if(p.id!==(window.iigOwnPlayerId?.(pin)||myPlayerId) && !isAdmin)return;
 
  const h=await appPrompt("Change Handicap","Enter the new golf handicap.",formatGolfHandicap(p.handicap),{type:"text",inputmode:"text",maxlength:5,handicap:true,okLabel:"Save Handicap"});
  if(h===null)return;
@@ -6999,7 +6999,7 @@ async function adminAddPlayer(){
     return;
   }
 
-  const h=prompt("Handicap","18");
+  const h=await appPrompt("Add Player","Golf handicap","18",{type:"text",inputmode:"text",maxlength:5,handicap:true,okLabel:"Add Player"});
   if(h===null)return;
 
   const handicapText=String(h).trim();
@@ -7029,7 +7029,7 @@ async function adminAddPlayer(){
   alert("✅ " + cleanName + " added to the group.");
 }
 
-async function editPlayer(i){const p=state.players[i];const name=prompt("Player name",p.name);if(!name)return;const h=prompt("Handicap",formatGolfHandicap(p.handicap));if(h===null)return;const handicapText=String(h).trim();if(!validGolfHandicap(handicapText)){alert("Enter a handicap up to 60, or a plus handicap up to +10, with up to 1 decimal place.");return}p.name=name.trim();p.handicap=parseGolfHandicap(handicapText);render();await save("members")}
+async function editPlayer(i){const p=state.players[i];const name=prompt("Player name",p.name);if(!name)return;const h=await appPrompt("Edit Player","Golf handicap",formatGolfHandicap(p.handicap),{type:"text",inputmode:"text",maxlength:5,handicap:true,okLabel:"Save Player"});if(h===null)return;const handicapText=String(h).trim();if(!validGolfHandicap(handicapText)){alert("Enter a handicap up to 60, or a plus handicap up to +10, with up to 1 decimal place.");return}p.name=name.trim();p.handicap=parseGolfHandicap(handicapText);render();await save("members")}
 async function removePlayer(i){const p=state.players[i];if(!p)return;if(!await appConfirm("Remove Player","Remove "+p.name+" from this group? Their past round history will stay saved.","Remove Player",true))return;state.players.splice(i,1);render();await save("members")}
 
 
