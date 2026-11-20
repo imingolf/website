@@ -50,9 +50,9 @@
     <details id="regPasswordOption"><summary>Sign in with an existing password</summary><form id="regPasswordForm"><label for="regPasswordEmail">Your email address</label><input id="regPasswordEmail" type="email" autocomplete="username" maxlength="254" required><label for="regPassword">Password</label><input id="regPassword" type="password" autocomplete="current-password" required><button class="primary full">Sign in</button><p class="muted">Sensitive changes still need a fresh email code.</p></form></details>
     <form id="regCodeForm" hidden><label for="regCode">Code from your email</label><p id="regSentTo"></p><input id="regCode" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6,10}" minlength="6" maxlength="10" required><button class="primary full" id="regVerify">Verify email</button><button id="regResend" type="button" class="secondary full">Send another code</button><button id="regChangeEmail" type="button" class="ghost full">Use a different email</button></form>
     <section id="regSignedIn" hidden><p id="regAccount" class="muted"></p>
-    <form id="regGroupForm" hidden><label for="regName">Your name</label><input id="regName" autocomplete="name" maxlength="80" required><label for="regSetupEmail" id="regSetupEmailLabel">Your email</label><input id="regSetupEmail" type="email" autocomplete="email" maxlength="254"><label for="regGroupName">Group name</label><input id="regGroupName" maxlength="80" required placeholder="e.g. Sunday Golfers"><label for="regSetupHandicap">Your handicap</label><input id="regSetupHandicap" type="text" inputmode="decimal" autocomplete="off" required aria-describedby="regSetupHandicapHelp"><small id="regSetupHandicapHelp">Example: 11.2. We’ll add you to the player list automatically using your name and handicap.</small><button id="regCreate" class="primary full">Create my group</button><p class="muted">I’m In Golf+ is included free for now. Your name and email are shared with I’m In Golf to manage your group.</p></form>
-    <section id="regAccessHelp" hidden><p id="regAccessHelpText"></p><p id="regAccessHelpNext" hidden></p><button id="regReconnectOwned" class="primary full" type="button" hidden>Reconnect my existing player</button><button id="regAccessChangeEmail" class="primary full" type="button">Use a different email</button><button id="regOtherPin" class="secondary full" type="button">Enter group PIN</button></section><form id="regJoinForm" hidden><p id="regJoinGroupName" class="ui-invited-group"></p><label for="regPlayerName">Your name</label><input id="regPlayerName" autocomplete="name" maxlength="80" required><label for="regHandicap">Handicap</label><input id="regHandicap" type="text" inputmode="decimal" maxlength="5" pattern="-?[0-9]{1,2}([.][0-9])?" aria-describedby="regHandicapHelp" required><small id="regHandicapHelp">Example: 11.2.</small><p id="regAppJoinHelp" class="muted" hidden></p><p id="regJoinError" role="alert" tabindex="-1"></p><button class="primary full">Join my group</button></form>
-    <section id="regCreated" hidden><h2>Your group is ready</h2><p id="regCreatedName"></p><p>Group PIN: <strong id="regPin"></strong></p><button id="regOpenGroup" type="button" class="primary full">Open my group</button><button id="regInvite" type="button" class="secondary full">Invite players</button><button id="regPlayerView" type="button" class="secondary full">Open my player account</button><details class="ui-options" hidden><summary>Competition options</summary><button id="regFirstCompetition" type="button" class="secondary full">Create first competition</button></details><details id="regOwnerPlayerSetup" class="ui-options" hidden><summary>I’m playing too</summary><form id="regOwnerPlayerForm"><label for="regOwnerPlayerName">Your player name</label><input id="regOwnerPlayerName" autocomplete="name" maxlength="80" required><label for="regOwnerHandicap">Your handicap</label><input id="regOwnerHandicap" inputmode="decimal" required><small>Up to two digits and one decimal place, e.g. 11.2.</small><button class="secondary full">Add me as a player</button></form><p id="regOwnerPlayerStatus" role="status"></p></details></section>
+    <form id="regGroupForm" hidden><label for="regName">Your name</label><input id="regName" autocomplete="name" maxlength="80" required><label for="regSetupEmail" id="regSetupEmailLabel">Your email</label><input id="regSetupEmail" type="email" autocomplete="email" maxlength="254"><label for="regGroupName">Group name</label><input id="regGroupName" maxlength="80" required placeholder="e.g. Sunday Golfers"><label for="regSetupHandicap">Your handicap</label><input id="regSetupHandicap" type="text" inputmode="decimal" autocomplete="off" required aria-describedby="regSetupHandicapHelp"><small id="regSetupHandicapHelp">Examples: 11.2 or +2. We’ll add you to the player list automatically using your name and handicap.</small><button id="regCreate" class="primary full">Create my group</button><p class="muted">I’m In Golf+ is included free for now. Your name and email are shared with I’m In Golf to manage your group.</p></form>
+    <section id="regAccessHelp" hidden><p id="regAccessHelpText"></p><p id="regAccessHelpNext" hidden></p><button id="regReconnectOwned" class="primary full" type="button" hidden>Reconnect my existing player</button><button id="regAccessChangeEmail" class="primary full" type="button">Use a different email</button><button id="regOtherPin" class="secondary full" type="button">Enter group PIN</button></section><form id="regJoinForm" hidden><p id="regJoinGroupName" class="ui-invited-group"></p><label for="regPlayerName">Your name</label><input id="regPlayerName" autocomplete="name" maxlength="80" required><label for="regHandicap">Handicap</label><input id="regHandicap" type="text" inputmode="decimal" maxlength="5" pattern="[+-]?[0-9]{1,2}([.][0-9])?" aria-describedby="regHandicapHelp" required><small id="regHandicapHelp">Examples: 11.2 or +2.</small><p id="regAppJoinHelp" class="muted" hidden></p><p id="regJoinError" role="alert" tabindex="-1"></p><button class="primary full">Join my group</button></form>
+    <section id="regCreated" hidden><h2>Your group is ready</h2><p id="regCreatedName"></p><p>Group PIN: <strong id="regPin"></strong></p><button id="regOpenGroup" type="button" class="primary full">Open my group</button><button id="regInvite" type="button" class="secondary full">Invite players</button><button id="regPlayerView" type="button" class="secondary full">Open my player account</button><details class="ui-options" hidden><summary>Competition options</summary><button id="regFirstCompetition" type="button" class="secondary full">Create first competition</button></details><details id="regOwnerPlayerSetup" class="ui-options" hidden><summary>I’m playing too</summary><form id="regOwnerPlayerForm"><label for="regOwnerPlayerName">Your player name</label><input id="regOwnerPlayerName" autocomplete="name" maxlength="80" required><label for="regOwnerHandicap">Your handicap</label><input id="regOwnerHandicap" inputmode="decimal" required><small>Up to two digits and one decimal place, e.g. 11.2 or +2.</small><button class="secondary full">Add me as a player</button></form><p id="regOwnerPlayerStatus" role="status"></p></details></section>
     <button id="regReload" type="button" class="secondary full">${dashboard ? 'Open dashboard' : 'Check my group'}</button><details id="regAccountOptions" class="ui-options"><summary>My account</summary><p id="regAccountReference" class="muted"></p><button id="regAccountControls" type="button" class="secondary full">Account settings</button><button id="regSignout" type="button" class="ghost full">Sign out</button></details></section>`;
   window.iigHandicap.bind($('regSetupHandicap'));
   // Additional groups use the same four steps after an explicit organiser choice.
@@ -84,7 +84,7 @@
     form.after(returning);
     returning.onclick=()=>{onboarding?.suspend();creating=false;form.hidden=true;$('regEmailForm').hidden=false;returning.hidden=true;progress('Sign in with your existing email');$('regEmail').focus();};
     progress('1 of 3 · Your group and details');onboarding?.details();
-    try{const draft=JSON.parse(sessionStorage.getItem('iig-group-draft')||'null');if(draft){$('regName').value=draft.organiser||'';$('regGroupName').value=draft.name||'';$('regSetupEmail').value=draft.email||'';$('regSetupHandicap').value=draft.handicap??'';}}catch(_){}
+    try{const draft=JSON.parse(sessionStorage.getItem('iig-group-draft')||'null');if(draft){$('regName').value=draft.organiser||'';$('regGroupName').value=draft.name||'';$('regSetupEmail').value=draft.email||'';$('regSetupHandicap').value=draft.handicap==null?'':window.iigHandicap.format(draft.handicap);}}catch(_){}
   }
   const nativeApp=()=>!!window.IigNativeApp||typeof window.IigPurchase?.postMessage==='function';
   if(validInvitation&&!nativeApp()){$('regAppJoinHelp').hidden=false;$('regAppJoinHelp').textContent='Join securely here first. Then open the iPhone app with group PIN '+invitePin+' and the same verified email.';}
@@ -343,8 +343,8 @@
     const name=$('regGroupName').value.trim(),organiser=$('regName').value.trim();
     if(!name||!organiser||name.length>80||organiser.length>80)throw new Error('Enter your name and a group name (up to 80 characters each).');
     const raw=$('regSetupHandicap').value.trim();
-    if(!window.iigHandicap.valid(raw))throw new Error('Enter your handicap from -10 to 60, with up to one decimal place.');
-    return {name,organiser,handicap:Number(raw)};
+    if(!window.iigHandicap.valid(raw))throw new Error('Enter a handicap up to 60, or a plus handicap up to +10, with up to one decimal place.');
+    return {name,organiser,handicap:window.iigHandicap.parse(raw)};
   }
   async function createGroup(){
     const {name,organiser,handicap}=groupDetails();
@@ -395,9 +395,9 @@
   $('regFirstCompetition').onclick=()=>action(async()=>{if(await openOwnedGroup())window.iigSecureOrganiser.firstCompetition();});
   $('regOwnerPlayerForm').onsubmit=event=>{event.preventDefault();action(async()=>{
     const name=$('regOwnerPlayerName').value.trim(),raw=$('regOwnerHandicap').value.trim();
-    if(!name||name.length>80||!window.iigHandicap.valid(raw))throw Error('Enter your name and a handicap from -10 to 60, with up to one decimal place.');
+    if(!name||name.length>80||!window.iigHandicap.valid(raw))throw Error('Enter your name and a handicap up to 60, or a plus handicap up to +10.');
     const group=await loadGroup();if(!group)throw Error('Create your group first.');
-    await request('/rest/v1/rpc/'+joinRpc,{p_pin:group.group_pin,p_invite:group.invite_token,p_name:name,p_handicap:Number(raw)},true);
+    await request('/rest/v1/rpc/'+joinRpc,{p_pin:group.group_pin,p_invite:group.invite_token,p_name:name,p_handicap:window.iigHandicap.parse(raw)},true);
     $('regOwnerPlayerStatus').textContent='You’re on the player list. You still have organiser access.';
     ownerPlayerReady=true;$('regOwnerPlayerSetup').hidden=true;message('You have been added as a player. Use Open my group, then Group options → Switch to player view.');
   });};
@@ -480,7 +480,7 @@
     $('regGroupName').value='';$('regCreate').textContent='Create my group';
     if($('regReturning'))$('regReturning').hidden=true;
     const me=typeof state==='object'?state.players?.find(p=>p.id===window.iigOwnPlayerId?.(homePin)):null;
-    if(me){$('regName').value=me.name||'';$('regSetupHandicap').value=me.handicap??'';}
+    if(me){$('regName').value=me.name||'';$('regSetupHandicap').value=me.handicap==null?'':window.iigHandicap.format(me.handicap);}
     const cancel=document.createElement('button');cancel.id='regCancelAdditional';cancel.type='button';cancel.className='ghost full';cancel.textContent='Cancel';cancel.onclick=cancelAdditional;$('regGroupForm').append(cancel);
     showWelcomePanel('start',false);$('setupOverlay').classList.remove('hidden');onboarding?.details();
     $('welcomeStartTitle').textContent='Start another golf group';$('welcomeStartTitle').nextElementSibling.textContent='Use your signed-in account. Each group has its own players, payments and results.';
@@ -579,14 +579,14 @@
     get('iigPlayerProfileForm').onsubmit=async event=>{
       event.preventDefault();if(writing||!current())return;
       const name=get('iigPlayerProfileName').value.trim(),raw=get('iigPlayerProfileHandicap').value.trim();
-      if(!name||name.length>80||!window.iigHandicap.valid(raw)){note('Enter your name and a handicap from -10 to 60, with up to one decimal place.');return;}
+      if(!name||name.length>80||!window.iigHandicap.valid(raw)){note('Enter your name and a handicap up to 60, or a plus handicap up to +10.');return;}
       writing=true;dialog.querySelectorAll('button,input').forEach(el=>el.disabled=true);note('Checking and saving your player profile…');
       try{
         const group=await owned();if(!group)return;
         let data=await member();if(!current())return;
         if(!data){
           if(!/^[0-9a-f-]{36}$/i.test(group.invite_token||''))throw Error('Your group’s joining permission could not be confirmed. No player profile was created.');
-          await request('/rest/v1/rpc/'+joinRpc,{p_pin:targetPin,p_invite:group.invite_token,p_name:name,p_handicap:Number(raw)},true);
+          await request('/rest/v1/rpc/'+joinRpc,{p_pin:targetPin,p_invite:group.invite_token,p_name:name,p_handicap:window.iigHandicap.parse(raw)},true);
           if(!current())return;data=await member();if(!data)throw Error('Your player profile was not confirmed. Reopen player view to check before trying again.');
         }
         enter(data);
@@ -630,8 +630,8 @@
     openPlayerData(data,invitePin);
   }
   $('regJoinForm').onsubmit=event=>{event.preventDefault();action(async()=>{
-    const name=$('regPlayerName').value.trim(),raw=$('regHandicap').value.trim(),handicap=Number(raw);
-    if(!name||name.length>80||!/^[-]?[0-9]{1,2}(?:\.[0-9])?$/.test(raw)||handicap < -10||handicap > 60)throw new Error('Enter your name and a handicap from -10 to 60, with up to one decimal place.');
+    const name=$('regPlayerName').value.trim(),raw=$('regHandicap').value.trim(),handicap=window.iigHandicap.parse(raw);
+    if(!name||name.length>80||!window.iigHandicap.valid(raw))throw new Error('Enter your name and a handicap up to 60, or a plus handicap up to +10.');
     if(!validInvitation&&!(playerJoinOptions?.group_pin===invitePin&&playerJoinOptions.pin_join_enabled===true))throw new Error('Open the complete invitation link from your organiser.');
     $('regJoinError').textContent='';
     await request('/rest/v1/rpc/'+joinRpc,{p_pin:invitePin,p_invite:validInvitation?inviteToken:null,p_name:name,p_handicap:handicap},true);

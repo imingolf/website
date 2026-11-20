@@ -50,7 +50,7 @@
   panel.innerHTML='<h2>Reconnect an existing player</h2><p>Check that this is the original golfer and verify their email privately. This connects their existing history; it does not create or rename a player. Verify a fresh email code before continuing.</p><label for="relinkPlayer">Existing player</label><select id="relinkPlayer"></select><label for="relinkEmail">Their verified email</label><input id="relinkEmail" type="email"><button id="relinkIssue" type="button" class="primary">Create private reconnection link</button><label for="relinkLink">Private link — expires in 24 hours</label><input id="relinkLink" readonly><p id="relinkMessage" role="status"></p><button id="relinkClose" type="button" class="secondary">Close</button>';
   document.getElementById('relinkPlayers')?.remove();document.getElementById('screen').before(panel);
   const get=id=>panel.querySelector('#'+id),current=active,e=epoch;
-  for(const player of state.players){const option=document.createElement('option');option.value=player.id;option.textContent=player.name+' · handicap '+(player.handicap??'—');get('relinkPlayer').appendChild(option);}
+  for(const player of state.players){const option=document.createElement('option');option.value=player.id;option.textContent=player.name+' · handicap '+window.iigHandicap.format(player.handicap);get('relinkPlayer').appendChild(option);}
   get('relinkClose').onclick=()=>panel.remove();
   get('relinkIssue').onclick=async()=>{
    get('relinkIssue').disabled=true;get('relinkLink').value='';
