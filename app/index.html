@@ -8260,43 +8260,7 @@ if(roundLocked()){
     return;
   }
 
-  const notPaid=currentRoundPlayers()
-    .filter(p=>!p.paid)
-    .map(p=>p.name);
-
-  const noCompetition=tripBetterBallActive() ? [] : currentRoundPlayers()
-    .filter(p=>p.paid && !p.competition)
-    .map(p=>p.name);
-
-  if(!notPaid.length && !noCompetition.length){
-    alert("Everyone is paid and entered into a competition.");
-    return;
-  }
-
-  let message=`⛳ I'm In Golf — Competition Reminder
-
-${state.course}
-${formatDate(state.date)}
-
-`;
-
-  if(notPaid.length){
-    message+=`💷 Still to pay:
-${notPaid.join(", ")}
-
-`;
-  }
-
-  if(noCompetition.length){
-    message+=`🏆 Still to choose Stableford or Net:
-${noCompetition.join(", ")}
-
-`;
-  }
-
-  message+=tripBetterBallActive()
-    ? "Please pay your entry before the Better Ball round starts."
-    : "Please pay your entry and choose Stableford or Net before scoring starts.";
+  const message="Hi all, just a reminder there’s a competition open to enter. If you’re planning to play, please pay your entry fee before the day. Thanks, and good luck.";
 
   if(navigator.share){
     navigator.share({
