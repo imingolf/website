@@ -3972,7 +3972,7 @@ function scores(){
         <div class="player">
           <div>
             <b>${esc(p.name)}</b>
-            <div class="muted">HCP ${esc(String(p.handicap??"—"))}</div>
+            <div class="muted">HCP ${esc(formatGolfHandicap(p.handicap))}</div>
           </div>
 
           ${canControl ? `
@@ -4167,19 +4167,10 @@ if(!demoCanEdit())return;
 function validIndividualScore(raw,type){
   return type==="stableford" ? /^[0-9]{1,2}$/.test(raw) : /^[0-9]{1,3}$/.test(raw);
 }
-function validGolfHandicap(raw){
-  return /^-?[0-9]{1,2}(?:\.[0-9])?$/.test(raw) && Number(raw)>=-10 && Number(raw)<=60;
-}
-function limitHandicapText(value){
-  const raw=String(value);
-  const sign=raw.startsWith("-") ? "-" : "";
-  const digits=raw.slice(sign.length).replace(/[^0-9.]/g,"");
-  const dot=digits.indexOf(".");
-  const whole=(dot<0?digits:digits.slice(0,dot)).replace(/\D/g,"").slice(0,2);
-  if(dot<0)return sign+whole;
-  const decimal=digits.slice(dot+1).replace(/\D/g,"").slice(0,1);
-  return sign+(whole||"0")+"."+decimal;
-}
+function validGolfHandicap(raw){ return window.iigHandicap.valid(raw); }
+function parseGolfHandicap(raw){ return window.iigHandicap.parse(raw); }
+function formatGolfHandicap(value){ return window.iigHandicap.format(value); }
+function limitHandicapText(value){ return window.iigHandicap.limit(value); }
 async function submitPlayerScore(i,type){
   if(!demoCanEdit())return;
   type=state.pointsCompetition||type||"stableford";
@@ -5543,7 +5534,7 @@ function finalStandingsHtml(record){
   return sorted.map((p,i)=>`
     <div class="player row">
       <span class="pos">${esc(finalStandingPosition(record,sorted,i))}</span>
-      <div style="flex:1"><b>${esc(p.name||"Player")}</b><div class="muted">HCP ${esc(String(p.handicap??"—"))}</div></div>
+      <div style="flex:1"><b>${esc(p.name||"Player")}</b><div class="muted">HCP ${esc(formatGolfHandicap(p.handicap))}</div></div>
       <span class="money">${esc(finalStandingScore(record,p))}</span>
     </div>`).join("");
 }
@@ -6434,7 +6425,7 @@ ${leagueView==="points" ? `
   <span onclick="showPlayerStats(${escAttr(JSON.stringify(p.id))})" style="cursor:pointer;text-decoration:underline;">
     ${pointsPlayed(p.name)>0 ? (i+1)+". " : ""}${esc(p.name)}${p.id===(window.iigOwnPlayerId?.(pin)||myPlayerId)?' <span class="pill">You</span>':''}
   </span>
-</b><div class="muted">Handicap ${esc(String(p.handicap??"—"))}</div></div><div style="text-align:right;">
+</b><div class="muted">Handicap ${esc(formatGolfHandicap(p.handicap))}</div></div><div style="text-align:right;">
         <div class="money">
           ${Number(p.leaguePoints||0)} league pts
         </div>
@@ -6455,7 +6446,7 @@ ${leagueView==="points" ? `
   <span onclick="showPlayerStats(${escAttr(JSON.stringify(p.id))})" style="cursor:pointer;text-decoration:underline;">
     ${moneyPlayed(p.name)>0 ? (i+1)+". " : ""}${esc(p.name)}${p.id===(window.iigOwnPlayerId?.(pin)||myPlayerId)?' <span class="pill">You</span>':''}
   </span>
-</b><div class="muted">Handicap ${esc(String(p.handicap??"—"))}</div></div><div style="text-align:right;">
+</b><div class="muted">Handicap ${esc(formatGolfHandicap(p.handicap))}</div></div><div style="text-align:right;">
   <div class="money" style="font-size:18px;font-weight:900;color:var(--green);">
     £${moneyWon(p.name)} WON
   </div>
@@ -6488,7 +6479,7 @@ ${tripSorted.map((p,i)=>{
       <b>
         ${i===0 && perf ? "👑 " : ""}
         ${perf ? (i+1)+". " : ""}${esc(p.name)}${p.id===(window.iigOwnPlayerId?.(pin)||myPlayerId)?' <span class="pill">You</span>':''}
-      </b><div class="muted">Handicap ${esc(String(p.handicap??"—"))}</div></div><div style="text-align:right;">
+      </b><div class="muted">Handicap ${esc(formatGolfHandicap(p.handicap))}</div></div><div style="text-align:right;">
       <div class="money" style="font-size:18px;font-weight:900;">
         ${perf ? (leagueTrip?.competition==="net" ? "Cumulative Net "+Number(perf.total) : Number(perf.total)+" pts total") : "—"}
       </div>
@@ -6708,7 +6699,7 @@ const bestNet=
       </h2>
 
       <div class="muted">
-        Handicap ${esc(String(p.handicap??"—"))}
+        Handicap ${esc(formatGolfHandicap(p.handicap))}
       </div>
     </div>
 
@@ -6856,7 +6847,7 @@ function playersPage(){
          <div class="row">
            <div>
              <b>${esc(p.name)}</b>
-             <div class="muted">Handicap ${esc(String(p.handicap??"—"))}</div>
+             <div class="muted">Handicap ${esc(formatGolfHandicap(p.handicap))}</div>
            </div>
 
            ${isAdmin ? `
@@ -6922,13 +6913,13 @@ async function changeMyHandicap(i){
 
  if(p.id!==myPlayerId && !isAdmin)return;
 
- const h=await appPrompt("Change Handicap","Enter the new golf handicap.",p.handicap,{type:"text",inputmode:"decimal",maxlength:5,handicap:true,okLabel:"Save Handicap"});
+ const h=await appPrompt("Change Handicap","Enter the new golf handicap.",formatGolfHandicap(p.handicap),{type:"text",inputmode:"text",maxlength:5,handicap:true,okLabel:"Save Handicap"});
  if(h===null)return;
 
  const handicapText=String(h).trim();
- const newHandicap=Number(handicapText);
+ const newHandicap=parseGolfHandicap(handicapText);
 if(!validGolfHandicap(handicapText)){
-  alert("Enter a handicap between -10 and 60, with up to 1 decimal place.");
+  alert("Enter a handicap up to 60, or a plus handicap up to +10, with up to 1 decimal place.");
   return;
 }
 p.handicap=newHandicap;
@@ -6945,7 +6936,7 @@ function playerJoinForm(){
       <div class="muted" style="margin-bottom:16px;">Enter your name and golf handicap.</div>
       <label><b>First name</b></label><input id="joinFirst" autocomplete="given-name">
       <label><b>Surname</b></label><input id="joinSurname" autocomplete="family-name">
-      <label><b>Golf handicap</b></label><input id="joinHandicap" type="text" inputmode="decimal" maxlength="5" value="18">
+      <label><b>Golf handicap</b></label><div class="muted">Example: 18 or +2</div><input id="joinHandicap" type="text" inputmode="text" maxlength="5" value="18">
       <div id="joinMsg" class="muted" style="min-height:18px;color:var(--red);"></div>
       <button class="primary full" id="joinSubmit">Join Group</button><button class="ghost full" id="joinCancel">Cancel</button>
     </div>`;
@@ -6958,9 +6949,9 @@ function playerJoinForm(){
       const first=overlay.querySelector("#joinFirst").value.trim();
       const surname=overlay.querySelector("#joinSurname").value.trim();
       const handicapText=overlay.querySelector("#joinHandicap").value.trim();
-      const handicap=Number(handicapText);
+      const handicap=parseGolfHandicap(handicapText);
       if(!first||!surname){msg.textContent="Please enter your first name and surname.";return}
-      if(!validGolfHandicap(handicapText)){msg.textContent="Enter a handicap between -10 and 60, with up to 1 decimal place.";return}
+      if(!validGolfHandicap(handicapText)){msg.textContent="Enter a handicap up to 60, or a plus handicap up to +10, with up to 1 decimal place.";return}
       overlay.remove();resolve({first,surname,handicap});
     };
     setTimeout(()=>overlay.querySelector("#joinFirst").focus(),50);
@@ -7012,9 +7003,9 @@ async function adminAddPlayer(){
   if(h===null)return;
 
   const handicapText=String(h).trim();
-  const handicap=Number(handicapText);
+  const handicap=parseGolfHandicap(handicapText);
   if(!validGolfHandicap(handicapText)){
-    alert("Enter a handicap between -10 and 60, with up to 1 decimal place.");
+    alert("Enter a handicap up to 60, or a plus handicap up to +10, with up to 1 decimal place.");
     return;
   }
 
@@ -7038,7 +7029,7 @@ async function adminAddPlayer(){
   alert("✅ " + cleanName + " added to the group.");
 }
 
-async function editPlayer(i){const p=state.players[i];const name=prompt("Player name",p.name);if(!name)return;const h=prompt("Handicap",p.handicap);if(h===null)return;const handicapText=String(h).trim();if(!validGolfHandicap(handicapText)){alert("Enter a handicap between -10 and 60, with up to 1 decimal place.");return}p.name=name.trim();p.handicap=Number(handicapText);render();await save("members")}
+async function editPlayer(i){const p=state.players[i];const name=prompt("Player name",p.name);if(!name)return;const h=prompt("Handicap",formatGolfHandicap(p.handicap));if(h===null)return;const handicapText=String(h).trim();if(!validGolfHandicap(handicapText)){alert("Enter a handicap up to 60, or a plus handicap up to +10, with up to 1 decimal place.");return}p.name=name.trim();p.handicap=parseGolfHandicap(handicapText);render();await save("members")}
 async function removePlayer(i){const p=state.players[i];if(!p)return;if(!await appConfirm("Remove Player","Remove "+p.name+" from this group? Their past round history will stay saved.","Remove Player",true))return;state.players.splice(i,1);render();await save("members")}
 
 
@@ -8858,7 +8849,7 @@ function tripSetupScreen(){
         <div style="margin-bottom:8px;font-weight:800;">Trip players</div>
         <div class="muted" style="margin-bottom:10px;">Choose everyone going on the trip. You can mark anyone Not Playing Today before each round.</div>
         <div class="notice" id="tripPlayerChoices" style="margin-bottom:18px;max-height:230px;overflow:auto;">
-          ${[...state.players].sort((a,b)=>a.name.localeCompare(b.name)).map(p=>`<label style="display:flex;align-items:center;gap:10px;padding:8px 2px;"><input type="checkbox" data-trip-player="${escAttr(p.id)}" checked style="width:22px;height:22px;margin:0;"><span><b>${esc(p.name)}</b> <span class="muted">HCP ${esc(String(p.handicap??"—"))}</span></span></label>`).join("")}
+          ${[...state.players].sort((a,b)=>a.name.localeCompare(b.name)).map(p=>`<label style="display:flex;align-items:center;gap:10px;padding:8px 2px;"><input type="checkbox" data-trip-player="${escAttr(p.id)}" checked style="width:22px;height:22px;margin:0;"><span><b>${esc(p.name)}</b> <span class="muted">HCP ${esc(formatGolfHandicap(p.handicap))}</span></span></label>`).join("")}
         </div>
 
         <div style="margin-bottom:8px;font-weight:800;">Main Trip scoring</div>
