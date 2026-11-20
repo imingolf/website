@@ -62,6 +62,14 @@
     if(window.iigSecureOrganiser?.active&&ownPlayerId()===member.id){identificationPage=false;originalShow('round');returnToPlayerView();}
    };}
    list.append(button);
+   if(member.id===ownId){
+    const handicapButton=document.createElement('button');
+    handicapButton.type='button';handicapButton.className='secondary full simpler-member-handicap';
+    handicapButton.textContent='Change my handicap';
+    handicapButton.setAttribute('aria-label','Change my golf handicap');
+    handicapButton.onclick=()=>{const playerIndex=state.players.findIndex(p=>p.id===member.id);if(playerIndex>=0)changeMyHandicap(playerIndex);};
+    list.append(handicapButton);
+   }
   }
   const add=document.getElementById('simplerNotListed');
   if(!ownId)add.classList.replace('secondary','primary');
