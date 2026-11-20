@@ -480,7 +480,7 @@
     $('regGroupName').value='';$('regCreate').textContent='Create my group';
     if($('regReturning'))$('regReturning').hidden=true;
     const me=typeof state==='object'?state.players?.find(p=>p.id===window.iigOwnPlayerId?.(homePin)):null;
-    if(me){$('regName').value=me.name||'';$('regSetupHandicap').value=window.iigHandicap.format(me.handicap);}
+    if(me){$('regName').value=me.name||'';$('regSetupHandicap').value=me.handicap==null?'':window.iigHandicap.format(me.handicap);}
     const cancel=document.createElement('button');cancel.id='regCancelAdditional';cancel.type='button';cancel.className='ghost full';cancel.textContent='Cancel';cancel.onclick=cancelAdditional;$('regGroupForm').append(cancel);
     showWelcomePanel('start',false);$('setupOverlay').classList.remove('hidden');onboarding?.details();
     $('welcomeStartTitle').textContent='Start another golf group';$('welcomeStartTitle').nextElementSibling.textContent='Use your signed-in account. Each group has its own players, payments and results.';
