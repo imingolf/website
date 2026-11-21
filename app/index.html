@@ -7375,11 +7375,8 @@ async function changeCurrentPrizePayout(){
     return;
   }
 
-  if(roundLocked()){
-    alert("Payment split cannot be changed after scoring has started.");
-    return;
-  }
-
+  // Prize distribution is editable while the Money Game is open, even after scores arrive.
+  // This does not reopen entries, change scores or affect the round's finish controls.
   if(state.gameType!=="money"){
     alert("Payment split is only available for Money Games.");
     return;
@@ -7523,7 +7520,8 @@ function settingsPage(){
       🔄 Change to ${state.pointsCompetition==="net" ? "Stableford" : "Net"}
     </button>
 
-    ${state.gameType==="money" ? `
+  ` : ""}
+  ${roundOpenNow() && state.gameType==="money" ? `
       <div class="notice" style="margin-top:12px;">
         <div class="muted">PAYMENT SPLIT</div>
         <b>${state.splitPrizes
@@ -7535,7 +7533,6 @@ function settingsPage(){
         🔄 ${state.splitPrizes ? "Change to Single Result Payment" : "Change to 1st / 2nd / 3rd"}
       </button>
     ` : ""}
-  ` : ""}
 ` : ""}
 ${state.trip?.active && Number(state.trip.currentRound)>1 ? `
   <button class="primary full" onclick="nextTripRound()">
