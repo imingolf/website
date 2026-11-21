@@ -3916,6 +3916,12 @@ function scores(){
     )
     .sort((a,b)=>Number(a.netScore)-Number(b.netScore));
 
+  // Money-game scores stay hidden until this player has submitted their own.
+  // This is presentation gating only; the member API must also enforce it.
+  const myScorePlayer=roundPlayers.find(p=>p.id===myPlayerId);
+  const canSeeMoneyLeaderboard=isAdmin || state.gameType!=="money" ||
+    !roundOpenNow() || Boolean(myScorePlayer && submitted(myScorePlayer,pointsComp));
+
   const rankLabel=(list,index,scoreOf)=>{
     const score=Number(scoreOf(list[index]));
     const firstIndex=list.findIndex(x=>Number(scoreOf(x))===score);
@@ -4043,7 +4049,8 @@ function scores(){
       }).join("")}
     </div>
 
-    ${pointsComp==="stableford" ? `
+    ${!canSeeMoneyLeaderboard ? `<div class="card"><h2>Leaderboard locked</h2><div class="notice">Submit your own score to see who is leading.</div></div>` : ""}
+    ${canSeeMoneyLeaderboard && pointsComp==="stableford" ? `
       <div class="card">
         <h2>Round scores · Stableford</h2>
 
@@ -4067,7 +4074,7 @@ function scores(){
       </div>
     ` : ""}
 
-    ${pointsComp==="net" ? `
+    ${canSeeMoneyLeaderboard && pointsComp==="net" ? `
       <div class="card">
         <h2>⛳ Net Score Leaderboard</h2>
 
