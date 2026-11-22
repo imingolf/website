@@ -3887,7 +3887,7 @@ function scores(){
   // Hide current round standings from players until their own score is submitted.
   // Organisers retain visibility to manage the competition.
   const myRoundPlayer=state.players.find(p=>p.id===myPlayerId);
-  const canSeeCurrentLeaderboard=isAdmin || (myRoundPlayer && submitted(myRoundPlayer,pointsComp));
+  const canSeeCurrentLeaderboard=isAdmin || state.gameType!=='money' || !roundOpenNow() || Boolean(myRoundPlayer && submitted(myRoundPlayer,pointsComp));
 
   const sortedPlayers=[...roundPlayers]
     .sort((a,b)=>a.name.localeCompare(b.name));
