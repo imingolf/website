@@ -3884,6 +3884,11 @@ function scores(){
     return !submitted(p,type);
   });
 
+  // Hide current round standings from players until their own score is submitted.
+  // Organisers retain visibility to manage the competition.
+  const myRoundPlayer=state.players.find(p=>p.id===myPlayerId);
+  const canSeeCurrentLeaderboard=isAdmin || (myRoundPlayer && submitted(myRoundPlayer,pointsComp));
+
   const sortedPlayers=[...roundPlayers]
     .sort((a,b)=>a.name.localeCompare(b.name));
 
@@ -4043,7 +4048,8 @@ function scores(){
       }).join("")}
     </div>
 
-    ${pointsComp==="stableford" ? `
+    ${!canSeeCurrentLeaderboard ? `<div class="card"><div class="notice">🔒 Submit your score to see the leaderboard.</div></div>` : ""}
+    ${canSeeCurrentLeaderboard && pointsComp==="stableford" ? `
       <div class="card">
         <h2>Round scores · Stableford</h2>
 
@@ -4067,7 +4073,7 @@ function scores(){
       </div>
     ` : ""}
 
-    ${pointsComp==="net" ? `
+    ${canSeeCurrentLeaderboard && pointsComp==="net" ? `
       <div class="card">
         <h2>⛳ Net Score Leaderboard</h2>
 
