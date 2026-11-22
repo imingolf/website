@@ -104,7 +104,7 @@
    const empty=[...screen.querySelectorAll('.muted')].find(el=>el.textContent.trim()==='No result details saved.');
    if(empty&&[...screen.querySelectorAll('h2')].some(el=>/standings/i.test(el.textContent)))empty.closest('.card')?.setAttribute('hidden','');
   }
-  for(const button of screen.querySelectorAll('button:disabled'))if(/entries closed.*scoring has started/i.test(button.textContent)&&!button.nextElementSibling?.classList.contains('ui-entry-explanation')){
+  for(const button of screen.querySelectorAll('button:disabled'))if(/entries closed/i.test(button.textContent)&&!button.nextElementSibling?.classList.contains('ui-entry-explanation')){
    const note=document.createElement('p');note.className='muted ui-entry-explanation';note.textContent='You can still join the group. Entry to this round is closed.';button.after(note);
   }
   const cards=[...screen.children].filter(el=>el.classList.contains('card'));

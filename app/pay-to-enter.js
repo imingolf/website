@@ -19,7 +19,7 @@
  function nextActionHtml(){
   if(!applicable()||state.roundOpen!==true)return null;
   if(!entered())return '<div class="card iig-paid-entry-next">'+(roundLocked()?'<h2>Entries closed</h2><p>You can join the next competition.</p>':(window.IIGRelease?.paymentIsExplicitlyUnpaid(me())?'<h2>You’re not entered yet</h2>':'')+'<p>Pay before you play.</p><button class="primary full" onclick="show(\'pay\')">Pay to enter</button>')+'</div>';
-  if(declaredPaid())return '<div class="card iig-paid-entry-next"><h2>✓ You’re entered</h2><p>'+(scored()?'Your score has been saved.':'Enjoy your round. Enter your final score when you’ve finished.')+'</p><button class="primary full" onclick="show(\'scores\')">'+(scored()?'View my score':'Enter score')+'</button></div>';
+  if(declaredPaid())return '<div class="card iig-paid-entry-next"><h2>✓ You’re entered</h2><p>'+(scored()?'Your score has been saved.':'Enjoy your round. Enter your final score when you’ve finished.')+'</p><button class="primary full" onclick="show(\'scores\')">'+(scored()?'View leaderboard':'Enter score')+'</button></div>';
   return '<div class="card iig-paid-entry-next"><h2>You’re entered</h2><p>Entry fee due: £'+esc(amount())+'</p><button class="primary full" onclick="show(\'pay\')">Pay entry fee</button><button class="secondary full" onclick="show(\'scores\')">'+(scored()?'View my locked score':'Enter score')+'</button></div>';
  }
  function button(parent,label,fn,secondary=false){const b=document.createElement('button');b.type='button';b.className=(secondary?'secondary':'primary')+' full';b.textContent=label;b.addEventListener('click',fn);parent.append(b);return b;}
@@ -40,7 +40,7 @@
     card.innerHTML='<h2>Entries closed</h2>'+detail()+'<p>You are not able to enter this competition now. If you have already paid, contact your organiser.</p>';
    }else if(declaredPaid()&&entered()){
     card.innerHTML='<h2>✓ You’re entered</h2>'+detail()+'<p>Payment confirmed.</p>';
-    button(card,scored()?'View my score':'Enter score',()=>show('scores'));
+    button(card,scored()?'View leaderboard':'Enter score',()=>show('scores'));
    }else{
     card.innerHTML='<h2>'+(entered()?'Pay entry fee':'Pay to enter')+'</h2><div class="iig-entry-details">'+detail()+'<p class="iig-entry-price">£'+esc(amount())+' <span>to '+(entered()?'pay':'enter')+'</span></p></div><p>Pay using the organiser’s payment link, then return here to confirm.</p>';
     button(card,'Open payment link',launch);

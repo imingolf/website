@@ -1105,14 +1105,25 @@ function accountEntryStatus(){
  if(typeof window==='undefined')return null;
  return window.iigSecureOrganiser?.entryStatus || window.iigSecurePlayer?.entryStatus || null;
 }
+function individualMoneyRound(){
+  return state.gameType==="money" && !state.trip?.active;
+}
+function playerResultIn(p,type){
+  if(!p)return false;
+  return type==="net" ? p.noReturn===true || p.netScore!=null : p.stableford!=null;
+}
+function scoringStarted(){
+  return Object.values(state.trip?.currentTeamScores||{}).some(v=>v!=null && v!=="") ||
+    state.players.some(p=>p.stableford!=null || p.netScore!=null || p.noReturn===true);
+}
 function roundLocked(){
- if(typeof accountEntryStatus==='function' && accountEntryStatus()?.closed)return true;
-  if(typeof iigEntryBridge!=="undefined" && iigEntryBridge && iigEntryBridge.entryStatus(state,pin).closed)return true;
-  return Object.values(state.trip?.currentTeamScores||{}).some(v=>v!=null && v!=="") || state.players.some(p=>
-    p.stableford!=null ||
-    p.netScore!=null ||
-    p.noReturn===true
-  );
+  const entry=accountEntryStatus() || (iigEntryBridge && iigEntryBridge.entryStatus(state,pin));
+  if(entry)return entry.closed;
+  if(individualMoneyRound()){
+    const field=state.players.filter(p=>Number(state.stake||0)<=0 || p.paid || p.playingThisRound || playerResultIn(p,state.pointsCompetition));
+    return field.length>0 && field.every(p=>playerResultIn(p,state.pointsCompetition));
+  }
+  return scoringStarted();
 }
 
 function sameEntryRound(a,b){
@@ -1122,7 +1133,7 @@ function sameEntryRound(a,b){
 function entryClosed(){return !roundOpenNow() || roundLocked();}
 function entryClosedMessage(){
   clearPaymentJourney();
-  showAppToast("Entries Closed","Entry and payment status cannot change after scoring starts.",4200);
+  showAppToast("Entries Closed","This competition is closed to new entries.",4200);
 }
 async function refreshEntryState(){
   const requestPin=pin,requestState=state;
@@ -1787,7 +1798,7 @@ async function enterNormalPointsGame(){
   if(state.trip?.active)return;
   if(state.gameType!=="points")return;
   if(roundLocked()){
-    alert("Entries are closed because scoring has started.");
+    alert("Entries are closed.");
     return;
   }
   if(!myPlayerId){
@@ -1838,7 +1849,7 @@ function playerNextActionHtml(){
       const ids=entry.entrantIds;
       const team=tripTeamRoundActive() && (state.trip.currentTeams||[]).find(t=>(t.playerIds||[]).includes(me.id));
       const entered=ids.includes(me.id) && (!tripTeamRoundActive() || (team && team.playerIds.length===2 && team.playerIds.every(id=>ids.includes(id))));
-      if(!entered)return `<div class="card" style="text-align:center;"><div class="muted">CURRENT ROUND</div><button class="secondary full" style="font-size:18px;margin-top:8px;" disabled>🔒 Entries closed — scoring has started</button></div>`;
+      if(!entered)return `<div class="card" style="text-align:center;"><div class="muted">CURRENT ROUND</div><button class="secondary full" style="font-size:18px;margin-top:8px;" disabled>🔒 Entries closed</button></div>`;
     }
   }
   if(tripTeamRoundActive()){
@@ -1858,7 +1869,7 @@ function playerNextActionHtml(){
   }
 
   if(normalPointsGame && !me.playingThisRound && roundLocked()){
-    return `<div class="card" style="text-align:center;"><div class="muted">CURRENT ROUND</div><button class="secondary full" style="font-size:18px;margin-top:8px;" disabled>🔒 Entries closed — scoring has started</button></div>`;
+    return `<div class="card" style="text-align:center;"><div class="muted">CURRENT ROUND</div><button class="secondary full" style="font-size:18px;margin-top:8px;" disabled>🔒 Entries closed</button></div>`;
   }
 
   if(moneyGame && !me.paid && !roundLocked()){
@@ -1874,7 +1885,7 @@ function playerNextActionHtml(){
     return "";
   }
   if(moneyGame && !me.paid && roundLocked()){
-    return `<div class="card" style="text-align:center;"><div class="muted">CURRENT ROUND</div><button class="secondary full" style="font-size:18px;margin-top:8px;" disabled>🔒 Entries closed — scoring has started</button></div>`;
+    return `<div class="card" style="text-align:center;"><div class="muted">CURRENT ROUND</div><button class="secondary full" style="font-size:18px;margin-top:8px;" disabled>🔒 Entries closed</button></div>`;
   }
 
   return `<div class="card" style="text-align:center;"><div class="muted">YOUR NEXT STEP</div><button class="secondary full" style="font-size:18px;margin-top:8px;" disabled>✅ You’re In — Good Luck! ⛳</button></div>`;
@@ -3354,7 +3365,7 @@ function pay(){
            ${isAdmin
              ? (Number(state.stake||0)<=0
                 ? `<span class="pill paid">No payment required</span>`
-                : `<button class="${p.paid?'secondary':'primary'} small" onclick="togglePaid(${i})" ${entryClosed()&&!window.iigSecureOrganiser?.active?"disabled":""}>${p.paid?'✓ Paid':'Mark paid'}</button>`)
+                : `<button class="${p.paid?'secondary':'primary'} small" onclick="togglePaid(${i})" ${entryClosed() && (!window.iigSecureOrganiser?.active || (!p.paid && !accountEntryStatus()?.entrantIds?.includes(p.id)))?"disabled":""}>${p.paid?'✓ Paid':'Mark paid'}</button>`)
              : (Number(state.stake||0)<=0
                 ? `<span class="pill paid">No payment required</span>`
                 : `<span class="pill ${p.paid?'paid':'pending'}">${p.paid?'✓ Paid':'Not paid'}</span>`)
@@ -3449,7 +3460,7 @@ function paymentLinkForStake(rawLink,stake){
 async function adminSelfEnter(){
   if(!demoCanEdit())return;
   if(!myPlayerId){alert("Please select who you are first.");return;}
-  if(roundLocked()){alert("🔒 Entries are closed — scoring has started.");return;}
+  if(roundLocked()){alert("🔒 Entries are closed.");return;}
 
   const player=state.players.find(p=>p.id===myPlayerId);
   if(!player)return;
@@ -3884,10 +3895,8 @@ function scores(){
     return !submitted(p,type);
   });
 
-  // Hide current round standings from players until their own score is submitted.
-  // Organisers retain visibility to manage the competition.
   const myRoundPlayer=state.players.find(p=>p.id===myPlayerId);
-  const canSeeCurrentLeaderboard=isAdmin || state.gameType!=='money' || !roundOpenNow() || Boolean(myRoundPlayer && submitted(myRoundPlayer,pointsComp));
+  const canSeeCurrentLeaderboard=isAdmin || !individualMoneyRound() || !roundOpenNow() || playerResultIn(myRoundPlayer,pointsComp);
 
   const sortedPlayers=[...roundPlayers]
     .sort((a,b)=>a.name.localeCompare(b.name));
@@ -3934,7 +3943,7 @@ function scores(){
       ${!isAdmin&&state.roundOpen===true&&state.gameType==='money'&&Number(state.stake||0)>0&&state.players.some(p=>p.id===myPlayerId&&(!p.paid||window.IIGRelease?.paymentIsExplicitlyUnpaid(p))&&window.IIGRelease?.entered(p))?'<div class="notice">Your entry fee is still due. Your submitted score stays locked.<button class="secondary full" onclick="show(\'pay\')">Go to Pay</button></div>':''}
 
       ${roundLocked() ? `
-        ${eligiblePlayers.length ? `
+        ${canSeeCurrentLeaderboard && eligiblePlayers.length ? `
           <div class="notice ${stillToEnter.length ? "warning" : ""}">
             ${stillToEnter.length
               ? `<b>⏳ Awaiting scores — ${stillToEnter.length}</b><br>${stillToEnter.map(p=>esc(p.name)).join(" • ")}`
@@ -3956,7 +3965,7 @@ function scores(){
           ${Number(state.stake||0)>0 ? `<div class="notice">💷 Only players marked as paid are included in the final result.</div>` : ""}
         `}
 
-        ${eligiblePlayers.length ? `
+        ${canSeeCurrentLeaderboard && eligiblePlayers.length ? `
           <div class="notice ${stillToEnter.length ? "warning" : ""}">
             ${stillToEnter.length
               ? `<b>⏳ Awaiting scores — ${stillToEnter.length}</b><br>${stillToEnter.map(p=>esc(p.name)).join(" • ")}`
@@ -4048,7 +4057,7 @@ function scores(){
       }).join("")}
     </div>
 
-    ${!canSeeCurrentLeaderboard ? `<div class="card"><div class="notice">🔒 Submit your score to see the leaderboard.</div></div>` : ""}
+    ${!canSeeCurrentLeaderboard ? `<div class="card"><div class="notice">🔒 ${roundLocked() && !eligiblePlayers.some(p=>p.id===myPlayerId) ? "See the results after the organiser finishes the round." : "Submit your score to see the leaderboard."}</div></div>` : ""}
     ${canSeeCurrentLeaderboard && pointsComp==="stableford" ? `
       <div class="card">
         <h2>Round scores · Stableford</h2>
@@ -4156,11 +4165,11 @@ if(!demoCanEdit())return;
   }
 
   if(roundLocked() && !isAdmin){
-    alert("🔒 Entries are closed — scoring has started.");
+    alert("🔒 Entries are closed.");
     return;
   }
 
-  if(roundLocked() && isAdmin && (p.scoreSubmitted===true || p.stableford!=null || p.netScore!=null || p.noReturn===true)){
+  if(isAdmin && (p.scoreSubmitted===true || p.stableford!=null || p.netScore!=null || p.noReturn===true)){
     alert("This player has already submitted. Use Correct score if a change is needed.");
     return;
   }
@@ -4784,7 +4793,10 @@ if(isTrip){
     p=>moneyEligible(p) && pointsComp==="net" && p.netScore!=null
   );
 
-  if(!stablefordPlayers.length && !netPlayers.length){
+  const enteredMoneyPlayers=currentRoundPlayers().filter(moneyEligible);
+  const allNetNR=!isTrip && pointsComp==="net" && enteredMoneyPlayers.length>0 &&
+    enteredMoneyPlayers.every(p=>p.noReturn===true);
+  if(!stablefordPlayers.length && !netPlayers.length && !allNetNR){
     alert(pointsComp==="stableford" ? "Enter at least one Stableford score first." : "Enter at least one Net score first.");
     return;
   }
@@ -7352,7 +7364,7 @@ async function changeCurrentRoundCompetition(){
     alert("There is no open round to change.");
     return;
   }
-  if(roundLocked()){
+  if(roundLocked() || scoringStarted()){
     alert("Competition cannot be changed after scoring has started.");
     return;
   }
@@ -7517,7 +7529,7 @@ function settingsPage(){
       Start new round
     </button>
   ` : ""}
-  ${roundOpenNow() && !roundLocked() ? `
+  ${roundOpenNow() && !roundLocked() && !scoringStarted() ? `
     <div class="notice" style="margin-top:12px;">
       <div class="muted">CURRENT COMPETITION</div>
       <b>${state.pointsCompetition==="net" ? "⛳ Net" : "🏆 Stableford"}</b>
@@ -7637,12 +7649,12 @@ function adminHelpBack(){
 
 function adminHelpTopicContent(topic){
   const topics={
-    setup:`<h2>⛳ Set up the next competition</h2><div class="notice"><b>1.</b> Open <b>Group organiser → Organiser settings</b>.<br><br><b>2.</b> When the previous round is finished, tap <b>Start new round</b>.<br><br><b>3.</b> Choose Money Game, Points Game or Trip Mode.<br><br><b>4.</b> Enter the course, date and choose <b>Stableford or Net</b> for everyone.<br><br><b>5.</b> For a Money Game, set the entry fee and payment amount.</div><div class="notice">On a new device, choose <b>Start a golf group → Already registered? Sign in</b>. Use the email you created your group with and enter the code emailed to you.</div><div class="notice warning">Once the first score is submitted, entries close automatically.</div>`,
+    setup:`<h2>⛳ Set up the next competition</h2><div class="notice"><b>1.</b> Open <b>Group organiser → Organiser settings</b>.<br><br><b>2.</b> When the previous round is finished, tap <b>Start new round</b>.<br><br><b>3.</b> Choose Money Game, Points Game or Trip Mode.<br><br><b>4.</b> Enter the course, date and choose <b>Stableford or Net</b> for everyone.<br><br><b>5.</b> For a Money Game, set the entry fee and payment amount.</div><div class="notice">On a new device, choose <b>Start a golf group → Already registered? Sign in</b>. Use the email you created your group with and enter the code emailed to you.</div><div class="notice warning">In an individual Money Game, entries close automatically when every entrant has submitted a score or valid NR.</div>`,
     players:`<h2>👥 Add or edit players</h2><div class="notice">Go to <b>Players</b>.<br><br>Players can join themselves, or the organiser can manage names and handicaps in Organiser view.<br><br>Your player profile is linked to the email you used to join. To reopen it, choose <b>Join my golf group</b>, enter your <b>Group PIN</b> and sign in with <b>the same email</b>. If another account is open, sign out first.</div>`,
-    payments:`<h2>💷 Payments</h2><div class="notice"><b>What is a payment link?</b><br><br>It is your personal web address that lets players pay money directly to your chosen account. You copy it from your banking or payment app and paste it into I’m In Golf once.</div><div class="notice"><b>Set yours up:</b><br><br><b>1.</b> Go to <b>Organiser settings → Set Up Player Payments</b>.<br><br><b>2.</b> Choose Monzo, Revolut, PayPal, Starling, Wise or Other secure link.<br><br><b>3.</b> Follow the instructions shown for that provider.<br><br><b>4.</b> Paste the link, test it and save.</div><div class="notice">In a Money Game, players tap <b>Pay & Join</b> and use the organiser’s payment link to pay the organiser directly.<br><br>I’m In Golf records the payment status. Once scoring starts, entries close.</div><div class="muted">Payments go directly to the organiser. I’m In Golf does not receive, verify or hold the money.</div>`,
+    payments:`<h2>💷 Payments</h2><div class="notice"><b>What is a payment link?</b><br><br>It is your personal web address that lets players pay money directly to your chosen account. You copy it from your banking or payment app and paste it into I’m In Golf once.</div><div class="notice"><b>Set yours up:</b><br><br><b>1.</b> Go to <b>Organiser settings → Set Up Player Payments</b>.<br><br><b>2.</b> Choose Monzo, Revolut, PayPal, Starling, Wise or Other secure link.<br><br><b>3.</b> Follow the instructions shown for that provider.<br><br><b>4.</b> Paste the link, test it and save.</div><div class="notice">In a Money Game, players tap <b>Pay & Join</b> and use the organiser’s payment link to pay the organiser directly.<br><br>I’m In Golf records the payment status. Entries stay open until every entrant has submitted a result in an individual Money Game.</div><div class="muted">Payments go directly to the organiser. I’m In Golf does not receive, verify or hold the money.</div>`,
     scoring:`<h2>🏌️ Scores</h2><div class="notice">Players enter their own score and tap <b>Submit My Score</b>.<br><br>The app asks <b>Are you sure?</b> before saving.<br><br>Once submitted, the player's score is locked.</div><div class="notice">The group organiser can use <b>Correct score</b> if a genuine mistake needs fixing.</div>`,
     nr:`<h2>NR — No Return</h2><div class="notice">In a <b>Net</b> competition, a player who does not return a score should tap <b>NR — No Return</b>.<br><br>NR counts as submitted, removes the player from <b>Awaiting scores</b>, and the player cannot win the Net competition.</div>`,
-    waiting:`<h2>⏳ Awaiting scores</h2><div class="notice">Once scoring starts, the Scores screen shows the names of everyone who still needs to submit.<br><br>For a Money Game, the Scores screen includes players who entered before scoring started.<br><br>The list updates automatically as scores or NR results are submitted.</div>`,
+    waiting:`<h2>⏳ Awaiting scores</h2><div class="notice">Once scoring starts, the Scores screen shows the names of everyone who still needs to submit.<br><br>In an individual Money Game, players see the leaderboard after submitting their own score.<br><br>The list updates automatically as scores or NR results are submitted.</div>`,
     finish:`<h2>🏁 Finish a round</h2><div class="notice">When every entered player has submitted a score or valid NR, the group organiser will see <b>Finish Round</b> at the bottom of Scores.<br><br>Check the leaderboard, tap the button and confirm the result.<br><br>The winner and <b>full final standings</b> are saved in <b>League → Previous rounds</b> and can be shared as an I’m In Golf results image.</div><div class="notice">After a normal round finishes, players see <b>Next Competition — Coming soon…</b>. To set up the next competition, open <b>Group organiser → Organiser settings → Start new round</b>.<br><br>On a new device, choose <b>Start a golf group → Already registered? Sign in</b> and sign in with your organiser email and the code emailed to you.</div>`,
     points:`<h2>🏆 Points Games</h2><div class="notice">Everyone plays the same competition — Stableford or Net.<br><br>There is no payment step.<br><br>Players enter their score in the normal Scores screen and the top three receive league points based on the value chosen when the round is set up.</div>`,
     trip:`<h2>✈️ Trip Mode</h2><div class="notice">Choose <b>Trip Mode</b>, enter the trip name, choose the Trip players and plan each round.<br><br>Rounds can be <b>Individual</b>, <b>Better Ball</b> or <b>Pairs Aggregate</b>. Before each round, mark anyone <b>Not Playing Today</b>, then use <b>Randomise Fourballs</b> or <b>Pick Fourballs Myself</b>.</div><div class="notice"><b>Pairs rounds:</b> either partner enters the pair’s one final score. Better Ball uses the pair’s final Better Ball Stableford total. Pairs Aggregate combines both partners’ final scores. These rounds build the separate <b>Team-event standings</b>.</div><div class="notice"><b>Individual rounds</b> build the Individual Trip Championship standings. After the final round, the Trip Summary shows daily winners, Individual and Team-event standings, any Trip money summary and the Trip champion. The organiser then taps <b>Save Trip & Return to Normal Golf</b>.</div>`,
@@ -8254,7 +8266,7 @@ if(!roundOpenNow()){
   return;
 }
 if(roundLocked()){
-    alert("🔒 Entries are closed — scoring has started.");
+    alert("🔒 Entries are closed.");
     return;
   }
 
