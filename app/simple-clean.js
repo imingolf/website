@@ -58,6 +58,12 @@
    const button=document.createElement('button');button.type='button';button.className='secondary full';button.textContent='❓ Group Help';card.append(button);
    const panel=document.createElement('div');panel.hidden=true;
    const heading=document.createElement('h2');heading.textContent='Group Help';panel.append(heading);
+   const intro=document.createElement('p');intro.textContent='Tap a topic to read it. Tap again to close.';panel.append(intro);
+   for(const [topic,label] of [['setup','Set up a competition'],['players','Players, handicaps & invitations'],['payments','Payment settings'],['prizes','Prize split'],['finish','Finish a competition'],['reminder','Share a reminder']]){
+    const detail=document.createElement('details');detail.className='ui-options';const summary=document.createElement('summary');summary.textContent=label;detail.append(summary);
+    const body=document.createElement('div');body.innerHTML=adminHelpTopicContent(topic);body.querySelector('h2')?.remove();detail.append(body);panel.append(detail);
+   }
+   const contact=document.createElement('h3');contact.textContent='Still need help?';panel.append(contact);
    const choice=document.createElement('select');choice.setAttribute('aria-label','Help request type');
    for(const label of ['Ask for help','Report a problem','Send feedback']){const option=document.createElement('option');option.value=label;option.textContent=label;choice.append(option);}panel.append(choice);
    const email=document.createElement('input');email.type='email';email.placeholder='Your email (for a reply)';email.setAttribute('aria-label','Your email for a reply');panel.append(email);
