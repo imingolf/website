@@ -47,7 +47,15 @@
   document.getElementById('nplayers').setAttribute('aria-current','page');window.scrollTo(0,0);
  }
  playersPage=function(){
-  if(!identificationPage&&!window.iigSecurePlayer?.active){originalPlayersPage();return;}
+  if(!identificationPage&&!window.iigSecurePlayer?.active){
+   originalPlayersPage();
+   if(window.iigSecureOrganiser?.active){
+    const back=document.createElement('button');back.type='button';back.className='secondary';back.id='simplerBackToOrganiser';
+    back.textContent='← Back to Group organiser';back.onclick=openAdminSettings;
+    document.getElementById('screen').prepend(back);
+   }
+   return;
+  }
   const screen=document.getElementById('screen'),ownId=ownPlayerId(),groupPin=pin;
   screen.innerHTML='<div class="card simpler-member-list"><h2>Who are you?</h2><p id="simplerMemberGroup"></p><p class="muted">Open the player profile linked to your verified account. Other names cannot be claimed.</p><div id="simplerMemberChoices"></div><p id="simplerMemberMessage" role="status" aria-live="polite"></p><button id="simplerNotListed" type="button" class="secondary full">I’m not listed</button></div>';
   text(document.getElementById('simplerMemberGroup'),state.groupName||'Your golf group');
