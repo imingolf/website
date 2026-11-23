@@ -7552,7 +7552,7 @@ ${state.trip?.completed ? `
     🏁 Finish Trip & Return to Normal Round
   </button>
 ` : ""}
-<button class="primary full" onclick="competitionReminder()">🔔 Competition Reminder</button>
+<button class="primary full" onclick="competitionReminder()">🔔 Share competition reminder</button>
 
 <details class="advanced-controls">
   <summary>⚠️ Advanced reset and delete controls</summary>
@@ -8291,28 +8291,32 @@ https://imingolf.co.uk/app/?pin=${encodeURIComponent(newPin)}&adminsetup=${encod
   window.scrollTo(0,0);
 }
 
-function competitionReminder(){
-if(!roundOpenNow()){
-  showAppToast('No competition currently open','Set up your next competition before sending a reminder.',3000);
-  return;
+async function competitionReminder(){
+ if(!isAdmin)return;
+ if(!roundOpenNow()){
+  showAppToast('No competition currently open','Set up your next competition before sharing a reminder.',3000);return;
+ }
+ if(roundLocked()){showAppToast('Entries are closed','New entries are closed for this competition.',3000);return;}
+ const details=[state.course,state.date?formatDate(state.date):''].filter(Boolean).join(' · ');
+ const paid=state.gameType==='money'&&Number(state.stake||0)>0;
+ const message='⛳ '+(state.groupName||'Golf competition')+'\n'+(details?details+'\n\n':'\n')+
+  'Our competition is open to enter. '+(paid?'Entry is £'+Number(state.stake)+' per player. Open I’m In Golf and tap Pay & Join to enter.':'Open I’m In Golf to join the competition. There’s no entry fee.')+'\n\nSee you there!';
+ if(navigator.share){
+  try{await navigator.share({title:'Competition reminder',text:message});return;}
+  catch(error){if(error.name==='AbortError')return;}
+ }
+ try{
+  if(!navigator.clipboard?.writeText)throw Error('Copy unavailable');
+  await navigator.clipboard.writeText(message);
+  showAppToast('Reminder copied','Paste it into WhatsApp or a message.',3000);
+ }catch(_){
+  const dialog=document.createElement('dialog');dialog.setAttribute('aria-label','Copy competition reminder');
+  dialog.style.cssText='width:min(440px,calc(100% - 32px));padding:20px;border:1px solid #dce5de;border-radius:16px';
+  dialog.innerHTML='<h2>Competition reminder</h2><p>Select and copy the message below.</p><textarea readonly aria-label="Reminder message" style="width:100%;min-height:180px"></textarea><button type="button" class="secondary full">Close</button>';
+  dialog.querySelector('textarea').value=message;dialog.querySelector('button').onclick=()=>dialog.close();dialog.addEventListener('close',()=>dialog.remove());document.body.append(dialog);dialog.showModal();dialog.querySelector('textarea').select();
+ }
 }
-if(roundLocked()){
-    alert("🔒 Entries are closed.");
-    return;
-  }
 
-  const message="Hi all, just a reminder there’s a competition open to enter. If you’re planning to play, please pay your entry fee before the day. Thanks, and good luck.";
-
-  if(navigator.share){
-    navigator.share({
-      title:"I'm In Golf — Competition Reminder",
-      text:message
-    });
-  }else{
-    navigator.clipboard?.writeText(message);
-    alert("Competition reminder copied. Paste it into WhatsApp.");
-  }
-}
 function organiserGroupNameSetup(currentName){
   return new Promise(resolve=>{
     const overlay=document.createElement("div");
