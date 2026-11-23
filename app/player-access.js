@@ -6,6 +6,28 @@
  const originalShow=show,originalPlayersPage=playersPage;
  let identificationPage=false;
  const ownPlayerId=()=>window.iigOwnPlayerId?.(pin)||null;
+ function inviteFriendButton(){
+  const button=document.createElement('button');button.type='button';button.className='secondary full';button.textContent='Invite a friend';button.onclick=inviteFriend;return button;
+ }
+ async function inviteFriend(){
+  if(!window.iigSecurePlayer?.active)return;
+  document.getElementById('playerFriendInvite')?.remove();
+  const dialog=document.createElement('dialog');dialog.id='playerFriendInvite';dialog.setAttribute('aria-labelledby','playerFriendInviteTitle');
+  dialog.style.cssText='width:min(440px,calc(100% - 32px));border:1px solid #dce5de;border-radius:16px;padding:20px';
+  dialog.innerHTML='<h2 id="playerFriendInviteTitle">Invite a friend</h2><p role="status">Preparing your invitation…</p><div hidden><a class="secondary full" target="_blank" rel="noopener noreferrer" style="display:block;padding:12px;text-align:center;border-radius:12px;text-decoration:none">Invite via WhatsApp</a><button type="button" class="secondary full" data-share>Share invitation</button><button type="button" class="secondary full" data-copy>Copy invitation</button><textarea aria-label="Invitation message" readonly hidden style="width:100%;min-height:140px"></textarea></div><button type="button" class="secondary full" data-close>Close</button>';
+  document.body.append(dialog);dialog.querySelector('[data-close]').onclick=()=>dialog.close();dialog.addEventListener('close',()=>dialog.remove());dialog.showModal();
+  const groupPin=pin;
+  const valid=()=>dialog.isConnected&&window.iigSecurePlayer?.active&&pin===groupPin;
+  const status=dialog.querySelector('[role=status]');
+  try{
+   const message=await window.iigSecurePlayer.invitation();if(!valid()){dialog.close();return;}
+   const controls=dialog.querySelector('div');controls.hidden=false;status.textContent='Send this invitation to a friend to join your group.';
+   const link=dialog.querySelector('a');link.href='https://wa.me/?text='+encodeURIComponent(message);link.onclick=e=>{if(!valid()){e.preventDefault();dialog.close();}};
+   const copy=async()=>{if(!valid()){dialog.close();return;}try{await navigator.clipboard.writeText(message);status.textContent='Invitation copied.';}catch(_){const area=dialog.querySelector('textarea');area.value=message;area.hidden=false;area.focus();area.select();status.textContent='Select and copy the invitation below.';}};
+   dialog.querySelector('[data-copy]').onclick=copy;
+   const share=dialog.querySelector('[data-share]');share.hidden=!navigator.share;share.onclick=async()=>{if(!valid()){dialog.close();return;}try{await navigator.share({title:'Invite a friend',text:message});}catch(error){if(error.name!=='AbortError')status.textContent='Sharing did not open. Try WhatsApp or Copy invitation.';}};
+  }catch(error){if(dialog.isConnected)status.textContent=error.message||'Could not prepare your invitation. Please try again.';}
+ }
  function closeGroup(){
   document.getElementById('screen').hidden=false;
   document.getElementById('simplerGroupInfo')?.remove();
@@ -23,7 +45,7 @@
   const close=document.createElement('button');close.type='button';close.className='secondary';close.textContent='Back';close.onclick=closeGroup;
   const change=document.createElement('button');change.id='simplerChangeGroup';change.type='button';change.className='secondary';change.textContent='Change group';
   change.onclick=()=>{if(window.iigChangeGroup?.())closeGroup();};
-  info.append(title,code,change,close);banner.prepend(info);banner.classList.add('ui-group-panel','ui-show-options');
+  info.append(title,code);if(window.iigSecurePlayer?.active)info.append(inviteFriendButton());info.append(change,close);banner.prepend(info);banner.classList.add('ui-group-panel','ui-show-options');
   for(const options of banner.querySelectorAll(':scope > details'))if(!options.hidden)options.open=true;
   document.getElementById('screen').hidden=true;
   for(const button of document.querySelectorAll('#uiPlayerOptions,#simplerOrganiserMenu'))button.setAttribute('aria-expanded','true');
@@ -52,6 +74,7 @@
   screen.innerHTML='<div class="card simpler-member-list"><h2>Who are you?</h2><p id="simplerMemberGroup"></p><p class="muted">Open the player profile linked to your verified account. Other names cannot be claimed.</p><div id="simplerMemberChoices"></div><p id="simplerMemberMessage" role="status" aria-live="polite"></p><button id="simplerNotListed" type="button" class="secondary full">I’m not listed</button></div>';
   text(document.getElementById('simplerMemberGroup'),state.groupName||'Your golf group');
   const list=document.getElementById('simplerMemberChoices');
+  if(window.iigSecurePlayer?.active)list.before(inviteFriendButton());
   for(const member of [...state.players].sort((a,b)=>a.name.localeCompare(b.name))){
    const button=document.createElement('button');button.type='button';button.className='secondary full simpler-member-choice';
    const name=document.createElement('strong');name.textContent=member.name+(member.id===ownId?' · You':'');
