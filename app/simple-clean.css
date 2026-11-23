@@ -356,3 +356,8 @@ body[data-ui-page]:not([data-ui-page=round]) .ui-app-handover{display:none}
 .iig-entry-dialog::backdrop{background:#10281ecc}.iig-entry-dialog h2{font-size:27px;line-height:1.2;margin:0 0 16px}.iig-entry-dialog p{font-size:17px;line-height:1.5}.iig-entry-dialog button{margin-top:12px;min-height:52px}.iig-entry-dialog [data-entry-status]:empty{display:none}
 .iig-entry-recovery{margin-top:22px;font-size:15px}.iig-entry-recovery summary{cursor:pointer}.iig-entry-recovery a{display:block;box-sizing:border-box;text-align:center;text-decoration:none;padding:14px;border-radius:12px}.iig-entry-dialog button:disabled{opacity:.6}
 @media(max-width:360px){.iig-entry-dialog{padding:20px}.iig-entry-dialog h2{font-size:24px}}
+
+/* Match organiser navigation to the neighbouring collapsed sections. */
+#screen .card.ui-navigation-card{padding-top:6px;padding-bottom:6px}
+.ui-navigation-row{display:block;width:100%;margin:0;padding:12px 0;min-height:48px;background:transparent;color:var(--ui-deep);font-size:17px;font-weight:700;line-height:1.5;text-align:left}
+.ui-navigation-row>span{color:var(--ui-green)}
