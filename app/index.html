@@ -7410,8 +7410,8 @@ async function changeCurrentPrizePayout(){
   if(currentlySplit){
     const confirmed=await appConfirm(
       "Change payment split?",
-      "Change this competition back to a single result payment?\n\nPlayers, payments and the current total will stay unchanged.",
-      "Single Result Payment"
+      "Change this competition to winner takes all?\n\nPlayers, payments and the current total will stay unchanged.",
+      "Winner takes all"
     );
     if(!confirmed)return;
 
@@ -7426,7 +7426,7 @@ async function changeCurrentPrizePayout(){
       return;
     }
 
-    alert("✅ Payment split changed to a single result payment.");
+    alert("✅ Payment split changed to winner takes all.");
     settingsPage();
     return;
   }
@@ -7482,56 +7482,16 @@ function settingsPage(){
   }
  if(!isAdmin){adminLogin();return}
  $("screen").innerHTML=`<div class="card"><h2>Group organiser</h2>
- <div class="muted">Shared controls for your golf group.</div>
- <button class="primary full" onclick="returnToPlayerView()">👤 Switch to player view</button>
- <div class="notice" style="margin-top:12px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
-   <div>
-     <div class="muted">GROUP NAME</div>
-     <b>${esc(state.groupName||"My Golf Group")}</b>
-   </div>
-   <button class="secondary" style="margin:0;width:auto;padding:9px 12px;" onclick="changeGroupName()">✏️ Change</button>
- </div>
-
- ${iigFreePlan() ? `
- <div class="notice" style="margin-top:12px;padding:14px;border:1px solid rgba(25,120,60,.25);">
-   <div class="muted">YOUR PLAN</div>
-   <b style="font-size:18px;">Group access needs checking</b>
-   <div class="muted" style="margin-top:3px;">Up to 10 players · Money Game · Points Game</div>
-
-   <div style="border-top:1px solid rgba(0,0,0,.10);margin:12px 0;"></div>
-
-   <b>⭐ I’m In Golf+</b>
-   <div class="muted" style="margin-top:3px;">
-     Unlimited players · Trip Mode · Side Game<br>
-     Plus all new premium features as they’re released
-   </div>
-
-   <p class="muted">Plus is included free for now. Reload your group to check its access.</p>
- </div>
- ` : `
- <div class="notice" style="margin-top:12px;">
-   <div class="muted">YOUR PLAN</div>
-   <b>⭐ I’m In Golf+</b><br>
-   <span class="muted">Unlimited players · All game modes · Included free for now</span>
- </div>
- `}
+ <div class="muted">${esc(state.groupName||"My Golf Group")}</div>
+ <button class="primary full" onclick="returnToPlayerView()">Back to player view</button>
 
  <button class="primary full" onclick="openAdminHelp()">❓ Organiser guide</button>
  </div>
- <div class="card">
-   <h2>💷 Player payments</h2>
-   <div class="notice">
-     <div class="muted">PAYMENT METHOD</div>
-     <b>${state.paymentLink ? `${esc(paymentProviderLabel(state.paymentProvider||detectPaymentProvider(state.paymentLink)))} — Link ready` : "Not set up"}</b>
-     <div class="muted" style="margin-top:5px;">Players pay directly to you. I’m In Golf never holds the money.</div>
-   </div>
-   <button class="secondary full" onclick="changePaymentLink()">${state.paymentLink ? "✏️ Change Payment Method" : "➕ Set Up Player Payments"}</button>
- </div>
- <div class="card"><h2>Round controls</h2>
+ <div class="card"><h2>Competition</h2>
  ${!state.trip?.active && !state.trip?.completed ? `
   ${!roundOpenNow() ? `
     <button class="secondary full" onclick="newRound()">
-      Start new round
+      Set up competition
     </button>
   ` : ""}
   ${roundOpenNow() && !roundLocked() && !scoringStarted() ? `
@@ -7549,11 +7509,12 @@ function settingsPage(){
         <div class="muted">PAYMENT SPLIT</div>
         <b>${state.splitPrizes
           ? `🥇 1st — remaining amount · 🥈 2nd £${Number(state.secondPrize||0)} · 🥉 3rd £${Number(state.thirdPrize||0)}`
-          : "🏆 Single Result Payment"}</b>
+          : "🏆 Winner takes all"}</b>
+     ${state.splitPrizes ? '<div class="muted">Second and third receive the amounts shown. The winner receives the rest.</div>' : ""}
       </div>
 
       <button class="secondary full" onclick="changeCurrentPrizePayout()">
-        🔄 ${state.splitPrizes ? "Change to Single Result Payment" : "Change to 1st / 2nd / 3rd"}
+        🔄 ${state.splitPrizes ? "Change to winner takes all" : "Split between 1st, 2nd & 3rd"}
       </button>
     ` : ""}
 ` : ""}
@@ -7586,7 +7547,48 @@ ${state.trip?.completed ? `
   <button class="red full" onclick="deleteLastRound()">↩️ Delete Last Round</button>
   <button class="red full" onclick="clearLeague()">🗑️ Clear League & History</button>
 </details></div>
- <div class="card"><details class="ui-fold"><summary>Manage players &amp; handicaps</summary>${playerManagementRows()}</details></div>
+ <div class="card"><details class="ui-fold"><summary>Players &amp; handicaps</summary>${playerManagementRows()}</details></div>
+ <div class="card">
+   <h2>💷 Player payments</h2>
+   <div class="notice">
+     <div class="muted">PAYMENT METHOD</div>
+     <b>${state.paymentLink ? `${esc(paymentProviderLabel(state.paymentProvider||detectPaymentProvider(state.paymentLink)))} — Link ready` : "Not set up"}</b>
+     <div class="muted" style="margin-top:5px;">Players pay directly to you. I’m In Golf never holds the money.</div>
+   </div>
+   <button class="secondary full" onclick="changePaymentLink()">${state.paymentLink ? "✏️ Change Payment Method" : "➕ Set Up Player Payments"}</button>
+ </div>
+<div class="card"><details class="ui-fold"><summary>Group details</summary> <div class="notice" style="margin-top:12px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
+   <div>
+     <div class="muted">GROUP NAME</div>
+     <b>${esc(state.groupName||"My Golf Group")}</b>
+   </div>
+   <button class="secondary" style="margin:0;width:auto;padding:9px 12px;" onclick="changeGroupName()">✏️ Change</button>
+ </div>
+
+ ${iigFreePlan() ? `
+ <div class="notice" style="margin-top:12px;padding:14px;border:1px solid rgba(25,120,60,.25);">
+   <div class="muted">YOUR PLAN</div>
+   <b style="font-size:18px;">Group access needs checking</b>
+   <div class="muted" style="margin-top:3px;">Up to 10 players · Money Game · Points Game</div>
+
+   <div style="border-top:1px solid rgba(0,0,0,.10);margin:12px 0;"></div>
+
+   <b>⭐ I’m In Golf+</b>
+   <div class="muted" style="margin-top:3px;">
+     Unlimited players · Trip Mode · Side Game<br>
+     Plus all new premium features as they’re released
+   </div>
+
+   <p class="muted">Plus is included free for now. Reload your group to check its access.</p>
+ </div>
+ ` : `
+ <div class="notice" style="margin-top:12px;">
+   <div class="muted">YOUR PLAN</div>
+   <b>⭐ I’m In Golf+</b><br>
+   <span class="muted">Unlimited players · All game modes · Included free for now</span>
+ </div>
+ `}
+</details></div>
 <div class="card">
   <h2>Group access</h2>
 
@@ -7654,13 +7656,13 @@ function adminHelpBack(){
 
 function adminHelpTopicContent(topic){
   const topics={
-    setup:`<h2>⛳ Set up the next competition</h2><div class="notice"><b>1.</b> Open <b>Group organiser</b>.<br><br><b>2.</b> When the previous round is finished, tap <b>Start new round</b>.<br><br><b>3.</b> Choose Money Game, Points Game or Trip Mode.<br><br><b>4.</b> Enter the course, date and choose <b>Stableford or Net</b> for everyone.<br><br><b>5.</b> For a Money Game, set the entry fee and payment amount.</div><div class="notice">On a new device, choose <b>Start a golf group → Already registered? Sign in</b>. Use the email you created your group with and enter the code emailed to you.</div><div class="notice warning">In an individual Money Game, entries close automatically when every entrant has submitted a score or valid NR.</div>`,
+    setup:`<h2>⛳ Set up the next competition</h2><div class="notice"><b>1.</b> Open <b>Group organiser</b>.<br><br><b>2.</b> When the previous round is finished, tap <b>Set up competition</b>.<br><br><b>3.</b> Choose Money Game, Points Game or Trip Mode.<br><br><b>4.</b> Enter the course, date and choose <b>Stableford or Net</b> for everyone.<br><br><b>5.</b> For a Money Game, set the entry fee and payment amount.</div><div class="notice">On a new device, choose <b>Start a golf group → Already registered? Sign in</b>. Use the email you created your group with and enter the code emailed to you.</div><div class="notice warning">In an individual Money Game, entries close automatically when every entrant has submitted a score or valid NR.</div>`,
     players:`<h2>👥 Add or edit players</h2><div class="notice">Go to <b>Players</b>.<br><br>Players can join themselves, or the organiser can manage names and handicaps in Organiser view.<br><br>Your player profile is linked to the email you used to join. To reopen it, choose <b>Join my golf group</b>, enter your <b>Group PIN</b> and sign in with <b>the same email</b>. If another account is open, sign out first.</div>`,
     payments:`<h2>💷 Payments</h2><div class="notice"><b>What is a payment link?</b><br><br>It is your personal web address that lets players pay money directly to your chosen account. You copy it from your banking or payment app and paste it into I’m In Golf once.</div><div class="notice"><b>Set yours up:</b><br><br><b>1.</b> Go to <b>Organiser settings → Set Up Player Payments</b>.<br><br><b>2.</b> Choose Monzo, Revolut, PayPal, Starling, Wise or Other secure link.<br><br><b>3.</b> Follow the instructions shown for that provider.<br><br><b>4.</b> Paste the link, test it and save.</div><div class="notice">In a Money Game, players tap <b>Pay & Join</b> and use the organiser’s payment link to pay the organiser directly.<br><br>I’m In Golf records the payment status. Entries stay open until every entrant has submitted a result in an individual Money Game.</div><div class="muted">Payments go directly to the organiser. I’m In Golf does not receive, verify or hold the money.</div>`,
     scoring:`<h2>🏌️ Scores</h2><div class="notice">Players enter their own score and tap <b>Submit My Score</b>.<br><br>The app asks <b>Are you sure?</b> before saving.<br><br>Once submitted, the player's score is locked.</div><div class="notice">The group organiser can use <b>Correct score</b> if a genuine mistake needs fixing.</div>`,
     nr:`<h2>NR — No Return</h2><div class="notice">In a <b>Net</b> competition, a player who does not return a score should tap <b>NR — No Return</b>.<br><br>NR counts as submitted, removes the player from <b>Awaiting scores</b>, and the player cannot win the Net competition.</div>`,
     waiting:`<h2>⏳ Awaiting scores</h2><div class="notice">Once scoring starts, the Scores screen shows the names of everyone who still needs to submit.<br><br>In an individual Money Game, players see the leaderboard after submitting their own score.<br><br>The list updates automatically as scores or NR results are submitted.</div>`,
-    finish:`<h2>🏁 Finish a round</h2><div class="notice">When every entered player has submitted a score or valid NR, the group organiser will see <b>Finish Round</b> at the bottom of Scores.<br><br>Check the leaderboard, tap the button and confirm the result.<br><br>The winner and <b>full final standings</b> are saved in <b>League → Previous rounds</b> and can be shared as an I’m In Golf results image.</div><div class="notice">After a normal round finishes, players see <b>Next Competition — Coming soon…</b>. To set up the next competition, open <b>Group organiser → Start new round</b>.<br><br>On a new device, choose <b>Start a golf group → Already registered? Sign in</b> and sign in with your organiser email and the code emailed to you.</div>`,
+    finish:`<h2>🏁 Finish a round</h2><div class="notice">When every entered player has submitted a score or valid NR, the group organiser will see <b>Finish Round</b> at the bottom of Scores.<br><br>Check the leaderboard, tap the button and confirm the result.<br><br>The winner and <b>full final standings</b> are saved in <b>League → Previous rounds</b> and can be shared as an I’m In Golf results image.</div><div class="notice">After a normal round finishes, players see <b>Next Competition — Coming soon…</b>. To set up the next competition, open <b>Group organiser → Set up competition</b>.<br><br>On a new device, choose <b>Start a golf group → Already registered? Sign in</b> and sign in with your organiser email and the code emailed to you.</div>`,
     points:`<h2>🏆 Points Games</h2><div class="notice">Everyone plays the same competition — Stableford or Net.<br><br>There is no payment step.<br><br>Players enter their score in the normal Scores screen and the top three receive league points based on the value chosen when the round is set up.</div>`,
     trip:`<h2>✈️ Trip Mode</h2><div class="notice">Choose <b>Trip Mode</b>, enter the trip name, choose the Trip players and plan each round.<br><br>Rounds can be <b>Individual</b>, <b>Better Ball</b> or <b>Pairs Aggregate</b>. Before each round, mark anyone <b>Not Playing Today</b>, then use <b>Randomise Fourballs</b> or <b>Pick Fourballs Myself</b>.</div><div class="notice"><b>Pairs rounds:</b> either partner enters the pair’s one final score. Better Ball uses the pair’s final Better Ball Stableford total. Pairs Aggregate combines both partners’ final scores. These rounds build the separate <b>Team-event standings</b>.</div><div class="notice"><b>Individual rounds</b> build the Individual Trip Championship standings. After the final round, the Trip Summary shows daily winners, Individual and Team-event standings, any Trip money summary and the Trip champion. The organiser then taps <b>Save Trip & Return to Normal Golf</b>.</div>`,
     pin:`<h2>🔐 Organiser sign-in</h2><div class="notice"><b>On a new device:</b><br><br><b>1.</b> Choose <b>Start a golf group</b>.<br><br><b>2.</b> Tap <b>Already registered? Sign in</b>.<br><br><b>3.</b> Use the email you created your group with and enter the sign-in code emailed to you.<br><br><b>4.</b> Open your group, then use <b>Group organiser</b> to manage it.</div><div class="notice">Your shared <b>Group PIN</b> helps players find your group. Your email sign-in code is private — do not share it.</div>`,
@@ -8799,7 +8801,7 @@ function normalRoundSetup(selectedType, selectedCompetition){
             <div style="font-weight:800;margin-bottom:10px;">💷 Payment split</div>
             <label style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
               <input id="normalSetupSplitPrizes" type="checkbox" style="width:auto;margin:0;">
-              Split payment between 1st / 2nd / 3rd
+              Split between 1st, 2nd &amp; 3rd
             </label>
             <div id="normalSetupPrizeAmounts" style="display:none;">
               <div style="margin-bottom:12px;"><b>🥇 1st payment</b> — remaining amount</div>
@@ -8808,7 +8810,7 @@ function normalRoundSetup(selectedType, selectedCompetition){
               <label style="display:block;margin:8px 0 4px;">🥉 3rd payment (£)</label>
               <input id="normalSetupThirdPrize" type="text" inputmode="numeric" pattern="[0-9]*" oninput="this.value=this.value.replace(/[^0-9]/g,'')" value="" placeholder="Enter amount">
             </div>
-            <div class="muted" style="margin-top:8px;">Leave off for a single result payment.</div>
+            <div class="muted" style="margin-top:8px;">Leave off for winner takes all. Second and third receive the amounts above; the winner receives the rest.</div>
           </div>
         `}
 
@@ -8964,7 +8966,7 @@ function tripSetupScreen(){
 
             <label style="display:flex;align-items:center;gap:10px;margin:8px 0;">
               <input data-split-prizes type="checkbox" ${d.splitPrizes?'checked':''} style="width:22px;height:22px;margin:0;">
-              <span><b>Split payment between 1st / 2nd / 3rd</b></span>
+              <span><b>Split between 1st, 2nd &amp; 3rd</b></span>
             </label>
 
             <div data-prize-amounts style="${d.splitPrizes?'':'display:none;'}">
