@@ -4,7 +4,7 @@
  const defaultAppName=document.querySelector('.ui-app-name')?.textContent||'I’m In Golf';
  const folded=new WeakSet();
  const folds=new Map([
-  ['Edit round details','Round details'],['Round controls','Round controls'],
+  ['Edit round details','Round details'],['Competition','Competition'],
   ['Side Game','Side game'],['Player payments','Payment settings'],['Play a side game','Side game']
  ]);
  function compactBanner(id,reloadId,summaryText){
