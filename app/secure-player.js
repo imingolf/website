@@ -110,6 +110,16 @@
   }finally{confirming=false;}
  }
  window.iigSecurePlayer={
+  async invitation(){
+   if(!active||busy||blocked)throw Error('Reload your group before inviting a friend.');
+   const current=active,v=version;
+   const options=await current.request('/rest/v1/rpc/iig_get_player_join_options',{p_pin:current.pin},true);
+   if(current!==active||v!==version)throw Error('Your group changed. Open the invitation again.');
+   if(options?.group_pin!==current.pin||typeof options.pin_join_enabled!=='boolean')throw Error('Could not check the invitation. Please try again.');
+   if(!options.pin_join_enabled||current.pin==='1010')throw Error('Ask your organiser for this group’s private invitation.');
+   const url=location.origin+'/app/#pin='+encodeURIComponent(current.pin);
+   return '⛳ Join '+(options.group_name||state.groupName||'our golf group')+' on I’m In Golf.\n\n'+url+'\n\nGroup PIN: '+current.pin+'\nUse your email, then add your name and handicap. Works on iPhone, Android and in your browser.';
+  },
   async updateHandicap(value){
    if(!Number.isFinite(value)||value< -10||value>60||Math.round(value*10)!==value*10)return false;
    return write('iig_player_action',{p_action:'handicap',p_payload:{handicap:value}});
