@@ -3858,20 +3858,9 @@ async function editTripTeamScore(teamId){
   state.trip.currentTeamScores[teamId]=value;
   render();await save("correct");
 }
-function scores(){
-
-  if(waitingForNextCompetition()){
-    waitingScreen("scores");
-    return;
-  }
-  if(tripTeamRoundActive()){
-    tripBetterBallScores();
-    return;
-  }
-
+function competitionScoreProgress(){
   const isPointsGame=state.gameType==="points";
-  const pointsComp=state.pointsCompetition || "stableford";
-
+  const pointsComp=state.pointsCompetition||"stableford";
   const submitted=(p,type)=>{
     if(p.noReturn===true && type==="net")return true;
     if(p.scoreSubmitted===true)return true;
@@ -3894,6 +3883,24 @@ function scores(){
     const type=pointsComp;
     return !submitted(p,type);
   });
+
+  return {submitted,roundPlayers,normalPointsGame,eligiblePlayers,stillToEnter};
+}
+function scores(){
+
+  if(waitingForNextCompetition()){
+    waitingScreen("scores");
+    return;
+  }
+  if(tripTeamRoundActive()){
+    tripBetterBallScores();
+    return;
+  }
+
+  const isPointsGame=state.gameType==="points";
+  const pointsComp=state.pointsCompetition || "stableford";
+
+  const {submitted,roundPlayers,normalPointsGame,eligiblePlayers,stillToEnter}=competitionScoreProgress();
 
   const myRoundPlayer=state.players.find(p=>p.id===myPlayerId);
   const canSeeCurrentLeaderboard=isAdmin || !individualMoneyRound() || !roundOpenNow() || playerResultIn(myRoundPlayer,pointsComp);
@@ -7472,6 +7479,22 @@ async function changeCurrentPrizePayout(){
   settingsPage();
 }
 
+function organiserCompetitionStatus(){
+ if(state.trip?.completed)return '<div class="notice"><b>Trip complete</b><br>Finish the trip below to return to normal golf.</div>';
+ if(!roundOpenNow())return '<div class="notice"><b>No competition open</b><br>Set up your next competition below.</div>';
+ const paired=tripTeamRoundActive();
+ const progress=paired?null:competitionScoreProgress();
+ const entrants=paired?tripBetterBallEligibleTeams():progress.eligiblePlayers;
+ const waiting=paired?entrants.filter(t=>state.trip?.currentTeamScores?.[t.id]==null):progress.stillToEnter;
+ const unit=paired?'pair':'player';
+ let title,action;
+ if(!entrants.length){title='Competition open';action='No '+unit+'s entered yet. Invite your players to join.';}
+ else if(waiting.length){title='Awaiting '+waiting.length+' '+(paired?'pair ':'')+'score'+(waiting.length===1?'':'s');action='Go to Scores to see who still needs to submit.';}
+ else{title='All scores submitted';action='Go to Scores, check the results and tap Finish Round.';}
+ const details=[state.course,state.date?formatDate(state.date):'',state.pointsCompetition==='net'?'Net':'Stableford',state.gameType==='money'&&Number(state.stake)>0?'£'+Number(state.stake)+' per player':'No entry fee'].filter(Boolean).map(esc).join(' · ');
+ return '<div class="notice"><b>'+title+'</b><div class="muted">'+details+'</div><p style="margin-bottom:0">'+action+'</p></div>';
+}
+
 function settingsPage(){
   if(typeof iigEntryBridge!=="undefined" && iigEntryBridge && iigEntryBridge.hasPending()){
     if(!document.getElementById("guardRecoveryButton")){
@@ -7488,6 +7511,7 @@ function settingsPage(){
  <button class="primary full" onclick="openAdminHelp()">❓ Organiser guide</button>
  </div>
  <div class="card"><h2>Competition</h2>
+ ${organiserCompetitionStatus()}
  ${!state.trip?.active && !state.trip?.completed ? `
   ${!roundOpenNow() ? `
     <button class="secondary full" onclick="newRound()">
