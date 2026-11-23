@@ -6797,6 +6797,44 @@ const bestNet=
     </div>
   `;
 }
+function playerManagementRows(){
+ const sortedPlayers=[...state.players].sort((a,b)=>a.name.localeCompare(b.name));
+ return `
+   ${sortedPlayers.map(p=>{
+
+     const i=state.players.findIndex(x=>x.id===p.id);
+
+     return `
+       <div class="player">
+         <div class="row">
+           <div>
+             <b>${esc(p.name)}</b>
+             <div class="muted">Handicap ${esc(formatGolfHandicap(p.handicap))}</div>
+           </div>
+
+           ${isAdmin ? `
+             <div>
+               <button class="secondary small" onclick="editPlayer(${i})">Edit</button>
+               ${state.players.length>2 ? `
+                 <button class="red small" onclick="removePlayer(${i})">Remove</button>
+               ` : ""}
+             </div>
+           ` : p.id===(window.iigOwnPlayerId?.(pin)||myPlayerId) ? `
+             <button class="secondary small" onclick="changeMyHandicap(${i})">
+               ✏️ Change Handicap
+             </button>
+           ` : ""}
+
+         </div>
+       </div>
+     `;
+   }).join("")}
+
+   ${isAdmin ? `
+     <button class="primary full" onclick="copyInvite()">👥 Invite Players</button>
+     <button class="secondary full" onclick="adminAddPlayer()">➕ Add Player Manually</button>
+   ` : ""}`;
+}
 function playersPage(){
 
  const sortedPlayers=[...state.players]
@@ -6856,40 +6894,7 @@ function playersPage(){
      🔐 ${adminDeviceRecognised() ? "Open organiser view" : "Organiser sign-in"}
    </button>` : ""}
 
-   ${sortedPlayers.map(p=>{
-
-     const i=state.players.findIndex(x=>x.id===p.id);
-
-     return `
-       <div class="player">
-         <div class="row">
-           <div>
-             <b>${esc(p.name)}</b>
-             <div class="muted">Handicap ${esc(formatGolfHandicap(p.handicap))}</div>
-           </div>
-
-           ${isAdmin ? `
-             <div>
-               <button class="secondary small" onclick="editPlayer(${i})">Edit</button>
-               ${state.players.length>2 ? `
-                 <button class="red small" onclick="removePlayer(${i})">Remove</button>
-               ` : ""}
-             </div>
-           ` : p.id===(window.iigOwnPlayerId?.(pin)||myPlayerId) ? `
-             <button class="secondary small" onclick="changeMyHandicap(${i})">
-               ✏️ Change Handicap
-             </button>
-           ` : ""}
-
-         </div>
-       </div>
-     `;
-   }).join("")}
-
-   ${isAdmin ? `
-     <button class="primary full" onclick="copyInvite()">👥 Invite Players</button>
-     <button class="secondary full" onclick="adminAddPlayer()">➕ Add Player Manually</button>
-   ` : ""}
+   ${playerManagementRows()}
  </div>`;
 }
 function changeMyPlayer(){
@@ -7581,7 +7586,7 @@ ${state.trip?.completed ? `
   <button class="red full" onclick="deleteLastRound()">↩️ Delete Last Round</button>
   <button class="red full" onclick="clearLeague()">🗑️ Clear League & History</button>
 </details></div>
- <div class="card ui-navigation-card"><button type="button" class="ui-navigation-row" onclick="show('players')"><span aria-hidden="true">▶</span> Manage players & handicaps</button></div>
+ <div class="card"><details class="ui-fold"><summary>Manage players &amp; handicaps</summary>${playerManagementRows()}</details></div>
 <div class="card">
   <h2>Group access</h2>
 
